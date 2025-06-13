@@ -1,298 +1,259 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useAuth } from "@/contexts/auth-context"
+import type React from "react"
+
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
-import { Music, MessageSquare, Ticket, Calendar, Clock, Award, ArrowUpRight, ArrowDownRight } from "lucide-react"
-import Link from "next/link"
-import { useTheme } from "@/contexts/theme-context"
+import { useAuth } from "@/contexts/auth-context"
+import { Music, Users, Calendar, TrendingUp, Clock } from "lucide-react"
 
-// Mock data for charts
-const activityData = [
-  { name: "Mon", points: 20 },
-  { name: "Tue", points: 40 },
-  { name: "Wed", points: 30 },
-  { name: "Thu", points: 70 },
-  { name: "Fri", points: 50 },
-  { name: "Sat", points: 90 },
-  { name: "Sun", points: 60 },
+// Mock data for the dashboard
+const mockRecentTracks = [
+  { id: 1, title: "Send Her Money", artist: "Erigga ft. Yemi Alade", plays: 5200000 },
+  { id: 2, title: "The Fear of God", artist: "Erigga", plays: 3800000 },
+  { id: 3, title: "Area to the World", artist: "Erigga ft. Zlatan", plays: 4100000 },
 ]
 
-const contentEngagementData = [
-  { name: "Music", value: 40 },
-  { name: "Videos", value: 30 },
-  { name: "Chronicles", value: 20 },
-  { name: "Community", value: 10 },
+const mockUpcomingEvents = [
+  { id: 1, title: "Erigga Live in Lagos", date: "Dec 31, 2024", venue: "Eko Hotel & Suites" },
+  { id: 2, title: "Street Motivation Tour - Abuja", date: "Nov 15, 2024", venue: "ICC Abuja" },
 ]
 
-const COLORS = ["#D4ED3A", "#00796B", "#004D40", "#B1C62D"]
-
-const upcomingEvents = [
-  { title: "Warri Live Show", date: "Dec 25, 2024", venue: "Warri City Stadium", status: "confirmed" },
-  { title: "Lagos Concert", date: "Jan 15, 2025", venue: "Eko Hotel", status: "pending" },
-]
-
-const recentActivity = [
-  { type: "comment", content: "Commented on 'Street Anthem 2024'", time: "2h ago", points: 10 },
-  { type: "like", content: "Liked WarriKing23's bars", time: "4h ago", points: 5 },
-  { type: "purchase", content: "Bought Paper Boi hoodie", time: "1d ago", points: 50 },
-  { type: "exclusive", content: "Watched exclusive studio session", time: "2d ago", points: 25 },
+const mockCommunityPosts = [
+  { id: 1, author: "PaperBoi_Fan", content: "Just got my tickets for the Lagos show! Who else is going?", likes: 24 },
+  { id: 2, author: "WarriToTheWorld", content: "That new freestyle is 🔥🔥🔥", likes: 18 },
 ]
 
 export default function DashboardPage() {
   const { profile } = useAuth()
   const [activeTab, setActiveTab] = useState("overview")
-  const { theme } = useTheme()
-  const [mounted, setMounted] = useState(false)
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return null
-  }
-
-  // Calculate progress percentage
-  const nextLevelPoints = profile?.level ? profile.level * 1000 : 1000
-  const progressPercentage = profile?.points ? (profile.points / nextLevelPoints) * 100 : 0
-
-  const chartColors = {
-    primary: theme === "dark" ? "#FFFFFF" : "#004D40",
-    secondary: theme === "dark" ? "#888888" : "#D4ED3A",
-    grid: theme === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)",
-    text: theme === "dark" ? "#AAAAAA" : "#666666",
+  if (!profile) {
+    return null // This will be handled by the DashboardLayout
   }
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Page Header */}
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back, {profile?.username || "Fan"}!</p>
+          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {profile.username}!</h1>
+          <p className="text-muted-foreground">Here's what's happening with your Erigga fan account today.</p>
         </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="stat-card">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Points</p>
-                <p className="stat-value">{profile?.points || 0}</p>
-              </div>
-              <div className="p-2 rounded-full bg-brand-lime/20 dark:bg-harkonnen-dark-gray">
-                <Award className="h-5 w-5 text-brand-teal dark:text-white" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-center text-xs">
-              <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
-              <span className="text-green-500 font-medium">12%</span>
-              <span className="text-muted-foreground ml-1">from last week</span>
-            </div>
-          </Card>
+        <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="music">Music</TabsTrigger>
+            <TabsTrigger value="community">Community</TabsTrigger>
+            <TabsTrigger value="events">Events</TabsTrigger>
+          </TabsList>
 
-          <Card className="stat-card">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Content Watched</p>
-                <p className="stat-value">24</p>
-              </div>
-              <div className="p-2 rounded-full bg-brand-lime/20 dark:bg-harkonnen-dark-gray">
-                <Music className="h-5 w-5 text-brand-teal dark:text-white" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-center text-xs">
-              <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
-              <span className="text-green-500 font-medium">8%</span>
-              <span className="text-muted-foreground ml-1">from last week</span>
-            </div>
-          </Card>
+          <TabsContent value="overview" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Your Balance</CardTitle>
+                  <Coins className="h-4 w-4 text-yellow-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{profile.coins} Coins</div>
+                  <p className="text-xs text-muted-foreground">Use coins to unlock premium content</p>
+                </CardContent>
+              </Card>
 
-          <Card className="stat-card">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Community Posts</p>
-                <p className="stat-value">7</p>
-              </div>
-              <div className="p-2 rounded-full bg-brand-lime/20 dark:bg-harkonnen-dark-gray">
-                <MessageSquare className="h-5 w-5 text-brand-teal dark:text-white" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-center text-xs">
-              <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
-              <span className="text-red-500 font-medium">3%</span>
-              <span className="text-muted-foreground ml-1">from last week</span>
-            </div>
-          </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Membership Tier</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold capitalize">{profile.tier}</div>
+                  <p className="text-xs text-muted-foreground">{getTierDescription(profile.tier)}</p>
+                </CardContent>
+              </Card>
 
-          <Card className="stat-card">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Event Tickets</p>
-                <p className="stat-value">2</p>
-              </div>
-              <div className="p-2 rounded-full bg-brand-lime/20 dark:bg-harkonnen-dark-gray">
-                <Ticket className="h-5 w-5 text-brand-teal dark:text-white" />
-              </div>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Upcoming Events</CardTitle>
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">2</div>
+                  <p className="text-xs text-muted-foreground">Events in the next 3 months</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">New Releases</CardTitle>
+                  <Music className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">3</div>
+                  <p className="text-xs text-muted-foreground">New tracks this month</p>
+                </CardContent>
+              </Card>
             </div>
-            <div className="mt-2 flex items-center text-xs">
-              <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
-              <span className="text-green-500 font-medium">New</span>
-              <span className="text-muted-foreground ml-1">ticket purchased</span>
-            </div>
-          </Card>
-        </div>
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Activity Chart */}
-          <Card className="lg:col-span-2 chart-container">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-medium">Weekly Activity</CardTitle>
-              <CardDescription>Your point earning activity for the past week</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={activityData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-                    <XAxis dataKey="name" tick={{ fill: chartColors.text }} />
-                    <YAxis tick={{ fill: chartColors.text }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: theme === "dark" ? "#1a1a1a" : "#fff",
-                        borderColor: theme === "dark" ? "#333" : "#ddd",
-                        color: chartColors.text,
-                      }}
-                    />
-                    <Bar dataKey="points" fill={chartColors.secondary} radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Content Engagement */}
-          <Card className="chart-container">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-medium">Content Engagement</CardTitle>
-              <CardDescription>How you engage with different content types</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px] flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={contentEngagementData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {contentEngagementData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: theme === "dark" ? "#1a1a1a" : "#fff",
-                        borderColor: theme === "dark" ? "#333" : "#ddd",
-                        color: chartColors.text,
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Level Progress */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Level Progress</CardTitle>
-            <CardDescription>
-              {profile?.points || 0} / {nextLevelPoints} points to reach Level {(profile?.level || 0) + 1}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Progress value={progressPercentage} className="h-2" />
-            <div className="mt-2 text-sm text-muted-foreground">
-              {nextLevelPoints - (profile?.points || 0)} more points needed for next level
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Activity and Upcoming Events */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Activity */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-medium flex items-center">
-                <Clock className="mr-2 h-5 w-5" />
-                Recent Activity
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {recentActivity.map((activity, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
-                    <div>
-                      <p className="text-sm">{activity.content}</p>
-                      <p className="text-xs text-muted-foreground">{activity.time}</p>
-                    </div>
-                    <div className="text-sm font-medium text-brand-teal dark:text-white">+{activity.points} pts</div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+              <Card className="col-span-4">
+                <CardHeader>
+                  <CardTitle>Recent Tracks</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {mockRecentTracks.map((track) => (
+                      <div key={track.id} className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{track.title}</p>
+                          <p className="text-sm text-muted-foreground">{track.artist}</p>
+                        </div>
+                        <div className="flex items-center">
+                          <TrendingUp className="h-4 w-4 text-muted-foreground mr-1" />
+                          <span className="text-sm">{formatNumber(track.plays)}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
-          {/* Upcoming Events */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-medium flex items-center">
-                <Calendar className="mr-2 h-5 w-5" />
-                Upcoming Events
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {upcomingEvents.map((event, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium">{event.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {event.date} • {event.venue}
-                      </p>
-                    </div>
-                    <div
-                      className={`text-xs px-2 py-1 rounded-full ${
-                        event.status === "confirmed"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
-                          : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400"
-                      }`}
-                    >
-                      {event.status}
-                    </div>
+              <Card className="col-span-3">
+                <CardHeader>
+                  <CardTitle>Upcoming Events</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {mockUpcomingEvents.map((event) => (
+                      <div key={event.id} className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{event.title}</p>
+                          <p className="text-sm text-muted-foreground">{event.venue}</p>
+                        </div>
+                        <div className="flex items-center">
+                          <Clock className="h-4 w-4 text-muted-foreground mr-1" />
+                          <span className="text-sm">{event.date}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-                <Button variant="outline" className="w-full" asChild>
-                  <Link href="/tickets">View All Events</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Community Activity</CardTitle>
+                <CardDescription>Recent posts from the Erigga fan community</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {mockCommunityPosts.map((post) => (
+                    <div key={post.id} className="border-b pb-4 last:border-0 last:pb-0">
+                      <div className="flex items-center mb-2">
+                        <span className="font-medium mr-2">{post.author}</span>
+                        <span className="text-xs text-muted-foreground">Posted recently</span>
+                      </div>
+                      <p>{post.content}</p>
+                      <div className="flex items-center mt-2 text-sm text-muted-foreground">
+                        <span>{post.likes} likes</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="music" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Your Music Library</CardTitle>
+                <CardDescription>Access your favorite Erigga tracks and albums</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p>Visit the Media Vault for full access to music content.</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="community" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Community Feed</CardTitle>
+                <CardDescription>Connect with other Erigga fans</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p>Visit the Community page to see all posts and discussions.</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="events" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Upcoming Events</CardTitle>
+                <CardDescription>Concerts, tours, and meet & greets</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p>Visit the Events page to see all upcoming events and purchase tickets.</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
+  )
+}
+
+// Helper function to format large numbers
+function formatNumber(num: number): string {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + "M"
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1) + "K"
+  }
+  return num.toString()
+}
+
+// Helper function to get tier descriptions
+function getTierDescription(tier: string): string {
+  switch (tier.toLowerCase()) {
+    case "grassroot":
+      return "Basic access to content"
+    case "pioneer":
+      return "Early access to new releases"
+    case "elder":
+      return "Exclusive content and event discounts"
+    case "blood_brotherhood":
+      return "VIP access to all content and events"
+    default:
+      return "Fan membership tier"
+  }
+}
+
+// Coins icon component
+function Coins(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="8" cy="8" r="6" />
+      <path d="M18.09 10.37A6 6 0 1 1 10.34 18" />
+      <path d="M7 6h1v4" />
+      <path d="m16.71 13.88.7.71-2.82 2.82" />
+    </svg>
   )
 }

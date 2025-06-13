@@ -46,7 +46,7 @@ const navItems = [
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
-  const { profile, isLoading } = useAuth()
+  const { profile, isLoading, signOut } = useAuth()
   const { theme } = useTheme()
   const router = useRouter()
 
@@ -190,9 +190,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Sidebar Footer */}
           <div className="p-4 border-t">
-            <div className="text-xs text-muted-foreground">
-              <p>Erigga Live Platform</p>
-              <p>© 2024 All rights reserved</p>
+            <div className="flex flex-col space-y-2">
+              <Button variant="outline" size="sm" onClick={() => signOut()}>
+                Sign Out
+              </Button>
+              <div className="text-xs text-muted-foreground">
+                <p>Erigga Live Platform</p>
+                <p>© 2024 All rights reserved</p>
+              </div>
             </div>
           </div>
         </div>
@@ -216,7 +221,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="flex items-center space-x-3">
               <div className="text-right hidden md:block">
                 <div className="font-medium">{profile.username}</div>
-                <div className="text-xs text-muted-foreground">Level {profile.level}</div>
+                <div className="text-xs text-muted-foreground">Level {profile.level || 1}</div>
               </div>
               <Avatar className="h-8 w-8">
                 <AvatarImage src={profile.avatar_url || "/placeholder.svg"} />

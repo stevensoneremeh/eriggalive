@@ -1,46 +1,29 @@
-import { createBrowserClient } from "@supabase/ssr"
-import type { Database } from "@/types/database"
-
-// Create a singleton instance
-let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null
-
 // Check if we're in a browser environment
 const isBrowser = typeof window !== "undefined"
 
-export function createClient() {
-  // Return existing client if already created (singleton pattern)
-  if (supabaseClient) return supabaseClient
+// Check if we're in preview mode
+const isPreviewMode =
+  isBrowser && (window.location.hostname.includes("vusercontent.net") || window.location.hostname.includes("v0.dev"))
 
-  try {
-    // Get environment variables
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-    // Check if environment variables are defined
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.error("Missing Supabase environment variables")
-      throw new Error("Missing Supabase environment variables")
-    }
-
-    // Create client
-    supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-      global: {
-        headers: {
-          "x-application-name": "eriggalive",
-        },
-      },
-    })
-    return supabaseClient
-  } catch (error) {
-    console.error("Error creating Supabase client:", error)
-    throw new Error("Failed to initialize Supabase client")
+// Create a mock client for preview mode
+const createMockClient = () => {
+  return {
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+      getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+      signInWithPassword: () => Promise.resolve({ data: { user: null }, error: null }),
+      signOut: () => Promise.resolve({ error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: () => Promise.resolve({ data: null, error: null }),
+        }),
+      }),
+    }),
   }
 }
 
 // Export a default client for convenience
-export default createClient()
+export default isPreviewMode ? createMockClient() : {}

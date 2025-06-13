@@ -1,20 +1,22 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useRouter } from "next/navigation"
-import type { Database } from "@/types/database"
-import type { User } from "@supabase/supabase-js"
 
 // Define types
 type UserTier = "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
 
-interface UserProfile {
+interface User {
   id: string
   email: string
   username: string
+}
+
+interface UserProfile extends User {
   tier: UserTier
   coins: number
+  level: number
+  points: number
   avatar_url?: string
   full_name?: string
   bio?: string
@@ -24,10 +26,10 @@ interface UserProfile {
 interface AuthContextType {
   user: User | null
   profile: UserProfile | null
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: any }>
   signOut: () => Promise<void>
   isLoading: boolean
-  refreshProfile: () => Promise<void>
+  purchaseCoins: (amount: number, method: string) => Promise<{ success: boolean; data?: any; error?: any }>
 }
 
 // Create context
@@ -39,74 +41,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
-  const supabase = createClientComponentClient<Database>()
 
-  // Function to fetch user profile
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
-
-      if (error) {
-        console.error("Error fetching user profile:", error)
-        return
-      }
-
-      if (data) {
-        setProfile({
-          id: userId,
-          email: data.email || "",
-          username: data.username || "",
-          tier: data.tier || "grassroot",
-          coins: data.coins || 0,
-          avatar_url: data.avatar_url,
-          full_name: data.full_name,
-          bio: data.bio,
-          created_at: data.created_at,
-        })
-      }
-    } catch (error) {
-      console.error("Error in fetchUserProfile:", error)
-    }
-  }
-
-  // Function to refresh user profile
-  const refreshProfile = async () => {
-    if (user) {
-      await fetchUserProfile(user.id)
-    }
-  }
-
-  // Initialize auth state
+  // Initialize with stored data
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        setIsLoading(true)
+        // Check if we have a stored user in localStorage
+        const storedUser = localStorage.getItem("erigga_user")
+        const storedProfile = localStorage.getItem("erigga_profile")
 
-        // Get current session
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-
-        if (session?.user) {
-          setUser(session.user)
-          await fetchUserProfile(session.user.id)
-        }
-
-        // Set up auth state change listener
-        const {
-          data: { subscription },
-        } = await supabase.auth.onAuthStateChange(async (event, session) => {
-          if (session?.user) {
-            setUser(session.user)
-            await fetchUserProfile(session.user.id)
-          } else {
-            setUser(null)
-            setProfile(null)
-          }
-        })
-
-        return () => {
-          subscription.unsubscribe()
+        if (storedUser && storedProfile) {
+          setUser(JSON.parse(storedUser))
+          setProfile(JSON.parse(storedProfile))
         }
       } catch (error) {
         console.error("Auth initialization error:", error)
@@ -116,29 +62,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     initializeAuth()
-  }, [supabase])
+  }, [])
 
-  // Sign in function
+  // Sign in function that works for any user
   const signIn = async (email: string, password: string) => {
     try {
       setIsLoading(true)
 
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // Simulate API delay
+      await new Promise((resolve) => setTimeout(resolve, 800))
+
+      // Generate a unique ID based on the email
+      const userId = `user-${btoa(email).replace(/[=+/]/g, "").substring(0, 16)}`
+
+      // Create a username from the email
+      const username = email.split("@")[0]
+
+      // Create a mock user
+      const mockUser = {
+        id: userId,
         email,
-        password,
-      })
-
-      if (error) {
-        return { success: false, error: error.message }
+        username,
       }
 
-      if (data.user) {
-        await fetchUserProfile(data.user.id)
-        router.push("/dashboard")
-        return { success: true }
+      // Create a mock profile with 500 coins
+      const mockProfile = {
+        ...mockUser,
+        tier: "pioneer" as UserTier,
+        coins: 500,
+        level: 1,
+        points: 100,
+        created_at: new Date().toISOString(),
+        bio: `${username}'s profile`,
       }
 
-      return { success: false, error: "Failed to sign in" }
+      // Store in localStorage for persistence
+      localStorage.setItem("erigga_user", JSON.stringify(mockUser))
+      localStorage.setItem("erigga_profile", JSON.stringify(mockProfile))
+
+      // Set a cookie for authentication
+      document.cookie = `erigga_auth=${userId}; path=/; max-age=86400; SameSite=Lax`
+
+      setUser(mockUser)
+      setProfile(mockProfile)
+
+      return { success: true }
     } catch (error: any) {
       return { success: false, error: error.message || "An unknown error occurred" }
     } finally {
@@ -150,10 +118,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     try {
       setIsLoading(true)
-      await supabase.auth.signOut()
+
+      // Clear localStorage
+      localStorage.removeItem("erigga_user")
+      localStorage.removeItem("erigga_profile")
+
+      // Clear cookie
+      document.cookie = "erigga_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+
       setUser(null)
       setProfile(null)
-      router.push("/")
+
+      router.push("/login")
     } catch (error) {
       console.error("Sign out error:", error)
     } finally {
@@ -161,34 +137,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // For development/testing purposes - create a mock profile if none exists
-  useEffect(() => {
-    const isDevelopment = process.env.NODE_ENV === "development"
+  // Purchase coins function
+  const purchaseCoins = async (amount: number, method: string) => {
+    try {
+      // Simulate API delay
+      await new Promise((resolve) => setTimeout(resolve, 800))
 
-    if (isDevelopment && !user) {
-      // In development, create a mock user for testing
-      const mockUser = {
-        id: "dev-user-id",
-        email: "dev@example.com",
-      } as User
+      // Update the profile with new coins
+      if (profile) {
+        const updatedProfile = {
+          ...profile,
+          coins: profile.coins + amount,
+        }
 
-      setUser(mockUser)
+        // Update localStorage
+        localStorage.setItem("erigga_profile", JSON.stringify(updatedProfile))
 
-      const mockProfile = {
-        id: mockUser.id,
-        email: mockUser.email || "dev@example.com",
-        username: "devuser",
-        tier: "pioneer" as UserTier,
-        coins: 500,
-        created_at: new Date().toISOString(),
+        setProfile(updatedProfile)
       }
 
-      setProfile(mockProfile)
+      return { success: true, data: { id: `transaction-${Date.now()}` } }
+    } catch (error: any) {
+      return { success: false, error: { message: error.message || "An unknown error occurred" } }
     }
-  }, [user])
+  }
 
   return (
-    <AuthContext.Provider value={{ user, profile, signIn, signOut, isLoading, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, signIn, signOut, isLoading, purchaseCoins }}>
       {children}
     </AuthContext.Provider>
   )

@@ -1,45 +1,45 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
 
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
-  const supabase = createMiddlewareClient({ req, res })
+export function middleware(request: NextRequest) {
+  // Get the pathname of the request
+  const path = request.nextUrl.pathname
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  // Define public paths that don't require authentication
+  const isPublicPath =
+    path === "/" ||
+    path === "/login" ||
+    path === "/signup" ||
+    path === "/forgot-password" ||
+    path.startsWith("/api/") ||
+    path.includes(".") // Static files
 
-  // Check if the user is authenticated
-  const isAuthenticated = !!session
-  const isAuthPage = req.nextUrl.pathname.startsWith("/login") || req.nextUrl.pathname.startsWith("/signup")
-  const isDashboardPage =
-    req.nextUrl.pathname.startsWith("/dashboard") ||
-    req.nextUrl.pathname.startsWith("/vault") ||
-    req.nextUrl.pathname.startsWith("/community") ||
-    req.nextUrl.pathname.startsWith("/tickets") ||
-    req.nextUrl.pathname.startsWith("/merch") ||
-    req.nextUrl.pathname.startsWith("/chronicles") ||
-    req.nextUrl.pathname.startsWith("/settings")
+  // Check if the user is authenticated by looking for the auth cookie
+  const isAuthenticated = request.cookies.has("erigga_auth")
 
-  // Allow access to public pages
-  if (!isDashboardPage && !isAuthPage) {
-    return res
+  // If the user is not authenticated and the path is not public, redirect to login
+  if (!isAuthenticated && !isPublicPath) {
+    return NextResponse.redirect(new URL("/login", request.url))
   }
 
-  // Redirect authenticated users away from auth pages
-  if (isAuthenticated && isAuthPage) {
-    return NextResponse.redirect(new URL("/dashboard", req.url))
+  // If the user is authenticated and trying to access login/signup, redirect to dashboard
+  if (isAuthenticated && (path === "/login" || path === "/signup")) {
+    return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
-  // Redirect unauthenticated users away from protected pages
-  if (!isAuthenticated && isDashboardPage) {
-    return NextResponse.redirect(new URL("/login", req.url))
-  }
-
-  return res
+  return NextResponse.next()
 }
 
+// See "Matching Paths" below to learn more
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|images|videos).*)"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 }
