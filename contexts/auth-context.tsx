@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase-utils"
 
 // Define types
 type UserTier = "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
+  const supabase = createClient()
 
   // Initialize with stored data
   useEffect(() => {

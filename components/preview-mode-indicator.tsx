@@ -1,1 +1,9 @@
-// This file should be deleted or left empty as we're removing all preview mode indicators
+"use client"
+
+// This component is intentionally left empty to remove preview mode indicators
+export function PreviewModeIndicator() {
+  return null
+}
+
+// Default export for compatibility
+export default PreviewModeIndicator
