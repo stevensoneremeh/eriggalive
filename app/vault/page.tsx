@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Play,
   Heart,
@@ -15,18 +16,16 @@ import {
   Clock,
   Eye,
   Music,
-  Video,
-  Camera,
   Search,
   Filter,
   Crown,
   Headphones,
   PlayCircle,
   Youtube,
-  Disc3,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
 
 // Mock data - in real app, this would come from Supabase
 const albums = [
@@ -167,6 +166,9 @@ const streamingPlatforms = [
 ]
 
 export default function VaultPage() {
+  const [media, setMedia] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("albums")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedAlbum, setSelectedAlbum] = useState<any>(null)
@@ -174,6 +176,30 @@ export default function VaultPage() {
   const [selectedVideo, setSelectedVideo] = useState<any>(null)
   const [showStreamingLinks, setShowStreamingLinks] = useState<any>(null)
   const { user, profile, isAuthenticated } = useAuth()
+  const supabase = createClient()
+
+  useEffect(() => {
+    async function fetchMedia() {
+      try {
+        setLoading(true)
+        const { data, error } = await supabase
+          .from("media_items")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(12)
+
+        if (error) throw error
+        setMedia(data || [])
+      } catch (err) {
+        console.error("Error fetching media:", err)
+        setError("Failed to load media items")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchMedia()
+  }, [])
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`
@@ -213,6 +239,33 @@ export default function VaultPage() {
     </Dialog>
   )
 
+  if (loading) {
+    return (
+      <div className="container py-8">
+        <h1 className="text-3xl font-bold mb-6">Media Vault</h1>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-[300px] rounded-lg" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="container py-8">
+        <h1 className="text-3xl font-bold mb-6">Media Vault</h1>
+        <div className="bg-red-50 border border-red-200 rounded-md p-4 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300">
+          <p className="font-medium">Error loading media</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
+  const userTier = profile?.tier || "grassroot"
+
   return (
     <div className="min-h-screen py-8 px-4">
       <div className="container mx-auto max-w-7xl">
@@ -250,7 +303,7 @@ export default function VaultPage() {
         {/* Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4 bg-card/50 border border-orange-500/20 mb-8">
-            <TabsTrigger value="albums" className="data-[state=active]:bg-orange-500 data-[state=active]:text-black">
+            {/*<TabsTrigger value="albums" className="data-[state=active]:bg-orange-500 data-[state=active]:text-black">
               <Music className="h-4 w-4 mr-2" />
               Albums
             </TabsTrigger>
@@ -265,7 +318,11 @@ export default function VaultPage() {
             <TabsTrigger value="gallery" className="data-[state=active]:bg-orange-500 data-[state=active]:text-black">
               <Camera className="h-4 w-4 mr-2" />
               Gallery
-            </TabsTrigger>
+            </TabsTrigger>*/}
+            <TabsTrigger value="all">All Media</TabsTrigger>
+            <TabsTrigger value="images">Images</TabsTrigger>
+            <TabsTrigger value="videos">Videos</TabsTrigger>
+            <TabsTrigger value="audio">Audio</TabsTrigger>
           </TabsList>
 
           {/* Albums Tab */}
@@ -511,6 +568,132 @@ export default function VaultPage() {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          </TabsContent>
+          <TabsContent value="all" className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {media.map((item) => (
+                <div key={item.id} className="bg-card rounded-lg overflow-hidden border">
+                  <div className="aspect-video relative">
+                    <img
+                      src={item.thumbnail_url || "/placeholder.svg?height=300&width=400"}
+                      alt={item.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                      {item.media_type}
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <h3 className="text-xl font-bold mb-1">{item.title}</h3>
+                    <p className="text-muted-foreground text-sm mb-2">{item.description}</p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded dark:bg-orange-900/30 dark:text-orange-300">
+                        {item.tier_access}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(item.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+          <TabsContent value="images" className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {media
+                .filter((item) => item.media_type === "image")
+                .map((item) => (
+                  <div key={item.id} className="bg-card rounded-lg overflow-hidden border">
+                    <div className="aspect-video relative">
+                      <img
+                        src={item.thumbnail_url || "/placeholder.svg?height=300&width=400"}
+                        alt={item.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                        {item.media_type}
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <h3 className="text-xl font-bold mb-1">{item.title}</h3>
+                      <p className="text-muted-foreground text-sm mb-2">{item.description}</p>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded dark:bg-orange-900/30 dark:text-orange-300">
+                          {item.tier_access}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(item.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </TabsContent>
+          <TabsContent value="videos" className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {media
+                .filter((item) => item.media_type === "video")
+                .map((item) => (
+                  <div key={item.id} className="bg-card rounded-lg overflow-hidden border">
+                    <div className="aspect-video relative">
+                      <img
+                        src={item.thumbnail_url || "/placeholder.svg?height=300&width=400"}
+                        alt={item.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                        {item.media_type}
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <h3 className="text-xl font-bold mb-1">{item.title}</h3>
+                      <p className="text-muted-foreground text-sm mb-2">{item.description}</p>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded dark:bg-orange-900/30 dark:text-orange-300">
+                          {item.tier_access}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(item.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </TabsContent>
+          <TabsContent value="audio" className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {media
+                .filter((item) => item.media_type === "audio")
+                .map((item) => (
+                  <div key={item.id} className="bg-card rounded-lg overflow-hidden border">
+                    <div className="aspect-video relative">
+                      <img
+                        src={item.thumbnail_url || "/placeholder.svg?height=300&width=400"}
+                        alt={item.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                        {item.media_type}
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <h3 className="text-xl font-bold mb-1">{item.title}</h3>
+                      <p className="text-muted-foreground text-sm mb-2">{item.description}</p>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded dark:bg-orange-900/30 dark:text-orange-300">
+                          {item.tier_access}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(item.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
             </div>
           </TabsContent>
         </Tabs>

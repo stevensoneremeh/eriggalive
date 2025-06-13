@@ -1,81 +1,86 @@
-import { Suspense } from "react"
+"use client"
+
+import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/client"
+import { useAuth } from "@/contexts/auth-context"
 
-export const dynamic = "force-dynamic"
-export const revalidate = 0
+export default function CommunityPage() {
+  const [categories, setCategories] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const { isAuthenticated } = useAuth()
+  const supabase = createClient()
 
-export default async function CommunityPage() {
-  // Always use the server client - it will return mock data in preview mode
-  const supabase = createServerSupabaseClient()
+  useEffect(() => {
+    async function fetchCategories() {
+      try {
+        setLoading(true)
+        const { data, error } = await supabase
+          .from("community_categories")
+          .select("*")
+          .order("display_order", { ascending: true })
 
-  try {
-    // Fetch categories
-    const { data: categories, error: categoriesError } = await supabase
-      .from("community_categories")
-      .select("*")
-      .order("display_order", { ascending: true })
-
-    if (categoriesError) {
-      console.error("Error fetching categories:", categoriesError)
+        if (error) throw error
+        setCategories(data || [])
+      } catch (err) {
+        console.error("Error fetching categories:", err)
+        setError("Failed to load categories")
+      } finally {
+        setLoading(false)
+      }
     }
 
+    fetchCategories()
+  }, [])
+
+  if (loading) {
     return (
       <div className="container py-8 max-w-5xl">
         <h1 className="text-3xl font-bold mb-6">Erigga Community</h1>
-
-        <Tabs defaultValue="all" className="w-full">
-          <TabsList className="mb-6 w-full max-w-full overflow-x-auto flex-nowrap justify-start">
-            <TabsTrigger value="all">All Posts</TabsTrigger>
-            {categories?.map((category) => (
-              <TabsTrigger key={category.id} value={category.slug}>
-                {category.name}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          <TabsContent value="all">
-            <Suspense fallback={<CommunityFallback />}>
-              <CommunityContent />
-            </Suspense>
-          </TabsContent>
-
-          {categories?.map((category) => (
-            <TabsContent key={category.id} value={category.slug}>
-              <Suspense fallback={<CommunityFallback />}>
-                <CommunityContent selectedCategory={category.slug} />
-              </Suspense>
-            </TabsContent>
-          ))}
-        </Tabs>
+        <Skeleton className="h-12 w-full mb-6" />
+        <Skeleton className="h-[400px] w-full" />
       </div>
     )
-  } catch (error) {
-    console.error("Error in community page:", error)
+  }
+
+  if (error) {
     return (
       <div className="container py-8">
         <h1 className="text-3xl font-bold mb-6">Erigga Community</h1>
         <div className="bg-red-50 border border-red-200 rounded-md p-4 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300">
           <p className="font-medium">Error loading community</p>
-          <p className="text-sm">There was a problem loading the community content. Please try again later.</p>
+          <p className="text-sm">{error}</p>
         </div>
       </div>
     )
   }
-}
 
-function CommunityFallback() {
   return (
-    <div className="space-y-6">
-      <Skeleton className="h-[200px] w-full" />
-      <div className="space-y-4">
-        {Array(5)
-          .fill(0)
-          .map((_, i) => (
-            <Skeleton key={i} className="h-[300px] w-full" />
+    <div className="container py-8 max-w-5xl">
+      <h1 className="text-3xl font-bold mb-6">Erigga Community</h1>
+
+      <Tabs defaultValue="all" className="w-full">
+        <TabsList className="mb-6 w-full max-w-full overflow-x-auto flex-nowrap justify-start">
+          <TabsTrigger value="all">All Posts</TabsTrigger>
+          {categories.map((category) => (
+            <TabsTrigger key={category.id} value={category.slug}>
+              {category.name}
+            </TabsTrigger>
           ))}
-      </div>
+        </TabsList>
+
+        <TabsContent value="all">
+          <CommunityContent />
+        </TabsContent>
+
+        {categories.map((category) => (
+          <TabsContent key={category.id} value={category.slug}>
+            <CommunityContent selectedCategory={category.slug} />
+          </TabsContent>
+        ))}
+      </Tabs>
     </div>
   )
 }
