@@ -2,271 +2,161 @@
 
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
-import { ChevronLeft, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getOptimizedVideoSources, getVideoFallbackImage, tryPlayVideo } from "@/utils/video-utils"
 
 interface SafeHeroVideoCarouselProps {
   images: string[]
-  videoUrl: string
-  autoScrollInterval?: number
+  videoUrl?: string
   className?: string
 }
 
-export function SafeHeroVideoCarousel({
-  images,
-  videoUrl,
-  autoScrollInterval = 5000,
-  className,
-}: SafeHeroVideoCarouselProps) {
+export function SafeHeroVideoCarousel({ images, videoUrl, className }: SafeHeroVideoCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [isTransitioning, setIsTransitioning] = useState(false)
-  const [videoEnded, setVideoEnded] = useState(false)
-  const [videoError, setVideoError] = useState(false)
-  const [videoLoaded, setVideoLoaded] = useState(false)
-  const [imagesLoaded, setImagesLoaded] = useState<boolean[]>([])
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false)
+  const [isVideoLoaded, setIsVideoLoaded] = useState(false)
+  const [isVideoError, setIsVideoError] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
-  const totalSlides = images.length + 1
+  const videoSources = getOptimizedVideoSources()
+  const fallbackImage = getVideoFallbackImage()
 
-  // Initialize imagesLoaded array
+  // Handle video loading and errors
   useEffect(() => {
-    setImagesLoaded(new Array(images.length).fill(false))
-  }, [images.length])
+    if (!videoUrl || !videoRef.current) return
 
-  // Handle video loading and events
-  useEffect(() => {
     const video = videoRef.current
-    if (!video) return
-
-    const handleVideoEnd = () => {
-      console.log("✅ Video ended, moving to images")
-      setVideoEnded(true)
-      setCurrentIndex(1) // Move to first image
-    }
-
-    const handleError = (e: any) => {
-      console.error("❌ Video error:", e)
-      setVideoError(true)
-      setCurrentIndex(1) // Move to first image on error
-    }
 
     const handleCanPlay = () => {
-      console.log("✅ Video can play")
-      setVideoLoaded(true)
-      playVideo()
+      setIsVideoLoaded(true)
+      tryPlayVideo(video).then((success) => {
+        setIsVideoPlaying(success)
+        if (!success) {
+          console.warn("Video autoplay was prevented. Using image carousel instead.")
+        }
+      })
     }
 
-    // Set up event listeners with error handling
-    try {
-      video.addEventListener("ended", handleVideoEnd)
-      video.addEventListener("error", handleError)
-      video.addEventListener("canplay", handleCanPlay)
-    } catch (err) {
-      console.error("❌ Error setting up video event listeners:", err)
-      setVideoError(true)
+    const handleError = (e: Event) => {
+      console.error("Video error:", e)
+      setIsVideoError(true)
     }
 
-    // Set a timeout to check if video is playing
-    const timeout = setTimeout(() => {
-      if (video.paused && !videoEnded && !videoLoaded) {
-        console.log("⚠️ Video still paused after timeout, showing images instead")
-        setVideoError(true)
-        setCurrentIndex(1)
-      }
-    }, 3000)
+    video.addEventListener("canplay", handleCanPlay)
+    video.addEventListener("error", handleError)
+
+    // Try to load the video
+    video.load()
 
     return () => {
-      try {
-        clearTimeout(timeout)
-        video.removeEventListener("ended", handleVideoEnd)
-        video.removeEventListener("error", handleError)
-        video.removeEventListener("canplay", handleCanPlay)
-      } catch (err) {
-        console.error("❌ Error cleaning up video event listeners:", err)
-      }
+      video.removeEventListener("canplay", handleCanPlay)
+      video.removeEventListener("error", handleError)
     }
-  }, [videoEnded, videoLoaded])
+  }, [videoUrl])
 
-  // Function to safely attempt to play the video
-  const playVideo = () => {
-    if (!videoRef.current) return
-
-    // Always mute before attempting to play (to avoid autoplay restrictions)
-    videoRef.current.muted = true
-
-    // Attempt to play with error handling
-    videoRef.current
-      .play()
-      .then(() => {
-        console.log("✅ Video playing")
-      })
-      .catch((err) => {
-        console.error("❌ Video play failed:", err)
-        setVideoError(true)
-        setCurrentIndex(1)
-      })
-  }
-
-  // Auto scroll functionality - only for image slides
+  // Auto-advance carousel if video is not playing
   useEffect(() => {
-    // Don't auto-scroll if on video slide (index 0) and video hasn't ended
-    if (currentIndex === 0 && !videoEnded && !videoError) return
+    if (isVideoPlaying) return
 
     const interval = setInterval(() => {
-      goToNext()
-    }, autoScrollInterval)
+      setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length)
+    }, 5000)
 
     return () => clearInterval(interval)
-  }, [currentIndex, autoScrollInterval, videoEnded, videoError])
+  }, [images.length, isVideoPlaying])
 
-  const goToPrevious = () => {
-    if (isTransitioning) return
-    setIsTransitioning(true)
-
-    // Skip video slide if it has ended or had an error
-    if (currentIndex === 1 && (videoEnded || videoError)) {
-      setCurrentIndex(totalSlides - 1)
-    } else {
-      setCurrentIndex((prevIndex) => (prevIndex === 0 ? totalSlides - 1 : prevIndex - 1))
-    }
-
-    setTimeout(() => setIsTransitioning(false), 500)
-  }
-
-  const goToNext = () => {
-    if (isTransitioning) return
-    setIsTransitioning(true)
-    setCurrentIndex((prevIndex) => (prevIndex === totalSlides - 1 ? (videoEnded || videoError ? 1 : 0) : prevIndex + 1))
-    setTimeout(() => setIsTransitioning(false), 500)
-  }
-
+  // Handle manual navigation
   const goToSlide = (index: number) => {
-    if (isTransitioning) return
-
-    // Skip video slide if it has ended or had an error
-    if (index === 0 && (videoEnded || videoError)) {
-      return
+    if (isVideoPlaying && videoRef.current) {
+      // Stop video and switch to images
+      videoRef.current.pause()
+      setIsVideoPlaying(false)
     }
-
-    setIsTransitioning(true)
     setCurrentIndex(index)
-    setTimeout(() => setIsTransitioning(false), 500)
   }
 
-  // Handle image load events
-  const handleImageLoad = (index: number) => {
-    setImagesLoaded((prev) => {
-      const newArray = [...prev]
-      newArray[index] = true
-      return newArray
-    })
+  // Toggle video playback
+  const toggleVideo = () => {
+    if (!videoRef.current || isVideoError) return
+
+    if (videoRef.current.paused) {
+      tryPlayVideo(videoRef.current).then((success) => {
+        setIsVideoPlaying(success)
+      })
+    } else {
+      videoRef.current.pause()
+      setIsVideoPlaying(false)
+    }
   }
 
   return (
-    <div className={cn("absolute inset-0 w-full h-full", className)}>
-      {/* Video Slide */}
-      <div
-        className={cn(
-          "absolute inset-0 w-full h-full transition-opacity duration-1000",
-          currentIndex === 0 ? "opacity-100 z-10" : "opacity-0 z-0",
-        )}
-      >
-        <div className="relative w-full h-full">
+    <div className={cn("relative w-full h-full overflow-hidden", className)}>
+      {/* Video Background (if available and playing) */}
+      {videoUrl && !isVideoError && (
+        <div className={cn("absolute inset-0 w-full h-full", isVideoPlaying ? "opacity-100" : "opacity-0")}>
           <video
             ref={videoRef}
+            className="w-full h-full object-cover"
             playsInline
             muted
             loop
-            className="absolute inset-0 w-full h-full object-cover"
-            poster={images[0]}
+            autoPlay
+            poster={fallbackImage}
           >
-            <source src={videoUrl} type="video/mp4" />
-            <source src={videoUrl} type="video/webm" />
+            {videoSources.map((source, index) => (
+              <source key={index} src={source.src} type={source.type} />
+            ))}
             Your browser does not support the video tag.
           </video>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
         </div>
-      </div>
+      )}
 
-      {/* Image Slides */}
-      {images.map((image, index) => {
-        // Adjust index for image slides
-        const slideIndex = index + 1
-
-        return (
+      {/* Image Carousel (fallback or when video is not playing) */}
+      <div className={cn("absolute inset-0 w-full h-full", isVideoPlaying ? "opacity-0" : "opacity-100")}>
+        {images.map((image, index) => (
           <div
             key={index}
             className={cn(
               "absolute inset-0 w-full h-full transition-opacity duration-1000",
-              currentIndex === slideIndex ? "opacity-100 z-10" : "opacity-0 z-0",
+              index === currentIndex ? "opacity-100" : "opacity-0",
             )}
           >
-            <div className="relative w-full h-full">
-              <Image
-                src={image || "/placeholder.svg"}
-                alt={`Hero image ${index + 1}`}
-                fill
-                priority={index === 0}
-                className="object-cover object-center"
-                sizes="100vw"
-                quality={90}
-                onLoad={() => handleImageLoad(index)}
-                onError={() => {
-                  console.error(`❌ Error loading image ${index}`)
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
-            </div>
+            <Image
+              src={image || "/placeholder.svg"}
+              alt={`Hero image ${index + 1}`}
+              fill
+              priority={index === 0}
+              className="object-cover"
+              sizes="100vw"
+            />
           </div>
-        )
-      })}
+        ))}
+      </div>
 
-      {/* Navigation arrows */}
-      <button
-        onClick={goToPrevious}
-        className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full backdrop-blur-sm transition-all"
-        aria-label="Previous slide"
-      >
-        <ChevronLeft className="h-6 w-6" />
-      </button>
-      <button
-        onClick={goToNext}
-        className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full backdrop-blur-sm transition-all"
-        aria-label="Next slide"
-      >
-        <ChevronRight className="h-6 w-6" />
-      </button>
+      {/* Gradient Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
 
-      {/* Indicators */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex space-x-2">
-        {/* Video indicator */}
-        {!videoEnded && !videoError && (
+      {/* Navigation Dots */}
+      <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-10">
+        {images.map((_, index) => (
           <button
-            onClick={() => goToSlide(0)}
+            key={index}
+            onClick={() => goToSlide(index)}
             className={cn(
-              "transition-all rounded-full flex items-center justify-center",
-              currentIndex === 0 ? "bg-white w-8 h-2" : "bg-white/50 hover:bg-white/80 w-2 h-2",
+              "w-2 h-2 rounded-full transition-all",
+              index === currentIndex && !isVideoPlaying ? "bg-white w-4" : "bg-white/50",
             )}
-            aria-label="Video slide"
+            aria-label={`Go to slide ${index + 1}`}
+          />
+        ))}
+        {videoUrl && !isVideoError && (
+          <button
+            onClick={toggleVideo}
+            className={cn("w-2 h-2 rounded-full transition-all", isVideoPlaying ? "bg-white w-4" : "bg-white/50")}
+            aria-label="Toggle video"
           >
-            {currentIndex === 0 && <div className="w-1/2 h-full bg-orange-500 animate-pulse rounded-full" />}
+            <span className="sr-only">Video</span>
           </button>
         )}
-
-        {/* Image indicators */}
-        {images.map((_, index) => {
-          const slideIndex = index + 1
-          return (
-            <button
-              key={index}
-              onClick={() => goToSlide(slideIndex)}
-              className={cn(
-                "w-2 h-2 rounded-full transition-all",
-                currentIndex === slideIndex ? "bg-white w-6" : "bg-white/50 hover:bg-white/80",
-              )}
-              aria-label={`Go to image ${index + 1}`}
-            />
-          )
-        })}
       </div>
     </div>
   )

@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
   LayoutDashboard,
@@ -17,6 +17,7 @@ import {
   X,
   Bell,
   Search,
+  Loader2,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
@@ -45,8 +46,16 @@ const navItems = [
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
-  const { profile } = useAuth()
+  const { profile, isLoading } = useAuth()
   const { theme } = useTheme()
+  const router = useRouter()
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isLoading && !profile) {
+      router.push("/login")
+    }
+  }, [isLoading, profile, router])
 
   // Close sidebar when clicking outside on mobile
   useEffect(() => {
@@ -70,6 +79,19 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }, [pathname])
 
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <h1 className="text-2xl font-bold">Loading...</h1>
+        </div>
+      </div>
+    )
+  }
+
+  // Show login prompt if not authenticated
   if (!profile) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">

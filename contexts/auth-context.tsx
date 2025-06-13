@@ -1,17 +1,18 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { useRouter } from "next/navigation"
+import type { Database } from "@/types/database"
+import type { User } from "@supabase/supabase-js"
 
 // Define types
 type UserTier = "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
 
-interface User {
+interface UserProfile {
   id: string
   email: string
   username: string
-}
-
-interface UserProfile extends User {
   tier: UserTier
   coins: number
   avatar_url?: string
@@ -26,7 +27,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   signOut: () => Promise<void>
   isLoading: boolean
-  isPreviewMode: boolean
+  refreshProfile: () => Promise<void>
 }
 
 // Create context
@@ -37,44 +38,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
+  const supabase = createClientComponentClient<Database>()
 
-  // Always true in v0 preview
-  const isPreviewMode = true
+  // Function to fetch user profile
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
 
-  // Initialize with mock data for preview
+      if (error) {
+        console.error("Error fetching user profile:", error)
+        return
+      }
+
+      if (data) {
+        setProfile({
+          id: userId,
+          email: data.email || "",
+          username: data.username || "",
+          tier: data.tier || "grassroot",
+          coins: data.coins || 0,
+          avatar_url: data.avatar_url,
+          full_name: data.full_name,
+          bio: data.bio,
+          created_at: data.created_at,
+        })
+      }
+    } catch (error) {
+      console.error("Error in fetchUserProfile:", error)
+    }
+  }
+
+  // Function to refresh user profile
+  const refreshProfile = async () => {
+    if (user) {
+      await fetchUserProfile(user.id)
+    }
+  }
+
+  // Initialize auth state
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        // In preview mode, we'll use mock data
-        if (isPreviewMode) {
-          // Simulate a delay for loading state
-          await new Promise((resolve) => setTimeout(resolve, 1000))
+        setIsLoading(true)
 
-          // 50% chance of being logged in for demo purposes
-          const isLoggedIn = Math.random() > 0.5
+        // Get current session
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
 
-          if (isLoggedIn) {
-            const mockUser = {
-              id: "preview-user-id",
-              email: "fan@eriggalive.com",
-              username: "EriggaFan",
-            }
+        if (session?.user) {
+          setUser(session.user)
+          await fetchUserProfile(session.user.id)
+        }
 
-            const mockProfile = {
-              ...mockUser,
-              tier: ["grassroot", "pioneer", "elder", "blood_brotherhood"][Math.floor(Math.random() * 4)] as UserTier,
-              coins: Math.floor(Math.random() * 1000),
-              created_at: new Date().toISOString(),
-              bio: "This is a preview mode user profile.",
-            }
-
-            setUser(mockUser)
-            setProfile(mockProfile)
+        // Set up auth state change listener
+        const {
+          data: { subscription },
+        } = await supabase.auth.onAuthStateChange(async (event, session) => {
+          if (session?.user) {
+            setUser(session.user)
+            await fetchUserProfile(session.user.id)
+          } else {
+            setUser(null)
+            setProfile(null)
           }
-        } else {
-          // Real authentication logic would go here
-          // const { data: { session } } = await supabase.auth.getSession()
-          // if (session) { ... }
+        })
+
+        return () => {
+          subscription.unsubscribe()
         }
       } catch (error) {
         console.error("Auth initialization error:", error)
@@ -84,40 +116,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     initializeAuth()
-  }, [isPreviewMode])
+  }, [supabase])
 
-  // Mock sign in function
+  // Sign in function
   const signIn = async (email: string, password: string) => {
     try {
       setIsLoading(true)
 
-      if (isPreviewMode) {
-        // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 1500))
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-        // Always succeed in preview mode with mock data
-        const mockUser = {
-          id: "preview-user-id",
-          email,
-          username: email.split("@")[0],
-        }
+      if (error) {
+        return { success: false, error: error.message }
+      }
 
-        const mockProfile = {
-          ...mockUser,
-          tier: "pioneer" as UserTier,
-          coins: 500,
-          created_at: new Date().toISOString(),
-          bio: "This is a preview mode user profile.",
-        }
-
-        setUser(mockUser)
-        setProfile(mockProfile)
-
+      if (data.user) {
+        await fetchUserProfile(data.user.id)
+        router.push("/dashboard")
         return { success: true }
       }
 
-      // Real sign in logic would go here
-      return { success: false, error: "Authentication only works when deployed" }
+      return { success: false, error: "Failed to sign in" }
     } catch (error: any) {
       return { success: false, error: error.message || "An unknown error occurred" }
     } finally {
@@ -125,19 +146,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Mock sign out function
+  // Sign out function
   const signOut = async () => {
     try {
       setIsLoading(true)
-
-      if (isPreviewMode) {
-        // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-        setUser(null)
-        setProfile(null)
-      } else {
-        // Real sign out logic would go here
-      }
+      await supabase.auth.signOut()
+      setUser(null)
+      setProfile(null)
+      router.push("/")
     } catch (error) {
       console.error("Sign out error:", error)
     } finally {
@@ -145,8 +161,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // For development/testing purposes - create a mock profile if none exists
+  useEffect(() => {
+    const isDevelopment = process.env.NODE_ENV === "development"
+
+    if (isDevelopment && !user) {
+      // In development, create a mock user for testing
+      const mockUser = {
+        id: "dev-user-id",
+        email: "dev@example.com",
+      } as User
+
+      setUser(mockUser)
+
+      const mockProfile = {
+        id: mockUser.id,
+        email: mockUser.email || "dev@example.com",
+        username: "devuser",
+        tier: "pioneer" as UserTier,
+        coins: 500,
+        created_at: new Date().toISOString(),
+      }
+
+      setProfile(mockProfile)
+    }
+  }, [user])
+
   return (
-    <AuthContext.Provider value={{ user, profile, signIn, signOut, isLoading, isPreviewMode }}>
+    <AuthContext.Provider value={{ user, profile, signIn, signOut, isLoading, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )

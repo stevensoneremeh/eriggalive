@@ -8,11 +8,14 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Music, Video, Newspaper, Users, ShoppingBag, Calendar } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SafeHeroVideoCarousel } from "@/components/safe-hero-video-carousel"
+import { getOptimizedVideoSources } from "@/utils/video-utils"
 
 export default function HomePage() {
   const { theme } = useTheme()
   const [currentSlide, setCurrentSlide] = useState(0)
   const [mounted, setMounted] = useState(false)
+  const videoSources = getOptimizedVideoSources()
+  const primaryVideoUrl = videoSources[0]?.src || "/videos/erigga-hero-video.mp4"
 
   // Hero images
   const heroImages = [
@@ -168,11 +171,7 @@ export default function HomePage() {
     <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
       <section className="relative h-[80vh] w-full">
-        <SafeHeroVideoCarousel
-          images={heroImages}
-          videoUrl="/videos/erigga-hero-video.mp4"
-          className="absolute inset-0"
-        />
+        <SafeHeroVideoCarousel images={heroImages} videoUrl={primaryVideoUrl} className="absolute inset-0" />
 
         <div className="absolute inset-0 flex items-center justify-center z-10">
           <div className="text-center max-w-3xl px-4">
@@ -196,38 +195,6 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-      </section>
-
-      {/* Preview Mode Notice */}
-      <section className="py-8 px-4">
-        <Card className="bg-orange-100 dark:bg-orange-900/30 border-orange-300 dark:border-orange-700">
-          <CardContent className="p-6">
-            <h2 className="text-2xl font-bold text-orange-800 dark:text-orange-300 mb-4">🚧 Preview Mode Active</h2>
-            <p className="text-orange-700 dark:text-orange-400 mb-4">
-              You're currently viewing the application in preview mode. Some features are limited or simulated:
-            </p>
-            <ul className="list-disc pl-5 space-y-2 text-orange-700 dark:text-orange-400">
-              <li>
-                <strong>Video Playback:</strong> Videos may not autoplay in this environment due to browser restrictions
-              </li>
-              <li>
-                <strong>Authentication:</strong> Sign in/out functionality is simulated
-              </li>
-              <li>
-                <strong>Database:</strong> All database operations are mocked
-              </li>
-              <li>
-                <strong>External Services:</strong> Connections to Supabase and other services are simulated
-              </li>
-            </ul>
-            <div className="mt-6">
-              <p className="font-medium text-orange-800 dark:text-orange-300">
-                To experience full functionality, deploy this application to Vercel and configure the required
-                environment variables.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
       </section>
 
       {/* Rest of the home page content */}
