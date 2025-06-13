@@ -8,144 +8,115 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Eye, EyeOff } from "lucide-react"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/contexts/auth-context"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const { signIn, user } = useAuth()
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { signIn, isAuthenticated } = useAuth()
 
-  // Get the redirect path from URL parameters
+  // Get redirect path from URL or cookie
   const redirectPath = searchParams?.get("redirect") || "/dashboard"
 
-  // If already logged in, redirect
+  // Check if already authenticated
   useEffect(() => {
-    if (user) {
+    if (isAuthenticated) {
       router.push(redirectPath)
     }
-  }, [user, router, redirectPath])
+  }, [isAuthenticated, router, redirectPath])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-    setError("")
+    setError(null)
+    setIsSubmitting(true)
 
     try {
-      const { success, error } = await signIn(email, password)
+      // Basic validation
+      if (!email || !password) {
+        setError("Please enter both email and password")
+        return
+      }
 
-      if (!success) {
-        console.error("Login error:", error)
-        setError(error?.toString() || "Authentication failed. Please try again.")
-      } else {
+      const result = await signIn(email, password)
+
+      if (result.success) {
         // Redirect to the specified path or dashboard
         router.push(redirectPath)
+      } else {
+        setError(result.error || "Failed to sign in")
       }
-    } catch (err) {
-      console.error("Unexpected error during login:", err)
-      setError("An unexpected error occurred. Please try again later.")
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred")
     } finally {
-      setLoading(false)
+      setIsSubmitting(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h1 className="font-street text-4xl text-gradient mb-2">WELCOME BACK</h1>
-          <p className="text-muted-foreground">Sign in to your Erigga fan account</p>
-        </div>
-
-        <Card className="bg-card/50 border-orange-500/20">
-          <CardHeader>
-            <CardTitle>Sign In</CardTitle>
-            <CardDescription>Enter your credentials to access your account</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  required
-                  className="bg-background/50"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    required
-                    className="bg-background/50 pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-black" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  "Sign In"
-                )}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center space-y-2">
-              <p className="text-sm text-muted-foreground">
-                Don't have an account?{" "}
-                <Link href="/signup" className="text-orange-500 hover:underline">
-                  Sign up
-                </Link>
-              </p>
-              <p className="text-sm text-muted-foreground">
-                <Link href="/forgot-password" className="text-orange-500 hover:underline">
-                  Forgot your password?
-                </Link>
-              </p>
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-md border-lime-500/20">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-center">Login to Erigga Fan Platform</CardTitle>
+          <CardDescription className="text-center">Enter your credentials to access your account</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="border-lime-500/20"
+              />
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link href="/forgot-password" className="text-xs text-lime-500 hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="border-lime-500/20"
+              />
+            </div>
+            {error && <p className="text-red-500 text-sm">{error}</p>}
+            <Button
+              type="submit"
+              className="w-full bg-lime-500 hover:bg-lime-600 text-teal-900"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Signing in..." : "Sign In"}
+            </Button>
+          </form>
+        </CardContent>
+        <CardFooter className="flex flex-col space-y-4">
+          <div className="text-center text-sm">
+            Don't have an account?{" "}
+            <Link href="/signup" className="text-lime-500 hover:underline">
+              Sign up
+            </Link>
+          </div>
+          <div className="text-center text-xs text-muted-foreground">
+            By signing in, you agree to our Terms of Service and Privacy Policy
+          </div>
+        </CardFooter>
+      </Card>
     </div>
   )
 }

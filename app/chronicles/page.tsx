@@ -23,7 +23,7 @@ export default function ChroniclesPage() {
   const [userProgress, setUserProgress] = useState<Record<number, UserEpisodeProgress>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { user, profile, isPreviewMode } = useAuth()
+  const { user, profile, isAuthenticated } = useAuth()
   const supabase = createClient()
 
   useEffect(() => {
@@ -178,16 +178,6 @@ export default function ChroniclesPage() {
   return (
     <div className="min-h-screen py-8 px-4">
       <div className="container mx-auto max-w-7xl">
-        {/* Preview Mode Indicator */}
-        {isPreviewMode && (
-          <div className="mb-6 p-4 bg-teal-900/20 border border-lime-500/20 rounded-lg">
-            <p className="text-lime-500 text-center">
-              <strong>Preview Mode:</strong> Showing mock data. In production, real data will be fetched from the
-              database.
-            </p>
-          </div>
-        )}
-
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="font-street text-4xl md:text-6xl text-gradient mb-4">ERIGGA CHRONICLES</h1>

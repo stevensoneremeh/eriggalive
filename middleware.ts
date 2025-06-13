@@ -7,6 +7,19 @@ const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-pass
 // Define paths that should always be accessible regardless of auth status
 const ALWAYS_ACCESSIBLE = ["/api", "/_next", "/favicon.ico", "/images", "/videos", "/fonts"]
 
+// Define paths that require authentication
+const PROTECTED_PATHS = [
+  "/dashboard",
+  "/community",
+  "/chronicles",
+  "/vault",
+  "/tickets",
+  "/premium",
+  "/merch",
+  "/settings",
+  "/admin",
+]
+
 export function middleware(request: NextRequest) {
   // Get the pathname of the request
   const { pathname } = request.nextUrl
@@ -19,11 +32,16 @@ export function middleware(request: NextRequest) {
   // Check if the path is public
   const isPublicPath = PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
 
-  // Check if the user is authenticated by looking for the auth cookie
-  const isAuthenticated = request.cookies.has("erigga_auth") || request.cookies.has("erigga_auth_session")
+  // Check if the path requires authentication
+  const requiresAuth = PROTECTED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+
+  // Check if the user is authenticated by looking for the auth cookies
+  const hasAuthCookie = request.cookies.has("erigga_auth")
+  const hasSessionCookie = request.cookies.has("erigga_auth_session")
+  const isAuthenticated = hasAuthCookie || hasSessionCookie
 
   // If accessing a protected route without authentication
-  if (!isPublicPath && !isAuthenticated) {
+  if (requiresAuth && !isAuthenticated) {
     // Store the original URL to redirect back after login
     const redirectUrl = new URL("/login", request.url)
     redirectUrl.searchParams.set("redirect", pathname)
@@ -52,6 +70,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(redirectUrl, request.url))
   }
 
+  // For all other cases, proceed normally
   return NextResponse.next()
 }
 

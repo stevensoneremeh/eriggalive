@@ -1,7 +1,8 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
+import { clientAuth } from "@/lib/auth-utils"
 
 // Define types
 type UserTier = "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
@@ -37,9 +38,6 @@ interface AuthContextType {
 // Create context
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Session expiration time (30 days in seconds)
-const SESSION_EXPIRY = 30 * 24 * 60 * 60
-
 // Provider component
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -47,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
 
   // Initialize with stored data
   useEffect(() => {
@@ -54,48 +53,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         setIsLoading(true)
 
-        // First check for an active session in cookies
-        const sessionCookie = getCookie("erigga_auth_session")
+        // Get session from our utility
+        const session = clientAuth.getSession()
 
-        if (sessionCookie) {
-          try {
-            const sessionData = JSON.parse(atob(sessionCookie))
-            if (sessionData && sessionData.user && sessionData.profile) {
-              setUser(sessionData.user)
-              setProfile(sessionData.profile)
-              setIsAuthenticated(true)
-
-              // Refresh the session expiry
-              persistSession(sessionData.user, sessionData.profile)
-              setIsLoading(false)
-              return
-            }
-          } catch (e) {
-            console.error("Error parsing session cookie:", e)
-          }
-        }
-
-        // Fallback to localStorage if cookie approach fails
-        const storedUser = localStorage.getItem("erigga_user")
-        const storedProfile = localStorage.getItem("erigga_profile")
-
-        if (storedUser && storedProfile) {
-          const parsedUser = JSON.parse(storedUser)
-          const parsedProfile = JSON.parse(storedProfile)
-
-          setUser(parsedUser)
-          setProfile(parsedProfile)
+        if (session?.user && session?.profile) {
+          setUser(session.user)
+          setProfile(session.profile)
           setIsAuthenticated(true)
 
-          // Update the session cookie from localStorage data
-          persistSession(parsedUser, parsedProfile)
+          // Refresh the session to extend expiry
+          clientAuth.refreshSession()
         } else {
           setIsAuthenticated(false)
         }
       } catch (error) {
         console.error("Auth initialization error:", error)
-        // Clear potentially corrupted data
-        clearSession()
         setIsAuthenticated(false)
       } finally {
         setIsLoading(false)
@@ -103,68 +75,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     initializeAuth()
-
-    // Set up an interval to refresh the session every 15 minutes
-    const refreshInterval = setInterval(
-      () => {
-        if (user && profile) {
-          persistSession(user, profile)
-        }
-      },
-      15 * 60 * 1000,
-    ) // 15 minutes
-
-    return () => clearInterval(refreshInterval)
   }, [])
 
-  // Helper to get a cookie value
-  const getCookie = (name: string): string | null => {
-    if (typeof document === "undefined") return null
-
-    const cookies = document.cookie.split(";")
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim()
-      if (cookie.startsWith(name + "=")) {
-        return cookie.substring(name.length + 1)
-      }
+  // Refresh session on route changes
+  useEffect(() => {
+    if (isAuthenticated) {
+      clientAuth.refreshSession()
     }
-    return null
-  }
+  }, [pathname, isAuthenticated])
 
-  // Helper to persist session in both cookie and localStorage
-  const persistSession = (user: User, profile: UserProfile) => {
-    try {
-      // Store in localStorage for compatibility
-      localStorage.setItem("erigga_user", JSON.stringify(user))
-      localStorage.setItem("erigga_profile", JSON.stringify(profile))
+  // Set up periodic session refresh
+  useEffect(() => {
+    if (!isAuthenticated) return
 
-      // Store in cookies for better security and persistence
-      const sessionData = btoa(JSON.stringify({ user, profile, timestamp: Date.now() }))
+    const refreshInterval = setInterval(
+      () => {
+        clientAuth.refreshSession()
+      },
+      5 * 60 * 1000,
+    ) // Every 5 minutes
 
-      // Set a secure, http-only cookie with a long expiration
-      document.cookie = `erigga_auth_session=${sessionData}; path=/; max-age=${SESSION_EXPIRY}; SameSite=Lax`
-
-      // Set a simple auth flag cookie for middleware checks
-      document.cookie = `erigga_auth=1; path=/; max-age=${SESSION_EXPIRY}; SameSite=Lax`
-    } catch (error) {
-      console.error("Error persisting session:", error)
-    }
-  }
-
-  // Helper to clear session data
-  const clearSession = () => {
-    try {
-      // Clear localStorage
-      localStorage.removeItem("erigga_user")
-      localStorage.removeItem("erigga_profile")
-
-      // Clear cookies
-      document.cookie = "erigga_auth_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
-      document.cookie = "erigga_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
-    } catch (error) {
-      console.error("Error clearing session:", error)
-    }
-  }
+    return () => clearInterval(refreshInterval)
+  }, [isAuthenticated])
 
   // Sign in function that works for any user
   const signIn = async (email: string, password: string) => {
@@ -198,8 +130,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         bio: `${username}'s profile`,
       }
 
-      // Persist the session
-      persistSession(mockUser, mockProfile)
+      // Persist the session using our utility
+      clientAuth.saveSession(mockUser, mockProfile)
 
       setUser(mockUser)
       setProfile(mockProfile)
@@ -218,8 +150,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true)
 
-      // Clear all session data
-      clearSession()
+      // Clear session using our utility
+      clientAuth.clearSession()
 
       setUser(null)
       setProfile(null)
@@ -236,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Function to refresh the current session
   const refreshSession = async () => {
     if (user && profile) {
-      persistSession(user, profile)
+      clientAuth.saveSession(user, profile)
     }
   }
 
@@ -254,7 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         // Update session with new profile data
-        persistSession(user!, updatedProfile)
+        clientAuth.saveSession(user!, updatedProfile)
 
         setProfile(updatedProfile)
       }

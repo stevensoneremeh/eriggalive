@@ -6,10 +6,9 @@ import { Navigation } from "@/components/navigation"
 import { AuthProvider } from "@/contexts/auth-context"
 import { ThemeProvider } from "@/contexts/theme-context"
 import ErrorBoundary from "@/components/error-boundary"
-import { PreviewModeIndicator } from "@/components/preview-mode-indicator"
+import { SessionRefresh } from "@/components/session-refresh"
 import Script from "next/script"
 import { DynamicLogo } from "@/components/dynamic-logo"
-import { SessionRefresh } from "@/components/session-refresh"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -34,7 +33,6 @@ export default function RootLayout({
               <div className="min-h-screen flex flex-col">
                 <Navigation />
                 <main className="flex-1 pt-16">{children}</main>
-                <PreviewModeIndicator />
               </div>
               <footer className="border-t bg-background/95 backdrop-blur">
                 <div className="container mx-auto px-4 py-8">

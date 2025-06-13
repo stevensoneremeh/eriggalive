@@ -1,7 +1,7 @@
 import { Suspense } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
-import { createServerSupabaseClient, isPreviewMode } from "@/lib/supabase/server"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -24,13 +24,6 @@ export default async function CommunityPage() {
     return (
       <div className="container py-8 max-w-5xl">
         <h1 className="text-3xl font-bold mb-6">Erigga Community</h1>
-
-        {isPreviewMode() && (
-          <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mb-6 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300">
-            <p className="font-medium">Preview Mode</p>
-            <p className="text-sm">You're viewing a simplified version of the community feature with mock data.</p>
-          </div>
-        )}
 
         <Tabs defaultValue="all" className="w-full">
           <TabsList className="mb-6 w-full max-w-full overflow-x-auto flex-nowrap justify-start">

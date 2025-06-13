@@ -3,243 +3,248 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X, Sun, Moon, User, LogOut, Settings, Crown } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useTheme } from "@/contexts/theme-context"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import {
+  Menu,
+  X,
+  User,
+  LogOut,
+  LogIn,
+  CreditCard,
+  Music,
+  Ticket,
+  ShoppingBag,
+  Home,
+  BookOpen,
+  Users,
+  Crown,
+} from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
+import { useTheme } from "@/contexts/theme-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
 import { CoinBalance } from "@/components/coin-balance"
-import { SessionRefresh } from "@/components/session-refresh"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-
-const navItems = [
-  { name: "Home", href: "/" },
-  { name: "Vault", href: "/vault" },
-  { name: "Chronicles", href: "/chronicles" },
-  { name: "Community", href: "/community" },
-  { name: "Events", href: "/tickets" },
-  { name: "Merch", href: "/merch" },
-  { name: "Premium", href: "/premium" },
-]
+import { UserTierBadge } from "@/components/user-tier-badge"
+import { clientAuth } from "@/lib/auth-utils"
 
 export function Navigation() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [scrolled, setScrolled] = useState(false)
-  const [isSigningOut, setIsSigningOut] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const pathname = usePathname()
-  const { theme, toggleTheme } = useTheme()
   const { user, profile, signOut, isAuthenticated } = useAuth()
+  const { theme, toggleTheme } = useTheme()
 
+  // Handle scroll effect
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 20)
+      setIsScrolled(window.scrollY > 10)
     }
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
-  const handleSignOut = async () => {
-    try {
-      setIsSigningOut(true)
-      await signOut()
-    } catch (error) {
-      console.error("Error signing out:", error)
-    } finally {
-      setIsSigningOut(false)
+  // Check authentication status on mount and route changes
+  useEffect(() => {
+    // This will refresh the session if the user is authenticated
+    if (isAuthenticated) {
+      clientAuth.refreshSession()
     }
+  }, [pathname, isAuthenticated])
+
+  const navItems = [
+    { name: "Home", href: "/", icon: <Home className="h-5 w-5" /> },
+    { name: "Community", href: "/community", icon: <Users className="h-5 w-5" /> },
+    { name: "Chronicles", href: "/chronicles", icon: <BookOpen className="h-5 w-5" /> },
+    { name: "Media Vault", href: "/vault", icon: <Music className="h-5 w-5" /> },
+    { name: "Tickets", href: "/tickets", icon: <Ticket className="h-5 w-5" /> },
+    { name: "Premium", href: "/premium", icon: <Crown className="h-5 w-5" /> },
+    { name: "Merch", href: "/merch", icon: <ShoppingBag className="h-5 w-5" /> },
+  ]
+
+  const isActive = (path: string) => {
+    if (path === "/") {
+      return pathname === "/"
+    }
+    return pathname?.startsWith(path)
   }
 
   return (
-    <nav
+    <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? "bg-white/95 dark:bg-black/95 backdrop-blur-md shadow-lg border-b border-gray-200/20 dark:border-white/10"
-          : "bg-white dark:bg-black"
+        isScrolled ? "bg-background/95 backdrop-blur shadow-md" : "bg-transparent"
       }`}
     >
-      {/* Include the session refresh component */}
-      <SessionRefresh />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+      <div className="container mx-auto px-4">
+        <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <DynamicLogo className="h-8 w-auto" />
+            <DynamicLogo width={120} height={32} />
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <nav className="hidden md:flex items-center space-x-1">
             {navItems.map((item) => (
               <Link
                 key={item.name}
                 href={item.href}
-                className={`text-sm font-medium transition-colors hover:text-brand-teal dark:hover:text-brand-lime ${
-                  pathname === item.href ? "text-brand-teal dark:text-brand-lime" : "text-gray-700 dark:text-gray-300"
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  isActive(item.href)
+                    ? "text-lime-500 bg-lime-500/10"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 }`}
               >
                 {item.name}
               </Link>
             ))}
-          </div>
+          </nav>
 
-          {/* Right Side Actions */}
-          <div className="flex items-center space-x-4">
-            {/* Coin Balance */}
-            {isAuthenticated && <CoinBalance />}
-
-            {/* Theme Toggle */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleTheme}
-              className="text-gray-700 dark:text-gray-300 hover:text-brand-teal dark:hover:text-brand-lime"
-            >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-
-            {/* User Menu */}
-            {isAuthenticated ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="flex items-center space-x-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-brand-lime to-brand-teal dark:from-gray-700 dark:to-gray-600 flex items-center justify-center">
-                      <span className="text-white text-sm font-medium">
-                        {profile?.username?.charAt(0).toUpperCase() || "U"}
-                      </span>
-                    </div>
-                    <div className="hidden sm:block text-left">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {profile?.username || "User"}
-                      </div>
-                      <div
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          theme === "dark" ? "bg-gray-800 text-white" : "bg-brand-lime-light text-brand-teal"
-                        }`}
-                      >
-                        {profile?.tier?.charAt(0).toUpperCase() + profile?.tier?.slice(1) || "Grassroot"}
-                      </div>
-                    </div>
+          {/* User Actions */}
+          <div className="flex items-center space-x-2">
+            {isAuthenticated && profile ? (
+              <>
+                <CoinBalance coins={profile.coins} />
+                <UserTierBadge tier={profile.tier} />
+                <Link href="/dashboard">
+                  <Button variant="outline" size="sm" className="hidden md:flex">
+                    <User className="h-4 w-4 mr-2" />
+                    Dashboard
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard" className="flex items-center">
-                      <User className="mr-2 h-4 w-4" />
-                      Dashboard
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/premium" className="flex items-center">
-                      <Crown className="mr-2 h-4 w-4" />
-                      Upgrade Tier
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/settings" className="flex items-center">
-                      <Settings className="mr-2 h-4 w-4" />
-                      Settings
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={handleSignOut}
-                    disabled={isSigningOut}
-                    className="text-red-600 dark:text-red-400 cursor-pointer"
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    {isSigningOut ? "Signing out..." : "Sign Out"}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <div className="flex items-center space-x-2">
-                <Button asChild variant="ghost" size="sm">
-                  <Link href="/login">Sign In</Link>
-                </Button>
+                </Link>
                 <Button
-                  asChild
+                  variant="ghost"
                   size="sm"
-                  className="bg-brand-teal hover:bg-brand-teal-dark text-white dark:bg-gray-800 dark:hover:bg-gray-700"
+                  onClick={signOut}
+                  className="text-red-500 hover:text-red-600 hover:bg-red-100/10 hidden md:flex"
                 >
-                  <Link href="/signup">Sign Up</Link>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
                 </Button>
-              </div>
+              </>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button variant="outline" size="sm" className="hidden md:flex">
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Login
+                  </Button>
+                </Link>
+                <Link href="/signup">
+                  <Button size="sm" className="hidden md:flex bg-lime-500 hover:bg-lime-600 text-teal-900">
+                    Sign Up
+                  </Button>
+                </Link>
+              </>
             )}
 
-            {/* Mobile Menu Button */}
-            <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setIsOpen(!isOpen)}>
-              {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
+            {/* Mobile Menu Trigger */}
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden">
+                  <Menu className="h-6 w-6" />
+                  <span className="sr-only">Toggle menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[80%] sm:w-[350px]">
+                <div className="flex flex-col h-full">
+                  <div className="flex items-center justify-between py-4">
+                    <DynamicLogo width={100} height={28} />
+                    <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)}>
+                      <X className="h-6 w-6" />
+                      <span className="sr-only">Close menu</span>
+                    </Button>
+                  </div>
+
+                  {/* User Info (if logged in) */}
+                  {isAuthenticated && profile && (
+                    <div className="border-b border-border py-4 mb-4">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className="w-10 h-10 rounded-full bg-lime-500/20 flex items-center justify-center">
+                          <User className="h-6 w-6 text-lime-500" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{profile.username || "User"}</p>
+                          <p className="text-xs text-muted-foreground">{profile.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <CoinBalance coins={profile.coins} />
+                        <UserTierBadge tier={profile.tier} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mobile Navigation */}
+                  <nav className="flex-1">
+                    <ul className="space-y-1">
+                      {navItems.map((item) => (
+                        <li key={item.name}>
+                          <Link
+                            href={item.href}
+                            className={`flex items-center px-3 py-3 rounded-md ${
+                              isActive(item.href)
+                                ? "bg-lime-500/10 text-lime-500"
+                                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                            }`}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <span className="mr-3">{item.icon}</span>
+                            {item.name}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </nav>
+
+                  {/* Mobile Auth Actions */}
+                  <div className="border-t border-border pt-4 mt-auto">
+                    {isAuthenticated ? (
+                      <div className="space-y-2">
+                        <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
+                          <Button variant="outline" className="w-full justify-start">
+                            <User className="h-4 w-4 mr-2" />
+                            Dashboard
+                          </Button>
+                        </Link>
+                        <Link href="/premium" onClick={() => setIsMobileMenuOpen(false)}>
+                          <Button variant="outline" className="w-full justify-start">
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            Buy Coins
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-100/10"
+                          onClick={() => {
+                            signOut()
+                            setIsMobileMenuOpen(false)
+                          }}
+                        >
+                          <LogOut className="h-4 w-4 mr-2" />
+                          Logout
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                          <Button variant="outline" className="w-full justify-start">
+                            <LogIn className="h-4 w-4 mr-2" />
+                            Login
+                          </Button>
+                        </Link>
+                        <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)}>
+                          <Button className="w-full justify-start bg-lime-500 hover:bg-lime-600 text-teal-900">
+                            Sign Up
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
-
-        {/* Mobile Navigation */}
-        {isOpen && (
-          <div className="md:hidden border-t border-gray-200 dark:border-gray-800">
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              {navItems.map((item) => (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`block px-3 py-2 text-base font-medium rounded-md transition-colors ${
-                    pathname === item.href
-                      ? "text-brand-teal dark:text-brand-lime bg-brand-lime/10 dark:bg-gray-800"
-                      : "text-gray-700 dark:text-gray-300 hover:text-brand-teal dark:hover:text-brand-lime hover:bg-gray-50 dark:hover:bg-gray-800"
-                  }`}
-                  onClick={() => setIsOpen(false)}
-                >
-                  {item.name}
-                </Link>
-              ))}
-              {!isAuthenticated && (
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
-                  <Link
-                    href="/login"
-                    className="block px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-brand-teal dark:hover:text-brand-lime"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Sign In
-                  </Link>
-                  <Link
-                    href="/signup"
-                    className="block px-3 py-2 text-base font-medium text-brand-teal dark:text-brand-lime"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Sign Up
-                  </Link>
-                </div>
-              )}
-              {isAuthenticated && (
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
-                  <Link
-                    href="/dashboard"
-                    className="block px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-brand-teal dark:hover:text-brand-lime"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Dashboard
-                  </Link>
-                  <button
-                    onClick={() => {
-                      setIsOpen(false)
-                      handleSignOut()
-                    }}
-                    disabled={isSigningOut}
-                    className="block w-full text-left px-3 py-2 text-base font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-                  >
-                    {isSigningOut ? "Signing out..." : "Sign Out"}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
-    </nav>
+    </header>
   )
 }

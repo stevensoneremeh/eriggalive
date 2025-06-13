@@ -173,7 +173,7 @@ export default function VaultPage() {
   const [selectedTrack, setSelectedTrack] = useState<any>(null)
   const [selectedVideo, setSelectedVideo] = useState<any>(null)
   const [showStreamingLinks, setShowStreamingLinks] = useState<any>(null)
-  const { user, profile } = useAuth()
+  const { user, profile, isAuthenticated } = useAuth()
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`
@@ -304,54 +304,37 @@ export default function VaultPage() {
                           <Play className="h-8 w-8 text-black fill-black" />
                         </div>
                       </div>
-
-                      {!canAccess(album) && (
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-t-lg">
-                          <div className="text-center text-white">
-                            <Crown className="h-8 w-8 mx-auto mb-2" />
-                            <p className="text-sm font-medium">Premium Only</p>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </CardHeader>
 
                   <CardContent className="p-6">
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       <div>
-                        <h3 className="font-bold text-xl text-gradient">{album.title}</h3>
+                        <h3 className="font-bold text-xl mb-1">{album.title}</h3>
                         <p className="text-sm text-muted-foreground">{album.description}</p>
                       </div>
 
+                      {/* Stats */}
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          {album.total_tracks} tracks • {album.duration}
-                        </span>
-                        <span className="text-orange-500 font-semibold">
-                          {new Date(album.release_date).getFullYear()}
-                        </span>
+                        <div className="flex items-center gap-4">
+                          <span className="flex items-center gap-1">
+                            <Music className="h-4 w-4 text-orange-500" />
+                            {album.total_tracks} tracks
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-4 w-4 text-orange-300" />
+                            {album.duration}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Headphones className="h-4 w-4 text-orange-500" />
+                          <span>{formatNumber(album.play_count)}</span>
+                        </div>
                       </div>
 
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Headphones className="h-3 w-3" />
-                          {formatNumber(album.play_count)} plays
-                        </span>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setShowStreamingLinks(album)
-                            }}
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                          </Button>
-                          <Button size="sm" variant="outline" className="text-red-500 border-red-500">
-                            <Heart className="h-3 w-3" />
-                          </Button>
-                        </div>
+                      {/* Release Date */}
+                      <div className="text-xs text-muted-foreground">
+                        Released: {new Date(album.release_date).toLocaleDateString()}
                       </div>
                     </div>
                   </CardContent>
@@ -361,67 +344,64 @@ export default function VaultPage() {
           </TabsContent>
 
           {/* Singles Tab */}
-          <TabsContent value="singles" className="space-y-6">
+          <TabsContent value="singles" className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {singles.map((single) => (
                 <Card
                   key={single.id}
-                  className={`bg-card/50 border-orange-500/20 hover:border-orange-500/40 transition-all group ${!canAccess(single) ? "opacity-60" : ""}`}
+                  className={`bg-card/50 border-orange-500/20 hover:border-orange-500/40 transition-all group cursor-pointer ${!canAccess(single) ? "opacity-60" : ""}`}
+                  onClick={() => canAccess(single) && setSelectedTrack(single)}
                 >
-                  <CardContent className="p-6">
-                    <div className="flex gap-4">
-                      <div className="relative flex-shrink-0">
-                        <img
-                          src={single.cover_url || "/placeholder.svg?height=100&width=100"}
-                          alt={single.title}
-                          className="w-20 h-20 object-cover rounded-lg"
-                        />
-                        <div className="absolute inset-0 bg-black/40 group-hover:bg-black/60 transition-colors flex items-center justify-center rounded-lg">
-                          <PlayCircle className="h-8 w-8 text-white" />
-                        </div>
-                      </div>
+                  <CardHeader className="p-0">
+                    <div className="relative">
+                      <img
+                        src={single.cover_url || "/placeholder.svg?height=300&width=300"}
+                        alt={single.title}
+                        className="w-full aspect-square object-cover rounded-t-lg"
+                      />
 
-                      <div className="flex-1 space-y-2">
-                        <div>
-                          <h3 className="font-bold text-lg">{single.title}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {single.artist}
-                            {single.featuring && ` feat. ${single.featuring}`}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {single.duration}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Headphones className="h-3 w-3" />
-                            {formatNumber(single.play_count)}
-                          </span>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            className="bg-orange-500 hover:bg-orange-600 text-black flex-1"
-                            disabled={!canAccess(single)}
-                          >
-                            <Play className="h-3 w-3 mr-1" />
-                            Play
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setShowStreamingLinks(single)}>
-                            <ExternalLink className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-
+                      {/* Premium Badge */}
                       {single.is_premium && (
-                        <Badge className="bg-gold-400 text-black h-fit">
+                        <Badge className="absolute top-2 right-2 bg-gold-400 text-black">
                           <Crown className="h-3 w-3 mr-1" />
                           PREMIUM
                         </Badge>
                       )}
+
+                      {/* Play Overlay */}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-t-lg">
+                        <div className="bg-orange-500 rounded-full p-4">
+                          <Play className="h-8 w-8 text-black fill-black" />
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="font-bold text-xl mb-1">{single.title}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {single.artist} {single.featuring ? `ft. ${single.featuring}` : ""}
+                        </p>
+                      </div>
+
+                      {/* Stats */}
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4 text-orange-300" />
+                          <span>{single.duration}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Headphones className="h-4 w-4 text-orange-500" />
+                          <span>{formatNumber(single.play_count)}</span>
+                        </div>
+                      </div>
+
+                      {/* Release Date */}
+                      <div className="text-xs text-muted-foreground">
+                        Released: {new Date(single.release_date).toLocaleDateString()}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -430,7 +410,7 @@ export default function VaultPage() {
           </TabsContent>
 
           {/* Videos Tab */}
-          <TabsContent value="videos" className="space-y-6">
+          <TabsContent value="videos" className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {musicVideos.map((video) => (
                 <Card
@@ -441,39 +421,48 @@ export default function VaultPage() {
                   <CardHeader className="p-0">
                     <div className="relative">
                       <img
-                        src={video.thumbnail_url || "/placeholder.svg?height=200&width=300"}
+                        src={video.thumbnail_url || "/placeholder.svg?height=300&width=400"}
                         alt={video.title}
-                        className="w-full h-48 object-cover rounded-t-lg"
+                        className="w-full aspect-video object-cover rounded-t-lg"
                       />
 
-                      {/* Play Button */}
-                      <div className="absolute inset-0 bg-black/40 group-hover:bg-black/60 transition-colors flex items-center justify-center rounded-t-lg">
-                        <div className="bg-orange-500 rounded-full p-4">
-                          <Play className="h-8 w-8 text-black fill-black" />
-                        </div>
-                      </div>
-
-                      {/* Duration */}
-                      <Badge className="absolute bottom-2 right-2 bg-black/80 text-white">{video.duration}</Badge>
-
+                      {/* Premium Badge */}
                       {video.is_premium && (
                         <Badge className="absolute top-2 right-2 bg-gold-400 text-black">
                           <Crown className="h-3 w-3 mr-1" />
                           PREMIUM
                         </Badge>
                       )}
+
+                      {/* Duration Badge */}
+                      <Badge className="absolute bottom-2 right-2 bg-black/70">{video.duration}</Badge>
+
+                      {/* Play Overlay */}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-t-lg">
+                        <div className="bg-orange-500 rounded-full p-4">
+                          <Play className="h-8 w-8 text-black fill-black" />
+                        </div>
+                      </div>
                     </div>
                   </CardHeader>
 
-                  <CardContent className="p-4">
-                    <div className="space-y-3">
-                      <h3 className="font-bold">{video.title}</h3>
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Eye className="h-3 w-3" />
-                          {formatNumber(video.views)} views
-                        </span>
-                        <span>{new Date(video.release_date).toLocaleDateString()}</span>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="font-bold text-xl mb-1">{video.title}</h3>
+                      </div>
+
+                      {/* Stats */}
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-1">
+                          <Eye className="h-4 w-4 text-orange-300" />
+                          <span>{formatNumber(video.views)} views</span>
+                        </div>
+                      </div>
+
+                      {/* Release Date */}
+                      <div className="text-xs text-muted-foreground">
+                        Released: {new Date(video.release_date).toLocaleDateString()}
                       </div>
                     </div>
                   </CardContent>
@@ -483,8 +472,8 @@ export default function VaultPage() {
           </TabsContent>
 
           {/* Gallery Tab */}
-          <TabsContent value="gallery" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <TabsContent value="gallery" className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {galleryItems.map((item) => (
                 <Card
                   key={item.id}
@@ -493,11 +482,12 @@ export default function VaultPage() {
                   <CardHeader className="p-0">
                     <div className="relative">
                       <img
-                        src={item.image_url || "/placeholder.svg?height=250&width=300"}
+                        src={item.image_url || "/placeholder.svg?height=300&width=400"}
                         alt={item.title}
-                        className="w-full h-64 object-cover rounded-t-lg"
+                        className="w-full aspect-square object-cover rounded-t-lg"
                       />
 
+                      {/* Premium Badge */}
                       {item.is_premium && (
                         <Badge className="absolute top-2 right-2 bg-gold-400 text-black">
                           <Crown className="h-3 w-3 mr-1" />
@@ -505,27 +495,25 @@ export default function VaultPage() {
                         </Badge>
                       )}
 
-                      <Badge className="absolute bottom-2 left-2 bg-black/80 text-white">{item.category}</Badge>
-
-                      {!canAccess(item) && (
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-t-lg">
-                          <Crown className="h-8 w-8 text-white" />
-                        </div>
-                      )}
+                      {/* Category Badge */}
+                      <Badge className="absolute top-2 left-2 bg-orange-500 text-black">
+                        {item.category.toUpperCase()}
+                      </Badge>
                     </div>
                   </CardHeader>
 
-                  <CardContent className="p-4">
-                    <h3 className="font-semibold text-sm">{item.title}</h3>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="font-bold text-xl mb-1">{item.title}</h3>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
           </TabsContent>
         </Tabs>
-
-        {/* Streaming Links Modal */}
-        <StreamingLinksModal item={showStreamingLinks} onClose={() => setShowStreamingLinks(null)} />
 
         {/* Album Detail Modal */}
         {selectedAlbum && (
@@ -535,64 +523,83 @@ export default function VaultPage() {
                 <DialogTitle className="text-2xl font-street text-gradient">{selectedAlbum.title}</DialogTitle>
               </DialogHeader>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Album Cover */}
+                <div>
                   <img
-                    src={selectedAlbum.cover_url || "/placeholder.svg"}
+                    src={selectedAlbum.cover_url || "/placeholder.svg?height=300&width=300"}
                     alt={selectedAlbum.title}
                     className="w-full aspect-square object-cover rounded-lg"
                   />
 
-                  <div className="flex gap-2">
-                    <Button className="flex-1 bg-orange-500 hover:bg-orange-600 text-black">
-                      <Play className="h-4 w-4 mr-2" />
-                      Play Album
-                    </Button>
-                    <Button variant="outline">
-                      <Heart className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline">
-                      <Share2 className="h-4 w-4" />
-                    </Button>
+                  <div className="mt-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Released:</span>
+                      <span>{new Date(selectedAlbum.release_date).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Tracks:</span>
+                      <span>{selectedAlbum.total_tracks}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Duration:</span>
+                      <span>{selectedAlbum.duration}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Plays:</span>
+                      <span>{formatNumber(selectedAlbum.play_count)}</span>
+                    </div>
+
+                    <div className="flex gap-2 pt-4">
+                      <Button className="flex-1 bg-orange-500 hover:bg-orange-600 text-black">
+                        <Play className="h-4 w-4 mr-2" />
+                        Play
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="border-orange-500/40 text-orange-500"
+                        onClick={() => setShowStreamingLinks(selectedAlbum)}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-lg font-bold mb-2">Album Info</h3>
-                    <p className="text-muted-foreground mb-4">{selectedAlbum.description}</p>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Release Date:</span>
-                        <span>{new Date(selectedAlbum.release_date).toLocaleDateString()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Total Tracks:</span>
-                        <span>{selectedAlbum.total_tracks}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Duration:</span>
-                        <span>{selectedAlbum.duration}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Total Plays:</span>
-                        <span>{formatNumber(selectedAlbum.play_count)}</span>
-                      </div>
-                    </div>
-                  </div>
+                {/* Track List */}
+                <div className="md:col-span-2">
+                  <h3 className="text-lg font-bold mb-4">Tracks</h3>
 
-                  <div>
-                    <h3 className="text-lg font-bold mb-4">Stream On</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      {streamingPlatforms.slice(0, 4).map((platform) => (
-                        <Button key={platform.name} variant="outline" size="sm" className="justify-start" asChild>
-                          <a href={platform.url} target="_blank" rel="noopener noreferrer">
-                            <span className="mr-2">{platform.icon}</span>
-                            {platform.name}
-                          </a>
-                        </Button>
-                      ))}
-                    </div>
+                  <div className="space-y-2">
+                    {Array.from({ length: selectedAlbum.total_tracks }).map((_, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 rounded-md hover:bg-card/80 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 flex items-center justify-center">
+                            <span className="text-muted-foreground">{index + 1}</span>
+                          </div>
+                          <div>
+                            <p className="font-medium">Track {index + 1}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {Math.floor(Math.random() * 2) + 2}:
+                              {Math.floor(Math.random() * 60)
+                                .toString()
+                                .padStart(2, "0")}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Play className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Heart className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -600,45 +607,125 @@ export default function VaultPage() {
           </Dialog>
         )}
 
-        {/* Video Player Modal */}
-        {selectedVideo && (
-          <Dialog open={!!selectedVideo} onOpenChange={() => setSelectedVideo(null)}>
-            <DialogContent className="max-w-4xl">
+        {/* Track Detail Modal */}
+        {selectedTrack && (
+          <Dialog open={!!selectedTrack} onOpenChange={() => setSelectedTrack(null)}>
+            <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>{selectedVideo.title}</DialogTitle>
+                <DialogTitle className="text-2xl font-street text-gradient">{selectedTrack.title}</DialogTitle>
               </DialogHeader>
 
-              <div className="space-y-4">
-                <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
-                  <div className="text-center text-white">
-                    <Youtube className="h-16 w-16 mx-auto mb-4" />
-                    <p className="text-lg">Video Player</p>
-                    <p className="text-sm text-gray-400">Duration: {selectedVideo.duration}</p>
-                  </div>
-                </div>
+              <div className="space-y-6">
+                <img
+                  src={selectedTrack.cover_url || "/placeholder.svg?height=300&width=300"}
+                  alt={selectedTrack.title}
+                  className="w-full aspect-square object-cover rounded-lg"
+                />
 
-                <div className="flex items-center justify-between">
+                <div className="space-y-4">
                   <div>
-                    <h3 className="font-bold text-lg">{selectedVideo.title}</h3>
-                    <p className="text-muted-foreground">
-                      {formatNumber(selectedVideo.views)} views •{" "}
-                      {new Date(selectedVideo.release_date).toLocaleDateString()}
+                    <p className="text-lg font-medium">
+                      {selectedTrack.artist} {selectedTrack.featuring ? `ft. ${selectedTrack.featuring}` : ""}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Released: {new Date(selectedTrack.release_date).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      <Heart className="h-4 w-4 mr-1" />
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-orange-300" />
+                      <span>{selectedTrack.duration}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Headphones className="h-4 w-4 text-orange-500" />
+                      <span>{formatNumber(selectedTrack.play_count)} plays</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <Button className="flex-1 bg-orange-500 hover:bg-orange-600 text-black">
+                      <Play className="h-4 w-4 mr-2" />
+                      Play
+                    </Button>
+                    <Button variant="outline" className="border-orange-500/40 text-orange-500">
+                      <Heart className="h-4 w-4 mr-2" />
                       Like
                     </Button>
-                    <Button variant="outline" size="sm">
-                      <Share2 className="h-4 w-4 mr-1" />
-                      Share
+                    <Button
+                      variant="outline"
+                      className="border-orange-500/40 text-orange-500"
+                      onClick={() => setShowStreamingLinks(selectedTrack)}
+                    >
+                      <Share2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
               </div>
             </DialogContent>
           </Dialog>
+        )}
+
+        {/* Video Detail Modal */}
+        {selectedVideo && (
+          <Dialog open={!!selectedVideo} onOpenChange={() => setSelectedVideo(null)}>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-street text-gradient">{selectedVideo.title}</DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-6">
+                {/* Video Player Placeholder */}
+                <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
+                  <div className="text-center text-white">
+                    <PlayCircle className="h-16 w-16 mx-auto mb-4" />
+                    <p className="text-lg">Video Player</p>
+                    <p className="text-sm text-gray-400">Duration: {selectedVideo.duration}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-lg font-medium">{selectedVideo.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Released: {new Date(selectedVideo.release_date).toLocaleDateString()}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Eye className="h-4 w-4" />
+                      <span>{formatNumber(selectedVideo.views)} views</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <Button className="flex-1 bg-orange-500 hover:bg-orange-600 text-black">
+                      <Play className="h-4 w-4 mr-2" />
+                      Play
+                    </Button>
+                    <Button variant="outline" className="border-orange-500/40 text-orange-500">
+                      <Heart className="h-4 w-4 mr-2" />
+                      Like
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="border-orange-500/40 text-orange-500"
+                      onClick={() => window.open("https://youtube.com", "_blank")}
+                    >
+                      <Youtube className="h-4 w-4 mr-2" />
+                      YouTube
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Streaming Links Modal */}
+        {showStreamingLinks && (
+          <StreamingLinksModal item={showStreamingLinks} onClose={() => setShowStreamingLinks(null)} />
         )}
       </div>
     </div>
