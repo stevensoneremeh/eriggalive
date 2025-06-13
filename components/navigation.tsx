@@ -9,6 +9,7 @@ import { useTheme } from "@/contexts/theme-context"
 import { useAuth } from "@/contexts/auth-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
 import { CoinBalance } from "@/components/coin-balance"
+import { SessionRefresh } from "@/components/session-refresh"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +17,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { SessionRefresh } from "@/components/session-refresh"
 
 const navItems = [
   { name: "Home", href: "/" },
@@ -34,7 +34,7 @@ export function Navigation() {
   const [isSigningOut, setIsSigningOut] = useState(false)
   const pathname = usePathname()
   const { theme, toggleTheme } = useTheme()
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, signOut, isAuthenticated } = useAuth()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -91,7 +91,7 @@ export function Navigation() {
           {/* Right Side Actions */}
           <div className="flex items-center space-x-4">
             {/* Coin Balance */}
-            {user && <CoinBalance />}
+            {isAuthenticated && <CoinBalance />}
 
             {/* Theme Toggle */}
             <Button
@@ -104,7 +104,7 @@ export function Navigation() {
             </Button>
 
             {/* User Menu */}
-            {user ? (
+            {isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="flex items-center space-x-2">
@@ -197,7 +197,7 @@ export function Navigation() {
                   {item.name}
                 </Link>
               ))}
-              {!user && (
+              {!isAuthenticated && (
                 <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
                   <Link
                     href="/login"
@@ -215,7 +215,7 @@ export function Navigation() {
                   </Link>
                 </div>
               )}
-              {user && (
+              {isAuthenticated && (
                 <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
                   <Link
                     href="/dashboard"

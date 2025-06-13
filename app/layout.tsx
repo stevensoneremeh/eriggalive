@@ -9,6 +9,7 @@ import ErrorBoundary from "@/components/error-boundary"
 import { PreviewModeIndicator } from "@/components/preview-mode-indicator"
 import Script from "next/script"
 import { DynamicLogo } from "@/components/dynamic-logo"
+import { SessionRefresh } from "@/components/session-refresh"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -29,6 +30,7 @@ export default function RootLayout({
         <ErrorBoundary>
           <ThemeProvider>
             <AuthProvider>
+              <SessionRefresh />
               <div className="min-h-screen flex flex-col">
                 <Navigation />
                 <main className="flex-1 pt-16">{children}</main>

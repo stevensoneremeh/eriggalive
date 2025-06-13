@@ -2,30 +2,25 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 // Define public paths that don't require authentication
-const PUBLIC_PATHS = [
-  "/",
-  "/login",
-  "/signup",
-  "/forgot-password",
-  "/reset-password",
-  "/api",
-  "/_next",
-  "/favicon.ico",
-  "/images",
-  "/videos",
-  "/fonts",
-]
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password"]
+
+// Define paths that should always be accessible regardless of auth status
+const ALWAYS_ACCESSIBLE = ["/api", "/_next", "/favicon.ico", "/images", "/videos", "/fonts"]
 
 export function middleware(request: NextRequest) {
   // Get the pathname of the request
   const { pathname } = request.nextUrl
 
+  // Check if the path is in the always accessible list or is a static file
+  if (ALWAYS_ACCESSIBLE.some((path) => pathname.startsWith(path)) || pathname.includes(".")) {
+    return NextResponse.next()
+  }
+
   // Check if the path is public
-  const isPublicPath =
-    PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`)) || pathname.includes(".")
+  const isPublicPath = PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
 
   // Check if the user is authenticated by looking for the auth cookie
-  const isAuthenticated = request.cookies.has("erigga_auth")
+  const isAuthenticated = request.cookies.has("erigga_auth") || request.cookies.has("erigga_auth_session")
 
   // If accessing a protected route without authentication
   if (!isPublicPath && !isAuthenticated) {
@@ -62,14 +57,5 @@ export function middleware(request: NextRequest) {
 
 // See "Matching Paths" below to learn more
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
+  matcher: ["/((?!api/|_next/|_static/|_vercel|[\\w-]+\\.\\w+).*)"],
 }

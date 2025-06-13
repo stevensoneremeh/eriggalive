@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase-utils"
 
 // Define types
 type UserTier = "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
@@ -30,6 +29,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: any }>
   signOut: () => Promise<void>
   isLoading: boolean
+  isAuthenticated: boolean
   purchaseCoins: (amount: number, method: string) => Promise<{ success: boolean; data?: any; error?: any }>
   refreshSession: () => Promise<void>
 }
@@ -45,8 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   // Initialize with stored data
   useEffect(() => {
@@ -63,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (sessionData && sessionData.user && sessionData.profile) {
               setUser(sessionData.user)
               setProfile(sessionData.profile)
+              setIsAuthenticated(true)
 
               // Refresh the session expiry
               persistSession(sessionData.user, sessionData.profile)
@@ -84,14 +85,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           setUser(parsedUser)
           setProfile(parsedProfile)
+          setIsAuthenticated(true)
 
           // Update the session cookie from localStorage data
           persistSession(parsedUser, parsedProfile)
+        } else {
+          setIsAuthenticated(false)
         }
       } catch (error) {
         console.error("Auth initialization error:", error)
         // Clear potentially corrupted data
         clearSession()
+        setIsAuthenticated(false)
       } finally {
         setIsLoading(false)
       }
@@ -134,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("erigga_profile", JSON.stringify(profile))
 
       // Store in cookies for better security and persistence
-      const sessionData = btoa(JSON.stringify({ user, profile }))
+      const sessionData = btoa(JSON.stringify({ user, profile, timestamp: Date.now() }))
 
       // Set a secure, http-only cookie with a long expiration
       document.cookie = `erigga_auth_session=${sessionData}; path=/; max-age=${SESSION_EXPIRY}; SameSite=Lax`
@@ -198,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setUser(mockUser)
       setProfile(mockProfile)
+      setIsAuthenticated(true)
 
       return { success: true }
     } catch (error: any) {
@@ -217,6 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setUser(null)
       setProfile(null)
+      setIsAuthenticated(false)
 
       router.push("/login")
     } catch (error) {
@@ -259,7 +266,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, signIn, signOut, isLoading, purchaseCoins, refreshSession }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        signIn,
+        signOut,
+        isLoading,
+        isAuthenticated,
+        purchaseCoins,
+        refreshSession,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )
