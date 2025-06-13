@@ -1,208 +1,162 @@
 "use client"
 
-import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
-import type { User as SupabaseUser } from "@supabase/supabase-js"
-import { createClient } from "@/lib/supabase/client"
-import type { User } from "@/types/database"
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+
+// Define types
+type UserTier = "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
+
+interface User {
+  id: string
+  email: string
+  username: string
+}
+
+interface UserProfile extends User {
+  tier: UserTier
+  coins: number
+  avatar_url?: string
+  full_name?: string
+  bio?: string
+  created_at: string
+}
 
 interface AuthContextType {
-  user: SupabaseUser | null
-  profile: User | null
-  loading: boolean
-  signIn: (email: string, password: string) => Promise<any>
-  signUp: (email: string, password: string, username: string, fullName: string) => Promise<any>
+  user: User | null
+  profile: UserProfile | null
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   signOut: () => Promise<void>
-  updateProfile: (updates: Partial<User>) => Promise<void>
+  isLoading: boolean
+  isPreviewMode: boolean
 }
 
-// Create a default context value to avoid null checks
-const defaultContextValue: AuthContextType = {
-  user: null,
-  profile: null,
-  loading: true,
-  signIn: async () => ({ error: new Error("Auth context not initialized") }),
-  signUp: async () => ({ error: new Error("Auth context not initialized") }),
-  signOut: async () => {},
-  updateProfile: async () => {},
-}
+// Create context
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const AuthContext = createContext<AuthContextType>(defaultContextValue)
+// Provider component
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [profile, setProfile] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
+  // Always true in v0 preview
+  const isPreviewMode = true
 
+  // Initialize with mock data for preview
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
+    const initializeAuth = async () => {
       try {
-        const supabase = createClient()
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession()
+        // In preview mode, we'll use mock data
+        if (isPreviewMode) {
+          // Simulate a delay for loading state
+          await new Promise((resolve) => setTimeout(resolve, 1000))
 
-        if (sessionError) {
-          console.error("Error getting session:", sessionError)
-          setError(sessionError)
-          setLoading(false)
-          return
-        }
+          // 50% chance of being logged in for demo purposes
+          const isLoggedIn = Math.random() > 0.5
 
-        setUser(session?.user ?? null)
+          if (isLoggedIn) {
+            const mockUser = {
+              id: "preview-user-id",
+              email: "fan@eriggalive.com",
+              username: "EriggaFan",
+            }
 
-        if (session?.user) {
-          await fetchProfile(session.user.id)
-        }
-      } catch (err) {
-        console.error("Error in getInitialSession:", err)
-        setError(err instanceof Error ? err : new Error(String(err)))
-      } finally {
-        setLoading(false)
-      }
-    }
+            const mockProfile = {
+              ...mockUser,
+              tier: ["grassroot", "pioneer", "elder", "blood_brotherhood"][Math.floor(Math.random() * 4)] as UserTier,
+              coins: Math.floor(Math.random() * 1000),
+              created_at: new Date().toISOString(),
+              bio: "This is a preview mode user profile.",
+            }
 
-    getInitialSession()
-
-    // Listen for auth changes
-    let subscription: { unsubscribe: () => void } | null = null
-
-    try {
-      const supabase = createClient()
-      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
-        setUser(session?.user ?? null)
-
-        if (session?.user) {
-          await fetchProfile(session.user.id)
+            setUser(mockUser)
+            setProfile(mockProfile)
+          }
         } else {
-          setProfile(null)
+          // Real authentication logic would go here
+          // const { data: { session } } = await supabase.auth.getSession()
+          // if (session) { ... }
         }
-
-        setLoading(false)
-      })
-
-      subscription = data.subscription
-    } catch (err) {
-      console.error("Error setting up auth subscription:", err)
-      setError(err instanceof Error ? err : new Error(String(err)))
-      setLoading(false)
-    }
-
-    return () => {
-      if (subscription) subscription.unsubscribe()
-    }
-  }, [])
-
-  const fetchProfile = async (authUserId: string) => {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", authUserId).single()
-
-      if (error) {
-        console.error("Error fetching profile:", error)
-        return
+      } catch (error) {
+        console.error("Auth initialization error:", error)
+      } finally {
+        setIsLoading(false)
       }
-
-      setProfile(data)
-    } catch (error) {
-      console.error("Error in fetchProfile:", error)
     }
-  }
 
+    initializeAuth()
+  }, [isPreviewMode])
+
+  // Mock sign in function
   const signIn = async (email: string, password: string) => {
     try {
-      const supabase = createClient()
-      return await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-    } catch (err) {
-      console.error("Error in signIn:", err)
-      return { data: null, error: err instanceof Error ? err : new Error(String(err)) }
-    }
-  }
+      setIsLoading(true)
 
-  const signUp = async (email: string, password: string, username: string, fullName: string) => {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      })
+      if (isPreviewMode) {
+        // Simulate API delay
+        await new Promise((resolve) => setTimeout(resolve, 1500))
 
-      if (data.user && !error) {
-        // Create user profile in our custom users table
-        const { error: profileError } = await supabase.from("users").insert({
-          auth_user_id: data.user.id,
-          username,
-          full_name: fullName,
-          tier: "street_rep",
-          level: 1,
-          points: 0,
-          // erigma_id will be auto-generated by the trigger
-        })
-
-        if (profileError) {
-          console.error("Error creating profile:", profileError)
+        // Always succeed in preview mode with mock data
+        const mockUser = {
+          id: "preview-user-id",
+          email,
+          username: email.split("@")[0],
         }
+
+        const mockProfile = {
+          ...mockUser,
+          tier: "pioneer" as UserTier,
+          coins: 500,
+          created_at: new Date().toISOString(),
+          bio: "This is a preview mode user profile.",
+        }
+
+        setUser(mockUser)
+        setProfile(mockProfile)
+
+        return { success: true }
       }
 
-      return { data, error }
-    } catch (err) {
-      console.error("Error in signUp:", err)
-      return { data: null, error: err instanceof Error ? err : new Error(String(err)) }
+      // Real sign in logic would go here
+      return { success: false, error: "Authentication only works when deployed" }
+    } catch (error: any) {
+      return { success: false, error: error.message || "An unknown error occurred" }
+    } finally {
+      setIsLoading(false)
     }
   }
 
+  // Mock sign out function
   const signOut = async () => {
     try {
-      const supabase = createClient()
-      await supabase.auth.signOut()
-      setUser(null)
-      setProfile(null)
-    } catch (err) {
-      console.error("Error in signOut:", err)
-    }
-  }
+      setIsLoading(true)
 
-  const updateProfile = async (updates: Partial<User>) => {
-    if (!user) return
-
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.from("users").update(updates).eq("auth_user_id", user.id)
-
-      if (error) {
-        console.error("Error updating profile:", error)
-        return
+      if (isPreviewMode) {
+        // Simulate API delay
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        setUser(null)
+        setProfile(null)
+      } else {
+        // Real sign out logic would go here
       }
-
-      setProfile((prev) => (prev ? { ...prev, ...updates } : null))
-    } catch (err) {
-      console.error("Error in updateProfile:", err)
+    } catch (error) {
+      console.error("Sign out error:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        profile,
-        loading,
-        signIn,
-        signUp,
-        signOut,
-        updateProfile,
-      }}
-    >
+    <AuthContext.Provider value={{ user, profile, signIn, signOut, isLoading, isPreviewMode }}>
       {children}
     </AuthContext.Provider>
   )
 }
 
-export function useAuth() {
-  return useContext(AuthContext)
+// Custom hook to use the auth context
+export const useAuth = () => {
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider")
+  }
+  return context
 }

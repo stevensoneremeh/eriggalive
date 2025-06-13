@@ -28,15 +28,38 @@ export default function LoginPage() {
     setError("")
 
     try {
-      const { error } = await signIn(email, password)
+      // Check if we're in a preview environment
+      const isPreviewMode =
+        typeof window !== "undefined" &&
+        (window.location.hostname.includes("lite.vusercontent.net") || window.location.hostname.includes("v0.dev"))
+
+      if (isPreviewMode) {
+        console.log("Running in preview mode")
+      }
+
+      const { error, data } = await signIn(email, password)
 
       if (error) {
-        setError(error.message)
+        console.error("Login error:", error)
+
+        // Provide more specific error messages
+        if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
+          setError(
+            "Network error: Unable to connect to authentication service. If you're in preview mode, use email 'test@example.com' and password 'password'.",
+          )
+        } else if (error.message.includes("Invalid login credentials")) {
+          setError("Invalid email or password. Please try again.")
+        } else if (error.message.includes("preview mode")) {
+          setError(error.message)
+        } else {
+          setError(error.message || "Authentication failed. Please try again.")
+        }
       } else {
         router.push("/dashboard")
       }
     } catch (err) {
-      setError("An unexpected error occurred")
+      console.error("Unexpected error during login:", err)
+      setError("An unexpected error occurred. Please try again later.")
     } finally {
       setLoading(false)
     }

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Volume2, VolumeX, Play, Pause } from "lucide-react"
+import Image from "next/image"
 
 interface HeroVideoProps {
   src: string
@@ -12,20 +13,28 @@ interface HeroVideoProps {
 
 export function HeroVideo({ src, fallbackImage, className = "" }: HeroVideoProps) {
   const [isMuted, setIsMuted] = useState(true)
-  const [isPlaying, setIsPlaying] = useState(true)
+  const [isPlaying, setIsPlaying] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
   const [hasError, setHasError] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
+  // Initialize video on mount
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
 
-    const handleLoadedData = () => setIsLoaded(true)
+    // Set up event listeners
+    const handleLoadedData = () => {
+      console.log("✅ Video loaded successfully")
+      setIsLoaded(true)
+      // Try to play the video automatically
+      playVideo()
+    }
+
     const handlePlay = () => setIsPlaying(true)
     const handlePause = () => setIsPlaying(false)
-    const handleError = () => {
-      console.error("Video failed to load")
+    const handleError = (e: any) => {
+      console.error("❌ Video failed to load:", e)
       setHasError(true)
     }
 
@@ -37,6 +46,7 @@ export function HeroVideo({ src, fallbackImage, className = "" }: HeroVideoProps
     // If video fails to load within 5 seconds, show fallback
     const timeout = setTimeout(() => {
       if (!isLoaded) {
+        console.warn("⚠️ Video load timeout - showing fallback")
         setHasError(true)
       }
     }, 5000)
@@ -50,6 +60,28 @@ export function HeroVideo({ src, fallbackImage, className = "" }: HeroVideoProps
     }
   }, [isLoaded])
 
+  // Function to safely attempt to play the video
+  const playVideo = () => {
+    if (!videoRef.current) return
+
+    // Always mute before attempting to play (to avoid autoplay restrictions)
+    videoRef.current.muted = true
+    setIsMuted(true)
+
+    // Attempt to play with error handling
+    videoRef.current
+      .play()
+      .then(() => {
+        console.log("✅ Video playing")
+        setIsPlaying(true)
+      })
+      .catch((err) => {
+        console.error("❌ Video play failed:", err)
+        setIsPlaying(false)
+        setHasError(true)
+      })
+  }
+
   const toggleMute = () => {
     if (videoRef.current) {
       videoRef.current.muted = !isMuted
@@ -62,23 +94,25 @@ export function HeroVideo({ src, fallbackImage, className = "" }: HeroVideoProps
       if (isPlaying) {
         videoRef.current.pause()
       } else {
-        videoRef.current.play().catch((err) => {
-          console.error("Video play failed:", err)
-          setHasError(true)
-        })
+        playVideo()
       }
     }
   }
 
+  // If there's an error and we have a fallback image, show it
   if (hasError && fallbackImage) {
     return (
-      <div
-        className={`absolute inset-0 bg-cover bg-center ${className}`}
-        style={{
-          backgroundImage: `url(${fallbackImage})`,
-          filter: "brightness(0.8) contrast(1.1) saturate(1.1)",
-        }}
-      />
+      <div className={`relative ${className}`}>
+        <Image
+          src={fallbackImage || "/placeholder.svg"}
+          alt="Hero fallback image"
+          fill
+          priority
+          className="object-cover"
+          sizes="100vw"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
+      </div>
     )
   }
 
@@ -86,7 +120,6 @@ export function HeroVideo({ src, fallbackImage, className = "" }: HeroVideoProps
     <div className={`relative ${className}`}>
       <video
         ref={videoRef}
-        autoPlay
         playsInline
         muted={isMuted}
         loop
@@ -98,10 +131,8 @@ export function HeroVideo({ src, fallbackImage, className = "" }: HeroVideoProps
         onError={() => setHasError(true)}
       >
         <source src={src} type="video/mp4" />
-        {/* Fallback */}
-        {fallbackImage && (
-          <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${fallbackImage})` }} />
-        )}
+        <source src={src} type="video/webm" />
+        Your browser does not support the video tag.
       </video>
 
       {/* Video Controls */}
@@ -140,6 +171,9 @@ export function HeroVideo({ src, fallbackImage, className = "" }: HeroVideoProps
           <div className="text-white text-lg">Loading video...</div>
         </div>
       )}
+
+      {/* Gradient Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40 pointer-events-none" />
     </div>
   )
 }

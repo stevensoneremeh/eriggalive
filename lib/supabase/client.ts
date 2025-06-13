@@ -1,7 +1,11 @@
 import { createBrowserClient } from "@supabase/ssr"
+import type { Database } from "@/types/database"
 
 // Create a singleton instance
-let supabaseClient: ReturnType<typeof createBrowserClient> | null = null
+let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null
+
+// Check if we're in a browser environment
+const isBrowser = typeof window !== "undefined"
 
 export function createClient() {
   // Return existing client if already created (singleton pattern)
@@ -19,38 +23,24 @@ export function createClient() {
     }
 
     // Create client
-    supabaseClient = createBrowserClient(supabaseUrl, supabaseAnonKey)
+    supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+      global: {
+        headers: {
+          "x-application-name": "eriggalive",
+        },
+      },
+    })
     return supabaseClient
   } catch (error) {
     console.error("Error creating Supabase client:", error)
-
-    // Return a mock client that won't throw errors when methods are called
-    // This prevents the app from crashing when Supabase is unavailable
-    return {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: () => ({ data: null, error: new Error("Supabase client creation failed") }),
-            order: () => ({
-              limit: () => ({ data: null, error: new Error("Supabase client creation failed") }),
-            }),
-          }),
-          order: () => ({
-            limit: () => ({ data: null, error: new Error("Supabase client creation failed") }),
-          }),
-          limit: () => ({ data: null, error: new Error("Supabase client creation failed") }),
-        }),
-        insert: () => ({ error: new Error("Supabase client creation failed") }),
-        update: () => ({ error: new Error("Supabase client creation failed") }),
-      }),
-      auth: {
-        getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-        signInWithPassword: () =>
-          Promise.resolve({ data: { user: null }, error: new Error("Supabase client creation failed") }),
-        signUp: () => Promise.resolve({ data: { user: null }, error: new Error("Supabase client creation failed") }),
-        signOut: () => Promise.resolve({ error: null }),
-        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-      },
-    } as any
+    throw new Error("Failed to initialize Supabase client")
   }
 }
+
+// Export a default client for convenience
+export default createClient()

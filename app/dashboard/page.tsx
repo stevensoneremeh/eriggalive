@@ -1,249 +1,298 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
+import { useState, useEffect } from "react"
+import { useAuth } from "@/contexts/auth-context"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { Crown, QrCode, Ticket, Trophy, Play, TrendingUp, Eye, Heart, MessageCircle } from "lucide-react"
+import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
+import { Music, MessageSquare, Ticket, Calendar, Clock, Award, ArrowUpRight, ArrowDownRight } from "lucide-react"
+import Link from "next/link"
+import { useTheme } from "@/contexts/theme-context"
 
-const user = {
-  username: "StreetSoldier23",
-  tier: "Warri Elite",
-  level: 15,
-  erigmaId: "ESG-2024-001523",
-  avatar: "/placeholder.svg?height=80&width=80",
-  points: 2450,
-  nextLevelPoints: 3000,
-  joinDate: "March 2024",
-}
+// Mock data for charts
+const activityData = [
+  { name: "Mon", points: 20 },
+  { name: "Tue", points: 40 },
+  { name: "Wed", points: 30 },
+  { name: "Thu", points: 70 },
+  { name: "Fri", points: 50 },
+  { name: "Sat", points: 90 },
+  { name: "Sun", points: 60 },
+]
 
-const activities = [
+const contentEngagementData = [
+  { name: "Music", value: 40 },
+  { name: "Videos", value: 30 },
+  { name: "Chronicles", value: 20 },
+  { name: "Community", value: 10 },
+]
+
+const COLORS = ["#D4ED3A", "#00796B", "#004D40", "#B1C62D"]
+
+const upcomingEvents = [
+  { title: "Warri Live Show", date: "Dec 25, 2024", venue: "Warri City Stadium", status: "confirmed" },
+  { title: "Lagos Concert", date: "Jan 15, 2025", venue: "Eko Hotel", status: "pending" },
+]
+
+const recentActivity = [
   { type: "comment", content: "Commented on 'Street Anthem 2024'", time: "2h ago", points: 10 },
   { type: "like", content: "Liked WarriKing23's bars", time: "4h ago", points: 5 },
   { type: "purchase", content: "Bought Paper Boi hoodie", time: "1d ago", points: 50 },
   { type: "exclusive", content: "Watched exclusive studio session", time: "2d ago", points: 25 },
 ]
 
-const tickets = [
-  { event: "Warri Live Show", date: "Dec 25, 2024", venue: "Warri City Stadium", status: "confirmed" },
-  { event: "Lagos Concert", date: "Jan 15, 2025", venue: "Eko Hotel", status: "pending" },
-]
-
-const exclusiveContent = [
-  { title: "Behind the Scenes: Studio Session #3", type: "video", watched: true },
-  { title: "Freestyle Friday: Warri Stories", type: "audio", watched: true },
-  { title: "Exclusive Interview: The Journey", type: "video", watched: false },
-]
-
 export default function DashboardPage() {
-  const progressPercentage = (user.points / user.nextLevelPoints) * 100
+  const { profile } = useAuth()
+  const [activeTab, setActiveTab] = useState("overview")
+  const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return null
+  }
+
+  // Calculate progress percentage
+  const nextLevelPoints = profile?.level ? profile.level * 1000 : 1000
+  const progressPercentage = profile?.points ? (profile.points / nextLevelPoints) * 100 : 0
+
+  const chartColors = {
+    primary: theme === "dark" ? "#FFFFFF" : "#004D40",
+    secondary: theme === "dark" ? "#888888" : "#D4ED3A",
+    grid: theme === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)",
+    text: theme === "dark" ? "#AAAAAA" : "#666666",
+  }
 
   return (
-    <div className="min-h-screen py-8 px-4">
-      <div className="container mx-auto max-w-6xl">
-        <div className="text-center mb-8">
-          <h1 className="font-street text-4xl md:text-6xl text-gradient mb-4">YOUR DASHBOARD</h1>
-          <p className="text-muted-foreground">Track your journey in the Erigga community</p>
+    <DashboardLayout>
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">Welcome back, {profile?.username || "Fan"}!</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Profile Section */}
-          <div className="lg:col-span-1 space-y-6">
-            <Card className="bg-card/50 border-orange-500/20">
-              <CardContent className="p-6 text-center">
-                <div className="relative inline-block mb-4">
-                  <Avatar className="h-20 w-20 border-4 border-orange-500">
-                    <AvatarImage src={user.avatar || "/placeholder.svg"} />
-                    <AvatarFallback>SS</AvatarFallback>
-                  </Avatar>
-                  <div className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full bg-orange-500 flex items-center justify-center">
-                    <Crown className="h-4 w-4 text-black" />
-                  </div>
-                </div>
-
-                <h2 className="text-xl font-bold mb-2">{user.username}</h2>
-                <Badge className="bg-orange-500 text-black mb-4">{user.tier}</Badge>
-
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Level:</span>
-                    <span className="font-semibold">{user.level}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Erigma ID:</span>
-                    <span className="font-mono text-xs">{user.erigmaId}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Member Since:</span>
-                    <span>{user.joinDate}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Street Pass QR */}
-            <Card className="bg-gradient-to-br from-orange-500/20 to-gold-400/20 border-orange-500/40">
-              <CardHeader>
-                <CardTitle className="text-center flex items-center justify-center gap-2">
-                  <QrCode className="h-5 w-5" />
-                  Street Pass
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-center">
-                <div className="w-32 h-32 bg-white rounded-lg mx-auto mb-4 flex items-center justify-center">
-                  <QrCode className="h-16 w-16 text-black" />
-                </div>
-                <p className="text-xs text-muted-foreground">Show this at events for VIP access</p>
-              </CardContent>
-            </Card>
-
-            {/* Level Progress */}
-            <Card className="bg-card/50 border-orange-500/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-orange-500" />
-                  Fan Level Progress
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between text-sm">
-                    <span>Level {user.level}</span>
-                    <span>Level {user.level + 1}</span>
-                  </div>
-                  <Progress value={progressPercentage} className="h-3" />
-                  <div className="text-center">
-                    <span className="text-sm text-muted-foreground">
-                      {user.points} / {user.nextLevelPoints} points
-                    </span>
-                  </div>
-                  <div className="text-xs text-center text-muted-foreground">
-                    {user.nextLevelPoints - user.points} points to next level
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="bg-card/50 border-orange-500/20">
-                <CardContent className="p-4 text-center">
-                  <Trophy className="h-8 w-8 text-gold-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold">{user.points}</div>
-                  <div className="text-xs text-muted-foreground">Points Earned</div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card/50 border-orange-500/20">
-                <CardContent className="p-4 text-center">
-                  <Eye className="h-8 w-8 text-orange-500 mx-auto mb-2" />
-                  <div className="text-2xl font-bold">12</div>
-                  <div className="text-xs text-muted-foreground">Exclusives Watched</div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card/50 border-orange-500/20">
-                <CardContent className="p-4 text-center">
-                  <Ticket className="h-8 w-8 text-gold-400 mx-auto mb-2" />
-                  <div className="text-2xl font-bold">3</div>
-                  <div className="text-xs text-muted-foreground">Event Tickets</div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card/50 border-orange-500/20">
-                <CardContent className="p-4 text-center">
-                  <Heart className="h-8 w-8 text-red-500 mx-auto mb-2" />
-                  <div className="text-2xl font-bold">89</div>
-                  <div className="text-xs text-muted-foreground">Community Likes</div>
-                </CardContent>
-              </Card>
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="stat-card">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Points</p>
+                <p className="stat-value">{profile?.points || 0}</p>
+              </div>
+              <div className="p-2 rounded-full bg-brand-lime/20 dark:bg-harkonnen-dark-gray">
+                <Award className="h-5 w-5 text-brand-teal dark:text-white" />
+              </div>
             </div>
+            <div className="mt-2 flex items-center text-xs">
+              <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
+              <span className="text-green-500 font-medium">12%</span>
+              <span className="text-muted-foreground ml-1">from last week</span>
+            </div>
+          </Card>
 
-            {/* Event Tickets */}
-            <Card className="bg-card/50 border-orange-500/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Ticket className="h-5 w-5 text-orange-500" />
-                  Your Tickets
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {tickets.map((ticket, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 bg-background/50 rounded-lg">
-                      <div>
-                        <h4 className="font-semibold">{ticket.event}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {ticket.date} • {ticket.venue}
-                        </p>
-                      </div>
-                      <Badge variant={ticket.status === "confirmed" ? "default" : "secondary"}>{ticket.status}</Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+          <Card className="stat-card">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Content Watched</p>
+                <p className="stat-value">24</p>
+              </div>
+              <div className="p-2 rounded-full bg-brand-lime/20 dark:bg-harkonnen-dark-gray">
+                <Music className="h-5 w-5 text-brand-teal dark:text-white" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-center text-xs">
+              <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
+              <span className="text-green-500 font-medium">8%</span>
+              <span className="text-muted-foreground ml-1">from last week</span>
+            </div>
+          </Card>
 
-            {/* Exclusive Content */}
-            <Card className="bg-card/50 border-orange-500/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Play className="h-5 w-5 text-gold-400" />
-                  Exclusive Content
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {exclusiveContent.map((content, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-background/50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Play className="h-4 w-4 text-orange-500" />
-                        <div>
-                          <p className="font-medium text-sm">{content.title}</p>
-                          <p className="text-xs text-muted-foreground">{content.type}</p>
-                        </div>
-                      </div>
-                      <Badge variant={content.watched ? "default" : "outline"}>
-                        {content.watched ? "Watched" : "New"}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-                <Button className="w-full mt-4 bg-orange-500 hover:bg-orange-600 text-black">Browse Vault</Button>
-              </CardContent>
-            </Card>
+          <Card className="stat-card">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Community Posts</p>
+                <p className="stat-value">7</p>
+              </div>
+              <div className="p-2 rounded-full bg-brand-lime/20 dark:bg-harkonnen-dark-gray">
+                <MessageSquare className="h-5 w-5 text-brand-teal dark:text-white" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-center text-xs">
+              <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
+              <span className="text-red-500 font-medium">3%</span>
+              <span className="text-muted-foreground ml-1">from last week</span>
+            </div>
+          </Card>
 
-            {/* Recent Activity */}
-            <Card className="bg-card/50 border-orange-500/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageCircle className="h-5 w-5 text-orange-500" />
-                  Recent Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {activities.map((activity, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-background/50 rounded-lg">
-                      <div>
-                        <p className="text-sm">{activity.content}</p>
-                        <p className="text-xs text-muted-foreground">{activity.time}</p>
-                      </div>
-                      <Badge variant="outline" className="text-orange-500 border-orange-500">
-                        +{activity.points} pts
-                      </Badge>
+          <Card className="stat-card">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Event Tickets</p>
+                <p className="stat-value">2</p>
+              </div>
+              <div className="p-2 rounded-full bg-brand-lime/20 dark:bg-harkonnen-dark-gray">
+                <Ticket className="h-5 w-5 text-brand-teal dark:text-white" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-center text-xs">
+              <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
+              <span className="text-green-500 font-medium">New</span>
+              <span className="text-muted-foreground ml-1">ticket purchased</span>
+            </div>
+          </Card>
+        </div>
+
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Activity Chart */}
+          <Card className="lg:col-span-2 chart-container">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg font-medium">Weekly Activity</CardTitle>
+              <CardDescription>Your point earning activity for the past week</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={activityData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                    <XAxis dataKey="name" tick={{ fill: chartColors.text }} />
+                    <YAxis tick={{ fill: chartColors.text }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: theme === "dark" ? "#1a1a1a" : "#fff",
+                        borderColor: theme === "dark" ? "#333" : "#ddd",
+                        color: chartColors.text,
+                      }}
+                    />
+                    <Bar dataKey="points" fill={chartColors.secondary} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Content Engagement */}
+          <Card className="chart-container">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg font-medium">Content Engagement</CardTitle>
+              <CardDescription>How you engage with different content types</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px] flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={contentEngagementData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {contentEngagementData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: theme === "dark" ? "#1a1a1a" : "#fff",
+                        borderColor: theme === "dark" ? "#333" : "#ddd",
+                        color: chartColors.text,
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Level Progress */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-medium">Level Progress</CardTitle>
+            <CardDescription>
+              {profile?.points || 0} / {nextLevelPoints} points to reach Level {(profile?.level || 0) + 1}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Progress value={progressPercentage} className="h-2" />
+            <div className="mt-2 text-sm text-muted-foreground">
+              {nextLevelPoints - (profile?.points || 0)} more points needed for next level
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Recent Activity and Upcoming Events */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Recent Activity */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg font-medium flex items-center">
+                <Clock className="mr-2 h-5 w-5" />
+                Recent Activity
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {recentActivity.map((activity, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
+                    <div>
+                      <p className="text-sm">{activity.content}</p>
+                      <p className="text-xs text-muted-foreground">{activity.time}</p>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                    <div className="text-sm font-medium text-brand-teal dark:text-white">+{activity.points} pts</div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Upcoming Events */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg font-medium flex items-center">
+                <Calendar className="mr-2 h-5 w-5" />
+                Upcoming Events
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {upcomingEvents.map((event, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium">{event.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {event.date} • {event.venue}
+                      </p>
+                    </div>
+                    <div
+                      className={`text-xs px-2 py-1 rounded-full ${
+                        event.status === "confirmed"
+                          ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+                          : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400"
+                      }`}
+                    >
+                      {event.status}
+                    </div>
+                  </div>
+                ))}
+                <Button variant="outline" className="w-full" asChild>
+                  <Link href="/tickets">View All Events</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

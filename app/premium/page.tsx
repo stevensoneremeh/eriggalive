@@ -3,11 +3,11 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Check, Crown, Star, Shield, Zap } from "lucide-react"
+import { Check, Star, Crown, Shield, Zap, Droplets } from "lucide-react"
 
 const plans = [
   {
-    name: "Street Rep",
+    name: "Grassroot",
     price: "Free",
     icon: Star,
     color: "text-gray-400",
@@ -17,7 +17,7 @@ const plans = [
     limitations: ["No exclusive content", "Limited community features", "No premium badges"],
   },
   {
-    name: "Warri Elite",
+    name: "Pioneer",
     price: "₦2,500",
     period: "/month",
     icon: Crown,
@@ -30,13 +30,13 @@ const plans = [
       "Exclusive behind-the-scenes content",
       "10% discount on merch",
       "Priority event tickets",
-      "Elite profile badge",
+      "Pioneer profile badge",
       "Access to premium discussions",
       "Monthly exclusive freestyles",
     ],
   },
   {
-    name: "Erigma Circle",
+    name: "Elder",
     price: "₦5,000",
     period: "/month",
     icon: Shield,
@@ -44,15 +44,36 @@ const plans = [
     bgColor: "bg-gold-400/10",
     borderColor: "border-gold-400/40",
     features: [
-      "Everything in Warri Elite",
+      "Everything in Pioneer",
       "VIP access to all events",
       "20% discount on merch & tickets",
       "Direct access to exclusive content",
-      "Erigma Circle badge",
+      "Elder Circle badge",
       "Monthly video calls with Erigga",
       "First access to new music",
       "Exclusive merchandise",
       "Premium customer support",
+    ],
+  },
+  {
+    name: "Blood",
+    price: "₦10,000",
+    period: "/month",
+    icon: Droplets,
+    color: "text-red-500",
+    bgColor: "bg-red-500/10",
+    borderColor: "border-red-500/40",
+    features: [
+      "Everything in Elder",
+      "Backstage access at events",
+      "30% discount on all purchases",
+      "Personalized birthday message",
+      "Blood badge (highest tier)",
+      "Quarterly private sessions",
+      "Input on upcoming releases",
+      "Limited edition merchandise",
+      "Direct contact with Erigga",
+      "Lifetime membership benefits",
     ],
   },
 ]
@@ -69,7 +90,7 @@ export default function PremiumPage() {
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
           {plans.map((plan) => {
             const Icon = plan.icon
 
@@ -116,14 +137,16 @@ export default function PremiumPage() {
 
                   <Button
                     className={`w-full mt-6 ${
-                      plan.name === "Street Rep"
+                      plan.name === "Grassroot"
                         ? "bg-gray-600 hover:bg-gray-700"
-                        : plan.name === "Warri Elite"
+                        : plan.name === "Pioneer"
                           ? "bg-orange-500 hover:bg-orange-600 text-black"
-                          : "bg-gold-400 hover:bg-gold-500 text-black"
+                          : plan.name === "Elder"
+                            ? "bg-gold-400 hover:bg-gold-500 text-black"
+                            : "bg-red-500 hover:bg-red-600 text-white"
                     } font-bold`}
                   >
-                    {plan.name === "Street Rep" ? "Current Plan" : "Subscribe Now"}
+                    {plan.name === "Grassroot" ? "Current Plan" : "Subscribe Now"}
                   </Button>
                 </CardContent>
               </Card>
@@ -142,48 +165,61 @@ export default function PremiumPage() {
                 <thead>
                   <tr className="border-b border-orange-500/20">
                     <th className="text-left py-4 px-2">Features</th>
-                    <th className="text-center py-4 px-2 text-gray-400">Street Rep</th>
-                    <th className="text-center py-4 px-2 text-orange-500">Warri Elite</th>
-                    <th className="text-center py-4 px-2 text-gold-400">Erigma Circle</th>
+                    <th className="text-center py-4 px-2 text-gray-400">Grassroot</th>
+                    <th className="text-center py-4 px-2 text-orange-500">Pioneer</th>
+                    <th className="text-center py-4 px-2 text-gold-400">Elder</th>
+                    <th className="text-center py-4 px-2 text-red-500">Blood</th>
                   </tr>
                 </thead>
                 <tbody className="space-y-2">
                   {[
-                    ["Community Access", true, true, true],
-                    ["Exclusive Content", false, true, true],
-                    ["Early Music Access", false, true, true],
-                    ["Merch Discounts", false, "10%", "20%"],
-                    ["VIP Event Access", false, false, true],
-                    ["Direct Artist Access", false, false, true],
-                    ["Premium Badge", false, true, true],
-                  ].map(([feature, street, elite, circle], index) => (
+                    ["Community Access", true, true, true, true],
+                    ["Exclusive Content", false, true, true, true],
+                    ["Early Music Access", false, true, true, true],
+                    ["Merch Discounts", false, "10%", "20%", "30%"],
+                    ["VIP Event Access", false, false, true, true],
+                    ["Backstage Access", false, false, false, true],
+                    ["Direct Artist Access", false, false, true, true],
+                    ["Premium Badge", false, true, true, true],
+                    ["Private Sessions", false, false, "Monthly", "Quarterly"],
+                    ["Limited Edition Merch", false, false, true, true],
+                  ].map(([feature, grassroot, pioneer, elder, blood], index) => (
                     <tr key={index} className="border-b border-orange-500/10">
                       <td className="py-3 px-2 font-medium">{feature}</td>
                       <td className="text-center py-3 px-2">
-                        {street === true ? (
+                        {grassroot === true ? (
                           <Check className="h-4 w-4 text-green-500 mx-auto" />
-                        ) : street === false ? (
+                        ) : grassroot === false ? (
                           <span className="text-red-500">✕</span>
                         ) : (
-                          street
+                          grassroot
                         )}
                       </td>
                       <td className="text-center py-3 px-2">
-                        {elite === true ? (
+                        {pioneer === true ? (
                           <Check className="h-4 w-4 text-green-500 mx-auto" />
-                        ) : elite === false ? (
+                        ) : pioneer === false ? (
                           <span className="text-red-500">✕</span>
                         ) : (
-                          elite
+                          pioneer
                         )}
                       </td>
                       <td className="text-center py-3 px-2">
-                        {circle === true ? (
+                        {elder === true ? (
                           <Check className="h-4 w-4 text-green-500 mx-auto" />
-                        ) : circle === false ? (
+                        ) : elder === false ? (
                           <span className="text-red-500">✕</span>
                         ) : (
-                          circle
+                          elder
+                        )}
+                      </td>
+                      <td className="text-center py-3 px-2">
+                        {blood === true ? (
+                          <Check className="h-4 w-4 text-green-500 mx-auto" />
+                        ) : blood === false ? (
+                          <span className="text-red-500">✕</span>
+                        ) : (
+                          blood
                         )}
                       </td>
                     </tr>

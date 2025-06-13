@@ -22,7 +22,8 @@ export default function ChroniclesPage() {
   const [series, setSeries] = useState<SeriesWithEpisodes[]>([])
   const [userProgress, setUserProgress] = useState<Record<number, UserEpisodeProgress>>({})
   const [loading, setLoading] = useState(true)
-  const { user, profile } = useAuth()
+  const [error, setError] = useState<string | null>(null)
+  const { user, profile, isPreviewMode } = useAuth()
   const supabase = createClient()
 
   useEffect(() => {
@@ -34,6 +35,9 @@ export default function ChroniclesPage() {
 
   const fetchSeries = async () => {
     try {
+      setLoading(true)
+      setError(null)
+
       const { data: seriesData, error: seriesError } = await supabase
         .from("cartoon_series")
         .select("*")
@@ -62,6 +66,7 @@ export default function ChroniclesPage() {
       setSeries(seriesWithEpisodes)
     } catch (error) {
       console.error("Error fetching series:", error)
+      setError("Failed to load series. Please try again later.")
     } finally {
       setLoading(false)
     }
@@ -86,6 +91,7 @@ export default function ChroniclesPage() {
       setUserProgress(progressMap)
     } catch (error) {
       console.error("Error fetching user progress:", error)
+      // Don't set an error state here as this is not critical
     }
   }
 
@@ -93,6 +99,18 @@ export default function ChroniclesPage() {
     if (!profile) return
 
     try {
+      // Update local state first for immediate feedback
+      setUserProgress((prev) => ({
+        ...prev,
+        [episodeId]: {
+          user_id: profile.id,
+          episode_id: episodeId,
+          progress_percentage: progress,
+          completed: progress >= 90,
+          last_watched: new Date().toISOString(),
+        } as UserEpisodeProgress,
+      }))
+
       const { error } = await supabase.from("user_episode_progress").upsert({
         user_id: profile.id,
         episode_id: episodeId,
@@ -102,17 +120,6 @@ export default function ChroniclesPage() {
       })
 
       if (error) throw error
-
-      // Update local state
-      setUserProgress((prev) => ({
-        ...prev,
-        [episodeId]: {
-          ...prev[episodeId],
-          progress_percentage: progress,
-          completed: progress >= 90,
-          last_watched: new Date().toISOString(),
-        } as UserEpisodeProgress,
-      }))
     } catch (error) {
       console.error("Error updating progress:", error)
     }
@@ -143,8 +150,25 @@ export default function ChroniclesPage() {
       <div className="min-h-screen py-8 px-4">
         <div className="container mx-auto max-w-7xl">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-lime-500 mx-auto"></div>
             <p className="text-muted-foreground mt-2">Loading Chronicles...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen py-8 px-4">
+        <div className="container mx-auto max-w-7xl">
+          <div className="text-center">
+            <div className="bg-red-500/10 p-4 rounded-lg mb-4">
+              <p className="text-red-500">{error}</p>
+            </div>
+            <Button onClick={fetchSeries} variant="outline">
+              Try Again
+            </Button>
           </div>
         </div>
       </div>
@@ -154,6 +178,16 @@ export default function ChroniclesPage() {
   return (
     <div className="min-h-screen py-8 px-4">
       <div className="container mx-auto max-w-7xl">
+        {/* Preview Mode Indicator */}
+        {isPreviewMode && (
+          <div className="mb-6 p-4 bg-teal-900/20 border border-lime-500/20 rounded-lg">
+            <p className="text-lime-500 text-center">
+              <strong>Preview Mode:</strong> Showing mock data. In production, real data will be fetched from the
+              database.
+            </p>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="font-street text-4xl md:text-6xl text-gradient mb-4">ERIGGA CHRONICLES</h1>
@@ -165,23 +199,26 @@ export default function ChroniclesPage() {
 
         {/* Series Filter Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mb-8">
-          <TabsList className="grid w-full grid-cols-6 bg-card/50 border border-orange-500/20">
-            <TabsTrigger value="all" className="data-[state=active]:bg-orange-500 data-[state=active]:text-black">
+          <TabsList className="grid w-full grid-cols-6 bg-card/50 border border-lime-500/20">
+            <TabsTrigger value="all" className="data-[state=active]:bg-lime-500 data-[state=active]:text-teal-900">
               All Series
             </TabsTrigger>
-            <TabsTrigger value="ongoing" className="data-[state=active]:bg-orange-500 data-[state=active]:text-black">
+            <TabsTrigger value="ongoing" className="data-[state=active]:bg-lime-500 data-[state=active]:text-teal-900">
               Ongoing
             </TabsTrigger>
-            <TabsTrigger value="completed" className="data-[state=active]:bg-orange-500 data-[state=active]:text-black">
+            <TabsTrigger
+              value="completed"
+              className="data-[state=active]:bg-lime-500 data-[state=active]:text-teal-900"
+            >
               Completed
             </TabsTrigger>
-            <TabsTrigger value="comedy" className="data-[state=active]:bg-orange-500 data-[state=active]:text-black">
+            <TabsTrigger value="comedy" className="data-[state=active]:bg-lime-500 data-[state=active]:text-teal-900">
               Comedy
             </TabsTrigger>
-            <TabsTrigger value="drama" className="data-[state=active]:bg-orange-500 data-[state=active]:text-black">
+            <TabsTrigger value="drama" className="data-[state=active]:bg-lime-500 data-[state=active]:text-teal-900">
               Drama
             </TabsTrigger>
-            <TabsTrigger value="upcoming" className="data-[state=active]:bg-orange-500 data-[state=active]:text-black">
+            <TabsTrigger value="upcoming" className="data-[state=active]:bg-lime-500 data-[state=active]:text-teal-900">
               Upcoming
             </TabsTrigger>
           </TabsList>
@@ -192,7 +229,7 @@ export default function ChroniclesPage() {
           {filteredSeries.map((series) => (
             <Card
               key={series.id}
-              className="bg-card/50 border-orange-500/20 hover:border-orange-500/40 transition-all group cursor-pointer"
+              className="bg-card/50 border-lime-500/20 hover:border-lime-500/40 transition-all group cursor-pointer harkonnen-card-style"
               onClick={() => setSelectedSeries(series)}
             >
               <CardHeader className="p-0">
@@ -207,24 +244,24 @@ export default function ChroniclesPage() {
                   <Badge
                     className={`absolute top-2 left-2 ${
                       series.status === "ongoing"
-                        ? "bg-green-500"
+                        ? "bg-lime-500 text-teal-900"
                         : series.status === "completed"
-                          ? "bg-blue-500"
-                          : "bg-orange-500"
-                    } text-white`}
+                          ? "bg-teal-700 text-lime-300"
+                          : "bg-teal-900 text-lime-500"
+                    }`}
                   >
                     {series.status.toUpperCase()}
                   </Badge>
 
                   {/* Category Badge */}
-                  <Badge className="absolute top-2 right-2 bg-gold-400 text-black">
+                  <Badge className="absolute top-2 right-2 bg-lime-500 text-teal-900">
                     {series.category.toUpperCase()}
                   </Badge>
 
                   {/* Play Overlay */}
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-t-lg">
-                    <div className="bg-orange-500 rounded-full p-4">
-                      <Play className="h-8 w-8 text-black fill-black" />
+                  <div className="absolute inset-0 bg-teal-900/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-t-lg">
+                    <div className="bg-lime-500 rounded-full p-4">
+                      <Play className="h-8 w-8 text-teal-900 fill-teal-900" />
                     </div>
                   </div>
                 </div>
@@ -241,16 +278,16 @@ export default function ChroniclesPage() {
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-4">
                       <span className="flex items-center gap-1">
-                        <Film className="h-4 w-4 text-orange-500" />
+                        <Film className="h-4 w-4 text-lime-500" />
                         {series.total_episodes} episodes
                       </span>
                       <span className="flex items-center gap-1">
-                        <Eye className="h-4 w-4 text-gold-400" />
+                        <Eye className="h-4 w-4 text-lime-300" />
                         {formatViews(series.total_views)}
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                      <Star className="h-4 w-4 text-lime-500 fill-lime-500" />
                       <span>{series.rating}</span>
                     </div>
                   </div>
@@ -269,7 +306,7 @@ export default function ChroniclesPage() {
         {/* Series Detail Modal */}
         {selectedSeries && (
           <Dialog open={!!selectedSeries} onOpenChange={() => setSelectedSeries(null)}>
-            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto harkonnen-card-style">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-street text-gradient">{selectedSeries.title}</DialogTitle>
               </DialogHeader>
@@ -287,9 +324,9 @@ export default function ChroniclesPage() {
                     <p className="text-muted-foreground">{selectedSeries.description}</p>
 
                     <div className="flex items-center gap-4 text-sm">
-                      <Badge className="bg-orange-500 text-black">{selectedSeries.status.toUpperCase()}</Badge>
+                      <Badge className="bg-lime-500 text-teal-900">{selectedSeries.status.toUpperCase()}</Badge>
                       <span className="flex items-center gap-1">
-                        <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                        <Star className="h-4 w-4 text-lime-500 fill-lime-500" />
                         {selectedSeries.rating}
                       </span>
                       <span className="flex items-center gap-1">
@@ -309,16 +346,16 @@ export default function ChroniclesPage() {
                       {selectedSeries.episodes.map((episode, index) => (
                         <Card
                           key={episode.id}
-                          className={`bg-background/50 border-orange-500/20 hover:border-orange-500/40 transition-all cursor-pointer ${
+                          className={`bg-background/50 border-lime-500/20 hover:border-lime-500/40 transition-all cursor-pointer ${
                             !canWatchEpisode(episode) ? "opacity-50" : ""
                           }`}
                           onClick={() => canWatchEpisode(episode) && setSelectedEpisode(episode)}
                         >
                           <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                              <div className="w-12 h-12 bg-lime-500/20 rounded-lg flex items-center justify-center">
                                 {episode.is_released ? (
-                                  <Play className="h-6 w-6 text-orange-500" />
+                                  <Play className="h-6 w-6 text-lime-500" />
                                 ) : (
                                   <Clock className="h-6 w-6 text-muted-foreground" />
                                 )}
@@ -338,7 +375,7 @@ export default function ChroniclesPage() {
                                     {formatViews(episode.views)}
                                   </span>
                                   {userProgress[episode.id] && (
-                                    <span className="text-xs text-green-500">
+                                    <span className="text-xs text-lime-500">
                                       {Math.round(userProgress[episode.id].progress_percentage)}% watched
                                     </span>
                                   )}
@@ -364,20 +401,20 @@ export default function ChroniclesPage() {
         {/* Episode Player Modal */}
         {selectedEpisode && (
           <Dialog open={!!selectedEpisode} onOpenChange={() => setSelectedEpisode(null)}>
-            <DialogContent className="max-w-5xl">
+            <DialogContent className="max-w-5xl harkonnen-card-style">
               <DialogHeader>
                 <DialogTitle>{selectedEpisode.title}</DialogTitle>
               </DialogHeader>
 
               <div className="space-y-4">
                 {/* Video Player Placeholder */}
-                <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
+                <div className="aspect-video bg-teal-900 rounded-lg flex items-center justify-center">
                   <div className="text-center text-white">
                     <Play className="h-16 w-16 mx-auto mb-4" />
                     <p className="text-lg">Video Player</p>
                     <p className="text-sm text-gray-400">Duration: {selectedEpisode.duration}</p>
                     <Button
-                      className="mt-4 bg-orange-500 hover:bg-orange-600 text-black"
+                      className="mt-4 bg-lime-500 hover:bg-lime-600 text-teal-900"
                       onClick={() => updateProgress(selectedEpisode.id, 100)}
                     >
                       Mark as Watched
@@ -408,28 +445,28 @@ export default function ChroniclesPage() {
         )}
 
         {/* Stats Section */}
-        <section className="py-12 px-4 bg-gradient-to-r from-orange-500/10 to-gold-400/10 rounded-lg">
+        <section className="py-12 px-4 bg-gradient-to-r from-teal-900/20 to-lime-500/10 rounded-lg">
           <div className="text-center">
             <h2 className="font-street text-3xl text-gradient mb-8">CHRONICLES STATS</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
               <div className="space-y-2">
-                <div className="text-3xl font-bold text-orange-500">{series.length}</div>
+                <div className="text-3xl font-bold text-lime-500">{series.length}</div>
                 <div className="text-sm text-muted-foreground">Active Series</div>
               </div>
               <div className="space-y-2">
-                <div className="text-3xl font-bold text-gold-400">
+                <div className="text-3xl font-bold text-lime-300">
                   {series.reduce((acc, s) => acc + s.total_episodes, 0)}
                 </div>
                 <div className="text-sm text-muted-foreground">Total Episodes</div>
               </div>
               <div className="space-y-2">
-                <div className="text-3xl font-bold text-orange-500">
+                <div className="text-3xl font-bold text-lime-500">
                   {formatViews(series.reduce((acc, s) => acc + s.total_views, 0))}
                 </div>
                 <div className="text-sm text-muted-foreground">Total Views</div>
               </div>
               <div className="space-y-2">
-                <div className="text-3xl font-bold text-gold-400">
+                <div className="text-3xl font-bold text-lime-300">
                   {series.length > 0
                     ? (series.reduce((acc, s) => acc + s.rating, 0) / series.length).toFixed(1)
                     : "0.0"}

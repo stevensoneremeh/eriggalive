@@ -1,9 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { Menu, X, Sun, Moon, User, LogOut, Settings, Crown } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useTheme } from "@/contexts/theme-context"
+import { useAuth } from "@/contexts/auth-context"
+import { DynamicLogo } from "@/components/dynamic-logo"
+import { CoinBalance } from "@/components/coin-balance"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,157 +16,225 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, Crown, Star, Shield, Sun, Moon, LogIn } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
-import { useTheme } from "@/contexts/theme-context"
 
 const navItems = [
-  { href: "/", label: "Home" },
-  { href: "/community", label: "Community" },
-  { href: "/premium", label: "Premium" },
-  { href: "/vault", label: "Vault" },
-  { href: "/tickets", label: "Tickets" },
-  { href: "/merch", label: "Merch" },
-  { href: "/chronicles", label: "Chronicles" },
+  { name: "Home", href: "/" },
+  { name: "Vault", href: "/vault" },
+  { name: "Chronicles", href: "/chronicles" },
+  { name: "Community", href: "/community" },
+  { name: "Events", href: "/tickets" },
+  { name: "Merch", href: "/merch" },
+  { name: "Premium", href: "/premium" },
 ]
-
-const tierIcons = {
-  street_rep: Star,
-  warri_elite: Crown,
-  erigma_circle: Shield,
-}
-
-const tierColors = {
-  street_rep: "text-gray-400",
-  warri_elite: "text-orange-500",
-  erigma_circle: "text-gold-400",
-}
 
 export function Navigation() {
   const [isOpen, setIsOpen] = useState(false)
-  const { user, profile, signOut } = useAuth()
+  const [scrolled, setScrolled] = useState(false)
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const pathname = usePathname()
   const { theme, toggleTheme } = useTheme()
+  const { user, profile, signOut, isPreviewMode } = useAuth()
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20)
+    }
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
 
   const handleSignOut = async () => {
-    await signOut()
+    try {
+      setIsSigningOut(true)
+      await signOut()
+    } catch (error) {
+      console.error("Error signing out:", error)
+    } finally {
+      setIsSigningOut(false)
+    }
   }
 
-  const TierIcon = profile?.tier ? tierIcons[profile.tier] : Star
-  const tierColor = profile?.tier ? tierColors[profile.tier] : "text-gray-400"
-
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-orange-500/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center space-x-2">
-          <div className="font-street text-2xl text-gradient glow-text">ERIGGA</div>
-        </Link>
+    <nav
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled
+          ? "bg-white/95 dark:bg-black/95 backdrop-blur-md shadow-lg border-b border-gray-200/20 dark:border-white/10"
+          : "bg-white dark:bg-black"
+      }`}
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          {/* Logo */}
+          <Link href="/" className="flex items-center space-x-2">
+            <DynamicLogo className="h-8 w-auto" />
+          </Link>
 
-        {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center space-x-6">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="text-sm font-medium transition-colors hover:text-orange-500"
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-8">
+            {navItems.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`text-sm font-medium transition-colors hover:text-brand-teal dark:hover:text-brand-lime ${
+                  pathname === item.href ? "text-brand-teal dark:text-brand-lime" : "text-gray-700 dark:text-gray-300"
+                }`}
+              >
+                {item.name}
+              </Link>
+            ))}
+          </div>
+
+          {/* Right Side Actions */}
+          <div className="flex items-center space-x-4">
+            {/* Coin Balance */}
+            {user && <CoinBalance />}
+
+            {/* Theme Toggle */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleTheme}
+              className="text-gray-700 dark:text-gray-300 hover:text-brand-teal dark:hover:text-brand-lime"
             >
-              {item.label}
-            </Link>
-          ))}
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+
+            {/* User Menu */}
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="flex items-center space-x-2">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-brand-lime to-brand-teal dark:from-gray-700 dark:to-gray-600 flex items-center justify-center">
+                      <span className="text-white text-sm font-medium">
+                        {profile?.username?.charAt(0).toUpperCase() || "U"}
+                      </span>
+                    </div>
+                    <div className="hidden sm:block text-left">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        {profile?.username || "User"}
+                      </div>
+                      <div
+                        className={`text-xs px-2 py-0.5 rounded-full ${
+                          theme === "dark" ? "bg-gray-800 text-white" : "bg-brand-lime-light text-brand-teal"
+                        }`}
+                      >
+                        {profile?.tier?.charAt(0).toUpperCase() + profile?.tier?.slice(1) || "Grassroot"}
+                      </div>
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard" className="flex items-center">
+                      <User className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/premium" className="flex items-center">
+                      <Crown className="mr-2 h-4 w-4" />
+                      Upgrade Tier
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings" className="flex items-center">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Settings
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleSignOut}
+                    disabled={isSigningOut}
+                    className="text-red-600 dark:text-red-400 cursor-pointer"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    {isSigningOut ? "Signing out..." : "Sign Out"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Button asChild variant="ghost" size="sm">
+                  <Link href="/login">Sign In</Link>
+                </Button>
+                <Button
+                  asChild
+                  size="sm"
+                  className="bg-brand-teal hover:bg-brand-teal-dark text-white dark:bg-gray-800 dark:hover:bg-gray-700"
+                >
+                  <Link href="/signup">Sign Up</Link>
+                </Button>
+              </div>
+            )}
+
+            {/* Mobile Menu Button */}
+            <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setIsOpen(!isOpen)}>
+              {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+          </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center space-x-4">
-          {/* Theme Toggle */}
-          <Button variant="ghost" size="icon" onClick={toggleTheme} className="hover:bg-orange-500/20">
-            {theme === "dark" ? (
-              <Sun className="h-5 w-5 text-orange-500" />
-            ) : (
-              <Moon className="h-5 w-5 text-orange-500" />
-            )}
-          </Button>
-
-          {/* User Menu or Login */}
-          {user && profile ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                  <Avatar className="h-10 w-10 border-2 border-orange-500">
-                    <AvatarImage src={profile.avatar_url || "/placeholder.svg"} alt={profile.username} />
-                    <AvatarFallback>{profile.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-orange-500 flex items-center justify-center">
-                    <TierIcon className={`h-2.5 w-2.5 ${tierColor}`} />
-                  </div>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end">
-                <div className="flex items-center justify-start gap-2 p-2">
-                  <div className="flex flex-col space-y-1 leading-none">
-                    <p className="font-medium">{profile.username}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {profile.tier.replace("_", " ")} • Level {profile.level}
-                    </p>
-                    {profile.erigma_id && (
-                      <p className="text-xs font-mono text-muted-foreground">{profile.erigma_id}</p>
-                    )}
-                  </div>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard">Dashboard</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/profile">Profile</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/settings">Settings</Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut}>Sign out</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Button asChild className="bg-orange-500 hover:bg-orange-600 text-black">
-              <Link href="/login">
-                <LogIn className="h-4 w-4 mr-2" />
-                Sign In
-              </Link>
-            </Button>
-          )}
-
-          {/* Mobile Menu */}
-          <Sheet open={isOpen} onOpenChange={setIsOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-              <div className="flex flex-col space-y-4 mt-8">
-                {navItems.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="text-lg font-medium transition-colors hover:text-orange-500"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    {item.label}
-                  </Link>
-                ))}
-                {!user && (
+        {/* Mobile Navigation */}
+        {isOpen && (
+          <div className="md:hidden border-t border-gray-200 dark:border-gray-800">
+            <div className="px-2 pt-2 pb-3 space-y-1">
+              {navItems.map((item) => (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={`block px-3 py-2 text-base font-medium rounded-md transition-colors ${
+                    pathname === item.href
+                      ? "text-brand-teal dark:text-brand-lime bg-brand-lime/10 dark:bg-gray-800"
+                      : "text-gray-700 dark:text-gray-300 hover:text-brand-teal dark:hover:text-brand-lime hover:bg-gray-50 dark:hover:bg-gray-800"
+                  }`}
+                  onClick={() => setIsOpen(false)}
+                >
+                  {item.name}
+                </Link>
+              ))}
+              {!user && (
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
                   <Link
                     href="/login"
-                    className="text-lg font-medium transition-colors hover:text-orange-500"
+                    className="block px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-brand-teal dark:hover:text-brand-lime"
                     onClick={() => setIsOpen(false)}
                   >
                     Sign In
                   </Link>
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
+                  <Link
+                    href="/signup"
+                    className="block px-3 py-2 text-base font-medium text-brand-teal dark:text-brand-lime"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Sign Up
+                  </Link>
+                </div>
+              )}
+              {user && (
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
+                  <Link
+                    href="/dashboard"
+                    className="block px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-brand-teal dark:hover:text-brand-lime"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Dashboard
+                  </Link>
+                  <button
+                    onClick={() => {
+                      setIsOpen(false)
+                      handleSignOut()
+                    }}
+                    disabled={isSigningOut}
+                    className="block w-full text-left px-3 py-2 text-base font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                  >
+                    {isSigningOut ? "Signing out..." : "Sign Out"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </nav>
   )

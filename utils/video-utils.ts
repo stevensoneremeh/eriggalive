@@ -11,19 +11,14 @@ export interface VideoSource {
 export const getOptimizedVideoSources = (): VideoSource[] => {
   return [
     {
-      src: "/videos/erigga-hero-4k.mp4",
+      src: "/videos/erigga-hero-video.mp4",
       type: "video/mp4",
-      quality: "4K",
+      quality: "Original",
     },
     {
-      src: "/videos/erigga-hero-1080p.mp4",
+      src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/erigga-hero-video-F19YWf5JgcnmasQmH2s37F8lND161t.mp4",
       type: "video/mp4",
-      quality: "1080p",
-    },
-    {
-      src: "/videos/erigga-hero-720p.mp4",
-      type: "video/mp4",
-      quality: "720p",
+      quality: "Direct",
     },
   ]
 }
@@ -33,26 +28,18 @@ export const getVideoFallbackImage = () => {
 }
 
 /**
- * Instructions for adding the Instagram reel video:
- *
- * 1. Download the Instagram reel video from:
- *    https://www.instagram.com/reel/DJmYEProGNc/
- *
- * 2. Use a tool like:
- *    - SnapInsta (snapinsta.app)
- *    - SaveFrom.net
- *    - Or any Instagram video downloader
- *
- * 3. Save the video as: public/videos/erigga-hero-video.mp4
- *
- * 4. For best performance, create multiple quality versions:
- *    - 4K version for desktop
- *    - 1080p version for tablets
- *    - 720p version for mobile
- *
- * 5. Update the video source in the homepage component
+ * Checks if a video can be played in the current browser
  */
+export const canPlayVideo = (videoType = "video/mp4"): boolean => {
+  if (typeof document === "undefined") return false
 
+  const video = document.createElement("video")
+  return video.canPlayType(videoType) !== ""
+}
+
+/**
+ * Creates a video element with proper attributes and sources
+ */
 export const createVideoElement = (sources: VideoSource[], fallbackImage: string) => {
   return {
     sources,
@@ -63,7 +50,20 @@ export const createVideoElement = (sources: VideoSource[], fallbackImage: string
       muted: true,
       playsInline: true,
       controls: false,
-      preload: "metadata",
+      preload: "auto",
     },
+  }
+}
+
+/**
+ * Attempts to play a video with error handling
+ */
+export const tryPlayVideo = async (videoElement: HTMLVideoElement): Promise<boolean> => {
+  try {
+    await videoElement.play()
+    return true
+  } catch (error) {
+    console.error("Failed to play video:", error)
+    return false
   }
 }
