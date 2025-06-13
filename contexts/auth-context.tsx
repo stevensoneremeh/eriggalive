@@ -31,10 +31,14 @@ interface AuthContextType {
   signOut: () => Promise<void>
   isLoading: boolean
   purchaseCoins: (amount: number, method: string) => Promise<{ success: boolean; data?: any; error?: any }>
+  refreshSession: () => Promise<void>
 }
 
 // Create context
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+// Session expiration time (30 days in seconds)
+const SESSION_EXPIRY = 30 * 24 * 60 * 60
 
 // Provider component
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -48,23 +52,114 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        // Check if we have a stored user in localStorage
+        setIsLoading(true)
+
+        // First check for an active session in cookies
+        const sessionCookie = getCookie("erigga_auth_session")
+
+        if (sessionCookie) {
+          try {
+            const sessionData = JSON.parse(atob(sessionCookie))
+            if (sessionData && sessionData.user && sessionData.profile) {
+              setUser(sessionData.user)
+              setProfile(sessionData.profile)
+
+              // Refresh the session expiry
+              persistSession(sessionData.user, sessionData.profile)
+              setIsLoading(false)
+              return
+            }
+          } catch (e) {
+            console.error("Error parsing session cookie:", e)
+          }
+        }
+
+        // Fallback to localStorage if cookie approach fails
         const storedUser = localStorage.getItem("erigga_user")
         const storedProfile = localStorage.getItem("erigga_profile")
 
         if (storedUser && storedProfile) {
-          setUser(JSON.parse(storedUser))
-          setProfile(JSON.parse(storedProfile))
+          const parsedUser = JSON.parse(storedUser)
+          const parsedProfile = JSON.parse(storedProfile)
+
+          setUser(parsedUser)
+          setProfile(parsedProfile)
+
+          // Update the session cookie from localStorage data
+          persistSession(parsedUser, parsedProfile)
         }
       } catch (error) {
         console.error("Auth initialization error:", error)
+        // Clear potentially corrupted data
+        clearSession()
       } finally {
         setIsLoading(false)
       }
     }
 
     initializeAuth()
+
+    // Set up an interval to refresh the session every 15 minutes
+    const refreshInterval = setInterval(
+      () => {
+        if (user && profile) {
+          persistSession(user, profile)
+        }
+      },
+      15 * 60 * 1000,
+    ) // 15 minutes
+
+    return () => clearInterval(refreshInterval)
   }, [])
+
+  // Helper to get a cookie value
+  const getCookie = (name: string): string | null => {
+    if (typeof document === "undefined") return null
+
+    const cookies = document.cookie.split(";")
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim()
+      if (cookie.startsWith(name + "=")) {
+        return cookie.substring(name.length + 1)
+      }
+    }
+    return null
+  }
+
+  // Helper to persist session in both cookie and localStorage
+  const persistSession = (user: User, profile: UserProfile) => {
+    try {
+      // Store in localStorage for compatibility
+      localStorage.setItem("erigga_user", JSON.stringify(user))
+      localStorage.setItem("erigga_profile", JSON.stringify(profile))
+
+      // Store in cookies for better security and persistence
+      const sessionData = btoa(JSON.stringify({ user, profile }))
+
+      // Set a secure, http-only cookie with a long expiration
+      document.cookie = `erigga_auth_session=${sessionData}; path=/; max-age=${SESSION_EXPIRY}; SameSite=Lax`
+
+      // Set a simple auth flag cookie for middleware checks
+      document.cookie = `erigga_auth=1; path=/; max-age=${SESSION_EXPIRY}; SameSite=Lax`
+    } catch (error) {
+      console.error("Error persisting session:", error)
+    }
+  }
+
+  // Helper to clear session data
+  const clearSession = () => {
+    try {
+      // Clear localStorage
+      localStorage.removeItem("erigga_user")
+      localStorage.removeItem("erigga_profile")
+
+      // Clear cookies
+      document.cookie = "erigga_auth_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+      document.cookie = "erigga_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+    } catch (error) {
+      console.error("Error clearing session:", error)
+    }
+  }
 
   // Sign in function that works for any user
   const signIn = async (email: string, password: string) => {
@@ -98,12 +193,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         bio: `${username}'s profile`,
       }
 
-      // Store in localStorage for persistence
-      localStorage.setItem("erigga_user", JSON.stringify(mockUser))
-      localStorage.setItem("erigga_profile", JSON.stringify(mockProfile))
-
-      // Set a cookie for authentication
-      document.cookie = `erigga_auth=${userId}; path=/; max-age=86400; SameSite=Lax`
+      // Persist the session
+      persistSession(mockUser, mockProfile)
 
       setUser(mockUser)
       setProfile(mockProfile)
@@ -121,12 +212,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true)
 
-      // Clear localStorage
-      localStorage.removeItem("erigga_user")
-      localStorage.removeItem("erigga_profile")
-
-      // Clear cookie
-      document.cookie = "erigga_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+      // Clear all session data
+      clearSession()
 
       setUser(null)
       setProfile(null)
@@ -136,6 +223,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Sign out error:", error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Function to refresh the current session
+  const refreshSession = async () => {
+    if (user && profile) {
+      persistSession(user, profile)
     }
   }
 
@@ -152,8 +246,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           coins: profile.coins + amount,
         }
 
-        // Update localStorage
-        localStorage.setItem("erigga_profile", JSON.stringify(updatedProfile))
+        // Update session with new profile data
+        persistSession(user!, updatedProfile)
 
         setProfile(updatedProfile)
       }
@@ -165,7 +259,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, signIn, signOut, isLoading, purchaseCoins }}>
+    <AuthContext.Provider value={{ user, profile, signIn, signOut, isLoading, purchaseCoins, refreshSession }}>
       {children}
     </AuthContext.Provider>
   )

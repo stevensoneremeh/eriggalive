@@ -182,16 +182,32 @@ export default function HomePage() {
               Join the community and get exclusive access to music, videos, and events
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                asChild
-                size="lg"
-                className="bg-brand-teal hover:bg-brand-teal-dark text-white dark:bg-gray-800 dark:hover:bg-gray-700"
-              >
-                <Link href="/signup">Join Now</Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="text-white border-white hover:bg-white/20">
-                <Link href="/vault">Explore Content</Link>
-              </Button>
+              <Link href="/signup" className="inline-block">
+                <div
+                  className={cn(
+                    "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
+                    "transform hover:scale-105 hover:shadow-xl",
+                    theme === "dark"
+                      ? "bg-white text-harkonnen-black hover:bg-gray-200"
+                      : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
+                  )}
+                >
+                  Join Now
+                </div>
+              </Link>
+              <Link href="/vault" className="inline-block">
+                <div
+                  className={cn(
+                    "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
+                    "transform hover:scale-105 hover:shadow-xl",
+                    theme === "dark"
+                      ? "bg-transparent border-2 border-white text-white hover:bg-white/10"
+                      : "bg-brand-teal text-white hover:bg-brand-teal-dark",
+                  )}
+                >
+                  Explore Content
+                </div>
+              </Link>
             </div>
           </div>
         </div>
@@ -415,13 +431,19 @@ export default function HomePage() {
           <p className="text-lg max-w-2xl mx-auto mb-8 text-white/80">
             Get access to exclusive content, connect with other fans, and be part of Erigga's journey.
           </p>
-          <Button
-            size="lg"
-            className="bg-brand-lime text-brand-teal hover:bg-brand-lime-dark dark:bg-white dark:text-black dark:hover:bg-gray-200 font-medium px-8"
-            asChild
-          >
-            <Link href="/signup">Join Now</Link>
-          </Button>
+          <Link href="/signup" className="inline-block">
+            <div
+              className={cn(
+                "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
+                "transform hover:scale-105 hover:shadow-xl",
+                theme === "dark"
+                  ? "bg-white text-harkonnen-black hover:bg-gray-200"
+                  : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
+              )}
+            >
+              Join Now
+            </div>
+          </Link>
         </div>
       </section>
     </div>

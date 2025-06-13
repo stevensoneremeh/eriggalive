@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,8 +19,19 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const { signIn } = useAuth()
+  const { signIn, user } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Get the redirect path from URL parameters
+  const redirectPath = searchParams?.get("redirect") || "/dashboard"
+
+  // If already logged in, redirect
+  useEffect(() => {
+    if (user) {
+      router.push(redirectPath)
+    }
+  }, [user, router, redirectPath])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,7 +45,8 @@ export default function LoginPage() {
         console.error("Login error:", error)
         setError(error?.toString() || "Authentication failed. Please try again.")
       } else {
-        router.push("/dashboard")
+        // Redirect to the specified path or dashboard
+        router.push(redirectPath)
       }
     } catch (err) {
       console.error("Unexpected error during login:", err)

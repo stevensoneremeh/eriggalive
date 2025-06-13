@@ -16,6 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { SessionRefresh } from "@/components/session-refresh"
 
 const navItems = [
   { name: "Home", href: "/" },
@@ -33,7 +34,7 @@ export function Navigation() {
   const [isSigningOut, setIsSigningOut] = useState(false)
   const pathname = usePathname()
   const { theme, toggleTheme } = useTheme()
-  const { user, profile, signOut, isPreviewMode } = useAuth()
+  const { user, profile, signOut } = useAuth()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -62,6 +63,9 @@ export function Navigation() {
           : "bg-white dark:bg-black"
       }`}
     >
+      {/* Include the session refresh component */}
+      <SessionRefresh />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}

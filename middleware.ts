@@ -1,30 +1,60 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
+// Define public paths that don't require authentication
+const PUBLIC_PATHS = [
+  "/",
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/api",
+  "/_next",
+  "/favicon.ico",
+  "/images",
+  "/videos",
+  "/fonts",
+]
+
 export function middleware(request: NextRequest) {
   // Get the pathname of the request
-  const path = request.nextUrl.pathname
+  const { pathname } = request.nextUrl
 
-  // Define public paths that don't require authentication
+  // Check if the path is public
   const isPublicPath =
-    path === "/" ||
-    path === "/login" ||
-    path === "/signup" ||
-    path === "/forgot-password" ||
-    path.startsWith("/api/") ||
-    path.includes(".") // Static files
+    PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`)) || pathname.includes(".")
 
   // Check if the user is authenticated by looking for the auth cookie
   const isAuthenticated = request.cookies.has("erigga_auth")
 
-  // If the user is not authenticated and the path is not public, redirect to login
-  if (!isAuthenticated && !isPublicPath) {
-    return NextResponse.redirect(new URL("/login", request.url))
+  // If accessing a protected route without authentication
+  if (!isPublicPath && !isAuthenticated) {
+    // Store the original URL to redirect back after login
+    const redirectUrl = new URL("/login", request.url)
+    redirectUrl.searchParams.set("redirect", pathname)
+
+    // Create the response with the redirect
+    const response = NextResponse.redirect(redirectUrl)
+
+    // Add a temporary cookie to indicate where to redirect after login
+    response.cookies.set("redirect_after_login", pathname, {
+      path: "/",
+      maxAge: 60 * 5, // 5 minutes
+      httpOnly: true,
+      sameSite: "lax",
+    })
+
+    return response
   }
 
-  // If the user is authenticated and trying to access login/signup, redirect to dashboard
-  if (isAuthenticated && (path === "/login" || path === "/signup")) {
-    return NextResponse.redirect(new URL("/dashboard", request.url))
+  // If already authenticated and trying to access login/signup pages
+  if (isAuthenticated && (pathname === "/login" || pathname === "/signup")) {
+    // Check if there's a redirect parameter
+    const redirectParam = request.nextUrl.searchParams.get("redirect")
+
+    // Redirect to the specified path or dashboard
+    const redirectUrl = redirectParam || "/dashboard"
+    return NextResponse.redirect(new URL(redirectUrl, request.url))
   }
 
   return NextResponse.next()
