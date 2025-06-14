@@ -23,12 +23,12 @@ import {
 import { useAuth } from "@/contexts/auth-context"
 import { SocialFeed } from "@/components/community/social-feed"
 import { BarsSection } from "@/components/community/bars-section"
-import { TopBarsWeek } from "@/components/community/top-bars-week"
 import { UserLeaderboard } from "@/components/community/user-leaderboard"
 import { CreatePostDialog } from "@/components/community/create-post-dialog"
 import { CommunityStats } from "@/components/community/community-stats"
 import { TrendingTopics } from "@/components/community/trending-topics"
 import { useToast } from "@/components/ui/use-toast"
+import { TopBarsOfWeek } from "@/components/community/top-bars"
 
 export default function CommunityPage() {
   const [activeTab, setActiveTab] = useState("all")
@@ -283,7 +283,7 @@ export default function CommunityPage() {
                     </Badge>
                   </div>
                 </div>
-                <TopBarsWeek />
+                <TopBarsOfWeek />
               </Card>
 
               {/* User Leaderboard */}

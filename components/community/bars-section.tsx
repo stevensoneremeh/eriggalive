@@ -1,141 +1,117 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Coins, MessageSquare, ArrowUp, Trophy, FlameIcon as Fire, Mic, Award } from "lucide-react"
-import { formatDistanceToNow } from "date-fns"
+import { Play, Pause, Coins, TrendingUp, MessageCircle, Trophy } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { MediaPlayer } from "@/components/community/media-player"
-import { UserTierBadge } from "@/components/user-tier-badge"
 import { useToast } from "@/components/ui/use-toast"
+
+interface BarSubmission {
+  id: number
+  user: {
+    id: string
+    username: string
+    full_name: string
+    avatar_url?: string
+    tier: string
+    coins: number
+  }
+  content: string
+  audio_url?: string
+  vote_count: number
+  coins_earned: number
+  comments_count: number
+  created_at: string
+  has_voted: boolean
+  is_trending: boolean
+}
 
 interface BarsSectionProps {
   searchQuery: string
   filterType: string
 }
 
-interface BarSubmission {
-  id: string
-  user: {
-    id: string
-    username: string
-    fullName: string
-    avatar: string
-    tier: string
-    coinBalance: number
-    isVerified: boolean
-  }
-  content: string
-  audioUrl?: string
-  createdAt: string
-  votes: number
-  coinsEarned: number
-  comments: number
-  hasVoted: boolean
-  userVoteAmount: number
-  rank?: number
-  isWeeklyTop: boolean
-}
-
 export function BarsSection({ searchQuery, filterType }: BarsSectionProps) {
   const [bars, setBars] = useState<BarSubmission[]>([])
   const [loading, setLoading] = useState(true)
-  const [votingBar, setVotingBar] = useState<string | null>(null)
-  const [voteAmount, setVoteAmount] = useState(1)
+  const [playingId, setPlayingId] = useState<number | null>(null)
+  const [votingId, setVotingId] = useState<number | null>(null)
   const { profile, isAuthenticated } = useAuth()
   const { toast } = useToast()
 
   // Mock data for preview
-  const mockBars: BarSubmission[] = [
-    {
-      id: "bar1",
-      user: {
-        id: "user1",
-        username: "lyric_king",
-        fullName: "David Okonkwo",
-        avatar: "/placeholder.svg?height=40&width=40",
-        tier: "pioneer",
-        coinBalance: 2450,
-        isVerified: true,
-      },
-      content:
-        "Paper boy with the paper flow, money talks but I speak it slow\nWarri boy with the delta soul, every bar that I drop is gold\nErigga taught me how to be real, now I'm spitting with that same feel",
-      audioUrl: "/placeholder-audio.mp3",
-      createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-      votes: 89,
-      coinsEarned: 1340,
-      comments: 23,
-      hasVoted: false,
-      userVoteAmount: 0,
-      rank: 1,
-      isWeeklyTop: true,
-    },
-    {
-      id: "bar2",
-      user: {
-        id: "user2",
-        username: "warri_wordsmith",
-        fullName: "Grace Effiong",
-        avatar: "/placeholder.svg?height=40&width=40",
-        tier: "elder",
-        coinBalance: 1890,
-        isVerified: false,
-      },
-      content:
-        "From the streets of Warri to the world stage bright\nErigga's legacy burning like a guiding light\nEvery verse I write carries that delta pride\nPaper boy inspiration, can't be denied",
-      createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-      votes: 67,
-      coinsEarned: 890,
-      comments: 18,
-      hasVoted: true,
-      userVoteAmount: 5,
-      rank: 2,
-      isWeeklyTop: true,
-    },
-    {
-      id: "bar3",
-      user: {
-        id: "user3",
-        username: "delta_dreamer",
-        fullName: "Emmanuel Okoro",
-        avatar: "/placeholder.svg?height=40&width=40",
-        tier: "blood_brotherhood",
-        coinBalance: 3200,
-        isVerified: true,
-      },
-      content:
-        "Industry nights and paper boy dreams\nErigga showed us what success really means\nFrom the bottom to the top, never lost his roots\nThat's the kind of artist that the culture salutes",
-      audioUrl: "/placeholder-audio.mp3",
-      createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-      votes: 45,
-      coinsEarned: 670,
-      comments: 12,
-      hasVoted: false,
-      userVoteAmount: 0,
-      isWeeklyTop: false,
-    },
-  ]
-
   useEffect(() => {
-    const fetchBars = async () => {
-      setLoading(true)
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+    const mockBars: BarSubmission[] = [
+      {
+        id: 1,
+        user: {
+          id: "1",
+          username: "lyrical_genius",
+          full_name: "David Okonkwo",
+          avatar_url: "/placeholder-user.jpg",
+          tier: "Blood",
+          coins: 4500,
+        },
+        content: "Money no be everything but everything need money, Erigga taught me that the hustle never funny 🔥",
+        audio_url: "/placeholder-audio.mp3",
+        vote_count: 89,
+        coins_earned: 445,
+        comments_count: 23,
+        created_at: "2024-01-15T12:00:00Z",
+        has_voted: false,
+        is_trending: true,
+      },
+      {
+        id: 2,
+        user: {
+          id: "2",
+          username: "street_poet",
+          full_name: "Blessing Eze",
+          avatar_url: "/placeholder-user.jpg",
+          tier: "Elder",
+          coins: 2100,
+        },
+        content:
+          "From Warri to the world, Erigga's story unfold, Teaching us that real recognize real, that's the code 💯",
+        audio_url: "/placeholder-audio.mp3",
+        vote_count: 67,
+        coins_earned: 335,
+        comments_count: 18,
+        created_at: "2024-01-15T11:30:00Z",
+        has_voted: true,
+        is_trending: false,
+      },
+      {
+        id: 3,
+        user: {
+          id: "3",
+          username: "bars_machine",
+          full_name: "Emmanuel Okoro",
+          avatar_url: "/placeholder-user.jpg",
+          tier: "Pioneer",
+          coins: 1800,
+        },
+        content: "Paper Boy mentality, stacking up the green, Living like a king but staying humble in the scene 👑",
+        vote_count: 45,
+        coins_earned: 225,
+        comments_count: 12,
+        created_at: "2024-01-15T10:45:00Z",
+        has_voted: false,
+        is_trending: false,
+      },
+    ]
+
+    setTimeout(() => {
       setBars(mockBars)
       setLoading(false)
-    }
-
-    fetchBars()
+    }, 1000)
   }, [searchQuery, filterType])
 
-  const handleVote = async (barId: string, amount: number) => {
-    if (!isAuthenticated || !profile) {
+  const handleVote = async (barId: number) => {
+    if (!isAuthenticated) {
       toast({
         title: "Sign in required",
         description: "Please sign in to vote on bars",
@@ -144,28 +120,29 @@ export function BarsSection({ searchQuery, filterType }: BarsSectionProps) {
       return
     }
 
-    if (profile.coins < amount) {
+    if (!profile?.coins || profile.coins < 5) {
       toast({
         title: "Insufficient coins",
-        description: "You don't have enough coins to vote",
+        description: "You need at least 5 coins to vote",
         variant: "destructive",
       })
       return
     }
 
+    setVotingId(barId)
+
     try {
       // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      await new Promise((resolve) => setTimeout(resolve, 1000))
 
       setBars((prev) =>
         prev.map((bar) =>
           bar.id === barId
             ? {
                 ...bar,
-                votes: bar.votes + amount,
-                coinsEarned: bar.coinsEarned + amount,
-                hasVoted: true,
-                userVoteAmount: bar.userVoteAmount + amount,
+                has_voted: !bar.has_voted,
+                vote_count: bar.has_voted ? bar.vote_count - 1 : bar.vote_count + 1,
+                coins_earned: bar.has_voted ? bar.coins_earned - 5 : bar.coins_earned + 5,
               }
             : bar,
         ),
@@ -173,17 +150,40 @@ export function BarsSection({ searchQuery, filterType }: BarsSectionProps) {
 
       toast({
         title: "Vote successful!",
-        description: `You voted with ${amount} coins`,
+        description: bars.find((b) => b.id === barId)?.has_voted ? "Vote removed" : "5 coins spent on vote",
       })
-
-      setVotingBar(null)
-      setVoteAmount(1)
     } catch (error) {
       toast({
         title: "Vote failed",
         description: "Please try again",
         variant: "destructive",
       })
+    } finally {
+      setVotingId(null)
+    }
+  }
+
+  const handlePlay = (barId: number, audioUrl: string) => {
+    if (playingId === barId) {
+      setPlayingId(null)
+    } else {
+      setPlayingId(barId)
+      // In a real app, you'd implement actual audio playback here
+    }
+  }
+
+  const getTierColor = (tier: string) => {
+    switch (tier.toLowerCase()) {
+      case "blood":
+        return "bg-red-500"
+      case "elder":
+        return "bg-purple-500"
+      case "pioneer":
+        return "bg-blue-500"
+      case "mod":
+        return "bg-green-500"
+      default:
+        return "bg-gray-500"
     }
   }
 
@@ -191,27 +191,23 @@ export function BarsSection({ searchQuery, filterType }: BarsSectionProps) {
     return (
       <div className="space-y-6">
         {[1, 2, 3].map((i) => (
-          <Card key={i} className="overflow-hidden">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-10 w-10 rounded-full" />
-                <div className="space-y-2 flex-1">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-3 w-24" />
-                </div>
-                <Skeleton className="h-8 w-20" />
+          <Card key={i} className="p-6 animate-pulse">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-muted"></div>
+              <div className="flex-1">
+                <div className="h-4 bg-muted rounded w-1/4 mb-2"></div>
+                <div className="h-3 bg-muted rounded w-1/6"></div>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Skeleton className="h-20 w-full" />
-              <Skeleton className="h-12 w-full rounded-md" />
-            </CardContent>
-            <CardFooter>
-              <div className="flex gap-4">
-                <Skeleton className="h-8 w-24" />
-                <Skeleton className="h-8 w-24" />
-              </div>
-            </CardFooter>
+            </div>
+            <div className="space-y-2 mb-4">
+              <div className="h-4 bg-muted rounded w-full"></div>
+              <div className="h-4 bg-muted rounded w-3/4"></div>
+            </div>
+            <div className="h-16 bg-muted rounded mb-4"></div>
+            <div className="flex items-center gap-4">
+              <div className="h-8 bg-muted rounded w-20"></div>
+              <div className="h-8 bg-muted rounded w-16"></div>
+            </div>
           </Card>
         ))}
       </div>
@@ -220,191 +216,105 @@ export function BarsSection({ searchQuery, filterType }: BarsSectionProps) {
 
   return (
     <div className="space-y-6">
-      {/* Top Bars Header */}
-      <Card className="bg-gradient-to-r from-orange-500/10 via-lime-500/10 to-teal-500/10 border-orange-500/30">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-orange-500 to-lime-500 rounded-lg">
-                <Trophy className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold">Weekly Bars Competition</h3>
-                <p className="text-muted-foreground">Vote for the best bars and earn rewards!</p>
-              </div>
-            </div>
-            <Badge className="bg-gradient-to-r from-orange-500 to-lime-500 text-white">
-              <Fire className="h-3 w-3 mr-1" />
-              Live
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
-
       {bars.map((bar) => (
         <Card
           key={bar.id}
-          className={`overflow-hidden transition-all duration-200 ${
-            bar.isWeeklyTop
-              ? "border-l-4 border-l-orange-500 bg-gradient-to-r from-orange-500/5 to-transparent"
-              : "hover:shadow-lg hover:border-l-4 hover:border-l-lime-500"
-          }`}
+          className="overflow-hidden hover:shadow-lg transition-all duration-200 border-l-4 border-l-orange-500"
         >
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
+          <div className="p-6">
+            {/* User Header */}
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                {bar.rank && (
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-orange-500 to-lime-500 text-white font-bold text-sm">
-                    {bar.rank}
-                  </div>
-                )}
-                <Avatar className="h-10 w-10 ring-2 ring-orange-500/20">
-                  <AvatarImage src={bar.user.avatar || "/placeholder.svg"} alt={bar.user.username} />
-                  <AvatarFallback className="bg-gradient-to-r from-orange-500 to-lime-500 text-white">
-                    {bar.user.fullName.charAt(0)}
-                  </AvatarFallback>
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={bar.user.avatar_url || "/placeholder.svg"} alt={bar.user.username} />
+                  <AvatarFallback>{bar.user.full_name.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold truncate">{bar.user.fullName}</p>
-                    {bar.user.isVerified && (
-                      <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 text-xs">
-                        ✓
-                      </Badge>
-                    )}
-                    <UserTierBadge tier={bar.user.tier} size="sm" />
-                    {bar.isWeeklyTop && (
-                      <Badge className="bg-gradient-to-r from-orange-500 to-lime-500 text-white text-xs">
-                        <Award className="h-3 w-3 mr-1" />
-                        Top
+                    <p className="font-semibold truncate">{bar.user.full_name}</p>
+                    <Badge className={`${getTierColor(bar.user.tier)} text-white text-xs`}>{bar.user.tier}</Badge>
+                    {bar.is_trending && (
+                      <Badge
+                        variant="secondary"
+                        className="bg-gradient-to-r from-orange-500/20 to-lime-500/20 text-orange-600"
+                      >
+                        <TrendingUp className="h-3 w-3 mr-1" />
+                        Trending
                       </Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <span>@{bar.user.username}</span>
                     <span>•</span>
-                    <span>{formatDistanceToNow(new Date(bar.createdAt), { addSuffix: true })}</span>
-                    <span>•</span>
-                    <div className="flex items-center gap-1">
-                      <Coins className="h-3 w-3 text-orange-500" />
-                      <span>{bar.user.coinBalance.toLocaleString()}</span>
-                    </div>
+                    <span>{new Date(bar.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
               </div>
+              <div className="text-right">
+                <div className="flex items-center gap-1 text-sm font-medium text-orange-600">
+                  <Trophy className="h-4 w-4" />
+                  <span>{bar.coins_earned}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">coins earned</p>
+              </div>
             </div>
-          </CardHeader>
 
-          <CardContent className="space-y-4">
-            {/* Bars Content */}
-            <div className="bg-muted/30 rounded-lg p-4 border-l-4 border-l-orange-500/50">
-              <div className="flex items-center gap-2 mb-2">
-                <Mic className="h-4 w-4 text-orange-500" />
-                <span className="text-sm font-medium text-orange-600">Bars</span>
-              </div>
-              <div className="prose prose-sm max-w-none dark:prose-invert">
-                <p className="whitespace-pre-wrap leading-relaxed font-mono text-sm">{bar.content}</p>
-              </div>
+            {/* Bar Content */}
+            <div className="mb-4 p-4 bg-gradient-to-r from-orange-50 to-lime-50 dark:from-orange-950/20 dark:to-lime-950/20 rounded-lg border">
+              <p className="text-foreground leading-relaxed font-medium italic">"{bar.content}"</p>
             </div>
 
             {/* Audio Player */}
-            {bar.audioUrl && (
-              <div className="rounded-lg overflow-hidden">
-                <MediaPlayer type="audio" url={bar.audioUrl} title={`${bar.user.fullName}'s bars`} />
+            {bar.audio_url && (
+              <div className="mb-4 p-4 bg-muted rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handlePlay(bar.id, bar.audio_url!)}
+                    className="rounded-full bg-gradient-to-r from-orange-500 to-lime-500 text-white hover:from-orange-600 hover:to-lime-600"
+                  >
+                    {playingId === bar.id ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                  </Button>
+                  <div className="flex-1">
+                    <div className="h-2 bg-background rounded-full">
+                      <div className="h-2 bg-gradient-to-r from-orange-500 to-lime-500 rounded-full w-1/3"></div>
+                    </div>
+                  </div>
+                  <span className="text-sm text-muted-foreground">0:45 / 2:30</span>
+                </div>
               </div>
             )}
 
-            {/* Stats */}
-            <div className="flex items-center gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 text-orange-500">
-                  <ArrowUp className="h-4 w-4" />
-                  <span className="font-medium">{bar.votes}</span>
-                </div>
-                <span className="text-muted-foreground">votes</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 text-lime-500">
-                  <Coins className="h-4 w-4" />
-                  <span className="font-medium">{bar.coinsEarned.toLocaleString()}</span>
-                </div>
-                <span className="text-muted-foreground">earned</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                <span>{bar.comments} comments</span>
-              </div>
-            </div>
-          </CardContent>
-
-          <CardFooter className="pt-3 border-t bg-muted/20">
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-2">
-                {bar.hasVoted && (
-                  <Badge variant="secondary" className="bg-green-500/10 text-green-600">
-                    Voted ({bar.userVoteAmount} coins)
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm">
-                  <MessageSquare className="h-4 w-4 mr-1" />
-                  Comment
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant={bar.has_voted ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleVote(bar.id)}
+                  disabled={votingId === bar.id}
+                  className={bar.has_voted ? "bg-gradient-to-r from-orange-500 to-lime-500 text-white" : ""}
+                >
+                  <Coins className="h-4 w-4 mr-2" />
+                  {votingId === bar.id ? "Voting..." : `Vote (${bar.vote_count})`}
                 </Button>
-                <Dialog open={votingBar === bar.id} onOpenChange={(open) => !open && setVotingBar(null)}>
-                  <DialogTrigger asChild>
-                    <Button
-                      size="sm"
-                      className="bg-gradient-to-r from-orange-500 to-lime-500 hover:from-orange-600 hover:to-lime-600 text-white"
-                      onClick={() => setVotingBar(bar.id)}
-                      disabled={!isAuthenticated}
-                    >
-                      <Coins className="h-4 w-4 mr-1" />
-                      Vote
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Vote with Erigga Coins</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground mb-2">Support {bar.user.fullName}'s bars</p>
-                        <div className="bg-muted/30 rounded-lg p-3 text-sm">"{bar.content.split("\n")[0]}..."</div>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Vote amount (coins)</label>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={profile?.coins || 0}
-                          value={voteAmount}
-                          onChange={(e) => setVoteAmount(Number(e.target.value))}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Your balance: {profile?.coins?.toLocaleString() || 0} coins
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" className="flex-1" onClick={() => setVotingBar(null)}>
-                          Cancel
-                        </Button>
-                        <Button
-                          className="flex-1 bg-gradient-to-r from-orange-500 to-lime-500 hover:from-orange-600 hover:to-lime-600 text-white"
-                          onClick={() => handleVote(bar.id, voteAmount)}
-                          disabled={voteAmount <= 0 || voteAmount > (profile?.coins || 0)}
-                        >
-                          Vote {voteAmount} coins
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                  <MessageCircle className="h-4 w-4" />
+                  {bar.comments_count}
+                </Button>
               </div>
+              <div className="text-sm text-muted-foreground">Cost: 5 coins per vote</div>
             </div>
-          </CardFooter>
+          </div>
         </Card>
       ))}
+
+      {bars.length === 0 && !loading && (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">No bars submitted yet. Be the first to drop some fire! 🔥</p>
+        </div>
+      )}
     </div>
   )
 }
