@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Coins, CreditCard, AlertCircle, CheckCircle, Loader2, Shield } from "lucide-react"
+import { Coins, CreditCard, AlertCircle, CheckCircle, Loader2, Shield, Info } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -46,12 +46,40 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
   const [success, setSuccess] = useState<string | null>(null)
   const [paymentAttempts, setPaymentAttempts] = useState(0)
   const [isPaystackLoaded, setIsPaystackLoaded] = useState(false)
+  const [isPreviewMode, setIsPreviewMode] = useState(false)
+
+  // Check if we're in preview mode
+  useEffect(() => {
+    const checkPreviewMode = () => {
+      const isPreview =
+        process.env.NODE_ENV === "development" ||
+        window.location.hostname.includes("vercel.app") ||
+        window.location.hostname.includes("localhost")
+      setIsPreviewMode(isPreview)
+    }
+
+    checkPreviewMode()
+  }, [])
 
   // Load Paystack script with error handling
   useEffect(() => {
-    const loadPaystack = async () => {
+    const loadPaystack = () => {
       try {
-        if (typeof window !== "undefined" && !window.PaystackPop) {
+        if (typeof window !== "undefined") {
+          // Check if Paystack is already loaded
+          if (window.PaystackPop) {
+            setIsPaystackLoaded(true)
+            return
+          }
+
+          // Check if script is already in DOM
+          const existingScript = document.querySelector('script[src="https://js.paystack.co/v1/inline.js"]')
+          if (existingScript) {
+            existingScript.addEventListener("load", () => setIsPaystackLoaded(true))
+            return
+          }
+
+          // Create and load script
           const script = document.createElement("script")
           script.src = "https://js.paystack.co/v1/inline.js"
           script.async = true
@@ -66,15 +94,7 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
             console.error("Failed to load Paystack script")
           }
 
-          document.body.appendChild(script)
-
-          return () => {
-            if (document.body.contains(script)) {
-              document.body.removeChild(script)
-            }
-          }
-        } else if (window.PaystackPop) {
-          setIsPaystackLoaded(true)
+          document.head.appendChild(script)
         }
       } catch (err) {
         console.error("Error loading Paystack:", err)
@@ -90,6 +110,123 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
   const resetState = useCallback(() => {
     setError(null)
     setSuccess(null)
+  }, [])
+
+  const verifyPayment = useCallback(
+    async (reference: string, expectedAmount: number, expectedCoins: number) => {
+      try {
+        const response = await fetch("/api/coins/purchase", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("auth_token") || "mock-token"}`,
+          },
+          body: JSON.stringify({
+            reference,
+            amount: expectedAmount,
+            coins: expectedCoins,
+            userId: profile?.id,
+          }),
+        })
+
+        const result = await response.json()
+
+        if (!response.ok) {
+          // Handle different error types
+          let errorMessage = result.error || "Payment verification failed"
+
+          switch (result.code) {
+            case "AUTH_ERROR":
+              errorMessage = "Please log in to complete your purchase"
+              break
+            case "VALIDATION_ERROR":
+              errorMessage = `Validation failed: ${result.error}`
+              break
+            case "PAYMENT_FAILED":
+              errorMessage = "Payment was not successful. Please try again."
+              break
+            case "AMOUNT_MISMATCH":
+              errorMessage = "Payment amount doesn't match. Please contact support."
+              break
+            case "VERIFICATION_ERROR":
+              errorMessage = "Unable to verify payment. Please contact support if money was deducted."
+              break
+            case "CONFIG_ERROR":
+              errorMessage = "Payment system configuration error. Please try again later."
+              break
+            default:
+              errorMessage = result.error || `Payment verification failed (${response.status})`
+          }
+
+          throw new Error(errorMessage)
+        }
+
+        if (!result.success) {
+          throw new Error(result.error || "Payment verification failed")
+        }
+
+        return result
+      } catch (err) {
+        console.error("Payment verification error:", err)
+        throw err
+      }
+    },
+    [profile],
+  )
+
+  const handlePaymentSuccess = useCallback(
+    async (response: any, totalCoins: number, nairaAmount: number) => {
+      try {
+        console.log("Payment successful:", response)
+
+        const verificationResult = await verifyPayment(response.reference, nairaAmount, totalCoins)
+
+        setSuccess(`Successfully purchased ${totalCoins.toLocaleString()} Erigga Coins!`)
+
+        toast({
+          title: "Purchase Successful!",
+          description: `${totalCoins.toLocaleString()} Erigga Coins added to your account`,
+          duration: 5000,
+        })
+
+        // Refresh user session to update coin balance
+        if (refreshSession) {
+          await refreshSession()
+        }
+
+        if (onSuccess) {
+          onSuccess(verificationResult.transaction)
+        }
+
+        // Reset form
+        setCustomCoins("")
+        setIsCustom(false)
+        setSelectedPackage(COIN_PACKAGES[1])
+        setPaymentAttempts(0)
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Payment verification failed"
+        setError(errorMessage)
+
+        toast({
+          title: "Payment Verification Failed",
+          description: errorMessage,
+          variant: "destructive",
+          duration: 8000,
+        })
+
+        if (onError) {
+          onError(errorMessage)
+        }
+      } finally {
+        setIsProcessing(false)
+      }
+    },
+    [verifyPayment, refreshSession, onSuccess, onError, toast],
+  )
+
+  const handlePaymentClose = useCallback(() => {
+    console.log("Payment dialog closed")
+    setIsProcessing(false)
   }, [])
 
   const handlePurchaseValidation = useCallback(() => {
@@ -124,43 +261,7 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
     }
 
     return true
-  }, [profile, isPaystackLoaded, isCustom, customCoins, selectedPackage, paymentAttempts])
-
-  const verifyPayment = useCallback(
-    async (reference: string, expectedAmount: number, expectedCoins: number) => {
-      try {
-        const response = await fetch("/api/coins/purchase", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("auth_token") || "mock-token"}`,
-          },
-          body: JSON.stringify({
-            reference,
-            amount: expectedAmount,
-            coins: expectedCoins,
-            userId: profile?.id,
-          }),
-        })
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-
-        const result = await response.json()
-
-        if (!result.success) {
-          throw new Error(result.error || "Payment verification failed")
-        }
-
-        return result
-      } catch (err) {
-        console.error("Payment verification error:", err)
-        throw new Error(err instanceof Error ? err.message : "Payment verification failed")
-      }
-    },
-    [profile],
-  )
+  }, [profile, isPaystackLoaded, isCustom, customCoins, selectedPackage, paymentAttempts, resetState])
 
   const handlePurchase = useCallback(async () => {
     if (!handlePurchaseValidation()) return
@@ -177,7 +278,8 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
       const paymentReference = `erigga_coins_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
       if (typeof window !== "undefined" && window.PaystackPop) {
-        const handler = window.PaystackPop.setup({
+        // Create the configuration object with proper function references
+        const paystackConfig = {
           key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_0123456789abcdef0123456789abcdef01234567",
           email: profile?.email || "",
           amount: Math.round(nairaAmount * 100), // Convert to kobo and ensure integer
@@ -190,53 +292,17 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
             user_id: profile?.id || "guest",
             package_id: isCustom ? "custom" : selectedPackage.id,
             timestamp: new Date().toISOString(),
+            preview_mode: isPreviewMode,
           },
-          callback: async (response: any) => {
-            try {
-              console.log("Payment successful:", response)
-
-              const verificationResult = await verifyPayment(response.reference, nairaAmount, totalCoins)
-
-              setSuccess(`Successfully purchased ${totalCoins.toLocaleString()} Erigga Coins!`)
-
-              toast({
-                title: "Purchase Successful!",
-                description: `${totalCoins.toLocaleString()} Erigga Coins added to your account`,
-                duration: 5000,
-              })
-
-              // Refresh user session to update coin balance
-              await refreshSession()
-
-              if (onSuccess) onSuccess(verificationResult.transaction)
-
-              // Reset form
-              setCustomCoins("")
-              setIsCustom(false)
-              setSelectedPackage(COIN_PACKAGES[1])
-              setPaymentAttempts(0)
-            } catch (err) {
-              const errorMessage = err instanceof Error ? err.message : "Payment verification failed"
-              setError(errorMessage)
-
-              toast({
-                title: "Payment Verification Failed",
-                description: errorMessage,
-                variant: "destructive",
-                duration: 5000,
-              })
-
-              if (onError) onError(errorMessage)
-            } finally {
-              setIsProcessing(false)
-            }
+          callback: (response: any) => {
+            handlePaymentSuccess(response, totalCoins, nairaAmount)
           },
           onClose: () => {
-            console.log("Payment dialog closed")
-            setIsProcessing(false)
+            handlePaymentClose()
           },
-        })
+        }
 
+        const handler = window.PaystackPop.setup(paystackConfig)
         handler.openIframe()
       } else {
         throw new Error("Payment gateway not available")
@@ -253,7 +319,9 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
         duration: 5000,
       })
 
-      if (onError) onError(errorMessage)
+      if (onError) {
+        onError(errorMessage)
+      }
       setIsProcessing(false)
     }
   }, [
@@ -263,11 +331,11 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
     selectedPackage,
     calculateNaira,
     profile,
-    verifyPayment,
-    refreshSession,
-    onSuccess,
+    handlePaymentSuccess,
+    handlePaymentClose,
     onError,
     toast,
+    isPreviewMode,
   ])
 
   const isFormValid = isCustom
@@ -284,6 +352,13 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
           Secure payment powered by Paystack
         </div>
       </div>
+
+      {isPreviewMode && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>Preview Mode: Payments will be simulated for testing purposes.</AlertDescription>
+        </Alert>
+      )}
 
       {success && (
         <Alert className="bg-green-50 border-green-200">
@@ -431,7 +506,7 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
         ) : (
           <>
             <CreditCard className="h-4 w-4 mr-2" />
-            Pay ₦
+            {isPreviewMode ? "Simulate Payment" : "Pay"} ₦
             {isCustom
               ? customCoins
                 ? calculateNaira(Number.parseInt(customCoins, 10)).toLocaleString()
@@ -448,6 +523,7 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
       <div className="text-xs text-muted-foreground text-center space-y-1">
         <p>Your payment information is encrypted and secure.</p>
         <p>Coins will be added to your account immediately after successful payment.</p>
+        {isPreviewMode && <p className="text-orange-600 font-medium">Preview mode: No real money will be charged.</p>}
       </div>
     </div>
   )
@@ -457,7 +533,16 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
 declare global {
   interface Window {
     PaystackPop?: {
-      setup: (options: any) => {
+      setup: (options: {
+        key: string
+        email: string
+        amount: number
+        currency: string
+        ref: string
+        metadata?: any
+        callback: (response: any) => void
+        onClose: () => void
+      }) => {
         openIframe: () => void
       }
     }
