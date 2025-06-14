@@ -3,15 +3,57 @@
 import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
-import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+
+// Safe client creation function that doesn't rely on external utilities
+const createSafeClient = () => {
+  // Check if we're in a browser environment
+  const isBrowser = typeof window !== "undefined"
+
+  // Check if we're in preview mode
+  const isPreviewMode =
+    isBrowser && (window.location.hostname.includes("vusercontent.net") || window.location.hostname.includes("v0.dev"))
+
+  if (isPreviewMode) {
+    // Return a simple mock client for preview mode
+    return {
+      from: () => ({
+        select: () => ({
+          order: () => ({
+            limit: () => Promise.resolve({ data: [], error: null }),
+          }),
+        }),
+      }),
+    } as any
+  }
+
+  // For real client, use environment variables
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("Missing Supabase environment variables")
+    return {
+      from: () => ({
+        select: () => ({
+          order: () => ({
+            limit: () => Promise.resolve({ data: [], error: null }),
+          }),
+        }),
+      }),
+    } as any
+  }
+
+  return createSupabaseClient(supabaseUrl, supabaseAnonKey)
+}
 
 export default function CommunityPage() {
   const [categories, setCategories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { isAuthenticated } = useAuth()
-  const supabase = createClient()
+  const supabase = createSafeClient()
 
   useEffect(() => {
     async function fetchCategories() {

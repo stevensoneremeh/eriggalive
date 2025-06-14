@@ -1,6 +1,6 @@
 "use client"
 
-// Define types
+// Define types first
 type UserTier = "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
 
 interface User {
@@ -20,7 +20,7 @@ interface UserProfile extends User {
   created_at: string
 }
 
-interface SessionData {
+interface Session {
   user: User
   profile: UserProfile
   timestamp: number
@@ -29,10 +29,24 @@ interface SessionData {
 // Session expiration time (30 days in seconds)
 const SESSION_EXPIRY = 30 * 24 * 60 * 60
 
+// Helper to get a cookie value
+const getCookie = (name: string): string | null => {
+  if (typeof document === "undefined") return null
+
+  const cookies = document.cookie.split(";")
+  for (let i = 0; i < cookies.length; i++) {
+    const cookie = cookies[i].trim()
+    if (cookie.startsWith(name + "=")) {
+      return cookie.substring(name.length + 1)
+    }
+  }
+  return null
+}
+
 // Client-side auth utilities
 export const clientAuth = {
-  // Save session data to both localStorage and cookies
-  saveSession: (user: User, profile: UserProfile): void => {
+  // Save session data
+  saveSession: (user: User, profile: UserProfile) => {
     try {
       // Store in localStorage for compatibility
       localStorage.setItem("erigga_user", JSON.stringify(user))
@@ -51,23 +65,24 @@ export const clientAuth = {
     }
   },
 
-  // Get session data from cookies or localStorage
-  getSession: (): SessionData | null => {
+  // Get session data
+  getSession: (): Session | null => {
     try {
-      // First try to get from cookies
+      // First check for an active session in cookies
       const sessionCookie = getCookie("erigga_auth_session")
+
       if (sessionCookie) {
         try {
           const sessionData = JSON.parse(atob(sessionCookie))
           if (sessionData && sessionData.user && sessionData.profile) {
-            return sessionData
+            return sessionData as Session
           }
         } catch (e) {
           console.error("Error parsing session cookie:", e)
         }
       }
 
-      // Fallback to localStorage
+      // Fallback to localStorage if cookie approach fails
       const storedUser = localStorage.getItem("erigga_user")
       const storedProfile = localStorage.getItem("erigga_profile")
 
@@ -85,7 +100,7 @@ export const clientAuth = {
   },
 
   // Clear session data
-  clearSession: (): void => {
+  clearSession: () => {
     try {
       // Clear localStorage
       localStorage.removeItem("erigga_user")
@@ -100,10 +115,14 @@ export const clientAuth = {
   },
 
   // Refresh session to extend expiry
-  refreshSession: (): void => {
-    const session = clientAuth.getSession()
-    if (session?.user && session?.profile) {
-      clientAuth.saveSession(session.user, session.profile)
+  refreshSession: () => {
+    try {
+      const session = clientAuth.getSession()
+      if (session?.user && session?.profile) {
+        clientAuth.saveSession(session.user, session.profile)
+      }
+    } catch (error) {
+      console.error("Error refreshing session:", error)
     }
   },
 
@@ -111,18 +130,4 @@ export const clientAuth = {
   isAuthenticated: (): boolean => {
     return !!clientAuth.getSession()
   },
-}
-
-// Helper to get a cookie value
-function getCookie(name: string): string | null {
-  if (typeof document === "undefined") return null
-
-  const cookies = document.cookie.split(";")
-  for (let i = 0; i < cookies.length; i++) {
-    const cookie = cookies[i].trim()
-    if (cookie.startsWith(name + "=")) {
-      return cookie.substring(name.length + 1)
-    }
-  }
-  return null
 }

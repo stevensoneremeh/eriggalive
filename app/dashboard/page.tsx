@@ -8,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import { useAuth } from "@/contexts/auth-context"
 import { Music, Users, Calendar, TrendingUp, Clock } from "lucide-react"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
 
 // Mock data for the dashboard
 const mockRecentTracks = [
@@ -98,6 +100,23 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+              <Card className="col-span-2">
+                <CardHeader>
+                  <CardTitle>Coin Management</CardTitle>
+                  <CardDescription>Buy, withdraw, and manage your Erigga Coins</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-4">
+                    <Button asChild className="bg-green-500 hover:bg-green-600">
+                      <Link href="/coins">
+                        <Coins className="h-4 w-4 mr-2" />
+                        Manage Coins
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card className="col-span-4">
                 <CardHeader>
                   <CardTitle>Recent Tracks</CardTitle>

@@ -2,33 +2,98 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
-import { createClient } from "@/lib/supabase/client"
-import type { CartoonSeries, CartoonEpisode, UserEpisodeProgress } from "@/types/database"
+import { createClient } from "@supabase/supabase-js"
+import type { CartoonSeries, CartoonEpisode } from "@/types/database"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Button } from "@/components/ui/button"
+
+// Check if we're in a browser environment
+const isBrowser = typeof window !== "undefined"
+
+// Check if we're in preview mode
+const isPreviewMode =
+  isBrowser && (window.location.hostname.includes("vusercontent.net") || window.location.hostname.includes("v0.dev"))
+
+// Create a Supabase client for browser usage
+const getSupabaseClient = () => {
+  if (isPreviewMode) {
+    return createMockClient()
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("Missing Supabase environment variables")
+    return createMockClient()
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey)
+}
+
+// Create a mock client for preview mode
+const createMockClient = () => {
+  return {
+    from: (table: string) => ({
+      select: () => ({
+        order: () => ({
+          then: (callback: any) => {
+            setTimeout(() => {
+              callback({
+                data: [
+                  {
+                    id: 1,
+                    title: "Paper Boi Chronicles",
+                    description: "Follow Erigga's journey from the streets to stardom",
+                    thumbnail_url: "/placeholder.svg?height=300&width=400",
+                    release_date: "2023-01-15",
+                    status: "ongoing",
+                    category: "drama",
+                    total_episodes: 12,
+                    total_views: 1500000,
+                    rating: 4.8,
+                    created_at: "2023-01-01T00:00:00Z",
+                  },
+                  {
+                    id: 2,
+                    title: "Warri Adventures",
+                    description: "Comedy series based on Erigga's experiences in Warri",
+                    thumbnail_url: "/placeholder.svg?height=300&width=400",
+                    release_date: "2023-03-20",
+                    status: "completed",
+                    category: "comedy",
+                    total_episodes: 8,
+                    total_views: 980000,
+                    rating: 4.6,
+                    created_at: "2023-03-01T00:00:00Z",
+                  },
+                ],
+                error: null,
+              })
+            }, 500)
+          },
+        }),
+      }),
+    }),
+  } as any
+}
 
 interface SeriesWithEpisodes extends CartoonSeries {
   episodes: CartoonEpisode[]
 }
 
 export default function ChroniclesPage() {
-  const [selectedSeries, setSelectedSeries] = useState<SeriesWithEpisodes | null>(null)
-  const [selectedEpisode, setSelectedEpisode] = useState<CartoonEpisode | null>(null)
-  const [activeTab, setActiveTab] = useState("all")
   const [series, setSeries] = useState<any[]>([])
-  const [userProgress, setUserProgress] = useState<Record<number, UserEpisodeProgress>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { user, profile, isAuthenticated } = useAuth()
-  const supabase = createClient()
+  const { user, profile } = useAuth()
+  const supabase = getSupabaseClient()
 
   useEffect(() => {
     async function fetchSeries() {
       try {
         setLoading(true)
-        const { data, error } = await supabase
-          .from("cartoon_series")
-          .select("*")
-          .order("created_at", { ascending: false })
+        const { data, error } = await supabase.from("cartoon_series").select().order("created_at", { ascending: false })
 
         if (error) throw error
         setSeries(data || [])
@@ -42,79 +107,6 @@ export default function ChroniclesPage() {
 
     fetchSeries()
   }, [])
-
-  const fetchUserProgress = async () => {
-    if (!profile) return
-
-    try {
-      const { data, error } = await supabase.from("user_episode_progress").select("*").eq("user_id", profile.id)
-
-      if (error) throw error
-
-      const progressMap = (data || []).reduce(
-        (acc, progress) => {
-          acc[progress.episode_id] = progress
-          return acc
-        },
-        {} as Record<number, UserEpisodeProgress>,
-      )
-
-      setUserProgress(progressMap)
-    } catch (error) {
-      console.error("Error fetching user progress:", error)
-      // Don't set an error state here as this is not critical
-    }
-  }
-
-  const updateProgress = async (episodeId: number, progress: number) => {
-    if (!profile) return
-
-    try {
-      // Update local state first for immediate feedback
-      setUserProgress((prev) => ({
-        ...prev,
-        [episodeId]: {
-          user_id: profile.id,
-          episode_id: episodeId,
-          progress_percentage: progress,
-          completed: progress >= 90,
-          last_watched: new Date().toISOString(),
-        } as UserEpisodeProgress,
-      }))
-
-      const { error } = await supabase.from("user_episode_progress").upsert({
-        user_id: profile.id,
-        episode_id: episodeId,
-        progress_percentage: progress,
-        completed: progress >= 90,
-        last_watched: new Date().toISOString(),
-      })
-
-      if (error) throw error
-    } catch (error) {
-      console.error("Error updating progress:", error)
-    }
-  }
-
-  const filteredSeries = series.filter((series) => {
-    if (activeTab === "all") return true
-    if (activeTab === "ongoing") return series.status === "ongoing"
-    if (activeTab === "completed") return series.status === "completed"
-    if (activeTab === "upcoming") return series.status === "upcoming"
-    return series.category === activeTab
-  })
-
-  const formatViews = (views: number) => {
-    if (views >= 1000000) return `${(views / 1000000).toFixed(1)}M`
-    if (views >= 1000) return `${(views / 1000).toFixed(1)}K`
-    return views.toString()
-  }
-
-  const canWatchEpisode = (episode: CartoonEpisode) => {
-    if (!episode.is_released) return false
-    // Add premium gating logic here if needed
-    return true
-  }
 
   if (loading) {
     return (
@@ -136,6 +128,9 @@ export default function ChroniclesPage() {
         <div className="bg-red-50 border border-red-200 rounded-md p-4 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300">
           <p className="font-medium">Error loading chronicles</p>
           <p className="text-sm">{error}</p>
+          <Button onClick={() => window.location.reload()} className="mt-4">
+            Try Again
+          </Button>
         </div>
       </div>
     )
