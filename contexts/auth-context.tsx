@@ -1,222 +1,158 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { useRouter, usePathname } from "next/navigation"
-import { clientAuth } from "@/lib/auth-utils"
+import type React from "react"
+import { createContext, useContext, useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@supabase/supabase-js"
 
-// Define types
-type UserTier = "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
-
-interface User {
+interface UserProfile {
   id: string
-  email: string
   username: string
-}
-
-interface UserProfile extends User {
-  tier: UserTier
+  full_name: string
+  email: string
+  avatar_url?: string
+  tier: string
   coins: number
   level: number
   points: number
-  avatar_url?: string
-  full_name?: string
-  bio?: string
   created_at: string
+  updated_at: string
 }
 
 interface AuthContextType {
   user: User | null
   profile: UserProfile | null
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: any }>
-  signOut: () => Promise<void>
-  isLoading: boolean
   isAuthenticated: boolean
-  purchaseCoins: (amount: number, method: string) => Promise<{ success: boolean; data?: any; error?: any }>
-  refreshSession: () => Promise<void>
+  isLoading: boolean
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  signUp: (
+    email: string,
+    password: string,
+    userData: { username: string; full_name: string },
+  ) => Promise<{ success: boolean; error?: string }>
+  signOut: () => Promise<void>
+  refreshProfile: () => Promise<void>
 }
 
-// Create context
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Provider component
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const router = useRouter()
-  const pathname = usePathname()
+  const supabase = createClient()
 
-  // Initialize with stored data
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase.from("users").select("*").eq("id", userId).single()
+
+      if (error) throw error
+      setProfile(data)
+    } catch (error) {
+      console.error("Error fetching profile:", error)
+      setProfile(null)
+    }
+  }
+
+  const refreshProfile = async () => {
+    if (user?.id) {
+      await fetchProfile(user.id)
+    }
+  }
+
   useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        setIsLoading(true)
+    // Get initial session
+    const getInitialSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      setUser(session?.user ?? null)
 
-        // Get session from our utility
-        const session = clientAuth.getSession()
-
-        if (session?.user && session?.profile) {
-          setUser(session.user)
-          setProfile(session.profile)
-          setIsAuthenticated(true)
-
-          // Refresh the session to extend expiry
-          clientAuth.refreshSession()
-        } else {
-          setIsAuthenticated(false)
-        }
-      } catch (error) {
-        console.error("Auth initialization error:", error)
-        setIsAuthenticated(false)
-      } finally {
-        setIsLoading(false)
+      if (session?.user) {
+        await fetchProfile(session.user.id)
       }
+
+      setIsLoading(false)
     }
 
-    initializeAuth()
+    getInitialSession()
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user ?? null)
+
+      if (session?.user) {
+        await fetchProfile(session.user.id)
+      } else {
+        setProfile(null)
+      }
+
+      setIsLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
-  // Refresh session on route changes
-  useEffect(() => {
-    if (isAuthenticated) {
-      clientAuth.refreshSession()
-    }
-  }, [pathname, isAuthenticated])
-
-  // Set up periodic session refresh
-  useEffect(() => {
-    if (!isAuthenticated) return
-
-    const refreshInterval = setInterval(
-      () => {
-        clientAuth.refreshSession()
-      },
-      5 * 60 * 1000,
-    ) // Every 5 minutes
-
-    return () => clearInterval(refreshInterval)
-  }, [isAuthenticated])
-
-  // Sign in function that works for any user
   const signIn = async (email: string, password: string) => {
     try {
-      setIsLoading(true)
-
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 800))
-
-      // Generate a unique ID based on the email
-      const userId = `user-${btoa(email).replace(/[=+/]/g, "").substring(0, 16)}`
-
-      // Create a username from the email
-      const username = email.split("@")[0]
-
-      // Create a mock user
-      const mockUser = {
-        id: userId,
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        username,
-      }
+        password,
+      })
 
-      // Create a mock profile with 500 coins
-      const mockProfile = {
-        ...mockUser,
-        tier: "pioneer" as UserTier,
-        coins: 500,
-        level: 1,
-        points: 100,
-        created_at: new Date().toISOString(),
-        bio: `${username}'s profile`,
-      }
-
-      // Persist the session using our utility
-      clientAuth.saveSession(mockUser, mockProfile)
-
-      setUser(mockUser)
-      setProfile(mockProfile)
-      setIsAuthenticated(true)
+      if (error) throw error
 
       return { success: true }
-    } catch (error: any) {
-      return { success: false, error: error.message || "An unknown error occurred" }
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Sign out function
-  const signOut = async () => {
-    try {
-      setIsLoading(true)
-
-      // Clear session using our utility
-      clientAuth.clearSession()
-
-      setUser(null)
-      setProfile(null)
-      setIsAuthenticated(false)
-
-      router.push("/login")
     } catch (error) {
-      console.error("Sign out error:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Function to refresh the current session
-  const refreshSession = async () => {
-    if (user && profile) {
-      clientAuth.saveSession(user, profile)
-    }
-  }
-
-  // Purchase coins function
-  const purchaseCoins = async (amount: number, method: string) => {
-    try {
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 800))
-
-      // Update the profile with new coins
-      if (profile) {
-        const updatedProfile = {
-          ...profile,
-          coins: profile.coins + amount,
-        }
-
-        // Update session with new profile data
-        clientAuth.saveSession(user!, updatedProfile)
-
-        setProfile(updatedProfile)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Sign in failed",
       }
-
-      return { success: true, data: { id: `transaction-${Date.now()}` } }
-    } catch (error: any) {
-      return { success: false, error: { message: error.message || "An unknown error occurred" } }
     }
   }
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        profile,
-        signIn,
-        signOut,
-        isLoading,
-        isAuthenticated,
-        purchaseCoins,
-        refreshSession,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  )
+  const signUp = async (email: string, password: string, userData: { username: string; full_name: string }) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: userData,
+        },
+      })
+
+      if (error) throw error
+
+      return { success: true }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Sign up failed",
+      }
+    }
+  }
+
+  const signOut = async () => {
+    await supabase.auth.signOut()
+  }
+
+  const value = {
+    user,
+    profile,
+    isAuthenticated: !!user,
+    isLoading,
+    signIn,
+    signUp,
+    signOut,
+    refreshProfile,
+  }
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-// Custom hook to use the auth context
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext)
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider")

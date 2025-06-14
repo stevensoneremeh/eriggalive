@@ -5,28 +5,12 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Heart, MessageCircle, Share2, Play, Pause, Coins } from "lucide-react"
+import { Heart, MessageCircle, Share2, MoreHorizontal } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/components/ui/use-toast"
-
-interface Post {
-  id: number
-  user: {
-    id: string
-    username: string
-    full_name: string
-    avatar_url?: string
-    tier: string
-    coins: number
-  }
-  content: string
-  media_url?: string
-  media_type?: "image" | "audio" | "video"
-  likes_count: number
-  comments_count: number
-  created_at: string
-  is_liked: boolean
-}
+import { useContentManager, type Post } from "@/lib/content-manager"
+import { AudioPlayer } from "@/components/community/audio-player"
+import { formatDistanceToNow } from "date-fns"
 
 interface SocialFeedProps {
   searchQuery: string
@@ -36,76 +20,52 @@ interface SocialFeedProps {
 export function SocialFeed({ searchQuery, filterType }: SocialFeedProps) {
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
-  const [playingId, setPlayingId] = useState<number | null>(null)
+  const [likedPosts, setLikedPosts] = useState<Set<number>>(new Set())
+
   const { profile, isAuthenticated } = useAuth()
   const { toast } = useToast()
+  const contentManager = useContentManager()
 
-  // Mock data for preview
   useEffect(() => {
-    const mockPosts: Post[] = [
-      {
-        id: 1,
-        user: {
-          id: "1",
-          username: "erigga_fan_1",
-          full_name: "Sarah Johnson",
-          avatar_url: "/placeholder-user.jpg",
-          tier: "Pioneer",
-          coins: 1250,
-        },
-        content: "Just listened to Erigga's latest track and I'm blown away! The wordplay is incredible 🔥 #EriggaLive",
-        media_type: "image",
-        media_url: "/placeholder.jpg",
-        likes_count: 45,
-        comments_count: 12,
-        created_at: "2024-01-15T10:30:00Z",
-        is_liked: false,
-      },
-      {
-        id: 2,
-        user: {
-          id: "2",
-          username: "bars_king",
-          full_name: "Michael Chen",
-          avatar_url: "/placeholder-user.jpg",
-          tier: "Elder",
-          coins: 2800,
-        },
-        content: "Dropping some bars inspired by the king himself! What y'all think? 🎤",
-        media_type: "audio",
-        media_url: "/placeholder-audio.mp3",
-        likes_count: 78,
-        comments_count: 23,
-        created_at: "2024-01-15T09:15:00Z",
-        is_liked: true,
-      },
-      {
-        id: 3,
-        user: {
-          id: "3",
-          username: "erigga_stan",
-          full_name: "Amara Okafor",
-          avatar_url: "/placeholder-user.jpg",
-          tier: "Blood",
-          coins: 5600,
-        },
-        content: "Been following Erigga since day one. His journey is truly inspiring! From the streets to the top 💪",
-        likes_count: 156,
-        comments_count: 34,
-        created_at: "2024-01-15T08:45:00Z",
-        is_liked: false,
-      },
-    ]
-
-    // Simulate loading
-    setTimeout(() => {
-      setPosts(mockPosts)
-      setLoading(false)
-    }, 1000)
+    fetchPosts()
   }, [searchQuery, filterType])
 
+  const fetchPosts = async () => {
+    setLoading(true)
+    try {
+      const {
+        success,
+        posts: fetchedPosts,
+        error,
+      } = await contentManager.getPosts({
+        type: filterType === "recent" ? undefined : "post",
+        limit: 20,
+        searchQuery: searchQuery || undefined,
+      })
+
+      if (success && fetchedPosts) {
+        setPosts(fetchedPosts)
+      } else {
+        toast({
+          title: "Error",
+          description: error || "Failed to load posts",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching posts:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load posts",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleLike = async (postId: number) => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !profile) {
       toast({
         title: "Sign in required",
         description: "Please sign in to like posts",
@@ -114,30 +74,78 @@ export function SocialFeed({ searchQuery, filterType }: SocialFeedProps) {
       return
     }
 
-    setPosts((prev) =>
-      prev.map((post) =>
-        post.id === postId
-          ? {
-              ...post,
-              is_liked: !post.is_liked,
-              likes_count: post.is_liked ? post.likes_count - 1 : post.likes_count + 1,
-            }
-          : post,
-      ),
-    )
+    try {
+      const { success, error } = await contentManager.likePost(postId, profile.id)
 
-    toast({
-      title: "Success",
-      description: "Post liked successfully!",
-    })
+      if (success) {
+        const isLiked = likedPosts.has(postId)
+
+        // Update local state
+        setPosts((prev) =>
+          prev.map((post) =>
+            post.id === postId
+              ? {
+                  ...post,
+                  like_count: isLiked ? post.like_count - 1 : post.like_count + 1,
+                }
+              : post,
+          ),
+        )
+
+        // Update liked posts set
+        setLikedPosts((prev) => {
+          const newSet = new Set(prev)
+          if (isLiked) {
+            newSet.delete(postId)
+          } else {
+            newSet.add(postId)
+          }
+          return newSet
+        })
+
+        toast({
+          title: "Success",
+          description: isLiked ? "Post unliked" : "Post liked!",
+        })
+      } else {
+        throw new Error(error)
+      }
+    } catch (error) {
+      console.error("Like error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to like post",
+        variant: "destructive",
+      })
+    }
   }
 
-  const handlePlay = (postId: number, audioUrl: string) => {
-    if (playingId === postId) {
-      setPlayingId(null)
+  const handleShare = async (post: Post) => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${post.users?.full_name}'s post`,
+          text: post.content,
+          url: `${window.location.origin}/community/post/${post.id}`,
+        })
+      } catch (error) {
+        // User cancelled sharing
+      }
     } else {
-      setPlayingId(postId)
-      // In a real app, you'd implement actual audio playback here
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(`${window.location.origin}/community/post/${post.id}`)
+        toast({
+          title: "Link copied",
+          description: "Post link copied to clipboard",
+        })
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to copy link",
+          variant: "destructive",
+        })
+      }
     }
   }
 
@@ -190,63 +198,67 @@ export function SocialFeed({ searchQuery, filterType }: SocialFeedProps) {
         <Card key={post.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-200">
           <div className="p-6">
             {/* User Header */}
-            <div className="flex items-center gap-3 mb-4">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={post.user.avatar_url || "/placeholder.svg"} alt={post.user.username} />
-                <AvatarFallback>{post.user.full_name.charAt(0)}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold truncate">{post.user.full_name}</p>
-                  <Badge className={`${getTierColor(post.user.tier)} text-white text-xs`}>{post.user.tier}</Badge>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>@{post.user.username}</span>
-                  <span>•</span>
-                  <span>{new Date(post.created_at).toLocaleDateString()}</span>
-                  <span>•</span>
-                  <div className="flex items-center gap-1">
-                    <Coins className="h-3 w-3 text-orange-500" />
-                    <span>{post.user.coins.toLocaleString()}</span>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={post.users?.avatar_url || "/placeholder.svg"} alt={post.users?.username} />
+                  <AvatarFallback>{post.users?.full_name?.charAt(0) || "U"}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold truncate">{post.users?.full_name}</p>
+                    <Badge className={`${getTierColor(post.users?.tier || "grassroot")} text-white text-xs`}>
+                      {post.users?.tier || "Grassroot"}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>@{post.users?.username}</span>
+                    <span>•</span>
+                    <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
                   </div>
                 </div>
               </div>
+              <Button variant="ghost" size="sm">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
             </div>
 
             {/* Content */}
             <div className="mb-4">
-              <p className="text-foreground leading-relaxed">{post.content}</p>
+              <p className="text-foreground leading-relaxed whitespace-pre-wrap">{post.content}</p>
             </div>
 
+            {/* Hashtags */}
+            {post.hashtags && post.hashtags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {post.hashtags.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant="secondary"
+                    className="text-xs bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 cursor-pointer"
+                  >
+                    #{tag}
+                  </Badge>
+                ))}
+              </div>
+            )}
+
             {/* Media */}
-            {post.media_url && (
+            {post.media_urls && post.media_urls.length > 0 && (
               <div className="mb-4 rounded-lg overflow-hidden">
-                {post.media_type === "image" && (
+                {post.media_types?.includes("image") && (
                   <img
-                    src={post.media_url || "/placeholder.svg"}
+                    src={post.media_urls[post.media_types.indexOf("image")] || "/placeholder.svg"}
                     alt="Post media"
                     className="w-full h-64 object-cover"
                   />
                 )}
-                {post.media_type === "audio" && (
-                  <div className="bg-muted p-4 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handlePlay(post.id, post.media_url!)}
-                        className="rounded-full"
-                      >
-                        {playingId === post.id ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-                      </Button>
-                      <div className="flex-1">
-                        <div className="h-2 bg-background rounded-full">
-                          <div className="h-2 bg-gradient-to-r from-orange-500 to-lime-500 rounded-full w-1/3"></div>
-                        </div>
-                      </div>
-                      <span className="text-sm text-muted-foreground">0:45 / 2:30</span>
-                    </div>
-                  </div>
+                {post.media_types?.includes("audio") && (
+                  <AudioPlayer
+                    src={post.media_urls[post.media_types.indexOf("audio")]}
+                    title={`${post.users?.full_name}'s audio`}
+                    artist={post.users?.username}
+                  />
                 )}
               </div>
             )}
@@ -258,16 +270,21 @@ export function SocialFeed({ searchQuery, filterType }: SocialFeedProps) {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleLike(post.id)}
-                  className={`gap-2 ${post.is_liked ? "text-red-500" : "text-muted-foreground"}`}
+                  className={`gap-2 ${likedPosts.has(post.id) ? "text-red-500" : "text-muted-foreground"}`}
                 >
-                  <Heart className={`h-4 w-4 ${post.is_liked ? "fill-current" : ""}`} />
-                  {post.likes_count}
+                  <Heart className={`h-4 w-4 ${likedPosts.has(post.id) ? "fill-current" : ""}`} />
+                  {post.like_count}
                 </Button>
                 <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
                   <MessageCircle className="h-4 w-4" />
-                  {post.comments_count}
+                  {post.comment_count}
                 </Button>
-                <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-2 text-muted-foreground"
+                  onClick={() => handleShare(post)}
+                >
                   <Share2 className="h-4 w-4" />
                   Share
                 </Button>

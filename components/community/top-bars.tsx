@@ -4,7 +4,8 @@ import { useEffect, useState } from "react"
 import { Play, Pause } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { clientDb, type BarSubmission } from "@/lib/db-operations"
+import type { BarSubmission } from "@/lib/db-operations"
+import { supabase } from "@/lib/supabase-client"
 
 export function TopBarsOfWeek() {
   const [topBars, setTopBars] = useState<BarSubmission[]>([])
@@ -17,11 +18,22 @@ export function TopBarsOfWeek() {
     async function fetchTopBars() {
       try {
         setLoading(true)
-        const { topBars, error } = await clientDb.getTopBarsOfWeek()
+        const oneWeekAgo = new Date()
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
 
-        if (error) throw new Error(error)
+        const { data: topBars, error } = await supabase
+          .from("bar_submissions")
+          .select(`
+            *,
+            user:user_profiles(username, full_name, avatar_url)
+          `)
+          .gte("created_at", oneWeekAgo.toISOString())
+          .order("vote_count", { ascending: false })
+          .limit(10)
 
-        setTopBars(topBars)
+        if (error) throw new Error(error.message)
+
+        setTopBars(topBars as BarSubmission[])
       } catch (err) {
         console.error("Error fetching top bars:", err)
         setError("Failed to load top bars")
