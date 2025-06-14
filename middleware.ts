@@ -21,6 +21,19 @@ const PROTECTED_PATHS = [
 ]
 
 export function middleware(request: NextRequest) {
+  // Add health check headers for monitoring
+  const response = NextResponse.next()
+
+  // Add server timing header for performance monitoring
+  response.headers.set("Server-Timing", `total;dur=${Date.now()}`)
+
+  // Add health check endpoint info
+  if (request.nextUrl.pathname.startsWith("/api/health")) {
+    response.headers.set("Cache-Control", "no-cache, no-store, must-revalidate")
+    response.headers.set("Pragma", "no-cache")
+    response.headers.set("Expires", "0")
+  }
+
   // Get the pathname of the request
   const { pathname } = request.nextUrl
 
@@ -71,10 +84,10 @@ export function middleware(request: NextRequest) {
   }
 
   // For all other cases, proceed normally
-  return NextResponse.next()
+  return response
 }
 
 // See "Matching Paths" below to learn more
 export const config = {
-  matcher: ["/((?!api/|_next/|_static/|_vercel|[\\w-]+\\.\\w+).*)"],
+  matcher: ["/((?!api/|_next/|_static/|_vercel|[\\w-]+\\.\\w+).*)", "/((?!_next/static|_next/image|favicon.ico).*)"],
 }

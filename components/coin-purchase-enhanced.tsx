@@ -1,140 +1,288 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Coins, CreditCard, AlertCircle, CheckCircle } from "lucide-react"
+import { Coins, CreditCard, AlertCircle, CheckCircle, Loader2, Shield } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useToast } from "@/components/ui/use-toast"
 
 interface CoinPurchaseEnhancedProps {
-  onSuccess?: () => void
+  onSuccess?: (transaction: any) => void
+  onError?: (error: string) => void
 }
 
 const COIN_PACKAGES = [
-  { coins: 1000, naira: 500, popular: false },
-  { coins: 2000, naira: 1000, popular: true, bonus: 100 },
-  { coins: 5000, naira: 2500, popular: false, bonus: 300 },
-  { coins: 10000, naira: 5000, popular: false, bonus: 700 },
+  { coins: 1000, naira: 500, popular: false, id: "basic" },
+  { coins: 2000, naira: 1000, popular: true, bonus: 100, id: "popular" },
+  { coins: 5000, naira: 2500, popular: false, bonus: 300, id: "premium" },
+  { coins: 10000, naira: 5000, popular: false, bonus: 700, id: "ultimate" },
 ]
 
-export function CoinPurchaseEnhanced({ onSuccess }: CoinPurchaseEnhancedProps) {
-  const { profile } = useAuth()
+// Validation functions
+const validateCoinAmount = (amount: number): string | null => {
+  if (isNaN(amount) || amount <= 0) return "Please enter a valid amount"
+  if (amount < 100) return "Minimum purchase is 100 Erigga Coins"
+  if (amount > 100000) return "Maximum purchase is 100,000 Erigga Coins per transaction"
+  return null
+}
+
+const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
+
+export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhancedProps) {
+  const { profile, refreshSession } = useAuth()
+  const { toast } = useToast()
   const [selectedPackage, setSelectedPackage] = useState(COIN_PACKAGES[1])
   const [customCoins, setCustomCoins] = useState("")
   const [isCustom, setIsCustom] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [paymentAttempts, setPaymentAttempts] = useState(0)
+  const [isPaystackLoaded, setIsPaystackLoaded] = useState(false)
 
-  // Load Paystack script
+  // Load Paystack script with error handling
   useEffect(() => {
-    if (typeof window !== "undefined" && !window.PaystackPop) {
-      const script = document.createElement("script")
-      script.src = "https://js.paystack.co/v1/inline.js"
-      script.async = true
-      document.body.appendChild(script)
+    const loadPaystack = async () => {
+      try {
+        if (typeof window !== "undefined" && !window.PaystackPop) {
+          const script = document.createElement("script")
+          script.src = "https://js.paystack.co/v1/inline.js"
+          script.async = true
 
-      return () => {
-        if (document.body.contains(script)) {
-          document.body.removeChild(script)
+          script.onload = () => {
+            setIsPaystackLoaded(true)
+            console.log("Paystack loaded successfully")
+          }
+
+          script.onerror = () => {
+            setError("Failed to load payment gateway. Please refresh the page.")
+            console.error("Failed to load Paystack script")
+          }
+
+          document.body.appendChild(script)
+
+          return () => {
+            if (document.body.contains(script)) {
+              document.body.removeChild(script)
+            }
+          }
+        } else if (window.PaystackPop) {
+          setIsPaystackLoaded(true)
         }
+      } catch (err) {
+        console.error("Error loading Paystack:", err)
+        setError("Payment gateway initialization failed")
       }
     }
+
+    loadPaystack()
   }, [])
 
-  const calculateNaira = (coins: number) => coins * 0.5
+  const calculateNaira = useCallback((coins: number) => coins * 0.5, [])
 
-  const handlePurchase = async () => {
+  const resetState = useCallback(() => {
     setError(null)
     setSuccess(null)
+  }, [])
+
+  const handlePurchaseValidation = useCallback(() => {
+    resetState()
+
+    if (!profile?.email) {
+      setError("Please log in to purchase coins")
+      return false
+    }
+
+    if (!validateEmail(profile.email)) {
+      setError("Invalid email address in profile")
+      return false
+    }
+
+    if (!isPaystackLoaded) {
+      setError("Payment gateway not ready. Please wait a moment and try again.")
+      return false
+    }
+
+    const coins = isCustom ? Number.parseInt(customCoins, 10) : selectedPackage.coins + (selectedPackage.bonus || 0)
+    const validationError = validateCoinAmount(isCustom ? Number.parseInt(customCoins, 10) : selectedPackage.coins)
+
+    if (validationError) {
+      setError(validationError)
+      return false
+    }
+
+    if (paymentAttempts >= 3) {
+      setError("Too many payment attempts. Please wait 5 minutes before trying again.")
+      return false
+    }
+
+    return true
+  }, [profile, isPaystackLoaded, isCustom, customCoins, selectedPackage, paymentAttempts])
+
+  const verifyPayment = useCallback(
+    async (reference: string, expectedAmount: number, expectedCoins: number) => {
+      try {
+        const response = await fetch("/api/coins/purchase", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("auth_token") || "mock-token"}`,
+          },
+          body: JSON.stringify({
+            reference,
+            amount: expectedAmount,
+            coins: expectedCoins,
+            userId: profile?.id,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
+        const result = await response.json()
+
+        if (!result.success) {
+          throw new Error(result.error || "Payment verification failed")
+        }
+
+        return result
+      } catch (err) {
+        console.error("Payment verification error:", err)
+        throw new Error(err instanceof Error ? err.message : "Payment verification failed")
+      }
+    },
+    [profile],
+  )
+
+  const handlePurchase = useCallback(async () => {
+    if (!handlePurchaseValidation()) return
+
     setIsProcessing(true)
+    setPaymentAttempts((prev) => prev + 1)
 
     try {
-      const coins = isCustom ? Number.parseInt(customCoins, 10) : selectedPackage.coins + (selectedPackage.bonus || 0)
       const baseCoins = isCustom ? Number.parseInt(customCoins, 10) : selectedPackage.coins
+      const bonusCoins = isCustom ? 0 : selectedPackage.bonus || 0
+      const totalCoins = baseCoins + bonusCoins
       const nairaAmount = calculateNaira(baseCoins)
 
-      if (isNaN(coins) || coins <= 0) {
-        setError("Please enter a valid amount")
-        setIsProcessing(false)
-        return
-      }
+      const paymentReference = `erigga_coins_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-      if (coins < 100) {
-        setError("Minimum purchase is 100 Erigga Coins")
-        setIsProcessing(false)
-        return
-      }
-
-      // Initialize Paystack payment
       if (typeof window !== "undefined" && window.PaystackPop) {
         const handler = window.PaystackPop.setup({
           key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_0123456789abcdef0123456789abcdef01234567",
-          email: profile?.email || "user@example.com",
-          amount: nairaAmount * 100, // Convert to kobo
+          email: profile?.email || "",
+          amount: Math.round(nairaAmount * 100), // Convert to kobo and ensure integer
           currency: "NGN",
-          ref: `erigga_coins_${Date.now()}`,
+          ref: paymentReference,
           metadata: {
-            coin_amount: coins,
+            coin_amount: totalCoins,
             base_coins: baseCoins,
-            bonus_coins: selectedPackage.bonus || 0,
+            bonus_coins: bonusCoins,
             user_id: profile?.id || "guest",
+            package_id: isCustom ? "custom" : selectedPackage.id,
+            timestamp: new Date().toISOString(),
           },
           callback: async (response: any) => {
             try {
-              // Verify payment on backend
-              const verifyResponse = await fetch("/api/coins/purchase", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer mock-token`, // In production, use real JWT
-                },
-                body: JSON.stringify({
-                  reference: response.reference,
-                  amount: nairaAmount,
-                  coins: coins,
-                }),
+              console.log("Payment successful:", response)
+
+              const verificationResult = await verifyPayment(response.reference, nairaAmount, totalCoins)
+
+              setSuccess(`Successfully purchased ${totalCoins.toLocaleString()} Erigga Coins!`)
+
+              toast({
+                title: "Purchase Successful!",
+                description: `${totalCoins.toLocaleString()} Erigga Coins added to your account`,
+                duration: 5000,
               })
 
-              const result = await verifyResponse.json()
+              // Refresh user session to update coin balance
+              await refreshSession()
 
-              if (result.success) {
-                setSuccess(`Successfully purchased ${coins} Erigga Coins!`)
-                if (onSuccess) onSuccess()
-              } else {
-                setError(result.error || "Payment verification failed")
-              }
+              if (onSuccess) onSuccess(verificationResult.transaction)
+
+              // Reset form
+              setCustomCoins("")
+              setIsCustom(false)
+              setSelectedPackage(COIN_PACKAGES[1])
+              setPaymentAttempts(0)
             } catch (err) {
-              setError("Failed to verify payment")
+              const errorMessage = err instanceof Error ? err.message : "Payment verification failed"
+              setError(errorMessage)
+
+              toast({
+                title: "Payment Verification Failed",
+                description: errorMessage,
+                variant: "destructive",
+                duration: 5000,
+              })
+
+              if (onError) onError(errorMessage)
             } finally {
               setIsProcessing(false)
             }
           },
           onClose: () => {
+            console.log("Payment dialog closed")
             setIsProcessing(false)
           },
         })
 
         handler.openIframe()
       } else {
-        setError("Payment gateway not available")
-        setIsProcessing(false)
+        throw new Error("Payment gateway not available")
       }
     } catch (err) {
       console.error("Error processing purchase:", err)
-      setError("An error occurred while processing your purchase")
+      const errorMessage = err instanceof Error ? err.message : "An error occurred while processing your purchase"
+      setError(errorMessage)
+
+      toast({
+        title: "Purchase Failed",
+        description: errorMessage,
+        variant: "destructive",
+        duration: 5000,
+      })
+
+      if (onError) onError(errorMessage)
       setIsProcessing(false)
     }
-  }
+  }, [
+    handlePurchaseValidation,
+    isCustom,
+    customCoins,
+    selectedPackage,
+    calculateNaira,
+    profile,
+    verifyPayment,
+    refreshSession,
+    onSuccess,
+    onError,
+    toast,
+  ])
+
+  const isFormValid = isCustom
+    ? customCoins && Number.parseInt(customCoins, 10) >= 100 && Number.parseInt(customCoins, 10) <= 100000
+    : selectedPackage
 
   return (
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold mb-2">Purchase Erigga Coins</h2>
         <p className="text-muted-foreground">Exchange Rate: 1000 Coins = ₦500</p>
+        <div className="flex items-center justify-center mt-2 text-sm text-muted-foreground">
+          <Shield className="h-4 w-4 mr-1" />
+          Secure payment powered by Paystack
+        </div>
       </div>
 
       {success && (
@@ -151,15 +299,22 @@ export function CoinPurchaseEnhanced({ onSuccess }: CoinPurchaseEnhancedProps) {
         </Alert>
       )}
 
+      {!isPaystackLoaded && (
+        <Alert>
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <AlertDescription>Loading payment gateway...</AlertDescription>
+        </Alert>
+      )}
+
       {!isCustom ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {COIN_PACKAGES.map((pkg) => (
             <Card
-              key={pkg.coins}
+              key={pkg.id}
               className={`cursor-pointer transition-all relative ${
-                selectedPackage.coins === pkg.coins
-                  ? "border-orange-500 bg-orange-500/10"
-                  : "hover:border-orange-500/50"
+                selectedPackage.id === pkg.id
+                  ? "border-orange-500 bg-orange-500/10 ring-2 ring-orange-500/20"
+                  : "hover:border-orange-500/50 hover:shadow-md"
               }`}
               onClick={() => setSelectedPackage(pkg)}
             >
@@ -176,15 +331,20 @@ export function CoinPurchaseEnhanced({ onSuccess }: CoinPurchaseEnhancedProps) {
                     <Coins className="h-5 w-5 text-yellow-500 mr-2" />
                     <span>{pkg.coins.toLocaleString()} Coins</span>
                   </div>
-                  <span className="text-lg font-bold">₦{pkg.naira}</span>
+                  <span className="text-lg font-bold">₦{pkg.naira.toLocaleString()}</span>
                 </CardTitle>
                 {pkg.bonus && (
-                  <CardDescription className="text-green-600 font-medium">+{pkg.bonus} Bonus Coins!</CardDescription>
+                  <CardDescription className="text-green-600 font-medium">
+                    +{pkg.bonus.toLocaleString()} Bonus Coins!
+                  </CardDescription>
                 )}
               </CardHeader>
               <CardContent>
                 <div className="text-sm text-muted-foreground">
                   Total: {(pkg.coins + (pkg.bonus || 0)).toLocaleString()} coins
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Rate: ₦{(pkg.naira / pkg.coins).toFixed(2)} per coin
                 </div>
               </CardContent>
             </Card>
@@ -194,6 +354,7 @@ export function CoinPurchaseEnhanced({ onSuccess }: CoinPurchaseEnhancedProps) {
         <Card>
           <CardHeader>
             <CardTitle>Custom Amount</CardTitle>
+            <CardDescription>Enter the exact number of coins you want to purchase</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -202,38 +363,91 @@ export function CoinPurchaseEnhanced({ onSuccess }: CoinPurchaseEnhancedProps) {
                 id="custom-coins"
                 type="number"
                 min="100"
-                placeholder="Enter amount (min. 100 coins)"
+                max="100000"
+                placeholder="Enter amount (100 - 100,000 coins)"
                 value={customCoins}
-                onChange={(e) => setCustomCoins(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value
+                  if (value === "" || (Number.parseInt(value, 10) >= 0 && Number.parseInt(value, 10) <= 100000)) {
+                    setCustomCoins(value)
+                    resetState()
+                  }
+                }}
+                className={error && isCustom ? "border-red-500" : ""}
               />
-              <p className="text-sm text-muted-foreground">
-                Cost: ₦{isNaN(Number.parseInt(customCoins, 10)) ? 0 : calculateNaira(Number.parseInt(customCoins, 10))}
-              </p>
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Min: 100 coins</span>
+                <span>Max: 100,000 coins</span>
+              </div>
+              {customCoins && !isNaN(Number.parseInt(customCoins, 10)) && (
+                <div className="p-3 bg-muted rounded-md">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Cost:</span>
+                    <span className="font-bold">
+                      ₦{calculateNaira(Number.parseInt(customCoins, 10)).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">Rate: ₦0.50 per coin</div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
       )}
 
       <div className="flex gap-4">
-        <Button variant={!isCustom ? "default" : "outline"} onClick={() => setIsCustom(false)} className="flex-1">
+        <Button
+          variant={!isCustom ? "default" : "outline"}
+          onClick={() => {
+            setIsCustom(false)
+            resetState()
+          }}
+          className="flex-1"
+        >
           Packages
         </Button>
-        <Button variant={isCustom ? "default" : "outline"} onClick={() => setIsCustom(true)} className="flex-1">
+        <Button
+          variant={isCustom ? "default" : "outline"}
+          onClick={() => {
+            setIsCustom(true)
+            resetState()
+          }}
+          className="flex-1"
+        >
           Custom Amount
         </Button>
       </div>
 
       <Button
-        className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+        className="w-full bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50"
         onClick={handlePurchase}
-        disabled={isProcessing || (isCustom && (!customCoins || Number.parseInt(customCoins, 10) < 100))}
+        disabled={isProcessing || !isFormValid || !isPaystackLoaded}
       >
-        <CreditCard className="h-4 w-4 mr-2" />
-        {isProcessing ? "Processing..." : `Pay with Paystack`}
+        {isProcessing ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Processing Payment...
+          </>
+        ) : (
+          <>
+            <CreditCard className="h-4 w-4 mr-2" />
+            Pay ₦
+            {isCustom
+              ? customCoins
+                ? calculateNaira(Number.parseInt(customCoins, 10)).toLocaleString()
+                : "0"
+              : selectedPackage.naira.toLocaleString()}
+          </>
+        )}
       </Button>
 
-      <div className="text-xs text-muted-foreground text-center">
-        Secure payment powered by Paystack. Your payment information is encrypted and secure.
+      {paymentAttempts > 0 && (
+        <div className="text-xs text-muted-foreground text-center">Payment attempts: {paymentAttempts}/3</div>
+      )}
+
+      <div className="text-xs text-muted-foreground text-center space-y-1">
+        <p>Your payment information is encrypted and secure.</p>
+        <p>Coins will be added to your account immediately after successful payment.</p>
       </div>
     </div>
   )
