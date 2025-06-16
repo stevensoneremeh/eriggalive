@@ -31,17 +31,10 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
 
   // Set redirect path after component mounts to avoid SSR issues
   useEffect(() => {
-    // Convert searchParams to URLSearchParams-like object for getRedirectPath
-    const searchParamsObj = new URLSearchParams()
-    Object.entries(searchParams).forEach(([key, value]) => {
-      if (typeof value === 'string') {
-        searchParamsObj.set(key, value)
-      } else if (Array.isArray(value)) {
-        searchParamsObj.set(key, value[0] || '')
-      }
-    })
-    setRedirectPath(getRedirectPath(searchParamsObj))
-  }, [searchParams])
+    // Use window.location.search to avoid Next.js searchParams access issues
+    const urlSearchParams = new URLSearchParams(window.location.search)
+    setRedirectPath(getRedirectPath(urlSearchParams))
+  }, [])
 
   // Handle already authenticated users
   useEffect(() => {
