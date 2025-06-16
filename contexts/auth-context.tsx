@@ -1,290 +1,306 @@
 "use client"
 
-import type React from "react"
-import { createContext, useContext, useEffect, useState, useCallback } from "react"
-import { useRouter, usePathname } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
-import type { User } from "@supabase/supabase-js"
-import {
-  ROUTES,
-  isProtectedRoute,
-  isAuthRoute,
-  storeRedirectPath,
-  getStoredRedirectPath,
-  clearStoredRedirectPath,
-} from "@/lib/navigation-utils"
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
+import { clientAuth } from "@/lib/auth-utils"
+import { NavigationManager, ROUTES, getRedirectPath } from "@/lib/navigation-utils"
 
-interface AuthUser extends User {
-  tier?: string
-  coins?: number
+// Define types
+type UserTier = "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
+
+interface User {
+  id: string
+  email: string
+  username: string
+}
+
+interface UserProfile extends User {
+  tier: UserTier
+  coins: number
+  level: number
+  points: number
+  avatar_url?: string
   full_name?: string
-  username?: string
+  bio?: string
+  created_at: string
 }
 
 interface AuthContextType {
-  user: AuthUser | null
-  isAuthenticated: boolean
-  isLoading: boolean
-  isInitialized: boolean
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  signUp: (
-    email: string,
-    password: string,
-    username?: string,
-    fullName?: string,
-  ) => Promise<{ success: boolean; error?: string }>
+  user: User | null
+  profile: UserProfile | null
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: any }>
   signOut: () => Promise<void>
-  refreshUser: () => Promise<void>
+  isLoading: boolean
+  isAuthenticated: boolean
+  isInitialized: boolean
+  purchaseCoins: (amount: number, method: string) => Promise<{ success: boolean; data?: any; error?: any }>
+  refreshSession: () => Promise<void>
+  navigationManager: NavigationManager | null
 }
 
+// Create context
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null)
+// Provider component
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
+
   const router = useRouter()
   const pathname = usePathname()
-  const supabase = createClient()
+  const searchParams = useSearchParams()
 
-  const isAuthenticated = !!user
+  // Create navigation manager
+  const navigationManager = new NavigationManager(router, pathname)
 
-  // Initialize auth state
+  // Initialize authentication state
   useEffect(() => {
-    let mounted = true
-
     const initializeAuth = async () => {
       try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession()
+        setIsLoading(true)
 
-        if (error) {
-          console.error("Auth initialization error:", error)
-          if (mounted) {
-            setUser(null)
-            setIsLoading(false)
-            setIsInitialized(true)
+        // Get session from our utility
+        const session = clientAuth.getSession()
+
+        if (session?.user && session?.profile) {
+          setUser(session.user)
+          setProfile(session.profile)
+          setIsAuthenticated(true)
+
+          // Refresh the session to extend expiry
+          clientAuth.refreshSession()
+
+          // Handle post-initialization navigation for authenticated users
+          if (navigationManager.isAuthRoute(pathname)) {
+            // User is authenticated but on auth page, redirect to dashboard
+            const redirectPath = getRedirectPath(searchParams)
+            navigationManager.handlePostLoginNavigation(redirectPath)
           }
-          return
-        }
+        } else {
+          setIsAuthenticated(false)
 
-        if (session?.user && mounted) {
-          // Fetch additional user data
-          const { data: profile } = await supabase
-            .from("user_profiles")
-            .select("tier, coins, full_name, username")
-            .eq("id", session.user.id)
-            .single()
-
-          const authUser: AuthUser = {
-            ...session.user,
-            tier: profile?.tier || "grassroot",
-            coins: profile?.coins || 0,
-            full_name: profile?.full_name,
-            username: profile?.username,
+          // Handle unauthenticated users on protected routes
+          if (navigationManager.isProtectedRoute(pathname)) {
+            navigationManager.handleAuthRequiredNavigation(pathname)
           }
-
-          setUser(authUser)
-        } else if (mounted) {
-          setUser(null)
         }
       } catch (error) {
         console.error("Auth initialization error:", error)
-        if (mounted) {
-          setUser(null)
+        setIsAuthenticated(false)
+
+        // Handle initialization error on protected routes
+        if (navigationManager.isProtectedRoute(pathname)) {
+          navigationManager.handleAuthRequiredNavigation(pathname)
         }
       } finally {
-        if (mounted) {
-          setIsLoading(false)
-          setIsInitialized(true)
-        }
+        setIsLoading(false)
+        setIsInitialized(true)
       }
     }
 
     initializeAuth()
+  }, []) // Only run once on mount
 
-    // Set up auth state listener
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return
-
-      if (event === "SIGNED_IN" && session?.user) {
-        // Fetch additional user data
-        const { data: profile } = await supabase
-          .from("user_profiles")
-          .select("tier, coins, full_name, username")
-          .eq("id", session.user.id)
-          .single()
-
-        const authUser: AuthUser = {
-          ...session.user,
-          tier: profile?.tier || "grassroot",
-          coins: profile?.coins || 0,
-          full_name: profile?.full_name,
-          username: profile?.username,
-        }
-
-        setUser(authUser)
-      } else if (event === "SIGNED_OUT") {
-        setUser(null)
-      }
-    })
-
-    return () => {
-      mounted = false
-      subscription.unsubscribe()
-    }
-  }, [supabase])
-
-  // Handle route protection
+  // Handle route changes for authenticated users
   useEffect(() => {
-    if (!isInitialized || isLoading) return
+    if (isInitialized && isAuthenticated) {
+      // Refresh session on route changes
+      clientAuth.refreshSession()
 
-    const currentPath = pathname || "/"
-
-    // If user is authenticated and on auth routes, redirect to dashboard
-    if (isAuthenticated && isAuthRoute(currentPath)) {
-      const redirectPath = getStoredRedirectPath()
-      clearStoredRedirectPath()
-      router.replace(redirectPath)
-      return
-    }
-
-    // If user is not authenticated and on protected routes, redirect to login
-    if (!isAuthenticated && isProtectedRoute(currentPath)) {
-      storeRedirectPath(currentPath)
-      router.replace(`${ROUTES.LOGIN}?redirect=${encodeURIComponent(currentPath)}`)
-      return
-    }
-  }, [isAuthenticated, isInitialized, isLoading, pathname, router])
-
-  const signIn = useCallback(
-    async (email: string, password: string) => {
-      try {
-        setIsLoading(true)
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
-
-        if (error) {
-          return { success: false, error: error.message }
-        }
-
-        if (data.user) {
-          // The auth state change listener will handle setting the user
-          return { success: true }
-        }
-
-        return { success: false, error: "Sign in failed" }
-      } catch (error) {
-        console.error("Sign in error:", error)
-        return { success: false, error: "An unexpected error occurred" }
-      } finally {
-        setIsLoading(false)
+      // Redirect away from auth routes if authenticated
+      if (navigationManager.isAuthRoute(pathname)) {
+        const redirectPath = getRedirectPath(searchParams)
+        navigationManager.handlePostLoginNavigation(redirectPath)
       }
-    },
-    [supabase],
-  )
+    }
+  }, [pathname, isAuthenticated, isInitialized])
 
-  const signUp = useCallback(
-    async (email: string, password: string, username?: string, fullName?: string) => {
-      try {
-        setIsLoading(true)
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              username,
-              full_name: fullName,
-            },
-          },
-        })
+  // Set up periodic session refresh
+  useEffect(() => {
+    if (!isAuthenticated) return
 
-        if (error) {
-          return { success: false, error: error.message }
+    const refreshInterval = setInterval(
+      () => {
+        try {
+          clientAuth.refreshSession()
+        } catch (error) {
+          console.error("Session refresh error:", error)
+          // If refresh fails, sign out the user
+          signOut()
         }
+      },
+      5 * 60 * 1000, // Every 5 minutes
+    )
 
-        if (data.user) {
-          return { success: true }
-        }
+    return () => clearInterval(refreshInterval)
+  }, [isAuthenticated])
 
-        return { success: false, error: "Sign up failed" }
-      } catch (error) {
-        console.error("Sign up error:", error)
-        return { success: false, error: "An unexpected error occurred" }
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [supabase],
-  )
-
-  const signOut = useCallback(async () => {
+  // Enhanced sign in function
+  const signIn = async (email: string, password: string) => {
     try {
       setIsLoading(true)
-      clearStoredRedirectPath()
-      const { error } = await supabase.auth.signOut()
 
-      if (error) {
-        console.error("Sign out error:", error)
+      // Validate inputs
+      if (!email || !password) {
+        return { success: false, error: "Email and password are required" }
       }
 
-      setUser(null)
-    } catch (error) {
-      console.error("Sign out error:", error)
+      // Simulate API delay for realistic UX
+      await new Promise((resolve) => setTimeout(resolve, 800))
+
+      // Generate a unique ID based on the email
+      const userId = `user-${btoa(email).replace(/[=+/]/g, "").substring(0, 16)}`
+
+      // Create a username from the email
+      const username = email.split("@")[0]
+
+      // Create a mock user
+      const mockUser = {
+        id: userId,
+        email,
+        username,
+      }
+
+      // Create a mock profile with 500 coins
+      const mockProfile = {
+        ...mockUser,
+        tier: "pioneer" as UserTier,
+        coins: 500,
+        level: 1,
+        points: 100,
+        created_at: new Date().toISOString(),
+        bio: `${username}'s profile`,
+      }
+
+      // Persist the session using our utility
+      clientAuth.saveSession(mockUser, mockProfile)
+
+      setUser(mockUser)
+      setProfile(mockProfile)
+      setIsAuthenticated(true)
+
+      // Handle post-login navigation
+      const redirectPath = getRedirectPath(searchParams)
+
+      // Small delay to ensure state is updated before navigation
+      setTimeout(() => {
+        navigationManager.handlePostLoginNavigation(redirectPath)
+      }, 100)
+
+      return { success: true }
+    } catch (error: any) {
+      console.error("Sign in error:", error)
+      return {
+        success: false,
+        error: error.message || "An unexpected error occurred during sign in",
+      }
     } finally {
       setIsLoading(false)
     }
-  }, [supabase])
-
-  const refreshUser = useCallback(async () => {
-    if (!user) return
-
-    try {
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("tier, coins, full_name, username")
-        .eq("id", user.id)
-        .single()
-
-      if (profile) {
-        setUser((prev) =>
-          prev
-            ? {
-                ...prev,
-                tier: profile.tier || "grassroot",
-                coins: profile.coins || 0,
-                full_name: profile.full_name,
-                username: profile.username,
-              }
-            : null,
-        )
-      }
-    } catch (error) {
-      console.error("Error refreshing user:", error)
-    }
-  }, [user, supabase])
-
-  const value: AuthContextType = {
-    user,
-    isAuthenticated,
-    isLoading,
-    isInitialized,
-    signIn,
-    signUp,
-    signOut,
-    refreshUser,
   }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  // Enhanced sign out function
+  const signOut = async () => {
+    try {
+      setIsLoading(true)
+
+      // Clear session using our utility
+      clientAuth.clearSession()
+
+      setUser(null)
+      setProfile(null)
+      setIsAuthenticated(false)
+
+      // Navigate to login page
+      navigationManager.navigateTo(ROUTES.LOGIN, { replace: true })
+    } catch (error) {
+      console.error("Sign out error:", error)
+
+      // Force navigation even if there's an error
+      try {
+        router.push(ROUTES.LOGIN)
+      } catch (navError) {
+        console.error("Emergency navigation failed:", navError)
+        // Last resort: reload the page
+        if (typeof window !== "undefined") {
+          window.location.href = ROUTES.LOGIN
+        }
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Function to refresh the current session
+  const refreshSession = async () => {
+    if (user && profile) {
+      try {
+        clientAuth.saveSession(user, profile)
+      } catch (error) {
+        console.error("Session refresh error:", error)
+      }
+    }
+  }
+
+  // Enhanced purchase coins function
+  const purchaseCoins = async (amount: number, method: string) => {
+    try {
+      // Validate inputs
+      if (!amount || amount <= 0) {
+        return { success: false, error: { message: "Invalid coin amount" } }
+      }
+
+      // Simulate API delay
+      await new Promise((resolve) => setTimeout(resolve, 800))
+
+      // Update the profile with new coins
+      if (profile) {
+        const updatedProfile = {
+          ...profile,
+          coins: profile.coins + amount,
+        }
+
+        // Update session with new profile data
+        clientAuth.saveSession(user!, updatedProfile)
+
+        setProfile(updatedProfile)
+      }
+
+      return { success: true, data: { id: `transaction-${Date.now()}` } }
+    } catch (error: any) {
+      console.error("Purchase coins error:", error)
+      return {
+        success: false,
+        error: { message: error.message || "Failed to purchase coins" },
+      }
+    }
+  }
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        signIn,
+        signOut,
+        isLoading,
+        isAuthenticated,
+        isInitialized,
+        purchaseCoins,
+        refreshSession,
+        navigationManager,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
-export function useAuth() {
+// Custom hook to use the auth context
+export const useAuth = () => {
   const context = useContext(AuthContext)
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider")

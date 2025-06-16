@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
@@ -25,67 +25,19 @@ import {
   Monitor,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
+import { useTheme } from "@/contexts/theme-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
 import { CoinBalance } from "@/components/coin-balance"
 import { UserTierBadge } from "@/components/user-tier-badge"
 import { cn } from "@/lib/utils"
-
-// Safe theme hook that doesn't throw errors
-function useSafeTheme() {
-  const [theme, setThemeState] = useState<"light" | "dark" | "system">("system")
-  const [resolvedTheme, setResolvedTheme] = useState<"dark" | "light">("dark")
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    // Try to get theme from context, fallback to system detection
-    try {
-      const { useTheme } = require("@/contexts/theme-context")
-      const themeContext = useTheme()
-      setThemeState(themeContext.theme)
-      setResolvedTheme(themeContext.resolvedTheme)
-      setIsLoading(themeContext.isLoading)
-    } catch (error) {
-      // Fallback to system theme detection
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
-      setThemeState("system")
-      setResolvedTheme(systemTheme)
-      setIsLoading(false)
-    }
-  }, [])
-
-  const setTheme = (newTheme: "light" | "dark" | "system") => {
-    try {
-      const { useTheme } = require("@/contexts/theme-context")
-      const themeContext = useTheme()
-      themeContext.setTheme(newTheme)
-    } catch (error) {
-      // Fallback theme setting
-      setThemeState(newTheme)
-      localStorage.setItem("theme", newTheme)
-    }
-  }
-
-  const toggleTheme = () => {
-    if (theme === "light") {
-      setTheme("dark")
-    } else if (theme === "dark") {
-      setTheme("system")
-    } else {
-      setTheme("light")
-    }
-  }
-
-  return { theme, setTheme, toggleTheme, resolvedTheme, isLoading }
-}
 
 export function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
-  const router = useRouter()
   const { user, profile, signOut, isAuthenticated, isLoading } = useAuth()
-  const { theme, setTheme, resolvedTheme, isLoading: themeLoading } = useSafeTheme()
+  const { theme, setTheme, resolvedTheme, isLoading: themeLoading } = useTheme()
 
   // Handle mounting
   useEffect(() => {
@@ -122,15 +74,6 @@ export function Navigation() {
       return pathname === "/"
     }
     return pathname?.startsWith(path)
-  }
-
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-      router.push("/")
-    } catch (error) {
-      console.error("Sign out error:", error)
-    }
   }
 
   // Don't render until mounted to prevent hydration issues
@@ -239,7 +182,7 @@ export function Navigation() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={handleSignOut}
+                      onClick={signOut}
                       className="text-red-500 hover:text-red-600 hover:bg-red-100/10 hidden md:flex"
                     >
                       <LogOut className="h-4 w-4 mr-2" />
@@ -378,7 +321,7 @@ export function Navigation() {
                           variant="ghost"
                           className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-100/10"
                           onClick={() => {
-                            handleSignOut()
+                            signOut()
                             setIsMobileMenuOpen(false)
                           }}
                         >

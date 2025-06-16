@@ -60,8 +60,4 @@ class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-// Named export
-export { ErrorBoundary }
-
-// Default export
 export default ErrorBoundary
