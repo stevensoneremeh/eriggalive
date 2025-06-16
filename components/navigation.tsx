@@ -1,340 +1,233 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import {
-  Menu,
-  X,
-  User,
-  LogOut,
-  LogIn,
-  CreditCard,
-  Music,
-  Ticket,
-  ShoppingBag,
-  Home,
-  BookOpen,
-  Users,
-  Crown,
-  Coins,
-  Sun,
-  Moon,
-  Monitor,
-} from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
-import { useTheme } from "next-themes"
 import { DynamicLogo } from "@/components/dynamic-logo"
-import { CoinBalance } from "@/components/coin-balance"
-import { UserTierBadge } from "@/components/user-tier-badge"
-import { cn } from "@/lib/utils"
+import { Menu, Home, Users, BookOpen, Vault, Ticket, Crown, ShoppingBag, Coins, Settings, LogOut } from "lucide-react"
+
+const navigationItems = [
+  { name: "Home", href: "/", icon: Home },
+  { name: "Community", href: "/community", icon: Users },
+  { name: "Chronicles", href: "/chronicles", icon: BookOpen },
+  { name: "Vault", href: "/vault", icon: Vault },
+  { name: "Tickets", href: "/tickets", icon: Ticket },
+  { name: "Premium", href: "/premium", icon: Crown },
+  { name: "Merch", href: "/merch", icon: ShoppingBag },
+  { name: "Coins", href: "/coins", icon: Coins },
+]
+
+const getTierColor = (tier: string) => {
+  switch (tier) {
+    case "admin":
+      return "bg-red-500"
+    case "blood_brotherhood":
+      return "bg-red-600"
+    case "elder":
+      return "bg-purple-500"
+    case "pioneer":
+      return "bg-blue-500"
+    case "grassroot":
+    default:
+      return "bg-green-500"
+  }
+}
+
+const getTierLabel = (tier: string) => {
+  switch (tier) {
+    case "admin":
+      return "Admin"
+    case "blood_brotherhood":
+      return "Blood Brotherhood"
+    case "elder":
+      return "Elder"
+    case "pioneer":
+      return "Pioneer"
+    case "grassroot":
+    default:
+      return "Grassroot"
+  }
+}
 
 export function Navigation() {
-  const [isScrolled, setIsScrolled] = useState(false)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
-  const { user, profile, signOut, isAuthenticated, isLoading } = useAuth()
-  const { theme, setTheme, resolvedTheme } = useTheme()
+  const router = useRouter()
+  const { user, isAuthenticated, logout } = useAuth()
 
-  // Handle mounting
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Handle scroll effect
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10)
-    }
-    window.addEventListener("scroll", handleScroll)
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
-
-  // Close mobile menu on route change
-  useEffect(() => {
-    setIsMobileMenuOpen(false)
-  }, [pathname])
-
-  const navItems = [
-    { name: "Home", href: "/", icon: <Home className="h-5 w-5" /> },
-    { name: "Community", href: "/community", icon: <Users className="h-5 w-5" /> },
-    { name: "Chronicles", href: "/chronicles", icon: <BookOpen className="h-5 w-5" /> },
-    { name: "Media Vault", href: "/vault", icon: <Music className="h-5 w-5" /> },
-    { name: "Coins", href: "/coins", icon: <Coins className="h-5 w-5" /> },
-    { name: "Tickets", href: "/tickets", icon: <Ticket className="h-5 w-5" /> },
-    { name: "Premium", href: "/premium", icon: <Crown className="h-5 w-5" /> },
-    { name: "Merch", href: "/merch", icon: <ShoppingBag className="h-5 w-5" /> },
-  ]
-
-  const isActive = (path: string) => {
-    if (path === "/") {
-      return pathname === "/"
-    }
-    return pathname?.startsWith(path)
+  const handleLogout = () => {
+    logout()
+    router.push("/")
+    setIsOpen(false)
   }
 
-  // Don't render until mounted to prevent hydration issues
-  if (!mounted) {
-    return (
-      <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur shadow-md">
-        <div className="container mx-auto px-4">
-          <div className="flex h-16 items-center justify-between">
-            <div className="h-8 w-32 bg-muted animate-pulse rounded" />
-            <div className="h-8 w-24 bg-muted animate-pulse rounded" />
-          </div>
-        </div>
-      </header>
-    )
+  const handleNavigation = (href: string) => {
+    router.push(href)
+    setIsOpen(false)
   }
 
   return (
-    <header
-      className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-        isScrolled ? "bg-background/95 backdrop-blur shadow-md" : "bg-background/80 backdrop-blur",
-      )}
-    >
+    <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2 z-10">
-            <DynamicLogo width={120} height={32} />
+          <Link href="/" className="flex items-center space-x-2">
+            <DynamicLogo className="h-8 w-8" />
+            <span className="font-bold text-xl bg-gradient-to-r from-lime-600 to-teal-600 bg-clip-text text-transparent">
+              Erigga Live
+            </span>
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center space-x-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  "px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                  isActive(item.href)
-                    ? "text-lime-500 bg-lime-500/10"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent",
-                )}
-              >
-                {item.name}
-              </Link>
-            ))}
-          </nav>
+          <div className="hidden md:flex items-center space-x-6">
+            {navigationItems.slice(0, 4).map((item) => {
+              const isActive = pathname === item.href
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-lime-100 text-lime-700 dark:bg-lime-900 dark:text-lime-300"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.name}</span>
+                </Link>
+              )
+            })}
+          </div>
 
-          {/* User Actions */}
-          <div className="flex items-center space-x-2">
-            {/* Theme Toggle */}
-            <div className="hidden md:flex items-center space-x-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setTheme("light")}
-                className={cn("p-2", theme === "light" && "bg-accent")}
-                title="Light mode"
-              >
-                <Sun className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setTheme("dark")}
-                className={cn("p-2", theme === "dark" && "bg-accent")}
-                title="Dark mode"
-              >
-                <Moon className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setTheme("system")}
-                className={cn("p-2", theme === "system" && "bg-accent")}
-                title="System mode"
-              >
-                <Monitor className="h-4 w-4" />
-              </Button>
-            </div>
+          {/* User Menu / Auth Buttons */}
+          <div className="flex items-center space-x-4">
+            {isAuthenticated && user ? (
+              <div className="hidden md:flex items-center space-x-4">
+                {/* Coins Display */}
+                <div className="flex items-center space-x-1 text-sm">
+                  <Coins className="h-4 w-4 text-yellow-500" />
+                  <span className="font-medium">{user.coins?.toLocaleString() || 0}</span>
+                </div>
 
-            {/* User Authentication */}
-            {!isLoading && (
-              <>
-                {isAuthenticated && profile ? (
-                  <>
-                    <div className="hidden md:flex items-center space-x-2">
-                      <CoinBalance coins={profile.coins} size="sm" />
-                      <UserTierBadge tier={profile.tier} />
-                    </div>
-                    <Link href="/dashboard">
-                      <Button variant="outline" size="sm" className="hidden md:flex">
-                        <User className="h-4 w-4 mr-2" />
-                        Dashboard
-                      </Button>
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={signOut}
-                      className="text-red-500 hover:text-red-600 hover:bg-red-100/10 hidden md:flex"
-                    >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Logout
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Link href="/login">
-                      <Button variant="outline" size="sm" className="hidden md:flex">
-                        <LogIn className="h-4 w-4 mr-2" />
-                        Login
-                      </Button>
-                    </Link>
-                    <Link href="/signup">
-                      <Button size="sm" className="hidden md:flex bg-lime-500 hover:bg-lime-600 text-teal-900">
-                        Sign Up
-                      </Button>
-                    </Link>
-                  </>
-                )}
-              </>
+                {/* User Avatar and Info */}
+                <div className="flex items-center space-x-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user.avatarUrl || "/placeholder.svg"} alt={user.username} />
+                    <AvatarFallback>
+                      {user.username?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">{user.username || user.email}</span>
+                    <Badge variant="secondary" className={`text-xs ${getTierColor(user.tier)} text-white`}>
+                      {getTierLabel(user.tier)}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Logout Button */}
+                <Button variant="ghost" size="sm" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="hidden md:flex items-center space-x-2">
+                <Button variant="ghost" asChild>
+                  <Link href="/login">Sign In</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/signup">Sign Up</Link>
+                </Button>
+              </div>
             )}
 
             {/* Mobile Menu */}
-            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden">
-                  <Menu className="h-6 w-6" />
-                  <span className="sr-only">Toggle menu</span>
+                <Button variant="ghost" size="sm" className="md:hidden">
+                  <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-80 p-0">
+              <SheetContent side="right" className="w-80">
                 <div className="flex flex-col h-full">
-                  {/* Mobile Header */}
-                  <div className="flex items-center justify-between p-4 border-b">
-                    <DynamicLogo width={100} height={28} />
-                    <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)}>
-                      <X className="h-6 w-6" />
-                    </Button>
-                  </div>
-
-                  {/* User Info (Mobile) */}
-                  {isAuthenticated && profile && (
-                    <div className="p-4 border-b">
-                      <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-10 h-10 rounded-full bg-lime-500/20 flex items-center justify-center">
-                          <User className="h-6 w-6 text-lime-500" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{profile.username || "User"}</p>
-                          <p className="text-xs text-muted-foreground">{profile.email}</p>
+                  {/* User Info */}
+                  {isAuthenticated && user ? (
+                    <div className="flex items-center space-x-3 p-4 border-b">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={user.avatarUrl || "/placeholder.svg"} alt={user.username} />
+                        <AvatarFallback>
+                          {user.username?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{user.username || user.email}</span>
+                        <Badge variant="secondary" className={`text-xs w-fit ${getTierColor(user.tier)} text-white`}>
+                          {getTierLabel(user.tier)}
+                        </Badge>
+                        <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+                          <Coins className="h-3 w-3 text-yellow-500" />
+                          <span>{user.coins?.toLocaleString() || 0} coins</span>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <CoinBalance coins={profile.coins} size="sm" />
-                        <UserTierBadge tier={profile.tier} />
+                    </div>
+                  ) : (
+                    <div className="p-4 border-b">
+                      <div className="space-y-2">
+                        <Button className="w-full" onClick={() => handleNavigation("/login")}>
+                          Sign In
+                        </Button>
+                        <Button variant="outline" className="w-full" onClick={() => handleNavigation("/signup")}>
+                          Sign Up
+                        </Button>
                       </div>
                     </div>
                   )}
 
-                  {/* Mobile Navigation */}
-                  <nav className="flex-1 p-4">
-                    <ul className="space-y-2">
-                      {navItems.map((item) => (
-                        <li key={item.name}>
-                          <Link
-                            href={item.href}
-                            className={cn(
-                              "flex items-center px-3 py-3 rounded-md transition-colors",
-                              isActive(item.href)
-                                ? "bg-lime-500/10 text-lime-500"
-                                : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                            )}
-                            onClick={() => setIsMobileMenuOpen(false)}
+                  {/* Navigation Items */}
+                  <div className="flex-1 py-4">
+                    <div className="space-y-1">
+                      {navigationItems.map((item) => {
+                        const isActive = pathname === item.href
+                        return (
+                          <button
+                            key={item.name}
+                            onClick={() => handleNavigation(item.href)}
+                            className={`flex items-center space-x-3 w-full px-4 py-3 text-left rounded-md transition-colors ${
+                              isActive
+                                ? "bg-lime-100 text-lime-700 dark:bg-lime-900 dark:text-lime-300"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                            }`}
                           >
-                            <span className="mr-3">{item.icon}</span>
-                            {item.name}
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  </nav>
+                            <item.icon className="h-5 w-5" />
+                            <span>{item.name}</span>
+                          </button>
+                        )
+                      })}
 
-                  {/* Mobile Theme Toggle */}
-                  <div className="p-4 border-t">
-                    <div className="mb-4">
-                      <p className="text-sm font-medium mb-2">Theme</p>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant={theme === "light" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTheme("light")}
-                          className="flex-1"
-                        >
-                          <Sun className="h-4 w-4 mr-1" />
-                          Light
-                        </Button>
-                        <Button
-                          variant={theme === "dark" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTheme("dark")}
-                          className="flex-1"
-                        >
-                          <Moon className="h-4 w-4 mr-1" />
-                          Dark
-                        </Button>
-                        <Button
-                          variant={theme === "system" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTheme("system")}
-                          className="flex-1"
-                        >
-                          <Monitor className="h-4 w-4 mr-1" />
-                          Auto
-                        </Button>
-                      </div>
+                      {isAuthenticated && (
+                        <>
+                          <button
+                            onClick={() => handleNavigation("/settings")}
+                            className="flex items-center space-x-3 w-full px-4 py-3 text-left rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+                          >
+                            <Settings className="h-5 w-5" />
+                            <span>Settings</span>
+                          </button>
+                          <button
+                            onClick={handleLogout}
+                            className="flex items-center space-x-3 w-full px-4 py-3 text-left rounded-md transition-colors text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          >
+                            <LogOut className="h-5 w-5" />
+                            <span>Sign Out</span>
+                          </button>
+                        </>
+                      )}
                     </div>
-
-                    {/* Mobile Auth Actions */}
-                    {isAuthenticated ? (
-                      <div className="space-y-2">
-                        <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
-                          <Button variant="outline" className="w-full justify-start">
-                            <User className="h-4 w-4 mr-2" />
-                            Dashboard
-                          </Button>
-                        </Link>
-                        <Link href="/coins" onClick={() => setIsMobileMenuOpen(false)}>
-                          <Button variant="outline" className="w-full justify-start">
-                            <CreditCard className="h-4 w-4 mr-2" />
-                            Buy Coins
-                          </Button>
-                        </Link>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-100/10"
-                          onClick={() => {
-                            signOut()
-                            setIsMobileMenuOpen(false)
-                          }}
-                        >
-                          <LogOut className="h-4 w-4 mr-2" />
-                          Logout
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                          <Button variant="outline" className="w-full justify-start">
-                            <LogIn className="h-4 w-4 mr-2" />
-                            Login
-                          </Button>
-                        </Link>
-                        <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)}>
-                          <Button className="w-full justify-start bg-lime-500 hover:bg-lime-600 text-teal-900">
-                            Sign Up
-                          </Button>
-                        </Link>
-                      </div>
-                    )}
                   </div>
                 </div>
               </SheetContent>
@@ -342,6 +235,6 @@ export function Navigation() {
           </div>
         </div>
       </div>
-    </header>
+    </nav>
   )
 }

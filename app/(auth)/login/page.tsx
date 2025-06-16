@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
@@ -10,74 +11,34 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/contexts/auth-context"
-import { Eye, EyeOff, AlertCircle, Loader2, Shield, Smartphone } from "lucide-react"
-import { toast } from "@/components/ui/use-toast"
-
-interface FormData {
-  email: string
-  password: string
-  rememberMe: boolean
-}
-
-interface FormErrors {
-  email?: string
-  password?: string
-  general?: string
-}
+import { Eye, EyeOff, AlertCircle, Loader2, Shield } from "lucide-react"
 
 export default function LoginPage() {
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState({
     email: "",
     password: "",
     rememberMe: false,
   })
-  const [formErrors, setFormErrors] = useState<FormErrors>({})
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   const router = useRouter()
   const searchParams = useSearchParams()
-  const {
-    signIn,
-    isAuthenticated,
-    isLoading: authLoading,
-    isInitialized,
-    error: authError,
-    clearError,
-    retryAuth,
-    activeSessions,
-  } = useAuth()
+  const { login, isAuthenticated, isLoading, error, clearError } = useAuth()
 
-  // Get redirect path
   const redirectPath = searchParams?.get("redirect") || "/dashboard"
-
-  // Handle mounting
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (isInitialized && isAuthenticated && mounted) {
+    if (isAuthenticated && !isLoading) {
       router.push(redirectPath)
     }
-  }, [isAuthenticated, isInitialized, mounted, router, redirectPath])
+  }, [isAuthenticated, isLoading, router, redirectPath])
 
-  // Clear errors when auth error changes
-  useEffect(() => {
-    if (authError) {
-      setFormErrors((prev) => ({ ...prev, general: authError }))
-    } else {
-      setFormErrors((prev) => ({ ...prev, general: undefined }))
-    }
-  }, [authError])
-
-  // Form validation
-  const validateForm = useCallback((): boolean => {
-    const errors: FormErrors = {}
+  const validateForm = useCallback(() => {
+    const errors: Record<string, string> = {}
 
     if (!formData.email) {
       errors.email = "Email is required"
@@ -95,27 +56,6 @@ export default function LoginPage() {
     return Object.keys(errors).length === 0
   }, [formData])
 
-  // Handle input changes
-  const handleInputChange = useCallback(
-    (field: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = field === "rememberMe" ? e.target.checked : e.target.value
-      setFormData((prev) => ({ ...prev, [field]: value }))
-
-      // Clear field error when user starts typing
-      if (formErrors[field as keyof FormErrors]) {
-        setFormErrors((prev) => ({ ...prev, [field]: undefined }))
-      }
-
-      // Clear general error
-      if (formErrors.general) {
-        setFormErrors((prev) => ({ ...prev, general: undefined }))
-        clearError()
-      }
-    },
-    [formErrors, clearError],
-  )
-
-  // Handle form submission
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault()
@@ -125,62 +65,42 @@ export default function LoginPage() {
       }
 
       setIsSubmitting(true)
-      setFormErrors({})
+      clearError()
 
       try {
-        const result = await signIn(formData.email, formData.password, formData.rememberMe)
+        const result = await login(formData.email, formData.password, formData.rememberMe)
 
         if (result.success) {
-          // Success is handled by the auth context and redirect effect
-          toast({
-            title: "Welcome back!",
-            description: `You have been successfully signed in${formData.rememberMe ? " and will be remembered" : ""}`,
-          })
-        } else {
-          setFormErrors({ general: result.error || "Sign in failed" })
+          router.push(redirectPath)
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred"
-        setFormErrors({ general: errorMessage })
+        console.error("Login error:", error)
       } finally {
         setIsSubmitting(false)
       }
     },
-    [formData, validateForm, signIn],
+    [formData, validateForm, login, clearError, router, redirectPath],
   )
 
-  // Handle retry
-  const handleRetry = useCallback(async () => {
-    clearError()
-    setFormErrors({})
-    await retryAuth()
-  }, [clearError, retryAuth])
+  const handleInputChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = field === "rememberMe" ? e.target.checked : e.target.value
+    setFormData((prev) => ({ ...prev, [field]: value }))
 
-  // Show loading skeleton while initializing
-  if (!mounted || !isInitialized) {
+    // Clear field error
+    if (formErrors[field]) {
+      setFormErrors((prev) => ({ ...prev, [field]: "" }))
+    }
+
+    // Clear general error
+    if (error) {
+      clearError()
+    }
+  }
+
+  if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <Skeleton className="h-8 w-3/4 mx-auto" />
-            <Skeleton className="h-4 w-full" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-16" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-10 w-full" />
-          </CardContent>
-          <CardFooter>
-            <Skeleton className="h-4 w-full" />
-          </CardFooter>
-        </Card>
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     )
   }
@@ -193,18 +113,24 @@ export default function LoginPage() {
             Welcome Back
           </CardTitle>
           <CardDescription className="text-center">Sign in to your Erigga Fan Platform account</CardDescription>
-          {activeSessions > 0 && (
-            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-              <Smartphone className="h-3 w-3" />
-              <span>
-                {activeSessions} active session{activeSessions > 1 ? "s" : ""}
-              </span>
-            </div>
-          )}
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Demo Credentials Info */}
+            <Alert className="border-blue-200 bg-blue-50">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                <strong>Demo Credentials:</strong>
+                <br />
+                Admin: admin@erigga.com / admin123
+                <br />
+                User: user@erigga.com / user123
+                <br />
+                Demo: demo@erigga.com / demo123
+              </AlertDescription>
+            </Alert>
+
             {/* Email Field */}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -214,27 +140,16 @@ export default function LoginPage() {
                 placeholder="your@email.com"
                 value={formData.email}
                 onChange={handleInputChange("email")}
-                disabled={isSubmitting || authLoading}
-                className={`border-lime-500/20 ${formErrors.email ? "border-red-500" : ""}`}
+                disabled={isSubmitting}
+                className={formErrors.email ? "border-red-500" : ""}
                 autoComplete="email"
-                autoFocus
               />
-              {formErrors.email && (
-                <p className="text-sm text-red-500 flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  {formErrors.email}
-                </p>
-              )}
+              {formErrors.email && <p className="text-sm text-red-500">{formErrors.email}</p>}
             </div>
 
             {/* Password Field */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link href="/forgot-password" className="text-xs text-lime-500 hover:underline" tabIndex={-1}>
-                  Forgot password?
-                </Link>
-              </div>
+              <Label htmlFor="password">Password</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -242,32 +157,22 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   value={formData.password}
                   onChange={handleInputChange("password")}
-                  disabled={isSubmitting || authLoading}
-                  className={`border-lime-500/20 pr-10 ${formErrors.password ? "border-red-500" : ""}`}
+                  disabled={isSubmitting}
+                  className={`pr-10 ${formErrors.password ? "border-red-500" : ""}`}
                   autoComplete="current-password"
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  className="absolute right-0 top-0 h-full px-3"
                   onClick={() => setShowPassword(!showPassword)}
-                  disabled={isSubmitting || authLoading}
-                  tabIndex={-1}
+                  disabled={isSubmitting}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-muted-foreground" />
-                  )}
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
-              {formErrors.password && (
-                <p className="text-sm text-red-500 flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  {formErrors.password}
-                </p>
-              )}
+              {formErrors.password && <p className="text-sm text-red-500">{formErrors.password}</p>}
             </div>
 
             {/* Remember Me */}
@@ -276,7 +181,7 @@ export default function LoginPage() {
                 id="rememberMe"
                 checked={formData.rememberMe}
                 onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, rememberMe: checked as boolean }))}
-                disabled={isSubmitting || authLoading}
+                disabled={isSubmitting}
               />
               <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer flex items-center gap-2">
                 <Shield className="h-3 w-3" />
@@ -284,11 +189,11 @@ export default function LoginPage() {
               </Label>
             </div>
 
-            {/* General Error */}
-            {formErrors.general && (
+            {/* Error Alert */}
+            {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{formErrors.general}</AlertDescription>
+                <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
@@ -296,9 +201,9 @@ export default function LoginPage() {
             <Button
               type="submit"
               className="w-full bg-lime-500 hover:bg-lime-600 text-teal-900 font-medium"
-              disabled={isSubmitting || authLoading}
+              disabled={isSubmitting}
             >
-              {isSubmitting || authLoading ? (
+              {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Signing in...
