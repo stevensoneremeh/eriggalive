@@ -12,25 +12,44 @@ interface DynamicLogoProps {
 }
 
 export function DynamicLogo({ className = "", width = 120, height = 40, priority = false }: DynamicLogoProps) {
-  const { theme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const [currentTheme, setCurrentTheme] = useState<"dark" | "light">("dark")
+
+  // Safely get theme context
+  let theme: "dark" | "light" = "dark"
+  let resolvedTheme: "dark" | "light" = "dark"
+
+  // Initialize theme variables outside the try-catch block
+  let themeContext: any = null
+
+  try {
+    themeContext = useTheme()
+    theme = themeContext.theme === "system" ? themeContext.resolvedTheme : themeContext.theme
+    resolvedTheme = themeContext.resolvedTheme
+  } catch (error) {
+    // Fallback to system theme detection if context is not available
+    if (typeof window !== "undefined") {
+      theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+    }
+  }
 
   useEffect(() => {
     setMounted(true)
-  }, [])
+    setCurrentTheme(theme)
+  }, [theme])
 
   // Show fallback during SSR and initial hydration to prevent layout shift
   if (!mounted) {
     return <div className={`font-street text-2xl text-gradient glow-text ${className}`}>ERIGGA</div>
   }
 
-  const logoSrc = theme === "dark" ? "/images/loggotrans-dark.png" : "/images/loggotrans-light.png"
+  const logoSrc = currentTheme === "dark" ? "/images/loggotrans-dark.png" : "/images/loggotrans-light.png"
 
   return (
     <div className={`relative ${className}`}>
       <Image
         src={logoSrc || "/placeholder.svg"}
-        alt={`Erigga logo - ${theme} theme`}
+        alt={`Erigga logo - ${currentTheme} theme`}
         width={width}
         height={height}
         priority={priority}

@@ -2,7 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
+import { ThemeProvider } from "@/contexts/theme-context"
 import { AuthProvider } from "@/contexts/auth-context"
 import { Navigation } from "@/components/navigation"
 import { Toaster } from "@/components/ui/toaster"
@@ -49,7 +49,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ErrorBoundary>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <ThemeProvider>
             <AuthProvider>
               <div className="relative flex min-h-screen flex-col">
                 <Navigation />

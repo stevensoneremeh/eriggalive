@@ -28,15 +28,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize theme on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as Theme
-    const systemTheme = getSystemTheme()
+    try {
+      const savedTheme = localStorage.getItem("theme") as Theme
+      const systemTheme = getSystemTheme()
 
-    if (savedTheme && ["dark", "light", "system"].includes(savedTheme)) {
-      setTheme(savedTheme)
-      setResolvedTheme(savedTheme === "system" ? systemTheme : savedTheme)
-    } else {
+      if (savedTheme && ["dark", "light", "system"].includes(savedTheme)) {
+        setTheme(savedTheme)
+        setResolvedTheme(savedTheme === "system" ? systemTheme : savedTheme)
+      } else {
+        setTheme("system")
+        setResolvedTheme(systemTheme)
+      }
+    } catch (error) {
+      console.warn("Failed to load theme from localStorage:", error)
       setTheme("system")
-      setResolvedTheme(systemTheme)
+      setResolvedTheme(getSystemTheme())
     }
 
     setIsLoading(false)
@@ -44,6 +50,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   // Listen for system theme changes
   useEffect(() => {
+    if (typeof window === "undefined") return
+
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
 
     const handleChange = (e: MediaQueryListEvent) => {
@@ -58,7 +66,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   // Apply theme to document
   useEffect(() => {
-    if (isLoading) return
+    if (isLoading || typeof window === "undefined") return
 
     const root = document.documentElement
     const newResolvedTheme = theme === "system" ? getSystemTheme() : theme
@@ -73,7 +81,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setResolvedTheme(newResolvedTheme)
 
     // Save to localStorage
-    localStorage.setItem("theme", theme)
+    try {
+      localStorage.setItem("theme", theme)
+    } catch (error) {
+      console.warn("Failed to save theme to localStorage:", error)
+    }
 
     // Set color-scheme for better browser integration
     root.style.colorScheme = newResolvedTheme
