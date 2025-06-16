@@ -11,16 +11,16 @@ export class DeviceDetection {
     if (typeof window === "undefined") {
       // Server-side fallback
       return {
-        userAgent: "server",
-        platform: "server",
-        browser: "server",
-        os: "server",
+        userAgent: "Server",
+        platform: "Server",
+        browser: "Server",
+        os: "Server",
         isMobile: false,
       }
     }
 
     const userAgent = navigator.userAgent
-    const platform = navigator.platform || "unknown"
+    const platform = navigator.platform || "Unknown"
 
     return {
       userAgent,
@@ -29,6 +29,12 @@ export class DeviceDetection {
       os: this.getOS(userAgent, platform),
       isMobile: this.isMobile(userAgent),
     }
+  }
+
+  static getClientIP(): string {
+    // This would typically be determined server-side
+    // For client-side, we return a placeholder
+    return "client-ip"
   }
 
   private static getBrowser(userAgent: string): string {
@@ -45,7 +51,10 @@ export class DeviceDetection {
     if (userAgent.includes("Mac")) return "macOS"
     if (userAgent.includes("Linux")) return "Linux"
     if (userAgent.includes("Android")) return "Android"
-    if (userAgent.includes("iOS") || platform.includes("iPhone") || platform.includes("iPad")) return "iOS"
+    if (userAgent.includes("iOS")) return "iOS"
+    if (platform.includes("Win")) return "Windows"
+    if (platform.includes("Mac")) return "macOS"
+    if (platform.includes("Linux")) return "Linux"
     return "Unknown"
   }
 
