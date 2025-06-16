@@ -1,147 +1,152 @@
 "use client"
 
 import type React from "react"
-import { createContext, useState, useEffect, useContext, useCallback } from "react"
-import { enhancedAuthService } from "@/lib/auth/enhanced-auth-service"
-import { DeviceDetection } from "@/lib/auth/device-detection"
-import { toast } from "@/components/ui/use-toast"
+import { createContext, useContext, useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@supabase/supabase-js"
 
-interface User {
+interface UserProfile {
   id: string
-  email: string
   username: string
-  fullName: string
+  full_name: string
+  email: string
+  avatar_url?: string
   tier: string
   coins: number
   level: number
   points: number
-  avatarUrl?: string
-  isActive: boolean
+  created_at: string
+  updated_at: string
 }
 
 interface AuthContextType {
   user: User | null
+  profile: UserProfile | null
   isAuthenticated: boolean
   isLoading: boolean
-  error: string | null
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string }>
-  logout: () => void
-  clearError: () => void
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  signUp: (
+    email: string,
+    password: string,
+    userData: { username: string; full_name: string },
+  ) => Promise<{ success: boolean; error?: string }>
+  signOut: () => Promise<void>
+  refreshProfile: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  isAuthenticated: false,
-  isLoading: true,
-  error: null,
-  login: async () => ({ success: false }),
-  logout: () => {},
-  clearError: () => {},
-})
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const supabase = createClient()
 
-  const isAuthenticated = !!user
-
-  // Initialize auth state
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        // Check for stored token
-        const token = localStorage.getItem("auth_token")
-        if (token) {
-          const result = await enhancedAuthService.validateToken(token)
-          if (result.success && result.user) {
-            setUser(result.user)
-          } else {
-            localStorage.removeItem("auth_token")
-            localStorage.removeItem("refresh_token")
-          }
-        }
-      } catch (error) {
-        console.error("Auth initialization error:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    initAuth()
-  }, [])
-
-  const login = useCallback(async (email: string, password: string, rememberMe = false) => {
+  const fetchProfile = async (userId: string) => {
     try {
-      setIsLoading(true)
-      setError(null)
+      const { data, error } = await supabase.from("users").select("*").eq("id", userId).single()
 
-      const deviceInfo = DeviceDetection.getDeviceInfo()
-      const result = await enhancedAuthService.login({
-        email,
-        password,
-        rememberMe,
-        deviceInfo,
-        ipAddress: "client",
-      })
-
-      if (result.success && result.user && result.tokens) {
-        setUser(result.user)
-
-        // Store tokens
-        localStorage.setItem("auth_token", result.tokens.accessToken)
-        localStorage.setItem("refresh_token", result.tokens.refreshToken)
-
-        if (rememberMe) {
-          localStorage.setItem("remember_me", "true")
-        }
-
-        toast({
-          title: "Welcome back!",
-          description: `Successfully signed in as ${result.user.username}`,
-        })
-
-        return { success: true }
-      } else {
-        setError(result.error || "Login failed")
-        return { success: false, error: result.error }
-      }
+      if (error) throw error
+      setProfile(data)
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Login failed"
-      setError(errorMessage)
-      return { success: false, error: errorMessage }
-    } finally {
+      console.error("Error fetching profile:", error)
+      setProfile(null)
+    }
+  }
+
+  const refreshProfile = async () => {
+    if (user?.id) {
+      await fetchProfile(user.id)
+    }
+  }
+
+  useEffect(() => {
+    // Get initial session
+    const getInitialSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      setUser(session?.user ?? null)
+
+      if (session?.user) {
+        await fetchProfile(session.user.id)
+      }
+
       setIsLoading(false)
     }
-  }, [])
 
-  const logout = useCallback(() => {
-    setUser(null)
-    setError(null)
-    localStorage.removeItem("auth_token")
-    localStorage.removeItem("refresh_token")
-    localStorage.removeItem("remember_me")
+    getInitialSession()
 
-    enhancedAuthService.logout()
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user ?? null)
 
-    toast({
-      title: "Signed out",
-      description: "You have been successfully signed out",
+      if (session?.user) {
+        await fetchProfile(session.user.id)
+      } else {
+        setProfile(null)
+      }
+
+      setIsLoading(false)
     })
+
+    return () => subscription.unsubscribe()
   }, [])
 
-  const clearError = useCallback(() => {
-    setError(null)
-  }, [])
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-  const value: AuthContextType = {
+      if (error) throw error
+
+      return { success: true }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Sign in failed",
+      }
+    }
+  }
+
+  const signUp = async (email: string, password: string, userData: { username: string; full_name: string }) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: userData,
+        },
+      })
+
+      if (error) throw error
+
+      return { success: true }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Sign up failed",
+      }
+    }
+  }
+
+  const signOut = async () => {
+    await supabase.auth.signOut()
+  }
+
+  const value = {
     user,
-    isAuthenticated,
+    profile,
+    isAuthenticated: !!user,
     isLoading,
-    error,
-    login,
-    logout,
-    clearError,
+    signIn,
+    signUp,
+    signOut,
+    refreshProfile,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
@@ -149,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext)
-  if (!context) {
+  if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider")
   }
   return context

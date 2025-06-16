@@ -190,9 +190,6 @@ export function createServerSupabaseClient() {
   })
 }
 
-// Export createClient for compatibility
-export { createClient }
-
 // Create a mock Supabase client for preview mode
 function createMockClient() {
   return {
