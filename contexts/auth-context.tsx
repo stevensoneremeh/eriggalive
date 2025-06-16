@@ -1,419 +1,211 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
-import { useRouter, usePathname } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
-import type { User } from "@supabase/supabase-js"
-import { toast } from "@/components/ui/use-toast"
+import { createContext, useContext, useEffect, useState, useCallback } from "react"
+import { enhancedAuthService } from "@/lib/auth/enhanced-auth-service"
+import { SessionStorage } from "@/lib/auth/session-storage"
+import { DeviceDetection } from "@/lib/auth/device-detection"
 
-// Types
-interface UserProfile {
-  id: string
-  auth_user_id: string
-  username: string
-  full_name: string
+interface User {
+  id: number
   email: string
-  avatar_url?: string
-  tier: "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
+  username: string
+  fullName: string
+  tier: string
   coins: number
   level: number
   points: number
-  is_active: boolean
-  is_banned: boolean
-  created_at: string
-  updated_at: string
-  last_login?: string
-  login_count: number
+  avatarUrl?: string
+  isActive: boolean
 }
 
-interface AuthState {
+interface AuthContextType {
   user: User | null
-  profile: UserProfile | null
-  isAuthenticated: boolean
   isLoading: boolean
-  isInitialized: boolean
-  error: string | null
-}
-
-interface AuthContextType extends AuthState {
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  signUp: (
-    email: string,
-    password: string,
-    userData: { username: string; full_name: string },
-  ) => Promise<{ success: boolean; error?: string }>
-  signOut: () => Promise<void>
-  refreshProfile: () => Promise<void>
-  clearError: () => void
+  isAuthenticated: boolean
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string }>
+  logout: () => Promise<void>
+  logoutAllDevices: () => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Constants
-const PROFILE_CACHE_DURATION = 2 * 60 * 1000 // 2 minutes
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({
-    user: null,
-    profile: null,
-    isAuthenticated: false,
-    isLoading: true,
-    isInitialized: false,
-    error: null,
-  })
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const router = useRouter()
-  const pathname = usePathname()
-  const supabase = createClient()
-  const initializationRef = useRef(false)
-  const profileCacheRef = useRef<{ data: UserProfile | null; timestamp: number }>({
-    data: null,
-    timestamp: 0,
-  })
+  const isAuthenticated = !!user
 
-  // Stable update function to prevent infinite renders
-  const updateState = useCallback((updates: Partial<AuthState>) => {
-    setState((prev) => {
-      // Only update if there are actual changes
-      const hasChanges = Object.keys(updates).some((key) => {
-        const typedKey = key as keyof AuthState
-        return prev[typedKey] !== updates[typedKey]
-      })
+  // Initialize auth state
+  const initializeAuth = useCallback(async () => {
+    try {
+      setIsLoading(true)
 
-      if (!hasChanges) {
-        return prev
+      const storedSession = SessionStorage.getSession()
+      if (!storedSession) {
+        setIsLoading(false)
+        return
       }
 
-      return { ...prev, ...updates }
-    })
+      // Validate session with server
+      const result = await enhancedAuthService.validateSession(storedSession.sessionToken)
+
+      if (result.success && result.user) {
+        setUser(result.user)
+
+        // Update stored session with fresh data
+        SessionStorage.updateSession({
+          user: result.user,
+          expiresAt: result.session?.expiresAt?.toISOString() || storedSession.expiresAt,
+        })
+      } else {
+        // Invalid session, clear storage
+        SessionStorage.clearSession()
+        setUser(null)
+      }
+    } catch (error) {
+      console.error("Auth initialization error:", error)
+      SessionStorage.clearSession()
+      setUser(null)
+    } finally {
+      setIsLoading(false)
+    }
   }, [])
 
-  const clearError = useCallback(() => {
-    updateState({ error: null })
-  }, [updateState])
-
-  // Enhanced profile fetching with caching
-  const fetchProfile = useCallback(
-    async (userId: string, forceRefresh = false): Promise<UserProfile | null> => {
-      try {
-        // Check cache first
-        const now = Date.now()
-        const cached = profileCacheRef.current
-        if (!forceRefresh && cached.data && now - cached.timestamp < PROFILE_CACHE_DURATION) {
-          return cached.data
-        }
-
-        const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
-
-        if (error) {
-          console.error("Profile fetch error:", error)
-          throw new Error(`Failed to fetch user profile: ${error.message}`)
-        }
-
-        if (!data) {
-          throw new Error("User profile not found")
-        }
-
-        // Update cache
-        profileCacheRef.current = {
-          data: data as UserProfile,
-          timestamp: now,
-        }
-
-        return data as UserProfile
-      } catch (error) {
-        console.error("Error fetching profile:", error)
-        return null
-      }
-    },
-    [supabase],
-  )
-
-  // Initialize auth - only run once
-  useEffect(() => {
-    if (initializationRef.current) return
-
-    const initializeAuth = async () => {
-      try {
-        initializationRef.current = true
-
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession()
-
-        if (error) {
-          console.error("Session error:", error)
-          updateState({
-            user: null,
-            profile: null,
-            isAuthenticated: false,
-            isLoading: false,
-            isInitialized: true,
-            error: error.message,
-          })
-          return
-        }
-
-        if (session?.user) {
-          const profile = await fetchProfile(session.user.id)
-
-          if (profile && profile.is_active && !profile.is_banned) {
-            updateState({
-              user: session.user,
-              profile,
-              isAuthenticated: true,
-              isLoading: false,
-              isInitialized: true,
-              error: null,
-            })
-          } else {
-            await supabase.auth.signOut()
-            updateState({
-              user: null,
-              profile: null,
-              isAuthenticated: false,
-              isLoading: false,
-              isInitialized: true,
-              error: profile ? "Account is inactive or banned" : "Failed to load profile",
-            })
-          }
-        } else {
-          updateState({
-            user: null,
-            profile: null,
-            isAuthenticated: false,
-            isLoading: false,
-            isInitialized: true,
-            error: null,
-          })
-        }
-      } catch (error) {
-        console.error("Auth initialization error:", error)
-        updateState({
-          user: null,
-          profile: null,
-          isAuthenticated: false,
-          isLoading: false,
-          isInitialized: true,
-          error: error instanceof Error ? error.message : "Authentication failed",
-        })
-      }
-    }
-
-    initializeAuth()
-  }, [supabase, fetchProfile, updateState])
-
-  // Set up auth state listener - stable dependencies
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state change:", event)
-
-      switch (event) {
-        case "SIGNED_IN":
-          if (session?.user) {
-            const profile = await fetchProfile(session.user.id, true)
-            if (profile && profile.is_active && !profile.is_banned) {
-              updateState({
-                user: session.user,
-                profile,
-                isAuthenticated: true,
-                isLoading: false,
-                error: null,
-              })
-            } else {
-              await supabase.auth.signOut()
-            }
-          }
-          break
-
-        case "SIGNED_OUT":
-          profileCacheRef.current = { data: null, timestamp: 0 }
-          updateState({
-            user: null,
-            profile: null,
-            isAuthenticated: false,
-            isLoading: false,
-            error: null,
-          })
-          break
-
-        case "TOKEN_REFRESHED":
-          // Session refreshed, no action needed
-          break
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [supabase, fetchProfile, updateState])
-
-  // Sign in function
-  const signIn = useCallback(
-    async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-      try {
-        updateState({ isLoading: true, error: null })
-
-        if (!email || !password) {
-          throw new Error("Email and password are required")
-        }
-
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-          throw new Error("Please enter a valid email address")
-        }
-
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-
-        if (error) {
-          let errorMessage = "Sign in failed"
-          switch (error.message) {
-            case "Invalid login credentials":
-              errorMessage = "Invalid email or password"
-              break
-            case "Email not confirmed":
-              errorMessage = "Please verify your email address"
-              break
-            case "Too many requests":
-              errorMessage = "Too many login attempts. Please try again later"
-              break
-            default:
-              errorMessage = error.message || "Sign in failed"
-          }
-          throw new Error(errorMessage)
-        }
-
-        if (!data.user) {
-          throw new Error("Sign in failed - no user data received")
-        }
-
-        // Profile will be fetched by the auth state change listener
-        toast({
-          title: "Welcome back!",
-          description: "Successfully signed in",
-        })
-
-        return { success: true }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Sign in failed"
-        updateState({ isLoading: false, error: errorMessage })
-
-        toast({
-          title: "Sign in failed",
-          description: errorMessage,
-          variant: "destructive",
-        })
-
-        return { success: false, error: errorMessage }
-      }
-    },
-    [supabase, updateState],
-  )
-
-  // Sign up function
-  const signUp = useCallback(
-    async (
-      email: string,
-      password: string,
-      userData: { username: string; full_name: string },
-    ): Promise<{ success: boolean; error?: string }> => {
-      try {
-        updateState({ isLoading: true, error: null })
-
-        if (!email || !password || !userData.username || !userData.full_name) {
-          throw new Error("All fields are required")
-        }
-
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-          throw new Error("Please enter a valid email address")
-        }
-
-        if (password.length < 8) {
-          throw new Error("Password must be at least 8 characters long")
-        }
-
-        if (!/^[a-zA-Z0-9_]+$/.test(userData.username)) {
-          throw new Error("Username can only contain letters, numbers, and underscores")
-        }
-
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: userData,
-          },
-        })
-
-        if (error) {
-          throw new Error(error.message || "Sign up failed")
-        }
-
-        updateState({ isLoading: false })
-
-        toast({
-          title: "Account created!",
-          description: "Please check your email to verify your account",
-        })
-
-        return { success: true }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Sign up failed"
-        updateState({ isLoading: false, error: errorMessage })
-
-        toast({
-          title: "Sign up failed",
-          description: errorMessage,
-          variant: "destructive",
-        })
-
-        return { success: false, error: errorMessage }
-      }
-    },
-    [supabase, updateState],
-  )
-
-  // Sign out function
-  const signOut = useCallback(async (): Promise<void> => {
+  // Login function
+  const login = useCallback(async (email: string, password: string, rememberMe = false) => {
     try {
-      updateState({ isLoading: true })
-      await supabase.auth.signOut()
+      setIsLoading(true)
 
-      // Clear cache
-      profileCacheRef.current = { data: null, timestamp: 0 }
+      const deviceInfo = DeviceDetection.getDeviceInfo()
+      const ipAddress = "client" // Will be determined server-side
 
-      toast({
-        title: "Signed out",
-        description: "You have been successfully signed out",
+      const result = await enhancedAuthService.login({
+        email,
+        password,
+        rememberMe,
+        deviceInfo,
+        ipAddress,
       })
 
-      router.push("/login")
-    } catch (error) {
-      console.error("Sign out error:", error)
-      updateState({ isLoading: false })
-    }
-  }, [supabase, router, updateState])
+      if (result.success && result.user && result.tokens && result.session) {
+        setUser(result.user)
 
-  // Profile refresh
-  const refreshProfile = useCallback(async (): Promise<void> => {
-    if (state.user?.id) {
-      const profile = await fetchProfile(state.user.id, true)
-      if (profile) {
-        updateState({ profile })
+        // Store session
+        SessionStorage.saveSession({
+          sessionToken: result.session.sessionToken,
+          refreshToken: result.tokens.refreshToken,
+          expiresAt: result.session.expiresAt.toISOString(),
+          rememberMe: result.session.rememberMe,
+          user: result.user,
+        })
+
+        return { success: true }
+      } else {
+        return { success: false, error: result.error || "Login failed" }
       }
+    } catch (error) {
+      console.error("Login error:", error)
+      return { success: false, error: "Login failed" }
+    } finally {
+      setIsLoading(false)
     }
-  }, [state.user?.id, fetchProfile, updateState])
+  }, [])
 
-  const contextValue: AuthContextType = {
-    ...state,
-    signIn,
-    signUp,
-    signOut,
-    refreshProfile,
-    clearError,
+  // Logout function
+  const logout = useCallback(async () => {
+    try {
+      const storedSession = SessionStorage.getSession()
+      if (storedSession) {
+        await enhancedAuthService.logout(storedSession.sessionToken, user?.id.toString())
+      }
+    } catch (error) {
+      console.error("Logout error:", error)
+    } finally {
+      SessionStorage.clearSession()
+      setUser(null)
+    }
+  }, [user])
+
+  // Logout all devices
+  const logoutAllDevices = useCallback(async () => {
+    try {
+      if (user) {
+        await enhancedAuthService.logoutAllDevices(user.id.toString())
+      }
+    } catch (error) {
+      console.error("Logout all devices error:", error)
+    } finally {
+      SessionStorage.clearSession()
+      setUser(null)
+    }
+  }, [user])
+
+  // Refresh user data
+  const refreshUser = useCallback(async () => {
+    try {
+      const storedSession = SessionStorage.getSession()
+      if (!storedSession) return
+
+      const result = await enhancedAuthService.validateSession(storedSession.sessionToken)
+
+      if (result.success && result.user) {
+        setUser(result.user)
+        SessionStorage.updateSession({ user: result.user })
+      } else {
+        await logout()
+      }
+    } catch (error) {
+      console.error("Refresh user error:", error)
+      await logout()
+    }
+  }, [logout])
+
+  // Auto-refresh token
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    const interval = setInterval(
+      async () => {
+        try {
+          const storedSession = SessionStorage.getSession()
+          if (!storedSession) return
+
+          const result = await enhancedAuthService.refreshToken(storedSession.refreshToken)
+
+          if (result.success && result.tokens) {
+            // Update stored tokens
+            SessionStorage.updateSession({
+              refreshToken: result.tokens.refreshToken,
+            })
+          }
+        } catch (error) {
+          console.error("Auto-refresh error:", error)
+        }
+      },
+      14 * 60 * 1000,
+    ) // Refresh every 14 minutes
+
+    return () => clearInterval(interval)
+  }, [isAuthenticated])
+
+  // Initialize on mount
+  useEffect(() => {
+    initializeAuth()
+  }, [initializeAuth])
+
+  const value: AuthContextType = {
+    user,
+    isLoading,
+    isAuthenticated,
+    login,
+    logout,
+    logoutAllDevices,
+    refreshUser,
   }
 
-  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {
