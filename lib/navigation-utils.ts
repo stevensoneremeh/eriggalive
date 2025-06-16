@@ -3,7 +3,7 @@
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime"
 import { useRouter, usePathname } from "next/navigation"
 
-// Define route constants
+// Define route constants - EXPORTED
 export const ROUTES = {
   HOME: "/",
   LOGIN: "/login",
@@ -16,6 +16,7 @@ export const ROUTES = {
   MERCH: "/merch",
   COINS: "/coins",
   ADMIN: "/admin",
+  CHRONICLES: "/chronicles",
 } as const
 
 // Define protected routes that require authentication
@@ -28,6 +29,7 @@ export const PROTECTED_ROUTES = [
   ROUTES.MERCH,
   ROUTES.COINS,
   ROUTES.ADMIN,
+  ROUTES.CHRONICLES,
 ]
 
 // Define public routes that don't require authentication
@@ -35,6 +37,14 @@ export const PUBLIC_ROUTES = [ROUTES.HOME, ROUTES.LOGIN, ROUTES.SIGNUP]
 
 // Define auth routes that authenticated users shouldn't access
 export const AUTH_ROUTES = [ROUTES.LOGIN, ROUTES.SIGNUP]
+
+// Storage keys for consistent access
+export const STORAGE_KEYS = {
+  REDIRECT_PATH: "erigga_redirect_path",
+  USER_PREFERENCES: "erigga_user_preferences",
+} as const
+
+export const DEFAULT_REDIRECT_PATH = ROUTES.DASHBOARD
 
 export interface NavigationOptions {
   replace?: boolean
@@ -45,10 +55,12 @@ export interface NavigationOptions {
 export class NavigationManager {
   private router: AppRouterInstance
   private currentPath: string
+  private isClient: boolean
 
   constructor(router: AppRouterInstance, currentPath: string) {
     this.router = router
     this.currentPath = currentPath
+    this.isClient = typeof window !== "undefined"
   }
 
   // Navigate to a specific route with options
@@ -63,7 +75,7 @@ export class NavigationManager {
       }
 
       // Preserve query parameters if requested
-      if (preserveQuery && typeof window !== "undefined") {
+      if (preserveQuery && this.isClient) {
         const currentUrl = new URL(window.location.href)
         const targetUrl = new URL(path, window.location.origin)
 
@@ -103,7 +115,7 @@ export class NavigationManager {
   handlePostLoginNavigation(intendedPath?: string | null) {
     // Priority order for post-login navigation:
     // 1. Intended path from URL params
-    // 2. Stored redirect path from cookies/localStorage
+    // 2. Stored redirect path from storage
     // 3. Default dashboard
 
     let targetPath = ROUTES.DASHBOARD
@@ -153,15 +165,15 @@ export class NavigationManager {
 
   // Store redirect path for post-login navigation
   private storeRedirectPath(path: string) {
-    if (typeof window === "undefined") return
+    if (!this.isClient) return
 
     try {
       // Store in both localStorage and sessionStorage for redundancy
-      localStorage.setItem("erigga_redirect_path", path)
-      sessionStorage.setItem("erigga_redirect_path", path)
+      localStorage.setItem(STORAGE_KEYS.REDIRECT_PATH, path)
+      sessionStorage.setItem(STORAGE_KEYS.REDIRECT_PATH, path)
 
       // Also store in a cookie as backup (handled by middleware)
-      document.cookie = `erigga_redirect_path=${encodeURIComponent(path)}; path=/; max-age=300; SameSite=Lax`
+      document.cookie = `${STORAGE_KEYS.REDIRECT_PATH}=${encodeURIComponent(path)}; path=/; max-age=300; SameSite=Lax`
     } catch (error) {
       console.warn("Failed to store redirect path:", error)
     }
@@ -169,11 +181,13 @@ export class NavigationManager {
 
   // Get stored redirect path
   private getStoredRedirectPath(): string | null {
-    if (typeof window === "undefined") return null
+    if (!this.isClient) return null
 
     try {
       // Try localStorage first, then sessionStorage
-      return localStorage.getItem("erigga_redirect_path") || sessionStorage.getItem("erigga_redirect_path") || null
+      return (
+        localStorage.getItem(STORAGE_KEYS.REDIRECT_PATH) || sessionStorage.getItem(STORAGE_KEYS.REDIRECT_PATH) || null
+      )
     } catch {
       return null
     }
@@ -181,14 +195,14 @@ export class NavigationManager {
 
   // Clear stored redirect paths
   private clearStoredRedirectPath() {
-    if (typeof window === "undefined") return
+    if (!this.isClient) return
 
     try {
-      localStorage.removeItem("erigga_redirect_path")
-      sessionStorage.removeItem("erigga_redirect_path")
+      localStorage.removeItem(STORAGE_KEYS.REDIRECT_PATH)
+      sessionStorage.removeItem(STORAGE_KEYS.REDIRECT_PATH)
 
       // Clear cookie
-      document.cookie = "erigga_redirect_path=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+      document.cookie = `${STORAGE_KEYS.REDIRECT_PATH}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
     } catch (error) {
       console.warn("Failed to clear redirect path:", error)
     }
@@ -202,6 +216,19 @@ export class NavigationManager {
   // Check if current path is an auth route
   isAuthRoute(path: string = this.currentPath): boolean {
     return AUTH_ROUTES.some((route) => path === route || path.startsWith(`${route}/`))
+  }
+
+  // Safe execution wrapper for client-side operations
+  private safeExecute<T>(clientFn: () => T, fallback: T): T {
+    if (!this.isClient) {
+      return fallback
+    }
+    try {
+      return clientFn()
+    } catch (error) {
+      console.warn("NavigationManager operation failed:", error)
+      return fallback
+    }
   }
 }
 
@@ -217,7 +244,7 @@ export function useNavigationManager() {
   return new NavigationManager(router as AppRouterInstance, pathname)
 }
 
-// Utility function to get redirect path from URL or storage
+// Utility function to get redirect path from URL or storage - EXPORTED
 export function getRedirectPath(searchParams?: URLSearchParams): string {
   // Try URL params first
   if (searchParams?.has("redirect")) {
@@ -227,10 +254,11 @@ export function getRedirectPath(searchParams?: URLSearchParams): string {
     }
   }
 
-  // Try stored paths
+  // Try stored paths (only on client side)
   if (typeof window !== "undefined") {
     try {
-      const stored = localStorage.getItem("erigga_redirect_path") || sessionStorage.getItem("erigga_redirect_path")
+      const stored =
+        localStorage.getItem(STORAGE_KEYS.REDIRECT_PATH) || sessionStorage.getItem(STORAGE_KEYS.REDIRECT_PATH)
       if (stored && stored.startsWith("/")) {
         return stored
       }
@@ -239,5 +267,63 @@ export function getRedirectPath(searchParams?: URLSearchParams): string {
     }
   }
 
-  return ROUTES.DASHBOARD
+  return DEFAULT_REDIRECT_PATH
 }
+
+// Utility function to check if a path is protected - EXPORTED
+export function isProtectedRoute(path: string): boolean {
+  return PROTECTED_ROUTES.some((route) => path === route || path.startsWith(`${route}/`))
+}
+
+// Utility function to check if a path is an auth route - EXPORTED
+export function isAuthRoute(path: string): boolean {
+  return AUTH_ROUTES.some((route) => path === route || path.startsWith(`${route}/`))
+}
+
+// Utility function to validate redirect paths - EXPORTED
+export function isValidRedirectPath(path: string): boolean {
+  try {
+    // Must be a string and start with /
+    if (!path || typeof path !== "string" || !path.startsWith("/")) {
+      return false
+    }
+
+    // Check for potentially harmful characters
+    if (/[<>{}|\\^`;]/.test(path)) {
+      return false
+    }
+
+    // Must be a protected route (we don't redirect to public routes after login)
+    return PROTECTED_ROUTES.some((route) => path === route || path.startsWith(`${route}/`))
+  } catch {
+    return false
+  }
+}
+
+// Utility function to store redirect path - EXPORTED
+export function storeRedirectPath(path: string): void {
+  if (typeof window === "undefined" || !isValidRedirectPath(path)) return
+
+  try {
+    localStorage.setItem(STORAGE_KEYS.REDIRECT_PATH, path)
+    sessionStorage.setItem(STORAGE_KEYS.REDIRECT_PATH, path)
+  } catch (error) {
+    console.warn("Failed to store redirect path:", error)
+  }
+}
+
+// Utility function to clear redirect path - EXPORTED
+export function clearRedirectPath(): void {
+  if (typeof window === "undefined") return
+
+  try {
+    localStorage.removeItem(STORAGE_KEYS.REDIRECT_PATH)
+    sessionStorage.removeItem(STORAGE_KEYS.REDIRECT_PATH)
+  } catch (error) {
+    console.warn("Failed to clear redirect path:", error)
+  }
+}
+
+// Type exports for better TypeScript support
+export type RouteKey = keyof typeof ROUTES
+export type RoutePath = (typeof ROUTES)[RouteKey]
