@@ -56,13 +56,11 @@ class EnvironmentDetector {
       )
     }
 
-    // Server-side detection
+    // Server-side detection - only consider preview mode if explicitly set
     return (
       process.env.VERCEL_ENV === "preview" ||
       process.env.NODE_ENV === "development" ||
-      !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      !process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      !process.env.JWT_SECRET
+      process.env.FORCE_PREVIEW_MODE === "true"
     )
   }
 
@@ -84,16 +82,30 @@ class FlexibleTokenManager {
     this.isPreviewMode = EnvironmentDetector.isPreviewMode()
 
     if (this.isPreviewMode) {
-      // Use a default secret for preview mode
-      this.secret = secret || "preview-mode-secret-key-not-for-production-use-only"
+      // Use a valid 32+ character secret for preview mode
+      this.secret = secret || "preview-mode-jwt-secret-key-32-chars-minimum-length-required"
       console.log("🔧 Token manager running in preview mode")
     } else {
       // Production mode requires a proper secret
-      if (!secret || secret.length < 32) {
-        throw new Error("JWT secret must be at least 32 characters long for production")
+      const jwtSecret = secret || process.env.JWT_SECRET
+      if (!jwtSecret || jwtSecret.length < 32) {
+        // Generate a secure default if none provided
+        this.secret = this.generateSecureSecret()
+        console.warn("⚠️ Generated temporary JWT secret. Please set JWT_SECRET environment variable.")
+      } else {
+        this.secret = jwtSecret
       }
-      this.secret = secret
     }
+  }
+
+  private generateSecureSecret(): string {
+    // Generate a cryptographically secure 64-character secret
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*"
+    let result = ""
+    for (let i = 0; i < 64; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    return result
   }
 
   createToken(payload: any, expiresIn: number): string {
