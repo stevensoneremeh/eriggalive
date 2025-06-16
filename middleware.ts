@@ -2,10 +2,10 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 // Define public paths that don't require authentication
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password"]
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/terms", "/privacy"]
 
 // Define paths that should always be accessible regardless of auth status
-const ALWAYS_ACCESSIBLE = ["/api", "/_next", "/favicon.ico", "/images", "/videos", "/fonts"]
+const ALWAYS_ACCESSIBLE = ["/api", "/_next", "/favicon.ico", "/images", "/videos", "/fonts", "/placeholder"]
 
 // Define paths that require authentication
 const PROTECTED_PATHS = [
@@ -16,31 +16,51 @@ const PROTECTED_PATHS = [
   "/tickets",
   "/premium",
   "/merch",
+  "/coins",
   "/settings",
   "/admin",
 ]
 
+// Define auth paths that authenticated users should be redirected away from
+const AUTH_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password"]
+
 export function middleware(request: NextRequest) {
-  // Add health check headers for monitoring
+  const { pathname } = request.nextUrl
   const response = NextResponse.next()
 
-  // Add server timing header for performance monitoring
-  response.headers.set("Server-Timing", `total;dur=${Date.now()}`)
+  // Add performance and health monitoring headers
+  response.headers.set("Server-Timing", `middleware;dur=${Date.now()}`)
 
-  // Add health check endpoint info
-  if (request.nextUrl.pathname.startsWith("/api/health")) {
+  // Add security headers
+  response.headers.set("X-Frame-Options", "DENY")
+  response.headers.set("X-Content-Type-Options", "nosniff")
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+
+  // Handle health check endpoints
+  if (pathname.startsWith("/api/health")) {
     response.headers.set("Cache-Control", "no-cache, no-store, must-revalidate")
     response.headers.set("Pragma", "no-cache")
     response.headers.set("Expires", "0")
+    return response
   }
 
-  // Get the pathname of the request
-  const { pathname } = request.nextUrl
-
-  // Check if the path is in the always accessible list or is a static file
-  if (ALWAYS_ACCESSIBLE.some((path) => pathname.startsWith(path)) || pathname.includes(".")) {
-    return NextResponse.next()
+  // Skip middleware for always accessible paths and static files
+  if (
+    ALWAYS_ACCESSIBLE.some((path) => pathname.startsWith(path)) ||
+    pathname.includes(".") ||
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/api/")
+  ) {
+    return response
   }
+
+  // Check authentication status
+  const hasAuthCookie = request.cookies.has("erigga_auth")
+  const hasSessionCookie = request.cookies.has("erigga_auth_session")
+  const isAuthenticated = hasAuthCookie || hasSessionCookie
+
+  // Get stored redirect path from cookies
+  const storedRedirectPath = request.cookies.get("erigga_redirect_path")?.value
 
   // Check if the path is public
   const isPublicPath = PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
@@ -48,46 +68,79 @@ export function middleware(request: NextRequest) {
   // Check if the path requires authentication
   const requiresAuth = PROTECTED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
 
-  // Check if the user is authenticated by looking for the auth cookies
-  const hasAuthCookie = request.cookies.has("erigga_auth")
-  const hasSessionCookie = request.cookies.has("erigga_auth_session")
-  const isAuthenticated = hasAuthCookie || hasSessionCookie
+  // Check if the path is an auth path
+  const isAuthPath = AUTH_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
 
-  // If accessing a protected route without authentication
+  // Handle authenticated users accessing auth pages
+  if (isAuthenticated && isAuthPath) {
+    let redirectPath = "/dashboard"
+
+    // Check for redirect parameter in URL
+    const redirectParam = request.nextUrl.searchParams.get("redirect")
+    if (
+      redirectParam &&
+      redirectParam.startsWith("/") &&
+      PROTECTED_PATHS.some((path) => redirectParam === path || redirectParam.startsWith(`${path}/`))
+    ) {
+      redirectPath = redirectParam
+    }
+    // Check for stored redirect path
+    else if (
+      storedRedirectPath &&
+      storedRedirectPath.startsWith("/") &&
+      PROTECTED_PATHS.some((path) => storedRedirectPath === path || storedRedirectPath.startsWith(`${path}/`))
+    ) {
+      redirectPath = storedRedirectPath
+    }
+
+    const redirectResponse = NextResponse.redirect(new URL(redirectPath, request.url))
+
+    // Clear the stored redirect path cookie
+    redirectResponse.cookies.delete("erigga_redirect_path")
+
+    return redirectResponse
+  }
+
+  // Handle unauthenticated users accessing protected routes
   if (requiresAuth && !isAuthenticated) {
-    // Store the original URL to redirect back after login
+    // Store the current path for post-login redirect
     const redirectUrl = new URL("/login", request.url)
     redirectUrl.searchParams.set("redirect", pathname)
 
-    // Create the response with the redirect
-    const response = NextResponse.redirect(redirectUrl)
+    const redirectResponse = NextResponse.redirect(redirectUrl)
 
-    // Add a temporary cookie to indicate where to redirect after login
-    response.cookies.set("redirect_after_login", pathname, {
+    // Store redirect path in cookie for backup
+    redirectResponse.cookies.set("erigga_redirect_path", pathname, {
       path: "/",
-      maxAge: 60 * 5, // 5 minutes
+      maxAge: 60 * 10, // 10 minutes
       httpOnly: true,
       sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
     })
 
-    return response
+    return redirectResponse
   }
 
-  // If already authenticated and trying to access login/signup pages
-  if (isAuthenticated && (pathname === "/login" || pathname === "/signup")) {
-    // Check if there's a redirect parameter
-    const redirectParam = request.nextUrl.searchParams.get("redirect")
-
-    // Redirect to the specified path or dashboard
-    const redirectUrl = redirectParam || "/dashboard"
-    return NextResponse.redirect(new URL(redirectUrl, request.url))
+  // Handle root path redirect for authenticated users
+  if (pathname === "/" && isAuthenticated) {
+    return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
   // For all other cases, proceed normally
   return response
 }
 
-// See "Matching Paths" below to learn more
+// Configure matcher to handle all routes except static files and API routes
 export const config = {
-  matcher: ["/((?!api/|_next/|_static/|_vercel|[\\w-]+\\.\\w+).*)", "/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public files (images, etc.)
+     */
+    "/((?!api/|_next/static|_next/image|favicon.ico|images/|videos/|fonts/|placeholder).*)",
+  ],
 }

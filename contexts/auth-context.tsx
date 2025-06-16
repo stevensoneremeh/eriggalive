@@ -1,8 +1,9 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { useRouter, usePathname } from "next/navigation"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { clientAuth } from "@/lib/auth-utils"
+import { NavigationManager, ROUTES, getRedirectPath } from "@/lib/navigation-utils"
 
 // Define types
 type UserTier = "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
@@ -31,8 +32,10 @@ interface AuthContextType {
   signOut: () => Promise<void>
   isLoading: boolean
   isAuthenticated: boolean
+  isInitialized: boolean
   purchaseCoins: (amount: number, method: string) => Promise<{ success: boolean; data?: any; error?: any }>
   refreshSession: () => Promise<void>
+  navigationManager: NavigationManager | null
 }
 
 // Create context
@@ -44,10 +47,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false)
+
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
 
-  // Initialize with stored data
+  // Create navigation manager
+  const navigationManager = new NavigationManager(router, pathname)
+
+  // Initialize authentication state
   useEffect(() => {
     const initializeAuth = async () => {
       try {
@@ -63,26 +72,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           // Refresh the session to extend expiry
           clientAuth.refreshSession()
+
+          // Handle post-initialization navigation for authenticated users
+          if (navigationManager.isAuthRoute(pathname)) {
+            // User is authenticated but on auth page, redirect to dashboard
+            const redirectPath = getRedirectPath(searchParams)
+            navigationManager.handlePostLoginNavigation(redirectPath)
+          }
         } else {
           setIsAuthenticated(false)
+
+          // Handle unauthenticated users on protected routes
+          if (navigationManager.isProtectedRoute(pathname)) {
+            navigationManager.handleAuthRequiredNavigation(pathname)
+          }
         }
       } catch (error) {
         console.error("Auth initialization error:", error)
         setIsAuthenticated(false)
+
+        // Handle initialization error on protected routes
+        if (navigationManager.isProtectedRoute(pathname)) {
+          navigationManager.handleAuthRequiredNavigation(pathname)
+        }
       } finally {
         setIsLoading(false)
+        setIsInitialized(true)
       }
     }
 
     initializeAuth()
-  }, [])
+  }, []) // Only run once on mount
 
-  // Refresh session on route changes
+  // Handle route changes for authenticated users
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isInitialized && isAuthenticated) {
+      // Refresh session on route changes
       clientAuth.refreshSession()
+
+      // Redirect away from auth routes if authenticated
+      if (navigationManager.isAuthRoute(pathname)) {
+        const redirectPath = getRedirectPath(searchParams)
+        navigationManager.handlePostLoginNavigation(redirectPath)
+      }
     }
-  }, [pathname, isAuthenticated])
+  }, [pathname, isAuthenticated, isInitialized])
 
   // Set up periodic session refresh
   useEffect(() => {
@@ -90,20 +124,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const refreshInterval = setInterval(
       () => {
-        clientAuth.refreshSession()
+        try {
+          clientAuth.refreshSession()
+        } catch (error) {
+          console.error("Session refresh error:", error)
+          // If refresh fails, sign out the user
+          signOut()
+        }
       },
-      5 * 60 * 1000,
-    ) // Every 5 minutes
+      5 * 60 * 1000, // Every 5 minutes
+    )
 
     return () => clearInterval(refreshInterval)
   }, [isAuthenticated])
 
-  // Sign in function that works for any user
+  // Enhanced sign in function
   const signIn = async (email: string, password: string) => {
     try {
       setIsLoading(true)
 
-      // Simulate API delay
+      // Validate inputs
+      if (!email || !password) {
+        return { success: false, error: "Email and password are required" }
+      }
+
+      // Simulate API delay for realistic UX
       await new Promise((resolve) => setTimeout(resolve, 800))
 
       // Generate a unique ID based on the email
@@ -137,15 +182,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(mockProfile)
       setIsAuthenticated(true)
 
+      // Handle post-login navigation
+      const redirectPath = getRedirectPath(searchParams)
+
+      // Small delay to ensure state is updated before navigation
+      setTimeout(() => {
+        navigationManager.handlePostLoginNavigation(redirectPath)
+      }, 100)
+
       return { success: true }
     } catch (error: any) {
-      return { success: false, error: error.message || "An unknown error occurred" }
+      console.error("Sign in error:", error)
+      return {
+        success: false,
+        error: error.message || "An unexpected error occurred during sign in",
+      }
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Sign out function
+  // Enhanced sign out function
   const signOut = async () => {
     try {
       setIsLoading(true)
@@ -157,9 +214,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(null)
       setIsAuthenticated(false)
 
-      router.push("/login")
+      // Navigate to login page
+      navigationManager.navigateTo(ROUTES.LOGIN, { replace: true })
     } catch (error) {
       console.error("Sign out error:", error)
+
+      // Force navigation even if there's an error
+      try {
+        router.push(ROUTES.LOGIN)
+      } catch (navError) {
+        console.error("Emergency navigation failed:", navError)
+        // Last resort: reload the page
+        if (typeof window !== "undefined") {
+          window.location.href = ROUTES.LOGIN
+        }
+      }
     } finally {
       setIsLoading(false)
     }
@@ -168,13 +237,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Function to refresh the current session
   const refreshSession = async () => {
     if (user && profile) {
-      clientAuth.saveSession(user, profile)
+      try {
+        clientAuth.saveSession(user, profile)
+      } catch (error) {
+        console.error("Session refresh error:", error)
+      }
     }
   }
 
-  // Purchase coins function
+  // Enhanced purchase coins function
   const purchaseCoins = async (amount: number, method: string) => {
     try {
+      // Validate inputs
+      if (!amount || amount <= 0) {
+        return { success: false, error: { message: "Invalid coin amount" } }
+      }
+
       // Simulate API delay
       await new Promise((resolve) => setTimeout(resolve, 800))
 
@@ -193,7 +271,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return { success: true, data: { id: `transaction-${Date.now()}` } }
     } catch (error: any) {
-      return { success: false, error: { message: error.message || "An unknown error occurred" } }
+      console.error("Purchase coins error:", error)
+      return {
+        success: false,
+        error: { message: error.message || "Failed to purchase coins" },
+      }
     }
   }
 
@@ -206,8 +288,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         isLoading,
         isAuthenticated,
+        isInitialized,
         purchaseCoins,
         refreshSession,
+        navigationManager,
       }}
     >
       {children}
