@@ -5,10 +5,9 @@ import "./globals.css"
 import { Navigation } from "@/components/navigation"
 import { AuthProvider } from "@/contexts/auth-context"
 import { ThemeProvider } from "@/contexts/theme-context"
-import { ErrorBoundary } from "@/components/error-boundary"
+import ErrorBoundary from "@/components/error-boundary"
 import { SessionRefresh } from "@/components/session-refresh"
-import { Toaster } from "@/components/ui/toaster"
-import { PreviewModeIndicator } from "@/components/preview-mode-indicator"
+import Script from "next/script"
 import { DynamicLogo } from "@/components/dynamic-logo"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -111,11 +110,14 @@ export default function RootLayout({
                   </div>
                 </div>
               </footer>
-              <PreviewModeIndicator />
-              <Toaster />
             </AuthProvider>
           </ThemeProvider>
         </ErrorBoundary>
+
+        {/* Paystack Script - Only load in production */}
+        {process.env.NODE_ENV === "production" && (
+          <Script src="https://js.paystack.co/v1/inline.js" strategy="lazyOnload" />
+        )}
       </body>
     </html>
   )
