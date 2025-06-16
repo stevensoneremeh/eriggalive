@@ -20,13 +20,16 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [redirectPath, setRedirectPath] = useState(ROUTES.DASHBOARD)
 
   const router = useRouter()
   const searchParams = useSearchParams()
   const { signIn, isAuthenticated, isLoading, isInitialized } = useAuth()
 
-  // Get redirect path
-  const redirectPath = getRedirectPath(searchParams)
+  // Set redirect path after component mounts to avoid SSR issues
+  useEffect(() => {
+    setRedirectPath(getRedirectPath(searchParams))
+  }, [searchParams])
 
   // Handle already authenticated users
   useEffect(() => {

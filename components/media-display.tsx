@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ImageIcon, Play, Volume2, FileText } from "lucide-react"
 
 interface MediaDisplayProps {
@@ -154,6 +154,9 @@ export function MediaDisplay({ mediaUrls, mediaTypes, thumbnailUrls, className =
       {selectedMedia !== null && (
         <Dialog open={selectedMedia !== null} onOpenChange={handleClose}>
           <DialogContent className="max-w-4xl p-0 overflow-hidden bg-background/95 backdrop-blur-sm">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Media Viewer</DialogTitle>
+            </DialogHeader>
             <div className="p-4 flex items-center justify-center">
               {renderFullMedia(mediaUrls[selectedMedia], mediaTypes[selectedMedia])}
             </div>
