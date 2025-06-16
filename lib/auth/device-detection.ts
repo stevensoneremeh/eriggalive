@@ -9,17 +9,18 @@ interface DeviceInfo {
 export class DeviceDetection {
   static getDeviceInfo(): DeviceInfo {
     if (typeof window === "undefined") {
+      // Server-side fallback
       return {
-        userAgent: "server",
-        platform: "server",
-        browser: "server",
-        os: "server",
+        userAgent: "Server",
+        platform: "Server",
+        browser: "Server",
+        os: "Server",
         isMobile: false,
       }
     }
 
-    const userAgent = navigator.userAgent
-    const platform = navigator.platform
+    const userAgent = navigator.userAgent || ""
+    const platform = navigator.platform || ""
 
     return {
       userAgent,
@@ -28,6 +29,11 @@ export class DeviceDetection {
       os: this.getOS(userAgent, platform),
       isMobile: this.isMobile(userAgent),
     }
+  }
+
+  static getClientIP(): string {
+    // This will be handled server-side in API routes
+    return "client"
   }
 
   private static getBrowser(userAgent: string): string {
@@ -50,10 +56,5 @@ export class DeviceDetection {
 
   private static isMobile(userAgent: string): boolean {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
-  }
-
-  static getClientIP(): string {
-    // This would typically be handled server-side
-    return "client"
   }
 }
