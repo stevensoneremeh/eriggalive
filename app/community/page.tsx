@@ -12,13 +12,13 @@ import {
   Music,
   Calendar,
   Coins,
+  Filter,
   Users,
   MessageSquare,
   Plus,
   FlameIcon as Fire,
   Trophy,
   Star,
-  RefreshCw,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { SocialFeed } from "@/components/community/social-feed"
@@ -35,7 +35,6 @@ export default function CommunityPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState("recent")
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false)
-  const [refreshKey, setRefreshKey] = useState(0)
   const [communityStats, setCommunityStats] = useState({
     totalPosts: 0,
     totalBars: 0,
@@ -58,7 +57,7 @@ export default function CommunityPage() {
       })
     }
     fetchStats()
-  }, [refreshKey])
+  }, [])
 
   const handleCreatePost = useCallback(() => {
     if (!isAuthenticated) {
@@ -71,23 +70,6 @@ export default function CommunityPage() {
     }
     setIsCreatePostOpen(true)
   }, [isAuthenticated, toast])
-
-  const handlePostCreated = useCallback(() => {
-    // Refresh the feed when a new post is created
-    setRefreshKey((prev) => prev + 1)
-    toast({
-      title: "Success!",
-      description: "Your content has been shared with the community",
-    })
-  }, [toast])
-
-  const handleRefresh = useCallback(() => {
-    setRefreshKey((prev) => prev + 1)
-    toast({
-      title: "Refreshed",
-      description: "Community content has been updated",
-    })
-  }, [toast])
 
   const tabConfig = [
     {
@@ -154,9 +136,9 @@ export default function CommunityPage() {
                 />
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="lg" onClick={handleRefresh} className="flex-1 sm:flex-none">
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh
+                <Button variant="outline" size="lg" className="flex-1 sm:flex-none">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filter
                 </Button>
                 <Button
                   onClick={handleCreatePost}
@@ -223,11 +205,11 @@ export default function CommunityPage() {
 
               {/* Tab Content */}
               <TabsContent value="all" className="mt-0">
-                <SocialFeed key={`all-${refreshKey}`} searchQuery={searchQuery} filterType={filterType} />
+                <SocialFeed searchQuery={searchQuery} filterType={filterType} />
               </TabsContent>
 
               <TabsContent value="bars" className="mt-0">
-                <BarsSection key={`bars-${refreshKey}`} searchQuery={searchQuery} filterType={filterType} />
+                <BarsSection searchQuery={searchQuery} filterType={filterType} />
               </TabsContent>
 
               <TabsContent value="stories" className="mt-0">
@@ -301,7 +283,7 @@ export default function CommunityPage() {
                     </Badge>
                   </div>
                 </div>
-                <TopBarsOfWeek key={`top-bars-${refreshKey}`} />
+                <TopBarsOfWeek />
               </Card>
 
               {/* User Leaderboard */}
@@ -312,7 +294,7 @@ export default function CommunityPage() {
                     Community Leaders
                   </h3>
                 </div>
-                <UserLeaderboard key={`leaderboard-${refreshKey}`} />
+                <UserLeaderboard />
               </Card>
 
               {/* Trending Topics */}
@@ -323,7 +305,7 @@ export default function CommunityPage() {
                     Trending Topics
                   </h3>
                 </div>
-                <TrendingTopics key={`trending-${refreshKey}`} />
+                <TrendingTopics />
               </Card>
             </div>
           </div>
@@ -331,12 +313,7 @@ export default function CommunityPage() {
       </div>
 
       {/* Create Post Dialog */}
-      <CreatePostDialog
-        open={isCreatePostOpen}
-        onOpenChange={setIsCreatePostOpen}
-        defaultTab={activeTab}
-        onPostCreated={handlePostCreated}
-      />
+      <CreatePostDialog open={isCreatePostOpen} onOpenChange={setIsCreatePostOpen} defaultTab={activeTab} />
     </div>
   )
 }
