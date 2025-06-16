@@ -2,81 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/client"
 import type { CartoonSeries, CartoonEpisode } from "@/types/database"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
-
-// Check if we're in a browser environment
-const isBrowser = typeof window !== "undefined"
-
-// Check if we're in preview mode
-const isPreviewMode =
-  isBrowser && (window.location.hostname.includes("vusercontent.net") || window.location.hostname.includes("v0.dev"))
-
-// Create a Supabase client for browser usage
-const getSupabaseClient = () => {
-  if (isPreviewMode) {
-    return createMockClient()
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Missing Supabase environment variables")
-    return createMockClient()
-  }
-
-  return createClient(supabaseUrl, supabaseAnonKey)
-}
-
-// Create a mock client for preview mode
-const createMockClient = () => {
-  return {
-    from: (table: string) => ({
-      select: () => ({
-        order: () => ({
-          then: (callback: any) => {
-            setTimeout(() => {
-              callback({
-                data: [
-                  {
-                    id: 1,
-                    title: "Paper Boi Chronicles",
-                    description: "Follow Erigga's journey from the streets to stardom",
-                    thumbnail_url: "/placeholder.svg?height=300&width=400",
-                    release_date: "2023-01-15",
-                    status: "ongoing",
-                    category: "drama",
-                    total_episodes: 12,
-                    total_views: 1500000,
-                    rating: 4.8,
-                    created_at: "2023-01-01T00:00:00Z",
-                  },
-                  {
-                    id: 2,
-                    title: "Warri Adventures",
-                    description: "Comedy series based on Erigga's experiences in Warri",
-                    thumbnail_url: "/placeholder.svg?height=300&width=400",
-                    release_date: "2023-03-20",
-                    status: "completed",
-                    category: "comedy",
-                    total_episodes: 8,
-                    total_views: 980000,
-                    rating: 4.6,
-                    created_at: "2023-03-01T00:00:00Z",
-                  },
-                ],
-                error: null,
-              })
-            }, 500)
-          },
-        }),
-      }),
-    }),
-  } as any
-}
 
 interface SeriesWithEpisodes extends CartoonSeries {
   episodes: CartoonEpisode[]
@@ -87,7 +16,7 @@ export default function ChroniclesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { user, profile } = useAuth()
-  const supabase = getSupabaseClient()
+  const supabase = createClient()
 
   useEffect(() => {
     async function fetchSeries() {

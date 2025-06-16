@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,7 +14,11 @@ import { Loader2, AlertCircle, CheckCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { getRedirectPath, ROUTES } from "@/lib/navigation-utils"
 
-export default function LoginPage() {
+interface LoginPageProps {
+  searchParams: { [key: string]: string | string[] | undefined }
+}
+
+export default function LoginPage({ searchParams }: LoginPageProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -23,12 +27,20 @@ export default function LoginPage() {
   const [redirectPath, setRedirectPath] = useState(ROUTES.DASHBOARD)
 
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { signIn, isAuthenticated, isLoading, isInitialized } = useAuth()
 
   // Set redirect path after component mounts to avoid SSR issues
   useEffect(() => {
-    setRedirectPath(getRedirectPath(searchParams))
+    // Convert searchParams to URLSearchParams-like object for getRedirectPath
+    const searchParamsObj = new URLSearchParams()
+    Object.entries(searchParams).forEach(([key, value]) => {
+      if (typeof value === 'string') {
+        searchParamsObj.set(key, value)
+      } else if (Array.isArray(value)) {
+        searchParamsObj.set(key, value[0] || '')
+      }
+    })
+    setRedirectPath(getRedirectPath(searchParamsObj))
   }, [searchParams])
 
   // Handle already authenticated users
