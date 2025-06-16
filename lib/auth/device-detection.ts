@@ -4,28 +4,22 @@ interface DeviceInfo {
   browser: string
   os: string
   isMobile: boolean
-  screenResolution?: string
-  timezone?: string
-  language?: string
 }
 
 export class DeviceDetection {
   static getDeviceInfo(): DeviceInfo {
     if (typeof window === "undefined") {
       return {
-        userAgent: "Server",
-        platform: "Server",
-        browser: "Server",
-        os: "Server",
+        userAgent: "server",
+        platform: "server",
+        browser: "server",
+        os: "server",
         isMobile: false,
       }
     }
 
     const userAgent = navigator.userAgent
     const platform = navigator.platform
-    const language = navigator.language
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-    const screenResolution = `${screen.width}x${screen.height}`
 
     return {
       userAgent,
@@ -33,23 +27,14 @@ export class DeviceDetection {
       browser: this.getBrowser(userAgent),
       os: this.getOS(userAgent, platform),
       isMobile: this.isMobile(userAgent),
-      screenResolution,
-      timezone,
-      language,
     }
   }
 
-  static getClientIP(): string {
-    // In production, this would be handled by the server
-    // Client-side IP detection is not reliable
-    return "client-detected"
-  }
-
   private static getBrowser(userAgent: string): string {
-    if (userAgent.includes("Chrome") && !userAgent.includes("Edg")) return "Chrome"
+    if (userAgent.includes("Chrome")) return "Chrome"
     if (userAgent.includes("Firefox")) return "Firefox"
-    if (userAgent.includes("Safari") && !userAgent.includes("Chrome")) return "Safari"
-    if (userAgent.includes("Edg")) return "Edge"
+    if (userAgent.includes("Safari")) return "Safari"
+    if (userAgent.includes("Edge")) return "Edge"
     if (userAgent.includes("Opera")) return "Opera"
     return "Unknown"
   }
@@ -67,20 +52,8 @@ export class DeviceDetection {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
   }
 
-  static generateFingerprint(): string {
-    if (typeof window === "undefined") return "server-fingerprint"
-
-    const components = [
-      navigator.userAgent,
-      navigator.language,
-      screen.width + "x" + screen.height,
-      new Date().getTimezoneOffset(),
-      navigator.platform,
-      navigator.cookieEnabled,
-    ]
-
-    return btoa(components.join("|"))
-      .replace(/[^a-zA-Z0-9]/g, "")
-      .substring(0, 32)
+  static getClientIP(): string {
+    // This would typically be handled server-side
+    return "client"
   }
 }

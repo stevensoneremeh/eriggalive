@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/contexts/auth-context"
-import { Eye, EyeOff, AlertCircle, Loader2, Shield, Smartphone, RefreshCw } from "lucide-react"
+import { Eye, EyeOff, AlertCircle, Loader2, Shield, Smartphone } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 
 interface FormData {
@@ -51,37 +51,20 @@ export default function LoginPage() {
     activeSessions,
   } = useAuth()
 
-  // Get redirect path and error parameters
+  // Get redirect path
   const redirectPath = searchParams?.get("redirect") || "/dashboard"
-  const errorParam = searchParams?.get("error")
 
   // Handle mounting
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Handle URL error parameters
-  useEffect(() => {
-    if (errorParam) {
-      const errorMessages: Record<string, string> = {
-        auth_error: "Authentication failed. Please try again.",
-        profile_not_found: "User profile not found. Please contact support.",
-        account_inactive: "Your account is inactive or banned. Please contact support.",
-        session_expired: "Your session has expired. Please sign in again.",
-        access_denied: "Access denied. Insufficient permissions.",
-      }
-
-      setFormErrors({ general: errorMessages[errorParam] || "An error occurred. Please try again." })
-    }
-  }, [errorParam])
-
   // Redirect if already authenticated
   useEffect(() => {
     if (isInitialized && isAuthenticated && mounted) {
-      const finalRedirect = searchParams?.get("redirect") || "/dashboard"
-      router.push(finalRedirect)
+      router.push(redirectPath)
     }
-  }, [isAuthenticated, isInitialized, mounted, router, searchParams])
+  }, [isAuthenticated, isInitialized, mounted, router, redirectPath])
 
   // Clear errors when auth error changes
   useEffect(() => {
@@ -104,8 +87,8 @@ export default function LoginPage() {
 
     if (!formData.password) {
       errors.password = "Password is required"
-    } else if (formData.password.length < 8) {
-      errors.password = "Password must be at least 8 characters"
+    } else if (formData.password.length < 6) {
+      errors.password = "Password must be at least 6 characters"
     }
 
     setFormErrors(errors)
@@ -232,7 +215,7 @@ export default function LoginPage() {
                 value={formData.email}
                 onChange={handleInputChange("email")}
                 disabled={isSubmitting || authLoading}
-                className={formErrors.email ? "border-red-500 focus-visible:ring-red-500" : ""}
+                className={`border-lime-500/20 ${formErrors.email ? "border-red-500" : ""}`}
                 autoComplete="email"
                 autoFocus
               />
@@ -246,16 +229,21 @@ export default function LoginPage() {
 
             {/* Password Field */}
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link href="/forgot-password" className="text-xs text-lime-500 hover:underline" tabIndex={-1}>
+                  Forgot password?
+                </Link>
+              </div>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
+                  placeholder="••••••••"
                   value={formData.password}
                   onChange={handleInputChange("password")}
                   disabled={isSubmitting || authLoading}
-                  className={formErrors.password ? "border-red-500 focus-visible:ring-red-500 pr-10" : "pr-10"}
+                  className={`border-lime-500/20 pr-10 ${formErrors.password ? "border-red-500" : ""}`}
                   autoComplete="current-password"
                 />
                 <Button
@@ -267,7 +255,11 @@ export default function LoginPage() {
                   disabled={isSubmitting || authLoading}
                   tabIndex={-1}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
                 </Button>
               </div>
               {formErrors.password && (
@@ -286,70 +278,55 @@ export default function LoginPage() {
                 onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, rememberMe: checked as boolean }))}
                 disabled={isSubmitting || authLoading}
               />
-              <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">
+              <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer flex items-center gap-2">
+                <Shield className="h-3 w-3" />
                 Remember me for 30 days
               </Label>
             </div>
 
-            {/* Error Alert */}
+            {/* General Error */}
             {formErrors.general && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription className="flex items-center justify-between">
-                  <span>{formErrors.general}</span>
-                  {authError && (
-                    <Button variant="ghost" size="sm" onClick={handleRetry} className="h-auto p-1">
-                      <RefreshCw className="h-3 w-3" />
-                    </Button>
-                  )}
-                </AlertDescription>
+                <AlertDescription>{formErrors.general}</AlertDescription>
               </Alert>
             )}
 
             {/* Submit Button */}
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-lime-600 to-teal-600 hover:from-lime-700 hover:to-teal-700"
+              className="w-full bg-lime-500 hover:bg-lime-600 text-teal-900 font-medium"
               disabled={isSubmitting || authLoading}
             >
-              {isSubmitting ? (
+              {isSubmitting || authLoading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Signing in...
                 </>
               ) : (
-                <>
-                  <Shield className="mr-2 h-4 w-4" />
-                  Sign In
-                </>
+                "Sign In"
               )}
             </Button>
           </form>
         </CardContent>
 
-        <CardFooter className="flex flex-col space-y-2">
-          <div className="flex items-center justify-between w-full text-sm">
-            <Link
-              href="/forgot-password"
-              className="text-lime-600 hover:text-lime-700 hover:underline"
-              tabIndex={isSubmitting ? -1 : 0}
-            >
-              Forgot password?
-            </Link>
-            <Link
-              href="/signup"
-              className="text-lime-600 hover:text-lime-700 hover:underline"
-              tabIndex={isSubmitting ? -1 : 0}
-            >
-              Create account
+        <CardFooter className="flex flex-col space-y-4">
+          <div className="text-center text-sm">
+            Don't have an account?{" "}
+            <Link href="/signup" className="text-lime-500 hover:underline font-medium">
+              Sign up
             </Link>
           </div>
-
-          {redirectPath !== "/dashboard" && (
-            <p className="text-xs text-muted-foreground text-center">
-              You'll be redirected to {redirectPath} after signing in
-            </p>
-          )}
+          <div className="text-center text-xs text-muted-foreground">
+            By signing in, you agree to our{" "}
+            <Link href="/terms" className="hover:underline">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="hover:underline">
+              Privacy Policy
+            </Link>
+          </div>
         </CardFooter>
       </Card>
     </div>

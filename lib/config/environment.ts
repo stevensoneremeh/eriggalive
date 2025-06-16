@@ -1,224 +1,275 @@
 interface EnvironmentConfig {
-  app: {
-    name: string
-    url: string
-    environment: "development" | "staging" | "production"
-    version: string
-  }
-  database: {
-    url: string
-    poolSize: number
-    ssl: boolean
-    connectionTimeout: number
-    queryTimeout: number
-  }
-  auth: {
-    jwtSecret: string
-    jwtExpiresIn: string
-    refreshTokenExpiresIn: string
-    maxConcurrentSessions: number
-    sessionDuration: number
-    rememberMeDuration: number
-  }
-  security: {
-    corsOrigins: string[]
-    rateLimitEnabled: boolean
-    encryptionKey: string
-    hashRounds: number
-  }
-  upload: {
-    maxFileSize: number
-    allowedFileTypes: string[]
-    storageProvider: "supabase" | "aws" | "cloudinary"
-  }
-  payment: {
-    paystack: {
-      publicKey: string
-      secretKey: string
-      webhookSecret: string
-    }
-  }
-  monitoring: {
-    enableMetrics: boolean
-    logLevel: "error" | "warn" | "info" | "debug"
-    auditLogLevel: "minimal" | "standard" | "detailed"
-  }
-  features: {
-    enableRegistration: boolean
-    enablePayments: boolean
-    enableUploads: boolean
-    enableNotifications: boolean
-    maintenanceMode: boolean
-  }
+  // Database
+  supabaseUrl: string
+  supabaseAnonKey: string
+  supabaseServiceRoleKey: string
+
+  // Authentication
+  jwtSecret: string
+  jwtExpiresIn: string
+  refreshTokenExpiresIn: string
+
+  // Payment
+  paystackPublicKey: string
+  paystackSecretKey: string
+
+  // Security
+  corsOrigins: string[]
+  rateLimitEnabled: boolean
+  auditLogLevel: "low" | "medium" | "high" | "critical"
+
+  // Features
+  fileUploadMaxSize: number
+  allowedFileTypes: string[]
+
+  // Monitoring
+  enableMetrics: boolean
+  logLevel: "debug" | "info" | "warn" | "error"
 }
 
-class Environment {
-  private static instance: Environment
-  private config: EnvironmentConfig
-  private isPreviewMode: boolean
+class EnvironmentValidator {
+  private requiredVars = [
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "JWT_SECRET",
+    "PAYSTACK_PUBLIC_KEY",
+    "PAYSTACK_SECRET_KEY",
+    "NEXT_PUBLIC_APP_URL",
+  ]
 
-  private constructor() {
-    this.isPreviewMode = this.detectPreviewMode()
-    this.config = this.loadConfiguration()
-  }
+  validate(): EnvironmentConfig {
+    const missing: string[] = []
 
-  public static getInstance(): Environment {
-    if (!Environment.instance) {
-      Environment.instance = new Environment()
-    }
-    return Environment.instance
-  }
+    this.requiredVars.forEach((varName) => {
+      if (!process.env[varName]) {
+        missing.push(varName)
+      }
+    })
 
-  private detectPreviewMode(): boolean {
-    if (typeof window !== "undefined") {
-      const hostname = window.location.hostname
-      return (
-        hostname.includes("v0.dev") ||
-        hostname.includes("vusercontent.net") ||
-        hostname.includes("localhost") ||
-        hostname === "127.0.0.1"
-      )
+    if (missing.length > 0) {
+      throw new Error(`Missing required environment variables: ${missing.join(", ")}`)
     }
 
-    return (
-      process.env.VERCEL_ENV === "preview" ||
-      process.env.NODE_ENV === "development" ||
-      !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      !process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      !process.env.JWT_SECRET
-    )
-  }
-
-  private loadConfiguration(): EnvironmentConfig {
-    const nodeEnv = process.env.NODE_ENV || "development"
-
-    // Provide safe defaults for preview mode
-    const defaults = {
-      app: {
-        name: "Erigga Fan Platform",
-        url: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-        environment: nodeEnv as "development" | "staging" | "production",
-        version: process.env.npm_package_version || "1.0.0",
-      },
-      database: {
-        url: process.env.POSTGRES_URL || "mock://localhost",
-        poolSize: Number.parseInt(process.env.DB_POOL_SIZE || "10"),
-        ssl: !this.isPreviewMode,
-        connectionTimeout: Number.parseInt(process.env.DB_CONNECTION_TIMEOUT || "30000"),
-        queryTimeout: Number.parseInt(process.env.DB_QUERY_TIMEOUT || "60000"),
-      },
-      auth: {
-        jwtSecret: process.env.JWT_SECRET || "preview-mode-secret-key-not-for-production",
-        jwtExpiresIn: process.env.JWT_EXPIRES_IN || "15m",
-        refreshTokenExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || "7d",
-        maxConcurrentSessions: Number.parseInt(process.env.MAX_CONCURRENT_SESSIONS || "3"),
-        sessionDuration: Number.parseInt(process.env.SESSION_DURATION || "86400000"),
-        rememberMeDuration: Number.parseInt(process.env.REMEMBER_ME_DURATION || "2592000000"),
-      },
-      security: {
-        corsOrigins: process.env.CORS_ORIGINS?.split(",") || ["http://localhost:3000"],
-        rateLimitEnabled: process.env.RATE_LIMIT_ENABLED === "true" && !this.isPreviewMode,
-        encryptionKey: process.env.ENCRYPTION_KEY || process.env.JWT_SECRET || "preview-encryption-key",
-        hashRounds: Number.parseInt(process.env.HASH_ROUNDS || "12"),
-      },
-      upload: {
-        maxFileSize: Number.parseInt(process.env.FILE_UPLOAD_MAX_SIZE || "52428800"),
-        allowedFileTypes: process.env.ALLOWED_FILE_TYPES?.split(",") || [
-          "image/jpeg",
-          "image/png",
-          "image/webp",
-          "video/mp4",
-          "audio/mpeg",
-          "audio/wav",
-        ],
-        storageProvider: (process.env.STORAGE_PROVIDER as "supabase" | "aws" | "cloudinary") || "supabase",
-      },
-      payment: {
-        paystack: {
-          publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "",
-          secretKey: process.env.PAYSTACK_SECRET_KEY || "",
-          webhookSecret: process.env.PAYSTACK_WEBHOOK_SECRET || "",
-        },
-      },
-      monitoring: {
-        enableMetrics: process.env.ENABLE_METRICS === "true" && !this.isPreviewMode,
-        logLevel: (process.env.LOG_LEVEL as "error" | "warn" | "info" | "debug") || "info",
-        auditLogLevel: (process.env.AUDIT_LOG_LEVEL as "minimal" | "standard" | "detailed") || "standard",
-      },
-      features: {
-        enableRegistration: process.env.ENABLE_REGISTRATION !== "false",
-        enablePayments: process.env.ENABLE_PAYMENTS !== "false" && !this.isPreviewMode,
-        enableUploads: process.env.ENABLE_UPLOADS !== "false",
-        enableNotifications: process.env.ENABLE_NOTIFICATIONS !== "false" && !this.isPreviewMode,
-        maintenanceMode: process.env.MAINTENANCE_MODE === "true",
-      },
+    // Validate JWT secret strength
+    const jwtSecret = process.env.JWT_SECRET!
+    if (jwtSecret.length < 32) {
+      throw new Error("JWT_SECRET must be at least 32 characters long")
     }
 
-    if (this.isPreviewMode) {
-      console.log("🔧 Environment running in preview mode with safe defaults")
+    // Validate URLs
+    try {
+      new URL(process.env.SUPABASE_URL!)
+      new URL(process.env.NEXT_PUBLIC_APP_URL!)
+    } catch (error) {
+      throw new Error("Invalid URL format in environment variables")
     }
 
-    return defaults
-  }
-
-  public get<K extends keyof EnvironmentConfig>(key: K): EnvironmentConfig[K] {
-    return this.config[key]
-  }
-
-  public getAll(): EnvironmentConfig {
-    return { ...this.config }
-  }
-
-  public isProduction(): boolean {
-    return this.config.app.environment === "production" && !this.isPreviewMode
-  }
-
-  public isDevelopment(): boolean {
-    return this.config.app.environment === "development" || this.isPreviewMode
-  }
-
-  public isFeatureEnabled(feature: keyof EnvironmentConfig["features"]): boolean {
-    return this.config.features[feature]
-  }
-
-  public validatePaymentConfig(): boolean {
-    if (this.isPreviewMode) return false
-    const { paystack } = this.config.payment
-    return !!(paystack.publicKey && paystack.secretKey)
-  }
-
-  public getConnectionString(): string {
-    return this.config.database.url
-  }
-
-  public getCorsOrigins(): string[] {
-    return this.config.security.corsOrigins
-  }
-
-  public getJWTConfig() {
     return {
-      secret: this.config.auth.jwtSecret,
-      expiresIn: this.config.auth.jwtExpiresIn,
-      refreshExpiresIn: this.config.auth.refreshTokenExpiresIn,
+      supabaseUrl: process.env.SUPABASE_URL!,
+      supabaseAnonKey: process.env.SUPABASE_ANON_KEY!,
+      supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      jwtSecret: process.env.JWT_SECRET!,
+      jwtExpiresIn: process.env.JWT_EXPIRES_IN || "15m",
+      refreshTokenExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || "7d",
+      paystackPublicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY!,
+      paystackSecretKey: process.env.PAYSTACK_SECRET_KEY!,
+      corsOrigins: process.env.CORS_ORIGINS?.split(",") || ["http://localhost:3000"],
+      rateLimitEnabled: process.env.RATE_LIMIT_ENABLED !== "false",
+      auditLogLevel: (process.env.AUDIT_LOG_LEVEL as any) || "medium",
+      fileUploadMaxSize: Number.parseInt(process.env.FILE_UPLOAD_MAX_SIZE || "52428800"), // 50MB
+      allowedFileTypes: process.env.ALLOWED_FILE_TYPES?.split(",") || [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "audio/mpeg",
+        "audio/wav",
+        "audio/ogg",
+        "video/mp4",
+        "video/webm",
+        "video/ogg",
+      ],
+      enableMetrics: process.env.ENABLE_METRICS === "true",
+      logLevel: (process.env.LOG_LEVEL as any) || "info",
     }
   }
 
-  public getRateLimitConfig() {
-    return {
-      enabled: this.config.security.rateLimitEnabled,
-      windowMs: 15 * 60 * 1000,
-      maxRequests: 100,
-    }
+  // Check if running in production
+  isProduction(): boolean {
+    return process.env.NODE_ENV === "production"
   }
 
-  public getUploadConfig() {
+  // Check if running in development
+  isDevelopment(): boolean {
+    return process.env.NODE_ENV === "development"
+  }
+
+  // Get environment-specific configuration
+  getConfig(): EnvironmentConfig & { environment: string } {
+    const config = this.validate()
+
     return {
-      maxFileSize: this.config.upload.maxFileSize,
-      allowedTypes: this.config.upload.allowedFileTypes,
-      provider: this.config.upload.storageProvider,
+      ...config,
+      environment: process.env.NODE_ENV || "development",
     }
   }
 }
 
-export const environment = Environment.getInstance()
-export type { EnvironmentConfig }
+export const environmentValidator = new EnvironmentValidator()
+export const config = environmentValidator.getConfig()
+
+// Runtime configuration checks
+export async function performRuntimeChecks() {
+  const checks = [
+    {
+      name: "Database Connection",
+      check: async () => {
+        try {
+          const { createClient } = await import("@supabase/supabase-js")
+          const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey)
+          const { error } = await supabase.from("users").select("count").limit(1)
+          return !error
+        } catch (error) {
+          console.error("Database connection check failed:", error)
+          return false
+        }
+      },
+    },
+    {
+      name: "JWT Secret Strength",
+      check: async () => config.jwtSecret.length >= 32,
+    },
+    {
+      name: "CORS Configuration",
+      check: async () => config.corsOrigins.length > 0,
+    },
+    {
+      name: "File Upload Limits",
+      check: async () => config.fileUploadMaxSize > 0 && config.allowedFileTypes.length > 0,
+    },
+  ]
+
+  const results = []
+
+  for (const check of checks) {
+    try {
+      const result = await check.check()
+      results.push({
+        name: check.name,
+        status: result ? "PASS" : "FAIL",
+        success: result,
+      })
+    } catch (error) {
+      results.push({
+        name: check.name,
+        status: "ERROR",
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
+    }
+  }
+
+  return results
+}
+
+// Security configuration
+export const securityConfig = {
+  // Rate limiting
+  rateLimit: {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    message: "Too many requests from this IP, please try again later.",
+    standardHeaders: true,
+    legacyHeaders: false,
+  },
+
+  // CORS settings
+  cors: {
+    origin: config.corsOrigins,
+    credentials: true,
+    optionsSuccessStatus: 200,
+  },
+
+  // Security headers
+  headers: {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-XSS-Protection": "1; mode=block",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Content-Security-Policy":
+      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; media-src 'self' https:;",
+  },
+
+  // Session configuration
+  session: {
+    secret: config.jwtSecret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: config.environment === "production",
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: "strict" as const,
+    },
+  },
+}
+
+// Feature flags
+export const featureFlags = {
+  enableRateLimit: config.rateLimitEnabled,
+  enableMetrics: config.enableMetrics,
+  enableAuditLog: true,
+  enableFileUpload: true,
+  enableRealtime: true,
+  enableNotifications: true,
+}
+
+// Database configuration
+export const databaseConfig = {
+  url: config.supabaseUrl,
+  anonKey: config.supabaseAnonKey,
+  serviceRoleKey: config.supabaseServiceRoleKey,
+  options: {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10,
+      },
+    },
+  },
+}
+
+// Payment configuration
+export const paymentConfig = {
+  paystack: {
+    publicKey: config.paystackPublicKey,
+    secretKey: config.paystackSecretKey,
+    currency: "NGN",
+    channels: ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
+  },
+}
+
+// Logging configuration
+export const loggingConfig = {
+  level: config.logLevel,
+  format: config.environment === "production" ? "json" : "simple",
+  auditLevel: config.auditLogLevel,
+  enableConsole: config.environment !== "production",
+  enableFile: config.environment === "production",
+}
+
+// Export all configurations
+export default {
+  config,
+  securityConfig,
+  featureFlags,
+  databaseConfig,
+  paymentConfig,
+  loggingConfig,
+  performRuntimeChecks,
+}

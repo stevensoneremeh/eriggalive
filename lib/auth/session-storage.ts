@@ -3,58 +3,62 @@ interface StoredSession {
   refreshToken: string
   expiresAt: string
   rememberMe: boolean
-  user: any
-  fingerprint?: string
+  user: {
+    id: string
+    email: string
+    username: string
+    fullName: string
+    tier: string
+    coins: number
+    level: number
+    points: number
+    avatarUrl?: string
+  }
 }
 
 export class SessionStorage {
   private static readonly SESSION_KEY = "erigga_session"
-  private static readonly TEMP_SESSION_KEY = "erigga_temp_session"
+  private static readonly REMEMBER_KEY = "erigga_remember"
 
-  static saveSession(session: StoredSession): void {
+  /**
+   * Store session with persistence option
+   */
+  static storeSession(session: StoredSession): void {
     try {
-      const sessionData = {
-        ...session,
-        fingerprint: this.generateFingerprint(),
-        savedAt: new Date().toISOString(),
+      const sessionData = JSON.stringify(session)
+
+      if (session.rememberMe) {
+        // Use localStorage for persistent sessions
+        localStorage.setItem(this.SESSION_KEY, sessionData)
+        localStorage.setItem(this.REMEMBER_KEY, "true")
+      } else {
+        // Use sessionStorage for temporary sessions
+        sessionStorage.setItem(this.SESSION_KEY, sessionData)
+        localStorage.removeItem(this.REMEMBER_KEY)
       }
-
-      const storage = session.rememberMe ? localStorage : sessionStorage
-      storage.setItem(this.SESSION_KEY, JSON.stringify(sessionData))
-
-      // Also save to temporary storage for cross-tab communication
-      sessionStorage.setItem(this.TEMP_SESSION_KEY, JSON.stringify(sessionData))
     } catch (error) {
-      console.error("Failed to save session:", error)
+      console.error("Error storing session:", error)
     }
   }
 
-  static getSession(): StoredSession | null {
+  /**
+   * Retrieve stored session
+   */
+  static getStoredSession(): StoredSession | null {
     try {
-      // Try localStorage first (for remembered sessions)
-      let sessionData = localStorage.getItem(this.SESSION_KEY)
+      // Check if user chose to be remembered
+      const rememberMe = localStorage.getItem(this.REMEMBER_KEY) === "true"
 
-      // If not found, try sessionStorage
+      // Get session from appropriate storage
+      const sessionData = rememberMe ? localStorage.getItem(this.SESSION_KEY) : sessionStorage.getItem(this.SESSION_KEY)
+
       if (!sessionData) {
-        sessionData = sessionStorage.getItem(this.SESSION_KEY)
-      }
-
-      // If still not found, try temporary storage
-      if (!sessionData) {
-        sessionData = sessionStorage.getItem(this.TEMP_SESSION_KEY)
-      }
-
-      if (!sessionData) return null
-
-      const session: StoredSession & { fingerprint?: string; savedAt?: string } = JSON.parse(sessionData)
-
-      // Validate session integrity
-      if (!this.validateSession(session)) {
-        this.clearSession()
         return null
       }
 
-      // Check expiration
+      const session: StoredSession = JSON.parse(sessionData)
+
+      // Check if session is expired
       if (new Date(session.expiresAt) < new Date()) {
         this.clearSession()
         return null
@@ -62,57 +66,45 @@ export class SessionStorage {
 
       return session
     } catch (error) {
-      console.error("Failed to get session:", error)
+      console.error("Error retrieving session:", error)
       this.clearSession()
       return null
     }
   }
 
-  static updateSession(updates: Partial<StoredSession>): void {
-    const currentSession = this.getSession()
-    if (currentSession) {
-      this.saveSession({ ...currentSession, ...updates })
-    }
-  }
-
+  /**
+   * Clear stored session
+   */
   static clearSession(): void {
     try {
       localStorage.removeItem(this.SESSION_KEY)
+      localStorage.removeItem(this.REMEMBER_KEY)
       sessionStorage.removeItem(this.SESSION_KEY)
-      sessionStorage.removeItem(this.TEMP_SESSION_KEY)
     } catch (error) {
-      console.error("Failed to clear session:", error)
+      console.error("Error clearing session:", error)
     }
   }
 
-  static isSessionValid(): boolean {
-    const session = this.getSession()
-    return session !== null
-  }
-
-  private static validateSession(session: any): boolean {
-    const requiredFields = ["sessionToken", "refreshToken", "expiresAt", "user"]
-    return requiredFields.every((field) => session[field] !== undefined)
-  }
-
-  private static generateFingerprint(): string {
-    if (typeof window === "undefined") return "server"
-
-    const components = [
-      navigator.userAgent,
-      navigator.language,
-      screen.width + "x" + screen.height,
-      new Date().getTimezoneOffset(),
-    ]
-
-    let hash = 0
-    const str = components.join("|")
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i)
-      hash = (hash << 5) - hash + char
-      hash = hash & hash // Convert to 32-bit integer
+  /**
+   * Update session expiry
+   */
+  static updateSessionExpiry(expiresAt: string): void {
+    try {
+      const session = this.getStoredSession()
+      if (session) {
+        session.expiresAt = expiresAt
+        this.storeSession(session)
+      }
+    } catch (error) {
+      console.error("Error updating session expiry:", error)
     }
+  }
 
-    return Math.abs(hash).toString(36)
+  /**
+   * Check if session exists and is valid
+   */
+  static hasValidSession(): boolean {
+    const session = this.getStoredSession()
+    return session !== null && new Date(session.expiresAt) > new Date()
   }
 }
