@@ -1,10 +1,20 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
 
-// Define route configurations
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password"]
-const ALWAYS_ACCESSIBLE = ["/api", "/_next", "/favicon.ico", "/images", "/videos", "/fonts", "/manifest.json"]
+// Route configurations
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/terms", "/privacy"]
+const ALWAYS_ACCESSIBLE = [
+  "/api/health",
+  "/api/auth/callback",
+  "/_next",
+  "/favicon.ico",
+  "/images",
+  "/videos",
+  "/fonts",
+  "/manifest.json",
+  "/.well-known",
+]
 const PROTECTED_PATHS = [
   "/dashboard",
   "/community",
@@ -15,13 +25,15 @@ const PROTECTED_PATHS = [
   "/merch",
   "/settings",
   "/admin",
+  "/coins",
 ]
 
-// Rate limiting configuration
+const ADMIN_PATHS = ["/admin"]
 const RATE_LIMITS = {
-  "/api/auth": { requests: 5, window: 60000 }, // 5 requests per minute
-  "/api": { requests: 100, window: 60000 }, // 100 requests per minute
-  default: { requests: 200, window: 60000 }, // 200 requests per minute
+  "/api/auth": { requests: 5, window: 60000 },
+  "/api/coins": { requests: 10, window: 60000 },
+  "/api": { requests: 100, window: 60000 },
+  default: { requests: 200, window: 60000 },
 }
 
 export async function middleware(request: NextRequest) {
@@ -30,129 +42,104 @@ export async function middleware(request: NextRequest) {
 
   try {
     // Skip middleware for static files and always accessible paths
-    if (ALWAYS_ACCESSIBLE.some((path) => pathname.startsWith(path)) || pathname.includes(".")) {
+    if (
+      ALWAYS_ACCESSIBLE.some((path) => pathname.startsWith(path)) ||
+      pathname.includes(".") ||
+      pathname.startsWith("/_next/") ||
+      pathname.startsWith("/api/health")
+    ) {
       return NextResponse.next()
     }
 
     // Create response with security headers
     const response = NextResponse.next()
 
-    // Add security headers
+    // Production security headers
     response.headers.set("X-Content-Type-Options", "nosniff")
     response.headers.set("X-Frame-Options", "DENY")
     response.headers.set("X-XSS-Protection", "1; mode=block")
     response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 
-    // Add performance headers
+    // CORS headers for API routes
+    if (pathname.startsWith("/api/")) {
+      response.headers.set("Access-Control-Allow-Origin", process.env.NEXT_PUBLIC_APP_URL || "*")
+      response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+      response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+    }
+
+    // Performance headers
     response.headers.set("Server-Timing", `middleware;dur=${Date.now() - startTime}`)
 
-    // Handle API routes with rate limiting
-    if (pathname.startsWith("/api")) {
+    // Handle API routes with enhanced rate limiting
+    if (pathname.startsWith("/api/")) {
+      const rateLimitResult = await handleRateLimit(request, pathname)
+      if (rateLimitResult) return rateLimitResult
+
+      // Add rate limit headers to response
       const rateLimitKey = Object.keys(RATE_LIMITS).find((key) => pathname.startsWith(key)) || "default"
       const limit = RATE_LIMITS[rateLimitKey as keyof typeof RATE_LIMITS]
-
-      // Simple in-memory rate limiting (use Redis in production)
-      const clientIP = getClientIP(request)
-      const key = `${rateLimitKey}:${clientIP}`
-
-      // Add rate limit headers
       response.headers.set("X-RateLimit-Limit", limit.requests.toString())
-      response.headers.set("X-RateLimit-Window", limit.window.toString())
+      response.headers.set("X-RateLimit-Window", (limit.window / 1000).toString())
 
       return response
     }
 
     // Check if path is public
     const isPublicPath = PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
-
-    // Check if path requires authentication
     const requiresAuth = PROTECTED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+    const requiresAdmin = ADMIN_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
 
-    // If public path, allow access
+    // Allow access to public paths
     if (isPublicPath && !requiresAuth) {
       return response
     }
 
-    // For protected routes, check authentication
+    // Handle authentication for protected routes
     if (requiresAuth) {
-      try {
-        const supabase = createClient()
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession()
+      const authResult = await handleAuthentication(request)
 
-        if (error || !session) {
-          // Redirect to login with return URL
-          const redirectUrl = new URL("/login", request.url)
-          redirectUrl.searchParams.set("redirect", pathname)
-
-          const redirectResponse = NextResponse.redirect(redirectUrl)
-
-          // Set cookie for post-login redirect
-          redirectResponse.cookies.set("redirect_after_login", pathname, {
-            path: "/",
-            maxAge: 300, // 5 minutes
-            httpOnly: true,
-            sameSite: "lax",
-            secure: process.env.NODE_ENV === "production",
-          })
-
-          return redirectResponse
-        }
-
-        // Check if user profile exists and is active
-        const { data: profile, error: profileError } = await supabase
-          .from("users")
-          .select("is_active, is_banned")
-          .eq("auth_user_id", session.user.id)
-          .single()
-
-        if (profileError || !profile) {
-          console.error("Profile fetch error:", profileError)
-          return NextResponse.redirect(new URL("/login?error=profile_not_found", request.url))
-        }
-
-        if (!profile.is_active || profile.is_banned) {
-          await supabase.auth.signOut()
-          return NextResponse.redirect(new URL("/login?error=account_inactive", request.url))
-        }
-
-        // Add user context to response headers (for debugging)
-        response.headers.set("X-User-ID", session.user.id)
-        response.headers.set("X-Auth-Status", "authenticated")
-
-        return response
-      } catch (authError) {
-        console.error("Authentication error in middleware:", authError)
-
-        // On auth error, redirect to login
+      if (!authResult.success) {
         const redirectUrl = new URL("/login", request.url)
-        redirectUrl.searchParams.set("error", "auth_error")
         redirectUrl.searchParams.set("redirect", pathname)
+        if (authResult.error) {
+          redirectUrl.searchParams.set("error", authResult.error)
+        }
 
-        return NextResponse.redirect(redirectUrl)
+        const redirectResponse = NextResponse.redirect(redirectUrl)
+        redirectResponse.cookies.set("redirect_after_login", pathname, {
+          path: "/",
+          maxAge: 300,
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+        })
+
+        return redirectResponse
       }
+
+      // Check admin access
+      if (requiresAdmin && authResult.user?.tier !== "admin") {
+        return NextResponse.redirect(new URL("/dashboard?error=access_denied", request.url))
+      }
+
+      // Add user context to response headers
+      response.headers.set("X-User-ID", authResult.user?.id || "")
+      response.headers.set("X-User-Tier", authResult.user?.tier || "")
+      response.headers.set("X-Auth-Status", "authenticated")
+
+      return response
     }
 
-    // If already authenticated and trying to access auth pages
+    // Redirect authenticated users away from auth pages
     if (isPublicPath && (pathname === "/login" || pathname === "/signup")) {
-      try {
-        const supabase = createClient()
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
+      const authResult = await handleAuthentication(request)
 
-        if (session) {
-          // Check for redirect parameter
-          const redirectParam = request.nextUrl.searchParams.get("redirect")
-          const redirectUrl = redirectParam || "/dashboard"
-          return NextResponse.redirect(new URL(redirectUrl, request.url))
-        }
-      } catch (error) {
-        // If there's an error checking auth, allow access to login/signup
-        console.error("Auth check error:", error)
+      if (authResult.success) {
+        const redirectParam = request.nextUrl.searchParams.get("redirect")
+        const redirectUrl = redirectParam || "/dashboard"
+        return NextResponse.redirect(new URL(redirectUrl, request.url))
       }
     }
 
@@ -160,8 +147,12 @@ export async function middleware(request: NextRequest) {
   } catch (error) {
     console.error("Middleware error:", error)
 
-    // On critical error, allow the request to proceed
-    // but log the error for monitoring
+    // Return error response for API routes
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    }
+
+    // For other routes, allow request to proceed but log error
     const response = NextResponse.next()
     response.headers.set("X-Middleware-Error", "true")
     response.headers.set("X-Error-Time", Date.now().toString())
@@ -170,14 +161,154 @@ export async function middleware(request: NextRequest) {
   }
 }
 
+async function handleAuthentication(request: NextRequest): Promise<{
+  success: boolean
+  user?: any
+  error?: string
+}> {
+  try {
+    // Validate environment variables
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error("Missing Supabase configuration")
+    }
+
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+
+    // Get session from Authorization header or cookies
+    const authHeader = request.headers.get("authorization")
+    const sessionToken = authHeader?.replace("Bearer ", "") || request.cookies.get("session_token")?.value
+
+    if (!sessionToken) {
+      return { success: false, error: "no_session" }
+    }
+
+    // Validate session in database
+    const { data: sessionData, error: sessionError } = await supabase
+      .from("user_sessions")
+      .select(`
+        *,
+        users (*)
+      `)
+      .eq("session_token", sessionToken)
+      .eq("is_active", true)
+      .single()
+
+    if (sessionError || !sessionData) {
+      return { success: false, error: "invalid_session" }
+    }
+
+    // Check session expiration
+    if (new Date(sessionData.expires_at) < new Date()) {
+      // Deactivate expired session
+      await supabase
+        .from("user_sessions")
+        .update({ is_active: false, deactivated_at: new Date().toISOString() })
+        .eq("session_token", sessionToken)
+
+      return { success: false, error: "session_expired" }
+    }
+
+    const user = sessionData.users as any
+
+    // Check user status
+    if (!user.is_active || user.is_banned) {
+      return { success: false, error: "account_inactive" }
+    }
+
+    // Update session activity
+    await supabase
+      .from("user_sessions")
+      .update({ last_activity: new Date().toISOString() })
+      .eq("session_token", sessionToken)
+
+    return {
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        tier: user.tier,
+        isActive: user.is_active,
+      },
+    }
+  } catch (error) {
+    console.error("Authentication error:", error)
+    return { success: false, error: "auth_error" }
+  }
+}
+
+async function handleRateLimit(request: NextRequest, pathname: string): Promise<NextResponse | null> {
+  try {
+    const clientIP = getClientIP(request)
+    const rateLimitKey = Object.keys(RATE_LIMITS).find((key) => pathname.startsWith(key)) || "default"
+    const limit = RATE_LIMITS[rateLimitKey as keyof typeof RATE_LIMITS]
+
+    // In production, this would use Redis
+    // For now, we'll implement a simple in-memory rate limiter
+    const key = `${rateLimitKey}:${clientIP}`
+    const now = Date.now()
+
+    // This is a simplified implementation
+    // In production, use Redis with sliding window or token bucket algorithm
+    const requests = await getRateLimitCount(key, now, limit.window)
+
+    if (requests >= limit.requests) {
+      return NextResponse.json(
+        {
+          error: "Rate limit exceeded",
+          message: "Too many requests. Please try again later.",
+          retryAfter: Math.ceil(limit.window / 1000),
+        },
+        {
+          status: 429,
+          headers: {
+            "X-RateLimit-Limit": limit.requests.toString(),
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": new Date(now + limit.window).toISOString(),
+            "Retry-After": Math.ceil(limit.window / 1000).toString(),
+          },
+        },
+      )
+    }
+
+    // Record this request
+    await recordRateLimitRequest(key, now)
+
+    return null // Continue processing
+  } catch (error) {
+    console.error("Rate limit error:", error)
+    return null // Allow request on error
+  }
+}
+
+// Simplified rate limiting functions (use Redis in production)
+const rateLimitStore = new Map<string, number[]>()
+
+async function getRateLimitCount(key: string, now: number, window: number): Promise<number> {
+  const requests = rateLimitStore.get(key) || []
+  const validRequests = requests.filter((timestamp) => now - timestamp < window)
+  rateLimitStore.set(key, validRequests)
+  return validRequests.length
+}
+
+async function recordRateLimitRequest(key: string, timestamp: number): Promise<void> {
+  const requests = rateLimitStore.get(key) || []
+  requests.push(timestamp)
+  rateLimitStore.set(key, requests)
+}
+
 function getClientIP(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for")
   const realIp = request.headers.get("x-real-ip")
   const cfConnectingIp = request.headers.get("cf-connecting-ip")
 
-  return forwarded?.split(",")[0]?.trim() || realIp || cfConnectingIp || "unknown"
+  return forwarded?.split(",")[0]?.trim() || realIp || cfConnectingIp || request.ip || "unknown"
 }
 
 export const config = {
-  matcher: ["/((?!api/|_next/|_static/|_vercel|[\\w-]+\\.\\w+).*)", "/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/api/(.*)",
+    "/((?!api/health).*)",
+  ],
 }

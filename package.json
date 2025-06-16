@@ -64,7 +64,7 @@
     "uuid": "latest",
     "validator": "latest",
     "vaul": "latest",
-    "zod": "^3.24.1"
+    "zod": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
