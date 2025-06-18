@@ -17,7 +17,6 @@ import {
   Users,
   BookOpen,
   Music,
-  Coins,
   Ticket,
   Crown,
   ShoppingBag,
@@ -48,11 +47,12 @@ interface SidebarItem {
   category?: "main" | "secondary" | "settings"
 }
 
+// Updated sidebarItems: "Coins" item is removed.
 const sidebarItems: SidebarItem[] = [
   {
     name: "Dashboard",
     href: "/dashboard",
-    icon: Home,
+    icon: Home, // Main dashboard uses Home icon
     description: "Overview and stats",
     category: "main",
   },
@@ -78,13 +78,13 @@ const sidebarItems: SidebarItem[] = [
     description: "Exclusive content",
     category: "main",
   },
-  {
-    name: "Coins",
-    href: "/coins",
-    icon: Coins,
-    description: "Manage your coins",
-    category: "secondary",
-  },
+  // { // REMOVED this item
+  //   name: "Coins",
+  //   href: "/coins",
+  //   icon: Coins,
+  //   description: "Manage your coins",
+  //   category: "secondary",
+  // },
   {
     name: "Tickets",
     href: "/tickets",
@@ -182,7 +182,7 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
 
   const isActive = (href: string) => {
     if (href === "/dashboard") {
-      return pathname === "/dashboard"
+      return pathname === "/dashboard" || pathname?.startsWith("/dashboard/")
     }
     return pathname?.startsWith(href)
   }
@@ -395,16 +395,18 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
             </div>
 
             {/* Secondary Navigation */}
-            <div className="space-y-1">
-              {!isCollapsed && (
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">
-                  Services
-                </p>
-              )}
-              {secondaryItems.map((item) => (
-                <NavigationItem key={item.name} item={item} isCollapsed={isCollapsed} />
-              ))}
-            </div>
+            {secondaryItems.length > 0 && (
+              <div className="space-y-1">
+                {!isCollapsed && (
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">
+                    Services
+                  </p>
+                )}
+                {secondaryItems.map((item) => (
+                  <NavigationItem key={item.name} item={item} isCollapsed={isCollapsed} />
+                ))}
+              </div>
+            )}
 
             {/* Settings */}
             <div className="space-y-1">
@@ -429,6 +431,8 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
             <div className="space-y-2">
               <Button variant="outline" size="sm" className="w-full justify-start" asChild>
                 <Link href="/profile">
+                  {" "}
+                  {/* Assuming /profile exists or will be created */}
                   <User className="h-4 w-4 mr-2" />
                   Profile
                 </Link>
@@ -546,23 +550,27 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
           {/* Mobile Bottom Navigation */}
           <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-sm border-t">
             <div className="flex items-center justify-around py-2 px-4">
-              {sidebarItems.slice(0, 4).map((item) => {
-                const Icon = item.icon
-                const active = isActive(item.href)
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className={cn(
-                      "flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors",
-                      active ? "text-primary bg-primary/10" : "text-muted-foreground",
-                    )}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span className="text-xs font-medium">{item.name}</span>
-                  </Link>
-                )
-              })}
+              {sidebarItems
+                .filter((item) => item.category === "main")
+                .slice(0, 4)
+                .map((item) => {
+                  // Show first 4 main items
+                  const Icon = item.icon
+                  const active = isActive(item.href)
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={cn(
+                        "flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors",
+                        active ? "text-primary bg-primary/10" : "text-muted-foreground",
+                      )}
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span className="text-xs font-medium">{item.name}</span>
+                    </Link>
+                  )
+                })}
               <Button
                 variant="ghost"
                 size="sm"
@@ -582,7 +590,7 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
         <main
           className={cn(
             "flex-1 overflow-y-auto transition-all duration-300",
-            screenSize === "mobile" ? "pb-20" : "p-4 lg:p-6",
+            screenSize === "mobile" ? "pb-20" : "p-4 lg:p-6", // Added padding-bottom for mobile to avoid overlap with bottom nav
           )}
         >
           {children}

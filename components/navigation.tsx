@@ -19,7 +19,7 @@ import {
   BookOpen,
   Users,
   Crown,
-  Coins,
+  LayoutDashboard,
   Sun,
   Moon,
   Monitor,
@@ -63,7 +63,8 @@ export function Navigation() {
     { name: "Community", href: "/community", icon: <Users className="h-5 w-5" /> },
     { name: "Chronicles", href: "/chronicles", icon: <BookOpen className="h-5 w-5" /> },
     { name: "Media Vault", href: "/vault", icon: <Music className="h-5 w-5" /> },
-    { name: "Coins", href: "/coins", icon: <Coins className="h-5 w-5" /> },
+    // Changed "Coins" to "Dashboard"
+    { name: "Dashboard", href: "/dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
     { name: "Tickets", href: "/tickets", icon: <Ticket className="h-5 w-5" /> },
     { name: "Premium", href: "/premium", icon: <Crown className="h-5 w-5" /> },
     { name: "Merch", href: "/merch", icon: <ShoppingBag className="h-5 w-5" /> },
@@ -72,6 +73,10 @@ export function Navigation() {
   const isActive = (path: string) => {
     if (path === "/") {
       return pathname === "/"
+    }
+    // For dashboard, ensure it's active if path starts with /dashboard
+    if (path === "/dashboard") {
+      return pathname === "/dashboard" || pathname?.startsWith("/dashboard/")
     }
     return pathname?.startsWith(path)
   }
@@ -173,6 +178,11 @@ export function Navigation() {
                       <CoinBalance coins={profile.coins} size="sm" />
                       <UserTierBadge tier={profile.tier} />
                     </div>
+                    {/* This explicit Dashboard button might be redundant now, 
+                        but keeping it as it's styled differently and includes User icon.
+                        It could be a "My Account" or "Profile" button in the future.
+                        For now, it also points to /dashboard.
+                    */}
                     <Link href="/dashboard">
                       <Button variant="outline" size="sm" className="hidden md:flex">
                         <User className="h-4 w-4 mr-2" />
@@ -311,10 +321,14 @@ export function Navigation() {
                             Dashboard
                           </Button>
                         </Link>
+                        {/* The "Buy Coins" button can remain if it's a quick action, 
+                            or be removed if coin management is solely within /coins page accessed from dashboard.
+                            Given the main /coins page exists, this quick link might be useful.
+                        */}
                         <Link href="/coins" onClick={() => setIsMobileMenuOpen(false)}>
                           <Button variant="outline" className="w-full justify-start">
                             <CreditCard className="h-4 w-4 mr-2" />
-                            Buy Coins
+                            Manage Coins
                           </Button>
                         </Link>
                         <Button
