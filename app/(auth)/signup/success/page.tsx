@@ -1,21 +1,21 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useEffect, useState, Suspense } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Check, Coins, Gift, ArrowRight } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 
-export default function SignupSuccessPage() {
+// Component that uses useSearchParams - wrapped in Suspense
+function SignupSuccessContent() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { profile, isAuthenticated } = useAuth()
   const [countdown, setCountdown] = useState(5)
 
-  // Get user details from URL params or auth context
-  const username = searchParams.get("username") || profile?.username || "Fan"
-  const fullName = searchParams.get("fullName") || profile?.full_name || "New Fan"
+  // We'll get user details from auth context instead of search params to avoid SSR issues
+  const username = profile?.username || "Fan"
+  const fullName = profile?.full_name || "New Fan"
 
   // Redirect countdown
   useEffect(() => {
@@ -162,5 +162,33 @@ export default function SignupSuccessPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+// Loading fallback component
+function SignupSuccessLoading() {
+  return (
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <Card className="max-w-2xl w-full">
+        <CardContent className="p-12 text-center">
+          <div className="w-32 h-32 bg-muted animate-pulse rounded-full mx-auto mb-8"></div>
+          <div className="h-8 bg-muted animate-pulse rounded mb-4"></div>
+          <div className="h-4 bg-muted animate-pulse rounded mb-8 max-w-md mx-auto"></div>
+          <div className="grid md:grid-cols-2 gap-6 mb-8">
+            <div className="h-32 bg-muted animate-pulse rounded-xl"></div>
+            <div className="h-32 bg-muted animate-pulse rounded-xl"></div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// Main component with Suspense boundary
+export default function SignupSuccessPage() {
+  return (
+    <Suspense fallback={<SignupSuccessLoading />}>
+      <SignupSuccessContent />
+    </Suspense>
   )
 }
