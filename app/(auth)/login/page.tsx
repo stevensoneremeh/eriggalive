@@ -1,9 +1,8 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,11 +13,24 @@ import { Loader2, AlertCircle, CheckCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { getRedirectPath, ROUTES } from "@/lib/navigation-utils"
 
-interface LoginPageProps {
-  searchParams: { [key: string]: string | string[] | undefined }
+// Loading skeleton for the login page
+function LoginPageSkeleton() {
+  return (
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-md border-lime-500/20">
+        <CardContent className="flex items-center justify-center p-8">
+          <div className="flex flex-col items-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin text-lime-500" />
+            <p className="text-sm text-muted-foreground">Loading...</p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 
-export default function LoginPage({ searchParams }: LoginPageProps) {
+// Main login content component
+function LoginPageContent() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -27,14 +39,13 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
   const [redirectPath, setRedirectPath] = useState(ROUTES.DASHBOARD)
 
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { signIn, isAuthenticated, isLoading, isInitialized } = useAuth()
 
   // Set redirect path after component mounts to avoid SSR issues
   useEffect(() => {
-    // Use window.location.search to avoid Next.js searchParams access issues
-    const urlSearchParams = new URLSearchParams(window.location.search)
-    setRedirectPath(getRedirectPath(urlSearchParams))
-  }, [])
+    setRedirectPath(getRedirectPath(searchParams))
+  }, [searchParams])
 
   // Handle already authenticated users
   useEffect(() => {
@@ -52,18 +63,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
 
   // Show loading state during initialization
   if (!isInitialized || isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <Card className="w-full max-w-md border-lime-500/20">
-          <CardContent className="flex items-center justify-center p-8">
-            <div className="flex flex-col items-center space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin text-lime-500" />
-              <p className="text-sm text-muted-foreground">Loading...</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
+    return <LoginPageSkeleton />
   }
 
   // Show success state for already authenticated users
@@ -219,5 +219,14 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
         </CardFooter>
       </Card>
     </div>
+  )
+}
+
+// Main login page component with Suspense boundary
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginPageSkeleton />}>
+      <LoginPageContent />
+    </Suspense>
   )
 }
