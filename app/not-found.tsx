@@ -1,26 +1,9 @@
-"use client"
-
-import { Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Home, ArrowLeft } from "lucide-react"
 
-// Loading component for Suspense fallback
-function NotFoundSkeleton() {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen px-4 text-center">
-      <div className="animate-pulse">
-        <div className="h-16 w-32 bg-muted rounded mb-4"></div>
-        <div className="h-8 w-48 bg-muted rounded mb-2"></div>
-        <div className="h-4 w-64 bg-muted rounded mb-8"></div>
-        <div className="h-10 w-32 bg-muted rounded"></div>
-      </div>
-    </div>
-  )
-}
-
-// Main not found content
-function NotFoundContent() {
+// Static 404 page - no client-side hooks
+export default function NotFound() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-4 text-center space-y-6">
       <div className="space-y-4">
@@ -37,9 +20,11 @@ function NotFoundContent() {
           </Link>
         </Button>
 
-        <Button variant="outline" onClick={() => window.history.back()} className="flex items-center gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Go Back
+        <Button asChild variant="outline" className="flex items-center gap-2">
+          <Link href="/dashboard">
+            <ArrowLeft className="h-4 w-4" />
+            Go to Dashboard
+          </Link>
         </Button>
       </div>
 
@@ -47,13 +32,5 @@ function NotFoundContent() {
         <p>If you believe this is an error, please contact support.</p>
       </div>
     </div>
-  )
-}
-
-export default function NotFound() {
-  return (
-    <Suspense fallback={<NotFoundSkeleton />}>
-      <NotFoundContent />
-    </Suspense>
   )
 }

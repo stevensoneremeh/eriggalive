@@ -29,8 +29,8 @@ function LoginPageSkeleton() {
   )
 }
 
-// Main login content component
-function LoginPageContent() {
+// Component that uses useSearchParams - wrapped in its own Suspense
+function LoginFormWithSearchParams() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -42,7 +42,7 @@ function LoginPageContent() {
   const searchParams = useSearchParams()
   const { signIn, isAuthenticated, isLoading, isInitialized } = useAuth()
 
-  // Set redirect path after component mounts to avoid SSR issues
+  // Set redirect path after component mounts
   useEffect(() => {
     setRedirectPath(getRedirectPath(searchParams))
   }, [searchParams])
@@ -50,13 +50,10 @@ function LoginPageContent() {
   // Handle already authenticated users
   useEffect(() => {
     if (isInitialized && isAuthenticated) {
-      // Show success message briefly before redirecting
       setShowSuccess(true)
-
       const timer = setTimeout(() => {
         router.replace(redirectPath)
       }, 1000)
-
       return () => clearTimeout(timer)
     }
   }, [isAuthenticated, isInitialized, router, redirectPath])
@@ -88,13 +85,11 @@ function LoginPageContent() {
     setIsSubmitting(true)
 
     try {
-      // Basic validation
       if (!email?.trim() || !password?.trim()) {
         setError("Please enter both email and password")
         return
       }
 
-      // Validate email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (!emailRegex.test(email.trim())) {
         setError("Please enter a valid email address")
@@ -104,7 +99,6 @@ function LoginPageContent() {
       const result = await signIn(email.trim(), password)
 
       if (result.success) {
-        // Success is handled by the auth context and useEffect above
         setShowSuccess(true)
       } else {
         setError(result.error || "Failed to sign in. Please check your credentials.")
@@ -222,11 +216,11 @@ function LoginPageContent() {
   )
 }
 
-// Main login page component with Suspense boundary
+// Main login page component with double Suspense boundary
 export default function LoginPage() {
   return (
     <Suspense fallback={<LoginPageSkeleton />}>
-      <LoginPageContent />
+      <LoginFormWithSearchParams />
     </Suspense>
   )
 }

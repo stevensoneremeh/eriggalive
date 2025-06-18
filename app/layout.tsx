@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import { Suspense } from "react"
 import "./globals.css"
 import { Navigation } from "@/components/navigation"
 import { AuthProvider } from "@/contexts/auth-context"
@@ -18,6 +19,25 @@ export const metadata: Metadata = {
   generator: "v0.dev",
 }
 
+// Navigation loading fallback
+function NavigationSkeleton() {
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur shadow-md">
+      <div className="container mx-auto px-4">
+        <div className="flex h-16 items-center justify-between">
+          <div className="h-8 w-32 bg-muted animate-pulse rounded" />
+          <div className="hidden lg:flex items-center space-x-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-4 w-16 bg-muted animate-pulse rounded" />
+            ))}
+          </div>
+          <div className="h-8 w-24 bg-muted animate-pulse rounded" />
+        </div>
+      </div>
+    </header>
+  )
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -31,7 +51,9 @@ export default function RootLayout({
             <AuthProvider>
               <SessionRefresh />
               <div className="min-h-screen flex flex-col">
-                <Navigation />
+                <Suspense fallback={<NavigationSkeleton />}>
+                  <Navigation />
+                </Suspense>
                 <main className="flex-1 pt-16">{children}</main>
               </div>
               <footer className="border-t bg-background/95 backdrop-blur">
