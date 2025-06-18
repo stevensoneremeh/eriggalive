@@ -231,7 +231,7 @@ export async function createCommentAction(postId: number, content: string, paren
       content: sanitizedContent,
       parent_comment_id: parentCommentId || null,
     })
-    .select(`*, user:users!inner (id, auth_user_id, username, full_name, avatar_url, tier)`)
+    .select(`*, user:users!inner(id, auth_user_id, username, full_name, avatar_url, tier)`)
     .single()
 
   if (error) return { success: false, error: error.message }
@@ -261,7 +261,7 @@ export async function editCommentAction(commentId: number, content: string) {
     .update({ content: sanitizedContent, is_edited: true, updated_at: new Date().toISOString() })
     .eq("id", commentId)
     .eq("user_id", userProfile.id)
-    .select(`*, user:users!inner (id, auth_user_id, username, full_name, avatar_url, tier)`)
+    .select(`*, user:users!inner(id, auth_user_id, username, full_name, avatar_url, tier)`)
     .single()
 
   if (error) return { success: false, error: error.message }
@@ -379,9 +379,9 @@ export async function fetchCommunityPosts(
     .from("community_posts")
     .select(`
       *,
-      user:users!inner (id, auth_user_id, username, full_name, avatar_url, tier), /* More direct join */
-      category:community_categories!inner (id, name, slug),
-      votes:community_post_votes (user_id)
+      user:users!inner(id, auth_user_id, username, full_name, avatar_url, tier),
+      category:community_categories!inner(id, name, slug),
+      votes:community_post_votes(user_id)
     `)
     .eq("is_published", true)
     .eq("is_deleted", false)
@@ -425,7 +425,7 @@ export async function fetchCommentsForPost(postId: number, userId?: string) {
     .from("community_comments")
     .select(`
       *,
-      user:users!inner (id, auth_user_id, username, full_name, avatar_url, tier), /* More direct join */
+      user:users!inner(id, auth_user_id, username, full_name, avatar_url, tier),
       likes:community_comment_likes(user_id)
     `)
     .eq("post_id", postId)
@@ -445,7 +445,7 @@ export async function fetchCommentsForPost(postId: number, userId?: string) {
         .from("community_comments")
         .select(`
           *,
-          user:users!inner (id, auth_user_id, username, full_name, avatar_url, tier), /* More direct join */
+          user:users!inner(id, auth_user_id, username, full_name, avatar_url, tier),
           likes:community_comment_likes(user_id)
         `)
         .eq("post_id", postId) // ensure replies are for the same post
