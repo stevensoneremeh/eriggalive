@@ -16,6 +16,7 @@ import type { CommunityPost } from "@/types/database"
 import { VoteButton } from "./vote-button"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/components/ui/use-toast"
+import DOMPurify from "dompurify"
 
 interface PostCardProps {
   post: CommunityPost
@@ -69,6 +70,7 @@ export function PostCard({ post, currentUserId }: PostCardProps) {
   const [optimisticVoteCount, setOptimisticVoteCount] = useState(post.vote_count)
   const [hasVotedOptimistic, setHasVotedOptimistic] = useState(post.has_voted || false)
   const [isVoting, startVoteTransition] = useTransition()
+  const [showComments, setShowComments] = useState(false)
 
   const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true })
 
@@ -77,25 +79,28 @@ export function PostCard({ post, currentUserId }: PostCardProps) {
     toast({ title: "Reported", description: "This post has been reported for review." })
   }
 
-  const renderContentWithMentions = (text: string, mentionsData?: CommunityPost["mentions"]) => {
-    if (!mentionsData || mentionsData.length === 0) {
-      return <p className="whitespace-pre-wrap text-sm sm:text-base">{text}</p>
-    }
-    // This is a simplified display. react-mentions is primarily for input.
-    // For display, you'd typically parse and replace.
-    // A simple approach:
-    let contentWithLinks = text
-    mentionsData.forEach((mention) => {
-      // This regex is basic, might need refinement for edge cases
-      const mentionRegex = new RegExp(`@${mention.username}\\b`, "g")
-      contentWithLinks = contentWithLinks.replace(
-        mentionRegex,
-        `<a href="/profile/${mention.username}" class="text-primary hover:underline font-medium">@${mention.username}</a>`,
+  // Remove or comment out the old renderContentWithMentions function.
+  // Add this new function:
+  const renderRichContent = (htmlContent: string) => {
+    if (typeof window === "undefined") {
+      // DOMPurify only runs in browser
+      // For SSR, you might return a simplified version or a placeholder
+      // Or, if content is pre-sanitized on server, this check might not be needed.
+      // However, it's safer to sanitize before rendering.
+      // This basic SSR handling just returns the raw HTML, assuming it's safe or will be hydrated.
+      return (
+        <div
+          className="prose prose-sm sm:prose-base dark:prose-invert max-w-none"
+          dangerouslySetInnerHTML={{ __html: htmlContent }}
+        />
       )
-    })
-
+    }
+    const cleanHtml = DOMPurify.sanitize(htmlContent)
     return (
-      <p className="whitespace-pre-wrap text-sm sm:text-base" dangerouslySetInnerHTML={{ __html: contentWithLinks }} />
+      <div
+        className="prose prose-sm sm:prose-base dark:prose-invert max-w-none"
+        dangerouslySetInnerHTML={{ __html: cleanHtml }}
+      />
     )
   }
 
@@ -120,9 +125,11 @@ export function PostCard({ post, currentUserId }: PostCardProps) {
                 {post.user?.tier && <UserTierBadge tier={post.user.tier} size="xs" />}
               </div>
               <p className="text-xs text-muted-foreground">
-                {timeAgo}{" "}
+                {timeAgo}
+                {post.is_edited && <span title={new Date(post.updated_at).toLocaleString()}> (edited)</span>}
                 {post.category && (
                   <>
+                    {" "}
                     in{" "}
                     <Link href={`/community?category=${post.category.slug}`} className="hover:underline text-primary">
                       {post.category.name}
@@ -166,7 +173,7 @@ export function PostCard({ post, currentUserId }: PostCardProps) {
       </CardHeader>
 
       <CardContent className="px-4 pb-3 space-y-3">
-        {renderContentWithMentions(post.content, post.mentions)}
+        {renderRichContent(post.content)}
 
         {post.media_url && post.media_type && (
           <div className="mt-3 rounded-lg overflow-hidden border">
@@ -197,7 +204,12 @@ export function PostCard({ post, currentUserId }: PostCardProps) {
               setHasVotedOptimistic(newHasVoted)
             }}
           />
-          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-primary"
+            onClick={() => setShowComments(!showComments)} // Toggle comments
+          >
             <MessageSquare className="mr-1.5 h-4 w-4" />
             {post.comment_count || 0}
           </Button>
@@ -212,6 +224,14 @@ export function PostCard({ post, currentUserId }: PostCardProps) {
           </div>
         )}
       </CardFooter>
+
+      {showComments && (
+        <div className="p-4 border-t">
+          {/* Placeholder for CommentSection component */}
+          <p className="text-sm text-muted-foreground">Comment section coming soon...</p>
+          {/* <CommentSection postId={post.id} currentUserId={currentUserId} /> */}
+        </div>
+      )}
     </Card>
   )
 }
@@ -231,6 +251,7 @@ export function PostCardSkeleton() {
       <CardContent className="px-4 pb-3 space-y-2">
         <div className="h-4 w-full bg-muted rounded animate-pulse"></div>
         <div className="h-4 w-5/6 bg-muted rounded animate-pulse"></div>
+        <div className="h-4 w-4/6 bg-muted rounded animate-pulse"></div>
         <div className="h-40 w-full bg-muted rounded-lg animate-pulse mt-3"></div>
       </CardContent>
       <CardFooter className="p-4 flex items-center justify-between border-t bg-muted/30">

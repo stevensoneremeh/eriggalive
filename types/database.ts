@@ -456,7 +456,7 @@ export interface UserSettings {
   updated_at: string
 }
 
-// New Community Types
+// New Community Types (from previous, ensure CommunityPost.content is string for HTML)
 export interface CommunityCategory {
   id: number
   name: string
@@ -469,23 +469,25 @@ export interface CommunityPost {
   id: number
   user_id: string // UUID from auth.users
   category_id: number
-  content: string
+  content: string // HTML content from rich text editor
   media_url?: string
   media_type?: "image" | "audio" | "video"
-  media_metadata?: Record<string, any> // e.g., { width, height } for images, { duration } for audio/video
+  media_metadata?: Record<string, any>
   vote_count: number
   comment_count: number
   tags?: string[]
-  mentions?: { user_id: string; username: string; position: number }[]
+  mentions?: { user_id: string; username: string; position: number }[] // Or a simpler structure if not using position
   is_published: boolean
+  is_edited: boolean
   is_deleted: boolean
   deleted_at?: string
   created_at: string
   updated_at: string
   // Joined data
-  user?: Pick<User, "id" | "username" | "full_name" | "avatar_url" | "tier"> // Assuming User type exists
+  user?: Pick<User, "id" | "auth_user_id" | "username" | "full_name" | "avatar_url" | "tier"> // Ensure User has auth_user_id if it's different from id
   category?: Pick<CommunityCategory, "id" | "name" | "slug">
-  has_voted?: boolean // Client-side enrichment: has the current user voted?
+  has_voted?: boolean // Client-side enrichment
+  comments?: CommunityComment[] // For eager loading comments if needed
 }
 
 export interface CommunityPostVote {
@@ -494,13 +496,56 @@ export interface CommunityPostVote {
   created_at: string
 }
 
-// Database response types
+// NEW Community Comment Types
+export interface CommunityComment {
+  id: number
+  post_id: number
+  user_id: string // UUID from auth.users
+  parent_comment_id?: number | null
+  content: string // Can be HTML if comments also use rich text
+  like_count: number
+  reply_count: number
+  is_edited: boolean
+  is_deleted: boolean
+  deleted_at?: string
+  created_at: string
+  updated_at: string
+  // Joined data
+  user?: Pick<User, "id" | "auth_user_id" | "username" | "full_name" | "avatar_url" | "tier">
+  replies?: CommunityComment[] // For nested replies
+  has_liked?: boolean // Client-side enrichment
+}
+
+export interface CommunityCommentLike {
+  comment_id: number
+  user_id: string // UUID from auth.users
+  created_at: string
+}
+
+// NEW Community Report Types
+export type ReportReason = "spam" | "harassment" | "hate_speech" | "misinformation" | "inappropriate_content" | "other"
+export type ReportTargetType = "post" | "comment"
+
+export interface CommunityReport {
+  id: number
+  reporter_user_id: string // UUID
+  target_id: number // Post or Comment ID
+  target_type: ReportTargetType
+  reason: ReportReason
+  additional_notes?: string
+  is_resolved: boolean
+  resolved_by?: string // UUID of admin/mod
+  resolved_at?: string
+  created_at: string
+}
+
+// Update Database interface
 export interface Database {
   public: {
     Tables: {
+      // ... (all existing tables: users, albums, tracks, etc.)
       users: {
-        // Ensure this matches your actual public.users table structure
-        Row: User // Assuming User type is defined elsewhere and includes id, username, full_name, avatar_url, tier, coins
+        Row: User
         Insert: Partial<User>
         Update: Partial<User>
       }
@@ -595,22 +640,59 @@ export interface Database {
           | "updated_at"
           | "is_published"
           | "is_deleted"
+          | "is_edited"
           | "user"
           | "category"
           | "has_voted"
-        > & { user_id: string }
+          | "comments"
+        > & { user_id: string } // Ensure user_id is always provided on insert
         Update: Partial<
-          Omit<CommunityPost, "id" | "user_id" | "created_at" | "updated_at" | "user" | "category" | "has_voted">
+          Omit<
+            CommunityPost,
+            "id" | "user_id" | "created_at" | "updated_at" | "user" | "category" | "has_voted" | "comments"
+          >
         >
       }
       community_post_votes: {
         Row: CommunityPostVote
         Insert: CommunityPostVote
-        Update: never // Votes are usually not updated
+        Update: never
       }
+      community_comments: {
+        Row: CommunityComment
+        Insert: Omit<
+          CommunityComment,
+          | "id"
+          | "like_count"
+          | "reply_count"
+          | "created_at"
+          | "updated_at"
+          | "is_deleted"
+          | "is_edited"
+          | "user"
+          | "replies"
+          | "has_liked"
+        > & { user_id: string }
+        Update: Partial<
+          Omit<
+            CommunityComment,
+            "id" | "user_id" | "post_id" | "created_at" | "updated_at" | "user" | "replies" | "has_liked"
+          >
+        >
+      }
+      community_comment_likes: {
+        Row: CommunityCommentLike
+        Insert: CommunityCommentLike
+        Update: never
+      }
+      community_reports: {
+        Row: CommunityReport
+        Insert: Omit<CommunityReport, "id" | "created_at" | "is_resolved" | "resolved_by" | "resolved_at">
+        Update: Partial<Pick<CommunityReport, "is_resolved" | "resolved_by" | "resolved_at">>
+      }
+      // ... (other tables like albums, tracks, etc.)
     }
     Functions: {
-      // Add the Supabase function if you use it directly via RPC
       handle_post_vote: {
         Args: {
           p_post_id: number
@@ -620,7 +702,12 @@ export interface Database {
         }
         Returns: boolean
       }
+      // Add other functions if you call them via RPC
     }
-    // ... (Enums, CompositeTypes if any)
+    Enums: {
+      // Add enums if not automatically inferred by Supabase client
+      report_reason: ReportReason
+      report_target_type: ReportTargetType
+    }
   }
 }

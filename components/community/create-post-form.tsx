@@ -11,12 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/auth-context"
-import { createCommunityPostAction, searchUsersForMention } from "@/lib/community-actions"
+import { createCommunityPostAction } from "@/lib/community-actions"
 import { useToast } from "@/components/ui/use-toast"
 import type { CommunityCategory } from "@/types/database"
 import { ImagePlus, Video, Mic, Send, Loader2, X } from "lucide-react"
-import { MentionsInput, Mention, type SuggestionDataItem } from "react-mentions" // Using react-mentions
-import styles from "./mention-input.module.css" // Custom styles for react-mentions
+import { RichTextEditor } from "./rich-text-editor"
+// Remove MentionsInput, Mention, styles from 'react-mentions'
+// import { MentionsInput, Mention, type SuggestionDataItem } from "react-mentions" // Using react-mentions
+// import styles from "./mention-input.module.css" // Custom styles for react-mentions
 
 interface CreatePostFormProps {
   categories: CommunityCategory[]
@@ -37,7 +39,7 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
   const { profile } = useAuth()
   const { toast } = useToast()
   const [formState, formAction] = useFormState(createCommunityPostAction, { success: false, error: null })
-  const [content, setContent] = useState("")
+  const [content, setContent] = useState("") // This will now be HTML
   const [selectedCategory, setSelectedCategory] = useState<string>("")
   const [mediaFile, setMediaFile] = useState<File | null>(null)
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
@@ -100,11 +102,11 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
     })
   }
 
-  const fetchUsers = async (query: string, callback: (data: SuggestionDataItem[]) => void) => {
-    if (!query) return
-    const users = await searchUsersForMention(query)
-    callback(users.map((user) => ({ id: user.id, display: user.display, ...user })))
-  }
+  // const fetchUsers = async (query: string, callback: (data: SuggestionDataItem[]) => void) => {
+  //   if (!query) return
+  //   const users = await searchUsersForMention(query)
+  //   callback(users.map((user) => ({ id: user.id, display: user.display, ...user })))
+  // }
 
   if (!profile) return null // Or a login prompt
 
@@ -122,14 +124,15 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
               <Label htmlFor="content" className="sr-only">
                 What's on your mind?
               </Label>
+              {/* Replace this block:
               <MentionsInput
                 id="content"
-                name="content" // This name might not be picked up by formData if not a standard input. We'll handle it.
+                name="content"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder={`What's on your mind, ${profile.username}? Use @ to mention users.`}
-                className={styles.mentionsInput} // Apply custom styling
-                classNames={styles} // For internal elements
+                className={styles.mentionsInput}
+                classNames={styles}
                 a11ySuggestionsListLabel="Suggested mentions"
               >
                 <Mention
@@ -151,6 +154,16 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
                   )}
                 />
               </MentionsInput>
+              */}
+
+              {/* With this: */}
+              <RichTextEditor
+                content={content}
+                onChange={setContent}
+                placeholder={`What's on your mind, ${profile.username}?`}
+              />
+              {/* Hidden input to pass HTML content to FormData, as RichTextEditor itself isn't a form input */}
+              <input type="hidden" name="content" value={content} />
             </div>
           </div>
 
