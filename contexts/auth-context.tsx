@@ -29,6 +29,12 @@ interface AuthContextType {
   user: User | null
   profile: UserProfile | null
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: any }>
+  signUp: (
+    email: string,
+    password: string,
+    username: string,
+    fullName: string,
+  ) => Promise<{ success: boolean; error?: any }>
   signOut: () => Promise<void>
   isLoading: boolean
   isAuthenticated: boolean
@@ -202,6 +208,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Enhanced sign up function
+  const signUp = async (email: string, password: string, username: string, fullName: string) => {
+    try {
+      setIsLoading(true)
+
+      // Validate inputs
+      if (!email || !password || !username || !fullName) {
+        return { success: false, error: { message: "All fields are required" } }
+      }
+
+      if (password.length < 6) {
+        return { success: false, error: { message: "Password must be at least 6 characters" } }
+      }
+
+      // Check if username is already taken (simple check)
+      if (username.length < 3) {
+        return { success: false, error: { message: "Username must be at least 3 characters" } }
+      }
+
+      // Simulate API delay for realistic UX
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      // Generate a unique ID based on the email
+      const userId = `user-${btoa(email).replace(/[=+/]/g, "").substring(0, 16)}`
+
+      // Create a mock user
+      const mockUser = {
+        id: userId,
+        email,
+        username,
+      }
+
+      // Create a mock profile with welcome bonus coins
+      const mockProfile = {
+        ...mockUser,
+        tier: "grassroot" as UserTier,
+        coins: 100, // Welcome bonus
+        level: 1,
+        points: 0,
+        full_name: fullName,
+        created_at: new Date().toISOString(),
+        bio: `Welcome to the movement, ${username}!`,
+      }
+
+      // Persist the session using our utility
+      clientAuth.saveSession(mockUser, mockProfile)
+
+      setUser(mockUser)
+      setProfile(mockProfile)
+      setIsAuthenticated(true)
+
+      return { success: true }
+    } catch (error: any) {
+      console.error("Sign up error:", error)
+      return {
+        success: false,
+        error: { message: error.message || "An unexpected error occurred during sign up" },
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   // Enhanced sign out function
   const signOut = async () => {
     try {
@@ -285,6 +354,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         profile,
         signIn,
+        signUp,
         signOut,
         isLoading,
         isAuthenticated,
