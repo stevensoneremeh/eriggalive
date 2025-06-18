@@ -1,29 +1,34 @@
 "use client"
 
-import { useRef } from "react"
-
-import { useState, useTransition } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
 import Link from "next/link"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { RealtimeChannel } from "@supabase/supabase-js"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { UserTierBadge } from "@/components/user-tier-badge" // Assuming this exists
+import { UserTierBadge } from "@/components/user-tier-badge"
 import { formatDistanceToNow } from "date-fns"
-import { MessageSquare, MoreHorizontal, Flag, Edit, Trash2, LinkIcon, Play, Pause } from "lucide-react"
+import { MessageSquare, MoreHorizontal, Flag, Edit, Trash2, LinkIcon, Play, Pause, Loader2 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import type { CommunityPost } from "@/types/database"
+import type { CommunityPost, Database } from "@/types/database"
 import { VoteButton } from "./vote-button"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/components/ui/use-toast"
 import DOMPurify from "dompurify"
+import { CommentSection } from "./comment-section" // Import CommentSection
+import { RichTextEditor } from "./rich-text-editor" // For editing post
+import { deletePostAction, editPostAction } from "@/lib/community-actions"
+import { ReportDialog } from "./report-dialog" // To be created
 
 interface PostCardProps {
   post: CommunityPost
   currentUserId?: string
+  onPostDeleted: (postId: number) => void
+  onPostUpdated: (updatedPost: CommunityPost) => void
 }
 
-// Basic media player, can be expanded
 function MediaPlayer({ url, type }: { url: string; type: "audio" | "video" }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -45,7 +50,7 @@ function MediaPlayer({ url, type }: { url: string; type: "audio" | "video" }) {
           {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
         </Button>
         <audio ref={audioRef} src={url} onEnded={() => setIsPlaying(false)} className="w-full hidden" />
-        <span className="text-sm text-muted-foreground">Audio track</span> {/* Placeholder for track info/progress */}
+        <span className="text-sm text-muted-foreground">Audio track</span>
       </div>
     )
   }
@@ -64,45 +69,93 @@ function MediaPlayer({ url, type }: { url: string; type: "audio" | "video" }) {
   return null
 }
 
-export function PostCard({ post, currentUserId }: PostCardProps) {
+export function PostCard({ post: initialPost, currentUserId, onPostDeleted, onPostUpdated }: PostCardProps) {
+  const supabase = createClientComponentClient<Database>()
   const { user: authUser } = useAuth()
   const { toast } = useToast()
+
+  const [post, setPost] = useState(initialPost) // Use state for post data to allow realtime updates
   const [optimisticVoteCount, setOptimisticVoteCount] = useState(post.vote_count)
   const [hasVotedOptimistic, setHasVotedOptimistic] = useState(post.has_voted || false)
-  const [isVoting, startVoteTransition] = useTransition()
   const [showComments, setShowComments] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedContent, setEditedContent] = useState(post.content)
+  const [isDeleting, startDeleteTransition] = useTransition()
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
+
+  useEffect(() => {
+    setPost(initialPost)
+    setOptimisticVoteCount(initialPost.vote_count)
+    setHasVotedOptimistic(initialPost.has_voted || false)
+    setEditedContent(initialPost.content)
+  }, [initialPost])
+
+  // Realtime subscription for this specific post
+  useEffect(() => {
+    if (!post?.id) return
+
+    const postChannel: RealtimeChannel = supabase
+      .channel(`community_post:${post.id}`)
+      .on<CommunityPost>(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "community_posts", filter: `id=eq.${post.id}` },
+        (payload) => {
+          const updatedPost = payload.new as CommunityPost
+          setPost((prevPost) => ({ ...prevPost, ...updatedPost, user: prevPost.user, category: prevPost.category })) // Preserve joined data
+          setOptimisticVoteCount(updatedPost.vote_count)
+          // has_voted needs to be re-evaluated if another user's vote comes through,
+          // or if current user votes on another device. For simplicity, VoteButton handles its own optimistic state.
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(postChannel)
+    }
+  }, [supabase, post?.id])
 
   const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true })
 
-  const handleReport = () => {
-    // Placeholder for report functionality
-    toast({ title: "Reported", description: "This post has been reported for review." })
+  const renderRichContent = (htmlContent: string) => {
+    if (typeof window === "undefined") return { __html: htmlContent }
+    const cleanHtml = DOMPurify.sanitize(htmlContent, { USE_PROFILES: { html: true } })
+    return { __html: cleanHtml }
   }
 
-  // Remove or comment out the old renderContentWithMentions function.
-  // Add this new function:
-  const renderRichContent = (htmlContent: string) => {
-    if (typeof window === "undefined") {
-      // DOMPurify only runs in browser
-      // For SSR, you might return a simplified version or a placeholder
-      // Or, if content is pre-sanitized on server, this check might not be needed.
-      // However, it's safer to sanitize before rendering.
-      // This basic SSR handling just returns the raw HTML, assuming it's safe or will be hydrated.
-      return (
-        <div
-          className="prose prose-sm sm:prose-base dark:prose-invert max-w-none"
-          dangerouslySetInnerHTML={{ __html: htmlContent }}
-        />
-      )
+  const handleEditSubmit = async () => {
+    if (!editedContent.replace(/<[^>]*>?/gm, "").trim()) {
+      toast({ title: "Empty Post", description: "Post content cannot be empty.", variant: "destructive" })
+      return
     }
-    const cleanHtml = DOMPurify.sanitize(htmlContent)
-    return (
-      <div
-        className="prose prose-sm sm:prose-base dark:prose-invert max-w-none"
-        dangerouslySetInnerHTML={{ __html: cleanHtml }}
-      />
-    )
+    const formData = new FormData()
+    formData.append("content", editedContent)
+
+    const result = await editPostAction(post.id, formData)
+    if (result.success && result.post) {
+      onPostUpdated(result.post as CommunityPost) // Notify parent feed
+      setPost((prev) => ({ ...prev, ...(result.post as CommunityPost) })) // Update local state
+      setIsEditing(false)
+      toast({ title: "Post Updated" })
+    } else {
+      toast({ title: "Error", description: result.error || "Failed to update post.", variant: "destructive" })
+    }
   }
+
+  const handleDelete = () => {
+    if (!confirm("Are you sure you want to delete this post? This action cannot be undone.")) return
+    startDeleteTransition(async () => {
+      const result = await deletePostAction(post.id)
+      if (result.success) {
+        onPostDeleted(post.id) // Notify parent feed
+        toast({ title: "Post Deleted" })
+        // The post will be removed from the feed by the parent.
+      } else {
+        toast({ title: "Error", description: result.error || "Failed to delete post.", variant: "destructive" })
+      }
+    })
+  }
+
+  if (post.is_deleted) return null // Don't render deleted posts
 
   return (
     <Card className="shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden">
@@ -126,7 +179,9 @@ export function PostCard({ post, currentUserId }: PostCardProps) {
               </div>
               <p className="text-xs text-muted-foreground">
                 {timeAgo}
-                {post.is_edited && <span title={new Date(post.updated_at).toLocaleString()}> (edited)</span>}
+                {post.is_edited && !isEditing && (
+                  <span title={new Date(post.updated_at).toLocaleString()}> (edited)</span>
+                )}
                 {post.category && (
                   <>
                     {" "}
@@ -149,15 +204,29 @@ export function PostCard({ post, currentUserId }: PostCardProps) {
               <DropdownMenuContent align="end">
                 {authUser.id === post.user_id ? (
                   <>
-                    <DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setIsEditing(true)
+                        setEditedContent(post.content)
+                      }}
+                    >
                       <Edit className="mr-2 h-4 w-4" /> Edit Post
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                      <Trash2 className="mr-2 h-4 w-4" /> Delete Post
+                    <DropdownMenuItem
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                      className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="mr-2 h-4 w-4" />
+                      )}{" "}
+                      Delete Post
                     </DropdownMenuItem>
                   </>
                 ) : (
-                  <DropdownMenuItem onClick={handleReport}>
+                  <DropdownMenuItem onClick={() => setIsReportDialogOpen(true)}>
                     <Flag className="mr-2 h-4 w-4" /> Report Post
                   </DropdownMenuItem>
                 )}
@@ -173,9 +242,23 @@ export function PostCard({ post, currentUserId }: PostCardProps) {
       </CardHeader>
 
       <CardContent className="px-4 pb-3 space-y-3">
-        {renderRichContent(post.content)}
+        {isEditing ? (
+          <div className="space-y-2">
+            <RichTextEditor content={editedContent} onChange={setEditedContent} placeholder="Edit your post..." />
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleEditSubmit}>
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div dangerouslySetInnerHTML={renderRichContent(post.content)} />
+        )}
 
-        {post.media_url && post.media_type && (
+        {post.media_url && post.media_type && !isEditing && (
           <div className="mt-3 rounded-lg overflow-hidden border">
             {post.media_type === "image" && (
               <img
@@ -196,19 +279,20 @@ export function PostCard({ post, currentUserId }: PostCardProps) {
           <VoteButton
             postId={post.id}
             postCreatorId={post.user_id}
-            initialVoteCount={optimisticVoteCount}
-            initialHasVoted={hasVotedOptimistic}
+            initialVoteCount={optimisticVoteCount} // Use state variable
+            initialHasVoted={hasVotedOptimistic} // Use state variable
             currentUserId={currentUserId}
             onVoteSuccess={(newVoteCount, newHasVoted) => {
               setOptimisticVoteCount(newVoteCount)
               setHasVotedOptimistic(newHasVoted)
+              // Realtime will also update, this is for immediate UI feedback
             }}
           />
           <Button
             variant="ghost"
             size="sm"
             className="text-muted-foreground hover:text-primary"
-            onClick={() => setShowComments(!showComments)} // Toggle comments
+            onClick={() => setShowComments(!showComments)}
           >
             <MessageSquare className="mr-1.5 h-4 w-4" />
             {post.comment_count || 0}
@@ -227,15 +311,20 @@ export function PostCard({ post, currentUserId }: PostCardProps) {
 
       {showComments && (
         <div className="p-4 border-t">
-          {/* Placeholder for CommentSection component */}
-          <p className="text-sm text-muted-foreground">Comment section coming soon...</p>
-          {/* <CommentSection postId={post.id} currentUserId={currentUserId} /> */}
+          <CommentSection postId={post.id} />
         </div>
       )}
+      <ReportDialog
+        isOpen={isReportDialogOpen}
+        onClose={() => setIsReportDialogOpen(false)}
+        targetId={post.id}
+        targetType="post"
+      />
     </Card>
   )
 }
 
+// PostCardSkeleton remains the same
 export function PostCardSkeleton() {
   return (
     <Card className="shadow-md">
