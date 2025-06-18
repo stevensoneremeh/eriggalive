@@ -2,27 +2,51 @@
 
 import { revalidatePath } from "next/cache"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import type { CommunityPost, CommunityComment, ReportReason, ReportTargetType } from "@/types/database"
+import type {
+  User as PublicUser,
+  CommunityPost,
+  CommunityComment,
+  ReportReason,
+  ReportTargetType,
+} from "@/types/database"
 import DOMPurify from "isomorphic-dompurify" // For server-side sanitization
 
 const VOTE_COIN_AMOUNT = 100
 
-// Helper to get current user
-async function getCurrentUser(supabase: ReturnType<typeof createServerSupabaseClient>) {
+// Helper to get current user's public profile (including public.users.id)
+async function getCurrentPublicUserProfile(
+  supabaseClient: ReturnType<typeof createServerSupabaseClient>,
+): Promise<PublicUser> {
   const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-  if (error || !user) {
-    throw new Error("User not authenticated")
+    data: { user: authUser },
+    error: authError,
+  } = await supabaseClient.auth.getUser()
+  if (authError || !authUser) {
+    throw new Error("User not authenticated.")
   }
-  return user
+
+  const { data: userProfile, error: profileError } = await supabaseClient
+    .from("users")
+    .select("*")
+    .eq("auth_user_id", authUser.id)
+    .single()
+
+  if (profileError || !userProfile) {
+    console.error("Public user profile not found for auth user:", authUser.id, profileError)
+    throw new Error("User profile not found. Ensure user exists in public.users table.")
+  }
+  return userProfile
 }
 
 // --- Post Actions ---
 export async function createCommunityPostAction(formData: FormData) {
   const supabase = createServerSupabaseClient()
-  const user = await getCurrentUser(supabase)
+  let userProfile: PublicUser
+  try {
+    userProfile = await getCurrentPublicUserProfile(supabase)
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
 
   const rawContent = formData.get("content") as string // HTML from Tiptap
   const categoryId = formData.get("categoryId") as string
@@ -44,7 +68,7 @@ export async function createCommunityPostAction(formData: FormData) {
 
   if (mediaFile && mediaFile.size > 0) {
     const fileExt = mediaFile.name.split(".").pop()
-    const fileName = `${user.id}-${Date.now()}.${fileExt}`
+    const fileName = `${userProfile.id}-${Date.now()}.${fileExt}`
     const filePath = `community_media/${fileName}`
 
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -63,7 +87,7 @@ export async function createCommunityPostAction(formData: FormData) {
   }
 
   const postData = {
-    user_id: user.id,
+    user_id: userProfile.id, // This is now the public.users.id (BIGINT)
     category_id: Number.parseInt(categoryId),
     content: sanitizedContent, // Save sanitized HTML
     media_url,
@@ -82,7 +106,12 @@ export async function createCommunityPostAction(formData: FormData) {
 
 export async function editPostAction(postId: number, formData: FormData) {
   const supabase = createServerSupabaseClient()
-  const user = await getCurrentUser(supabase)
+  let userProfile: PublicUser
+  try {
+    userProfile = await getCurrentPublicUserProfile(supabase)
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
   const rawContent = formData.get("content") as string // HTML
 
   if (!rawContent) return { success: false, error: "Content cannot be empty." }
@@ -98,13 +127,13 @@ export async function editPostAction(postId: number, formData: FormData) {
     .single()
 
   if (fetchError || !existingPost) return { success: false, error: "Post not found." }
-  if (existingPost.user_id !== user.id) return { success: false, error: "Not authorized to edit this post." }
+  if (existingPost.user_id !== userProfile.id) return { success: false, error: "Not authorized to edit this post." }
 
   const { data, error } = await supabase
     .from("community_posts")
     .update({ content: sanitizedContent, is_edited: true, updated_at: new Date().toISOString() })
     .eq("id", postId)
-    .eq("user_id", user.id) // Ensure user owns the post
+    .eq("user_id", userProfile.id) // Ensure user owns the post
     .select()
     .single()
 
@@ -117,13 +146,18 @@ export async function editPostAction(postId: number, formData: FormData) {
 
 export async function deletePostAction(postId: number) {
   const supabase = createServerSupabaseClient()
-  const user = await getCurrentUser(supabase)
+  let userProfile: PublicUser
+  try {
+    userProfile = await getCurrentPublicUserProfile(supabase)
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
 
   const { error } = await supabase
     .from("community_posts")
     .update({ is_deleted: true, deleted_at: new Date().toISOString() })
     .eq("id", postId)
-    .eq("user_id", user.id) // Ensure user owns the post
+    .eq("user_id", userProfile.id) // Ensure user owns the post
 
   if (error) return { success: false, error: error.message }
 
@@ -131,19 +165,30 @@ export async function deletePostAction(postId: number) {
   return { success: true }
 }
 
-export async function voteOnPostAction(postId: number, postCreatorId: string) {
-  // ... (previous implementation is fine, ensure it revalidates paths)
+export async function voteOnPostAction(postId: number, postCreatorAuthId: string) {
+  // Renamed for clarity
   const supabase = createServerSupabaseClient()
-  const voter = await getCurrentUser(supabase)
+  let voterProfile: PublicUser
+  try {
+    voterProfile = await getCurrentPublicUserProfile(supabase)
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
 
-  if (voter.id === postCreatorId) {
+  // Fetch post creator's public.users.id to prevent self-vote using internal ID
+  const { data: postData } = await supabase.from("community_posts").select("user_id").eq("id", postId).single()
+  if (postData && postData.user_id === voterProfile.id) {
     return { success: false, error: "You cannot vote on your own post.", code: "SELF_VOTE" }
   }
+  // Or, if postCreatorAuthId is reliable and you want to compare auth IDs:
+  // if (voterProfile.auth_user_id === postCreatorAuthId) {
+  //   return { success: false, error: "You cannot vote on your own post.", code: "SELF_VOTE" }
+  // }
 
   const { data, error } = await supabase.rpc("handle_post_vote", {
     p_post_id: postId,
-    p_voter_id: voter.id,
-    p_post_creator_id: postCreatorId,
+    p_voter_id: voterProfile.auth_user_id, // Pass auth_user_id (string) to RPC, assuming RPC handles lookup
+    p_post_creator_id: postCreatorAuthId, // Pass auth_user_id (string)
     p_coin_amount: VOTE_COIN_AMOUNT,
   })
 
@@ -164,7 +209,12 @@ export async function voteOnPostAction(postId: number, postCreatorId: string) {
 // --- Comment Actions ---
 export async function createCommentAction(postId: number, content: string, parentCommentId?: number | null) {
   const supabase = createServerSupabaseClient()
-  const user = await getCurrentUser(supabase)
+  let userProfile: PublicUser
+  try {
+    userProfile = await getCurrentPublicUserProfile(supabase)
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
 
   if (!content.trim()) return { success: false, error: "Comment cannot be empty." }
   // Sanitize if comments also use rich text, otherwise not strictly needed for plain text
@@ -177,11 +227,11 @@ export async function createCommentAction(postId: number, content: string, paren
     .from("community_comments")
     .insert({
       post_id: postId,
-      user_id: user.id,
+      user_id: userProfile.id,
       content: sanitizedContent,
       parent_comment_id: parentCommentId || null,
     })
-    .select(`*, user:users!community_comments_user_id_fkey(id, username, full_name, avatar_url, tier)`)
+    .select(`*, user:users!inner (id, auth_user_id, username, full_name, avatar_url, tier)`)
     .single()
 
   if (error) return { success: false, error: error.message }
@@ -194,7 +244,12 @@ export async function createCommentAction(postId: number, content: string, paren
 
 export async function editCommentAction(commentId: number, content: string) {
   const supabase = createServerSupabaseClient()
-  const user = await getCurrentUser(supabase)
+  let userProfile: PublicUser
+  try {
+    userProfile = await getCurrentPublicUserProfile(supabase)
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
   if (!content.trim()) return { success: false, error: "Comment cannot be empty." }
   const sanitizedContent = DOMPurify.sanitize(content)
   if (!sanitizedContent.replace(/<[^>]*>?/gm, "").trim()) {
@@ -205,8 +260,8 @@ export async function editCommentAction(commentId: number, content: string) {
     .from("community_comments")
     .update({ content: sanitizedContent, is_edited: true, updated_at: new Date().toISOString() })
     .eq("id", commentId)
-    .eq("user_id", user.id)
-    .select(`*, user:users!community_comments_user_id_fkey(id, username, full_name, avatar_url, tier)`)
+    .eq("user_id", userProfile.id)
+    .select(`*, user:users!inner (id, auth_user_id, username, full_name, avatar_url, tier)`)
     .single()
 
   if (error) return { success: false, error: error.message }
@@ -217,13 +272,18 @@ export async function editCommentAction(commentId: number, content: string) {
 
 export async function deleteCommentAction(commentId: number) {
   const supabase = createServerSupabaseClient()
-  const user = await getCurrentUser(supabase)
+  let userProfile: PublicUser
+  try {
+    userProfile = await getCurrentPublicUserProfile(supabase)
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
 
   const { error } = await supabase
     .from("community_comments")
     .update({ is_deleted: true, deleted_at: new Date().toISOString(), content: "[deleted]" }) // Soft delete
     .eq("id", commentId)
-    .eq("user_id", user.id)
+    .eq("user_id", userProfile.id)
 
   if (error) return { success: false, error: error.message }
 
@@ -233,13 +293,18 @@ export async function deleteCommentAction(commentId: number) {
 
 export async function toggleLikeCommentAction(commentId: number) {
   const supabase = createServerSupabaseClient()
-  const user = await getCurrentUser(supabase)
+  let userProfile: PublicUser
+  try {
+    userProfile = await getCurrentPublicUserProfile(supabase)
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
 
   const { data: existingLike, error: fetchError } = await supabase
     .from("community_comment_likes")
     .select("comment_id")
     .eq("comment_id", commentId)
-    .eq("user_id", user.id)
+    .eq("user_id", userProfile.id)
     .maybeSingle()
 
   if (fetchError && fetchError.code !== "PGRST116") {
@@ -253,7 +318,7 @@ export async function toggleLikeCommentAction(commentId: number) {
       .from("community_comment_likes")
       .delete()
       .eq("comment_id", commentId)
-      .eq("user_id", user.id)
+      .eq("user_id", userProfile.id)
     if (deleteError) return { success: false, error: deleteError.message, liked: true }
     revalidatePath("/community")
     return { success: true, liked: false }
@@ -261,7 +326,7 @@ export async function toggleLikeCommentAction(commentId: number) {
     // Like
     const { error: insertError } = await supabase
       .from("community_comment_likes")
-      .insert({ comment_id: commentId, user_id: user.id })
+      .insert({ comment_id: commentId, user_id: userProfile.id })
     if (insertError) return { success: false, error: insertError.message, liked: false }
     revalidatePath("/community")
     return { success: true, liked: true }
@@ -276,10 +341,15 @@ export async function createReportAction(
   notes?: string,
 ) {
   const supabase = createServerSupabaseClient()
-  const user = await getCurrentUser(supabase)
+  let userProfile: PublicUser
+  try {
+    userProfile = await getCurrentPublicUserProfile(supabase)
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
 
   const { error } = await supabase.from("community_reports").insert({
-    reporter_user_id: user.id,
+    reporter_user_id: userProfile.id,
     target_id: targetId,
     target_type: targetType,
     reason: reason,
@@ -292,7 +362,7 @@ export async function createReportAction(
 
 // --- Fetching Actions (with search) ---
 export async function fetchCommunityPosts(
-  userId: string | undefined, // Current logged-in user for 'has_voted'
+  loggedInUserInternalId: number | undefined, // This should be public.users.id (BIGINT)
   options: {
     categoryId?: number
     sortOrder?: string
@@ -309,8 +379,8 @@ export async function fetchCommunityPosts(
     .from("community_posts")
     .select(`
       *,
-      user:users!community_posts_user_id_fkey (id, username, full_name, avatar_url, tier),
-      category:community_categories (id, name, slug),
+      user:users!inner (id, auth_user_id, username, full_name, avatar_url, tier), /* More direct join */
+      category:community_categories!inner (id, name, slug),
       votes:community_post_votes (user_id)
     `)
     .eq("is_published", true)
@@ -343,7 +413,7 @@ export async function fetchCommunityPosts(
     ...post,
     user: post.user,
     category: post.category,
-    has_voted: userId ? post.votes.some((vote) => vote.user_id === userId) : false,
+    has_voted: loggedInUserInternalId ? post.votes.some((vote) => vote.user_id === loggedInUserInternalId) : false,
   }))
 
   return { posts: postsWithVoteStatus, count: count || data.length, error: null } // count might be null if not exact
@@ -355,7 +425,7 @@ export async function fetchCommentsForPost(postId: number, userId?: string) {
     .from("community_comments")
     .select(`
       *,
-      user:users!community_comments_user_id_fkey(id, username, full_name, avatar_url, tier),
+      user:users!inner (id, auth_user_id, username, full_name, avatar_url, tier), /* More direct join */
       likes:community_comment_likes(user_id)
     `)
     .eq("post_id", postId)
@@ -375,7 +445,7 @@ export async function fetchCommentsForPost(postId: number, userId?: string) {
         .from("community_comments")
         .select(`
           *,
-          user:users!community_comments_user_id_fkey(id, username, full_name, avatar_url, tier),
+          user:users!inner (id, auth_user_id, username, full_name, avatar_url, tier), /* More direct join */
           likes:community_comment_likes(user_id)
         `)
         .eq("post_id", postId) // ensure replies are for the same post
@@ -407,7 +477,7 @@ export async function searchUsersForMention(query: string) {
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase
     .from("users")
-    .select("id, username, full_name, avatar_url") // Ensure 'id' here is the one Tiptap expects (e.g., username or UUID)
+    .select("id, username, full_name, avatar_url") // users.id is BIGINT
     .or(`username.ilike.%${query}%,full_name.ilike.%${query}%`)
     .limit(5)
 
@@ -416,5 +486,5 @@ export async function searchUsersForMention(query: string) {
     return []
   }
   // Format for Tiptap mention extension if using one that requires specific format
-  return data.map((u) => ({ id: u.username, label: u.username, name: u.full_name, avatar: u.avatar_url }))
+  return data.map((u) => ({ id: u.id, label: u.username, name: u.full_name, avatar: u.avatar_url }))
 }

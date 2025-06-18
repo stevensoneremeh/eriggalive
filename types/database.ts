@@ -467,7 +467,7 @@ export interface CommunityCategory {
 
 export interface CommunityPost {
   id: number
-  user_id: string // UUID from auth.users
+  user_id: number // References public.users.id (BIGINT)
   category_id: number
   content: string // HTML content from rich text editor
   media_url?: string
@@ -492,7 +492,7 @@ export interface CommunityPost {
 
 export interface CommunityPostVote {
   post_id: number
-  user_id: string // UUID from auth.users
+  user_id: number // References public.users.id (BIGINT)
   created_at: string
 }
 
@@ -500,7 +500,7 @@ export interface CommunityPostVote {
 export interface CommunityComment {
   id: number
   post_id: number
-  user_id: string // UUID from auth.users
+  user_id: number // References public.users.id (BIGINT)
   parent_comment_id?: number | null
   content: string // Can be HTML if comments also use rich text
   like_count: number
@@ -518,7 +518,7 @@ export interface CommunityComment {
 
 export interface CommunityCommentLike {
   comment_id: number
-  user_id: string // UUID from auth.users
+  user_id: number // References public.users.id (BIGINT)
   created_at: string
 }
 
@@ -528,7 +528,7 @@ export type ReportTargetType = "post" | "comment"
 
 export interface CommunityReport {
   id: number
-  reporter_user_id: string // UUID
+  reporter_user_id: number // References public.users.id (BIGINT)
   target_id: number // Post or Comment ID
   target_type: ReportTargetType
   reason: ReportReason
@@ -645,7 +645,7 @@ export interface Database {
           | "category"
           | "has_voted"
           | "comments"
-        > & { user_id: string } // Ensure user_id is always provided on insert
+        > & { user_id: number } // Ensure user_id is always provided on insert
         Update: Partial<
           Omit<
             CommunityPost,
@@ -672,7 +672,7 @@ export interface Database {
           | "user"
           | "replies"
           | "has_liked"
-        > & { user_id: string }
+        > & { user_id: number }
         Update: Partial<
           Omit<
             CommunityComment,
@@ -687,7 +687,9 @@ export interface Database {
       }
       community_reports: {
         Row: CommunityReport
-        Insert: Omit<CommunityReport, "id" | "created_at" | "is_resolved" | "resolved_by" | "resolved_at">
+        Insert: Omit<CommunityReport, "id" | "created_at" | "is_resolved" | "resolved_by" | "resolved_at"> & {
+          reporter_user_id: number
+        }
         Update: Partial<Pick<CommunityReport, "is_resolved" | "resolved_by" | "resolved_at">>
       }
       // ... (other tables like albums, tracks, etc.)
