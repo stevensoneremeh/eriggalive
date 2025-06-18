@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import { useAuth } from "@/contexts/auth-context"
-import { Music, Users, Calendar, TrendingUp, Clock } from "lucide-react"
+import { Music, Users, Calendar, TrendingUp, Clock, Home } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
@@ -39,6 +39,16 @@ export default function DashboardPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* Breadcrumb Navigation */}
+        <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
+          <Link href="/" className="hover:text-primary transition-colors flex items-center">
+            <Home className="h-4 w-4 mr-1" />
+            Home
+          </Link>
+          <span>/</span>
+          <span className="text-foreground">Dashboard</span>
+        </nav>
+
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Welcome back, {profile.username}!</h1>
           <p className="text-muted-foreground">Here's what's happening with your Erigga fan account today.</p>
