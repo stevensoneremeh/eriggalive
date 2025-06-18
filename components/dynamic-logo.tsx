@@ -1,54 +1,76 @@
 "use client"
 
-import { useTheme } from "@/contexts/theme-context"
+import { useState, useEffect } from "react"
 import Image from "next/image"
-import { useEffect, useState } from "react"
 
 interface DynamicLogoProps {
-  className?: string
   width?: number
   height?: number
-  priority?: boolean
+  className?: string
 }
 
-export function DynamicLogo({ className = "", width = 120, height = 40, priority = false }: DynamicLogoProps) {
-  const { theme } = useTheme()
+export function DynamicLogo({ width = 120, height = 32, className = "" }: DynamicLogoProps) {
   const [mounted, setMounted] = useState(false)
+  const [isDark, setIsDark] = useState(false)
 
   useEffect(() => {
     setMounted(true)
+
+    // Check initial theme
+    const checkTheme = () => {
+      const isDarkMode =
+        document.documentElement.classList.contains("dark") ||
+        (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches)
+      setIsDark(isDarkMode)
+    }
+
+    checkTheme()
+
+    // Listen for theme changes
+    const observer = new MutationObserver(checkTheme)
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    })
+
+    // Listen for system theme changes
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
+    const handleChange = () => {
+      if (
+        !document.documentElement.classList.contains("light") &&
+        !document.documentElement.classList.contains("dark")
+      ) {
+        checkTheme()
+      }
+    }
+
+    mediaQuery.addEventListener("change", handleChange)
+
+    return () => {
+      observer.disconnect()
+      mediaQuery.removeEventListener("change", handleChange)
+    }
   }, [])
 
-  // Show fallback during SSR and initial hydration to prevent layout shift
+  // Don't render until mounted to prevent hydration mismatch
   if (!mounted) {
-    return <div className={`font-street text-2xl text-gradient glow-text ${className}`}>ERIGGA</div>
+    return <div className={`bg-muted animate-pulse rounded ${className}`} style={{ width, height }} />
   }
 
-  const logoSrc = theme === "dark" ? "/images/loggotrans-dark.png" : "/images/loggotrans-light.png"
+  const logoSrc = isDark ? "/images/loggotrans-dark.png" : "/images/loggotrans-light.png"
 
   return (
-    <div className={`relative ${className}`}>
-      <Image
-        src={logoSrc || "/placeholder.svg"}
-        alt={`Erigga logo - ${theme} theme`}
-        width={width}
-        height={height}
-        priority={priority}
-        className="object-contain transition-opacity duration-300 ease-in-out"
-        style={{
-          maxWidth: "100%",
-          height: "auto",
-        }}
-        onError={(e) => {
-          // Fallback to text logo if image fails to load
-          const target = e.target as HTMLImageElement
-          target.style.display = "none"
-          const fallback = document.createElement("div")
-          fallback.className = "font-street text-2xl text-gradient glow-text"
-          fallback.textContent = "ERIGGA"
-          target.parentNode?.appendChild(fallback)
-        }}
-      />
-    </div>
+    <Image
+      src={logoSrc || "/placeholder.svg"}
+      alt="Erigga Live Logo"
+      width={width}
+      height={height}
+      className={className}
+      priority
+      onError={() => {
+        // Fallback to a simple text logo if images fail
+        console.warn("Logo image failed to load")
+      }}
+    />
   )
 }
