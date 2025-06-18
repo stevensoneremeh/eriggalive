@@ -174,14 +174,95 @@
     }
   }
 
-  /* Sidebar specific styles */
-  .sidebar-backdrop {
-    backdrop-filter: blur(8px);
-    background: rgba(0, 0, 0, 0.1);
+  /* Navigation specific animations */
+  .nav-slide-in {
+    animation: slideInFromBottom 0.3s ease-out;
   }
 
-  .dark .sidebar-backdrop {
-    background: rgba(0, 0, 0, 0.3);
+  .nav-fade-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  .nav-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  @keyframes slideInFromBottom {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      transform: scale(0.95);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Mobile navigation styles */
+  .mobile-nav-item {
+    @apply relative flex flex-col items-center space-y-1 p-2 rounded-lg transition-all duration-200 min-w-[60px];
+    touch-action: manipulation;
+  }
+
+  .mobile-nav-item:active {
+    transform: scale(0.95);
+  }
+
+  .mobile-nav-item.active {
+    @apply text-primary bg-primary/10;
+    transform: scale(1.05);
+  }
+
+  .mobile-nav-item.active::before {
+    content: "";
+    @apply absolute -top-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-primary rounded-full;
+  }
+
+  /* Desktop navigation styles */
+  .desktop-nav-item {
+    @apply relative px-3 py-2 text-sm font-medium rounded-md transition-all duration-200;
+    position: relative;
+  }
+
+  .desktop-nav-item:hover {
+    transform: translateY(-1px);
+  }
+
+  .desktop-nav-item.active::after {
+    content: "";
+    @apply absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full;
+    animation: expandWidth 0.3s ease-out;
+  }
+
+  @keyframes expandWidth {
+    from {
+      width: 0;
+      left: 50%;
+    }
+    to {
+      width: 100%;
+      left: 0;
+    }
   }
 
   /* Enhanced card styles with better responsiveness */
@@ -201,40 +282,11 @@
     touch-action: manipulation;
   }
 
-  /* Enhanced navigation styles */
-  .nav-item {
-    @apply relative flex items-center px-3 py-2 rounded-md text-sm font-medium transition-all duration-200;
-    touch-action: manipulation;
-  }
-
-  .nav-item:hover {
-    @apply bg-accent/50;
-  }
-
-  .nav-item.active {
-    @apply bg-primary/10 text-primary;
-  }
-
-  .nav-item.active::before {
-    content: "";
-    @apply absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full;
-  }
-
-  /* Responsive typography */
-  .responsive-text {
-    font-size: clamp(0.875rem, 2.5vw, 1rem);
-    line-height: 1.5;
-  }
-
-  .responsive-heading {
-    font-size: clamp(1.5rem, 4vw, 2.25rem);
-    line-height: 1.2;
-  }
-
   /* Enhanced mobile bottom navigation */
   .mobile-nav {
     @apply fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-sm border-t;
     padding-bottom: env(safe-area-inset-bottom);
+    animation: slideInFromBottom 0.3s ease-out;
   }
 
   /* Improved touch targets */
@@ -274,12 +326,6 @@
     }
   }
 
-  /* Enhanced sidebar transitions */
-  .sidebar-transition {
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s
-      ease-in-out;
-  }
-
   /* Improved glass morphism effect */
   .glass-effect {
     background: rgba(255, 255, 255, 0.1);
@@ -305,21 +351,45 @@
   .dark .hover-lift:hover {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
+
+  /* Navigation backdrop blur */
+  .nav-backdrop {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Safe area handling for mobile */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
 }
 
 /* Enhanced responsive breakpoints */
-@media (max-width: 639px) {
+@media (max-width: 767px) {
   .mobile-only {
     display: block;
   }
   .desktop-only {
     display: none;
   }
+  .tablet-only {
+    display: none;
+  }
 }
 
-@media (min-width: 640px) and (max-width: 1023px) {
+@media (min-width: 768px) and (max-width: 1023px) {
   .tablet-only {
     display: block;
+  }
+  .mobile-only {
+    display: none;
+  }
+  .desktop-only {
+    display: none;
   }
 }
 
@@ -353,6 +423,12 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+
+  .nav-slide-in,
+  .nav-fade-in,
+  .nav-scale-in {
+    animation: none;
+  }
 }
 
 /* High contrast mode support */
@@ -361,7 +437,26 @@
     border-width: 2px;
   }
 
-  .nav-item.active {
+  .mobile-nav-item.active,
+  .desktop-nav-item.active {
     outline: 2px solid currentColor;
   }
+}
+
+/* Dark mode specific navigation styles */
+.dark .mobile-nav {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark .nav-backdrop {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+/* Light mode specific navigation styles */
+.light .mobile-nav {
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.light .nav-backdrop {
+  background: rgba(255, 255, 255, 0.8);
 }

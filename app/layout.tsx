@@ -24,7 +24,9 @@ function SimpleLoading() {
 }
 
 // Lazy load components to avoid SSR issues
-const Navigation = React.lazy(() => import("@/components/navigation").then((mod) => ({ default: mod.Navigation })))
+const UnifiedNavigation = React.lazy(() =>
+  import("@/components/navigation/unified-navigation").then((mod) => ({ default: mod.UnifiedNavigation })),
+)
 const ThemeProvider = React.lazy(() =>
   import("@/contexts/theme-context").then((mod) => ({ default: mod.ThemeProvider })),
 )
@@ -50,27 +52,31 @@ export default function RootLayout({
                   <Suspense fallback={<div />}>
                     <SessionRefresh />
                   </Suspense>
-                  <div className="min-h-screen flex flex-col">
-                    <Suspense
-                      fallback={
-                        <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur shadow-md">
-                          <div className="container mx-auto px-4">
-                            <div className="flex h-16 items-center justify-between">
-                              <div className="h-8 w-32 bg-muted animate-pulse rounded" />
-                              <div className="h-8 w-24 bg-muted animate-pulse rounded" />
-                            </div>
+
+                  {/* Unified Navigation */}
+                  <Suspense
+                    fallback={
+                      <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur shadow-md">
+                        <div className="container mx-auto px-4">
+                          <div className="flex h-16 items-center justify-between">
+                            <div className="h-8 w-32 bg-muted animate-pulse rounded" />
+                            <div className="h-8 w-24 bg-muted animate-pulse rounded" />
                           </div>
-                        </header>
-                      }
-                    >
-                      <Navigation />
-                    </Suspense>
-                    <main className="flex-1 pt-16">
-                      <Suspense fallback={<SimpleLoading />}>{children}</Suspense>
-                    </main>
-                  </div>
+                        </div>
+                      </header>
+                    }
+                  >
+                    <UnifiedNavigation />
+                  </Suspense>
+
+                  {/* Main Content */}
+                  <main className="pt-16 pb-20 md:pb-0 min-h-screen">
+                    <Suspense fallback={<SimpleLoading />}>{children}</Suspense>
+                  </main>
+
+                  {/* Footer */}
                   <Suspense fallback={<div className="h-64 bg-muted animate-pulse" />}>
-                    <footer className="border-t bg-background/95 backdrop-blur">
+                    <footer className="border-t bg-background/95 backdrop-blur mb-20 md:mb-0">
                       <div className="container mx-auto px-4 py-8">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                           <div>
