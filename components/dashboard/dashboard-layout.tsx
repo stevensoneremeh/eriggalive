@@ -3,7 +3,6 @@
 import type React from "react"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
-import { ResponsiveSidebar } from "./responsive-sidebar"
 import { Loader2, AlertTriangle, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -129,14 +128,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     )
   }
 
-  // Success state - render dashboard
+  // Success state - render dashboard without sidebar
   return (
-    <div className="flex h-screen bg-background">
-      <ResponsiveSidebar />
-      <main className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto">
-          <div className="container mx-auto p-4 md:p-6 lg:p-8 max-w-7xl">{children}</div>
-        </div>
+    <div className="min-h-screen bg-background">
+      <main className="w-full">
+        <div className="container mx-auto p-4 md:p-6 lg:p-8 max-w-7xl">{children}</div>
       </main>
     </div>
   )
