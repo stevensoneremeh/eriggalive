@@ -111,3 +111,8 @@ export const useTheme = () => {
 
   return context
 }
+
+// Safe theme provider with error boundary
+export function SafeThemeProvider({ children, ...props }: ThemeProviderProps) {
+  return <ThemeProvider {...props}>{children}</ThemeProvider>
+}

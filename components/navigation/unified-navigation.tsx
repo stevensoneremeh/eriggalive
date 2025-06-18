@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -116,11 +116,13 @@ export function UnifiedNavigation() {
   const [mounted, setMounted] = useState(false)
 
   const pathname = usePathname()
+  const router = useRouter()
   const { user, profile, signOut, isAuthenticated, isLoading } = useAuth()
   const { theme, setTheme, resolvedTheme, isLoading: themeLoading } = useTheme()
 
   // Screen size detection
   const updateScreenSize = useCallback(() => {
+    if (typeof window === "undefined") return
     const width = window.innerWidth
     if (width < 768) {
       setScreenSize("mobile")
@@ -136,14 +138,20 @@ export function UnifiedNavigation() {
     updateScreenSize()
 
     const handleResize = () => updateScreenSize()
-    const handleScroll = () => setIsScrolled(window.scrollY > 10)
+    const handleScroll = () => {
+      if (typeof window !== "undefined") {
+        setIsScrolled(window.scrollY > 10)
+      }
+    }
 
-    window.addEventListener("resize", handleResize)
-    window.addEventListener("scroll", handleScroll)
+    if (typeof window !== "undefined") {
+      window.addEventListener("resize", handleResize)
+      window.addEventListener("scroll", handleScroll)
 
-    return () => {
-      window.removeEventListener("resize", handleResize)
-      window.removeEventListener("scroll", handleScroll)
+      return () => {
+        window.removeEventListener("resize", handleResize)
+        window.removeEventListener("scroll", handleScroll)
+      }
     }
   }, [updateScreenSize])
 
@@ -175,6 +183,21 @@ export function UnifiedNavigation() {
 
   const getDesktopItems = () => {
     return getVisibleItems()
+  }
+
+  const handleNavigation = (href: string) => {
+    router.push(href)
+    setIsMobileMenuOpen(false)
+  }
+
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+      setIsMobileMenuOpen(false)
+      router.push("/")
+    } catch (error) {
+      console.error("Sign out error:", error)
+    }
   }
 
   // Loading state
@@ -285,14 +308,16 @@ export function UnifiedNavigation() {
       )}
     >
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
-            <DynamicLogo width={120} height={32} />
-          </Link>
+        <div className="flex items-center justify-between h-16 w-full">
+          {/* Logo - Always visible */}
+          <div className="flex items-center shrink-0">
+            <Link href="/" className="flex items-center space-x-2">
+              <DynamicLogo width={120} height={32} />
+            </Link>
+          </div>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center space-x-1">
+          {/* Desktop Navigation - Centered */}
+          <nav className="hidden lg:flex items-center space-x-1 flex-1 justify-center max-w-2xl">
             {getDesktopItems().map((item) => {
               const active = isActive(item.href)
               return (
@@ -318,7 +343,7 @@ export function UnifiedNavigation() {
           </nav>
 
           {/* Right Actions */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 shrink-0">
             {/* Theme Toggle */}
             <div className="hidden md:flex items-center space-x-1 mr-2">
               <Button
@@ -374,7 +399,7 @@ export function UnifiedNavigation() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={signOut}
+                      onClick={handleSignOut}
                       className="text-red-500 hover:text-red-600 hidden md:flex"
                     >
                       <LogOut className="h-4 w-4 mr-2" />
@@ -424,7 +449,9 @@ export function UnifiedNavigation() {
       <div className="flex flex-col h-full bg-background">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
-          <DynamicLogo width={100} height={28} />
+          <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
+            <DynamicLogo width={100} height={28} />
+          </Link>
           <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)} className="h-8 w-8">
             <X className="h-4 w-4" />
           </Button>
@@ -459,12 +486,11 @@ export function UnifiedNavigation() {
               const Icon = item.icon
               const active = isActive(item.href)
               return (
-                <Link
+                <button
                   key={item.name}
-                  href={item.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={() => handleNavigation(item.href)}
                   className={cn(
-                    "flex items-center space-x-3 px-3 py-3 rounded-lg transition-all duration-200",
+                    "flex items-center space-x-3 px-3 py-3 rounded-lg transition-all duration-200 w-full text-left",
                     active
                       ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground",
@@ -477,7 +503,7 @@ export function UnifiedNavigation() {
                       {item.badge}
                     </Badge>
                   )}
-                </Link>
+                </button>
               )
             })}
           </div>
@@ -510,25 +536,18 @@ export function UnifiedNavigation() {
           {/* Auth Actions */}
           {isAuthenticated ? (
             <div className="space-y-2">
-              <Link href="/coins" onClick={() => setIsMobileMenuOpen(false)}>
-                <Button variant="outline" className="w-full justify-start">
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Manage Coins
-                </Button>
-              </Link>
-              <Link href="/settings" onClick={() => setIsMobileMenuOpen(false)}>
-                <Button variant="outline" className="w-full justify-start">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
-                </Button>
-              </Link>
+              <Button variant="outline" className="w-full justify-start" onClick={() => handleNavigation("/coins")}>
+                <CreditCard className="h-4 w-4 mr-2" />
+                Manage Coins
+              </Button>
+              <Button variant="outline" className="w-full justify-start" onClick={() => handleNavigation("/settings")}>
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </Button>
               <Button
                 variant="ghost"
                 className="w-full justify-start text-red-500 hover:text-red-600"
-                onClick={() => {
-                  signOut()
-                  setIsMobileMenuOpen(false)
-                }}
+                onClick={handleSignOut}
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
@@ -536,15 +555,13 @@ export function UnifiedNavigation() {
             </div>
           ) : (
             <div className="space-y-2">
-              <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                <Button variant="outline" className="w-full justify-start">
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Login
-                </Button>
-              </Link>
-              <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)}>
-                <Button className="w-full justify-start">Sign Up</Button>
-              </Link>
+              <Button variant="outline" className="w-full justify-start" onClick={() => handleNavigation("/login")}>
+                <LogIn className="h-4 w-4 mr-2" />
+                Login
+              </Button>
+              <Button className="w-full justify-start" onClick={() => handleNavigation("/signup")}>
+                Sign Up
+              </Button>
             </div>
           )}
         </div>
