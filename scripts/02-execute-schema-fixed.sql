@@ -1,4 +1,4 @@
--- Execute Complete Community Schema Setup
+-- Execute Complete Community Schema Setup (FIXED VERSION)
 -- This script sets up all community-related tables, functions, triggers, and policies
 
 -- First, let's check if we have the required users table
@@ -18,6 +18,20 @@ BEGIN
     END IF;
     
     RAISE NOTICE 'Users table validation passed. Proceeding with community schema setup.';
+END $$;
+
+-- Check the actual data type of auth_user_id column
+DO $$
+DECLARE
+    auth_user_id_type TEXT;
+BEGIN
+    SELECT data_type INTO auth_user_id_type
+    FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'users' 
+    AND column_name = 'auth_user_id';
+    
+    RAISE NOTICE 'auth_user_id column type: %', auth_user_id_type;
 END $$;
 
 -- Drop existing community tables if they exist (in correct order to handle dependencies)
@@ -117,7 +131,7 @@ CREATE TABLE public.community_reports (
     reason TEXT NOT NULL CHECK (reason IN ('spam', 'harassment', 'hate_speech', 'misinformation', 'inappropriate_content', 'other')),
     additional_notes TEXT,
     is_resolved BOOLEAN DEFAULT FALSE,
-    resolved_by TEXT, -- UUID of admin/mod
+    resolved_by UUID, -- UUID of admin/mod from auth.users
     resolved_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -166,11 +180,21 @@ DECLARE
     v_post_creator_id BIGINT;
     v_voter_coins INTEGER;
     v_existing_vote BOOLEAN;
+    v_voter_auth_uuid UUID;
+    v_creator_auth_uuid UUID;
 BEGIN
+    -- Convert text to UUID if needed
+    BEGIN
+        v_voter_auth_uuid := p_voter_auth_id::UUID;
+        v_creator_auth_uuid := p_post_creator_auth_id::UUID;
+    EXCEPTION WHEN invalid_text_representation THEN
+        RAISE EXCEPTION 'Invalid UUID format provided';
+    END;
+
     -- Get voter's internal ID and coin balance
     SELECT id, coins INTO v_voter_id, v_voter_coins
     FROM public.users 
-    WHERE auth_user_id = p_voter_auth_id;
+    WHERE auth_user_id = v_voter_auth_uuid;
     
     IF v_voter_id IS NULL THEN
         RAISE EXCEPTION 'Voter not found';
@@ -179,7 +203,7 @@ BEGIN
     -- Get post creator's internal ID
     SELECT id INTO v_post_creator_id
     FROM public.users 
-    WHERE auth_user_id = p_post_creator_auth_id;
+    WHERE auth_user_id = v_creator_auth_uuid;
     
     IF v_post_creator_id IS NULL THEN
         RAISE EXCEPTION 'Post creator not found';
@@ -361,7 +385,7 @@ DROP POLICY IF EXISTS "Users can delete own likes" ON public.community_comment_l
 DROP POLICY IF EXISTS "Authenticated users can report" ON public.community_reports;
 DROP POLICY IF EXISTS "Users can read own reports" ON public.community_reports;
 
--- RLS Policies
+-- RLS Policies with proper UUID handling
 -- Categories - everyone can read
 CREATE POLICY "Anyone can read categories" ON public.community_categories
     FOR SELECT USING (true);
@@ -374,19 +398,19 @@ CREATE POLICY "Anyone can read published posts" ON public.community_posts
 CREATE POLICY "Authenticated users can create posts" ON public.community_posts
     FOR INSERT WITH CHECK (
         auth.uid() IS NOT NULL AND 
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        EXISTS (SELECT 1 FROM public.users WHERE auth_user_id = auth.uid() AND id = user_id)
     );
 
 -- Posts - users can update their own posts
 CREATE POLICY "Users can update own posts" ON public.community_posts
     FOR UPDATE USING (
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        EXISTS (SELECT 1 FROM public.users WHERE auth_user_id = auth.uid() AND id = user_id)
     );
 
 -- Posts - users can delete their own posts
 CREATE POLICY "Users can delete own posts" ON public.community_posts
     FOR DELETE USING (
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        EXISTS (SELECT 1 FROM public.users WHERE auth_user_id = auth.uid() AND id = user_id)
     );
 
 -- Comments - everyone can read non-deleted comments
@@ -397,19 +421,19 @@ CREATE POLICY "Anyone can read comments" ON public.community_comments
 CREATE POLICY "Authenticated users can create comments" ON public.community_comments
     FOR INSERT WITH CHECK (
         auth.uid() IS NOT NULL AND 
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        EXISTS (SELECT 1 FROM public.users WHERE auth_user_id = auth.uid() AND id = user_id)
     );
 
 -- Comments - users can update their own comments
 CREATE POLICY "Users can update own comments" ON public.community_comments
     FOR UPDATE USING (
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        EXISTS (SELECT 1 FROM public.users WHERE auth_user_id = auth.uid() AND id = user_id)
     );
 
 -- Comments - users can delete their own comments
 CREATE POLICY "Users can delete own comments" ON public.community_comments
     FOR DELETE USING (
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        EXISTS (SELECT 1 FROM public.users WHERE auth_user_id = auth.uid() AND id = user_id)
     );
 
 -- Votes - everyone can read
@@ -420,13 +444,13 @@ CREATE POLICY "Anyone can read votes" ON public.community_post_votes
 CREATE POLICY "Authenticated users can vote" ON public.community_post_votes
     FOR INSERT WITH CHECK (
         auth.uid() IS NOT NULL AND 
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        EXISTS (SELECT 1 FROM public.users WHERE auth_user_id = auth.uid() AND id = user_id)
     );
 
 -- Votes - users can delete their own votes
 CREATE POLICY "Users can delete own votes" ON public.community_post_votes
     FOR DELETE USING (
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        EXISTS (SELECT 1 FROM public.users WHERE auth_user_id = auth.uid() AND id = user_id)
     );
 
 -- Likes - everyone can read
@@ -437,26 +461,26 @@ CREATE POLICY "Anyone can read likes" ON public.community_comment_likes
 CREATE POLICY "Authenticated users can like" ON public.community_comment_likes
     FOR INSERT WITH CHECK (
         auth.uid() IS NOT NULL AND 
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        EXISTS (SELECT 1 FROM public.users WHERE auth_user_id = auth.uid() AND id = user_id)
     );
 
 -- Likes - users can delete their own likes
 CREATE POLICY "Users can delete own likes" ON public.community_comment_likes
     FOR DELETE USING (
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        EXISTS (SELECT 1 FROM public.users WHERE auth_user_id = auth.uid() AND id = user_id)
     );
 
 -- Reports - authenticated users can create
 CREATE POLICY "Authenticated users can report" ON public.community_reports
     FOR INSERT WITH CHECK (
         auth.uid() IS NOT NULL AND 
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = reporter_user_id)
+        EXISTS (SELECT 1 FROM public.users WHERE auth_user_id = auth.uid() AND id = reporter_user_id)
     );
 
 -- Reports - users can read their own reports
 CREATE POLICY "Users can read own reports" ON public.community_reports
     FOR SELECT USING (
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = reporter_user_id)
+        EXISTS (SELECT 1 FROM public.users WHERE auth_user_id = auth.uid() AND id = reporter_user_id)
     );
 
 -- Final verification
@@ -503,5 +527,12 @@ BEGIN
     
     IF function_count < 3 THEN
         RAISE WARNING 'Expected 3 functions, but only % were created', function_count;
+    END IF;
+    
+    -- Test the handle_post_vote function exists and is callable
+    IF EXISTS (SELECT 1 FROM information_schema.routines WHERE routine_schema = 'public' AND routine_name = 'handle_post_vote') THEN
+        RAISE NOTICE 'handle_post_vote function is ready for use';
+    ELSE
+        RAISE WARNING 'handle_post_vote function was not created properly';
     END IF;
 END $$;

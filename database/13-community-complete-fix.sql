@@ -1,26 +1,7 @@
--- Execute Complete Community Schema Setup
--- This script sets up all community-related tables, functions, triggers, and policies
+-- Complete Community Schema Fix
+-- This script ensures all tables, relationships, functions, and policies are correctly set up
 
--- First, let's check if we have the required users table
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users') THEN
-        RAISE EXCEPTION 'The public.users table does not exist. Please run the main schema setup first.';
-    END IF;
-    
-    -- Check if users table has required columns
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'id') THEN
-        RAISE EXCEPTION 'The public.users table is missing the id column.';
-    END IF;
-    
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'auth_user_id') THEN
-        RAISE EXCEPTION 'The public.users table is missing the auth_user_id column.';
-    END IF;
-    
-    RAISE NOTICE 'Users table validation passed. Proceeding with community schema setup.';
-END $$;
-
--- Drop existing community tables if they exist (in correct order to handle dependencies)
+-- Drop existing tables if they exist (in correct order to handle dependencies)
 DROP TABLE IF EXISTS public.community_reports CASCADE;
 DROP TABLE IF EXISTS public.community_comment_likes CASCADE;
 DROP TABLE IF EXISTS public.community_comment_votes CASCADE;
@@ -221,14 +202,12 @@ BEGIN
         SET coins = coins - p_coin_amount 
         WHERE id = v_post_creator_id;
         
-        -- Record refund transaction (if coin_transactions table exists)
-        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'coin_transactions') THEN
-            INSERT INTO public.coin_transactions (user_id, amount, transaction_type, description, status)
-            VALUES (v_voter_id, p_coin_amount, 'refund', 'Vote removed - refund', 'completed');
-            
-            INSERT INTO public.coin_transactions (user_id, amount, transaction_type, description, status)
-            VALUES (v_post_creator_id, -p_coin_amount, 'refund', 'Vote removed - deduction', 'completed');
-        END IF;
+        -- Record refund transaction
+        INSERT INTO public.coin_transactions (user_id, amount, transaction_type, description, status)
+        VALUES (v_voter_id, p_coin_amount, 'refund', 'Vote removed - refund', 'completed');
+        
+        INSERT INTO public.coin_transactions (user_id, amount, transaction_type, description, status)
+        VALUES (v_post_creator_id, -p_coin_amount, 'refund', 'Vote removed - deduction', 'completed');
         
         RETURN FALSE; -- Vote removed
     ELSE
@@ -250,14 +229,12 @@ BEGIN
         SET coins = coins + p_coin_amount 
         WHERE id = v_post_creator_id;
         
-        -- Record transactions (if coin_transactions table exists)
-        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'coin_transactions') THEN
-            INSERT INTO public.coin_transactions (user_id, amount, transaction_type, description, status)
-            VALUES (v_voter_id, -p_coin_amount, 'content_access', 'Post vote', 'completed');
-            
-            INSERT INTO public.coin_transactions (user_id, amount, transaction_type, description, status)
-            VALUES (v_post_creator_id, p_coin_amount, 'reward', 'Post vote received', 'completed');
-        END IF;
+        -- Record transactions
+        INSERT INTO public.coin_transactions (user_id, amount, transaction_type, description, status)
+        VALUES (v_voter_id, -p_coin_amount, 'content_access', 'Post vote', 'completed');
+        
+        INSERT INTO public.coin_transactions (user_id, amount, transaction_type, description, status)
+        VALUES (v_post_creator_id, p_coin_amount, 'reward', 'Post vote received', 'completed');
         
         RETURN TRUE; -- Vote added
     END IF;
@@ -342,25 +319,6 @@ ALTER TABLE public.community_post_votes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.community_comment_likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.community_reports ENABLE ROW LEVEL SECURITY;
 
--- Drop existing policies if they exist
-DROP POLICY IF EXISTS "Anyone can read categories" ON public.community_categories;
-DROP POLICY IF EXISTS "Anyone can read published posts" ON public.community_posts;
-DROP POLICY IF EXISTS "Authenticated users can create posts" ON public.community_posts;
-DROP POLICY IF EXISTS "Users can update own posts" ON public.community_posts;
-DROP POLICY IF EXISTS "Users can delete own posts" ON public.community_posts;
-DROP POLICY IF EXISTS "Anyone can read comments" ON public.community_comments;
-DROP POLICY IF EXISTS "Authenticated users can create comments" ON public.community_comments;
-DROP POLICY IF EXISTS "Users can update own comments" ON public.community_comments;
-DROP POLICY IF EXISTS "Users can delete own comments" ON public.community_comments;
-DROP POLICY IF EXISTS "Anyone can read votes" ON public.community_post_votes;
-DROP POLICY IF EXISTS "Authenticated users can vote" ON public.community_post_votes;
-DROP POLICY IF EXISTS "Users can delete own votes" ON public.community_post_votes;
-DROP POLICY IF EXISTS "Anyone can read likes" ON public.community_comment_likes;
-DROP POLICY IF EXISTS "Authenticated users can like" ON public.community_comment_likes;
-DROP POLICY IF EXISTS "Users can delete own likes" ON public.community_comment_likes;
-DROP POLICY IF EXISTS "Authenticated users can report" ON public.community_reports;
-DROP POLICY IF EXISTS "Users can read own reports" ON public.community_reports;
-
 -- RLS Policies
 -- Categories - everyone can read
 CREATE POLICY "Anyone can read categories" ON public.community_categories
@@ -374,19 +332,19 @@ CREATE POLICY "Anyone can read published posts" ON public.community_posts
 CREATE POLICY "Authenticated users can create posts" ON public.community_posts
     FOR INSERT WITH CHECK (
         auth.uid() IS NOT NULL AND 
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        auth.uid() IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
     );
 
 -- Posts - users can update their own posts
 CREATE POLICY "Users can update own posts" ON public.community_posts
     FOR UPDATE USING (
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        auth.uid() IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
     );
 
 -- Posts - users can delete their own posts
 CREATE POLICY "Users can delete own posts" ON public.community_posts
     FOR DELETE USING (
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        auth.uid() IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
     );
 
 -- Comments - everyone can read non-deleted comments
@@ -397,19 +355,19 @@ CREATE POLICY "Anyone can read comments" ON public.community_comments
 CREATE POLICY "Authenticated users can create comments" ON public.community_comments
     FOR INSERT WITH CHECK (
         auth.uid() IS NOT NULL AND 
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        auth.uid() IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
     );
 
 -- Comments - users can update their own comments
 CREATE POLICY "Users can update own comments" ON public.community_comments
     FOR UPDATE USING (
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        auth.uid() IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
     );
 
 -- Comments - users can delete their own comments
 CREATE POLICY "Users can delete own comments" ON public.community_comments
     FOR DELETE USING (
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        auth.uid() IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
     );
 
 -- Votes - everyone can read
@@ -420,13 +378,13 @@ CREATE POLICY "Anyone can read votes" ON public.community_post_votes
 CREATE POLICY "Authenticated users can vote" ON public.community_post_votes
     FOR INSERT WITH CHECK (
         auth.uid() IS NOT NULL AND 
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        auth.uid() IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
     );
 
 -- Votes - users can delete their own votes
 CREATE POLICY "Users can delete own votes" ON public.community_post_votes
     FOR DELETE USING (
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        auth.uid() IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
     );
 
 -- Likes - everyone can read
@@ -437,71 +395,24 @@ CREATE POLICY "Anyone can read likes" ON public.community_comment_likes
 CREATE POLICY "Authenticated users can like" ON public.community_comment_likes
     FOR INSERT WITH CHECK (
         auth.uid() IS NOT NULL AND 
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        auth.uid() IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
     );
 
 -- Likes - users can delete their own likes
 CREATE POLICY "Users can delete own likes" ON public.community_comment_likes
     FOR DELETE USING (
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
+        auth.uid() IN (SELECT auth_user_id FROM public.users WHERE id = user_id)
     );
 
 -- Reports - authenticated users can create
 CREATE POLICY "Authenticated users can report" ON public.community_reports
     FOR INSERT WITH CHECK (
         auth.uid() IS NOT NULL AND 
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = reporter_user_id)
+        auth.uid() IN (SELECT auth_user_id FROM public.users WHERE id = reporter_user_id)
     );
 
 -- Reports - users can read their own reports
 CREATE POLICY "Users can read own reports" ON public.community_reports
     FOR SELECT USING (
-        auth.uid()::text IN (SELECT auth_user_id FROM public.users WHERE id = reporter_user_id)
+        auth.uid() IN (SELECT auth_user_id FROM public.users WHERE id = reporter_user_id)
     );
-
--- Final verification
-DO $$
-DECLARE
-    table_count INTEGER;
-    function_count INTEGER;
-    trigger_count INTEGER;
-    policy_count INTEGER;
-BEGIN
-    -- Count created tables
-    SELECT COUNT(*) INTO table_count
-    FROM information_schema.tables 
-    WHERE table_schema = 'public' 
-    AND table_name LIKE 'community_%';
-    
-    -- Count created functions
-    SELECT COUNT(*) INTO function_count
-    FROM information_schema.routines 
-    WHERE routine_schema = 'public' 
-    AND routine_name IN ('handle_post_vote', 'update_comment_counts', 'update_like_counts');
-    
-    -- Count created triggers
-    SELECT COUNT(*) INTO trigger_count
-    FROM information_schema.triggers 
-    WHERE trigger_schema = 'public' 
-    AND trigger_name IN ('trigger_update_comment_counts', 'trigger_update_like_counts');
-    
-    -- Count RLS policies
-    SELECT COUNT(*) INTO policy_count
-    FROM pg_policies 
-    WHERE schemaname = 'public' 
-    AND tablename LIKE 'community_%';
-    
-    RAISE NOTICE 'Community schema setup completed successfully!';
-    RAISE NOTICE 'Tables created: %', table_count;
-    RAISE NOTICE 'Functions created: %', function_count;
-    RAISE NOTICE 'Triggers created: %', trigger_count;
-    RAISE NOTICE 'RLS policies created: %', policy_count;
-    
-    IF table_count < 6 THEN
-        RAISE WARNING 'Expected 6 community tables, but only % were created', table_count;
-    END IF;
-    
-    IF function_count < 3 THEN
-        RAISE WARNING 'Expected 3 functions, but only % were created', function_count;
-    END IF;
-END $$;

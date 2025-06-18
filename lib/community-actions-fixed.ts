@@ -221,14 +221,10 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId: string
       }
     }
 
-    // Ensure auth IDs are properly formatted as strings
-    const voterAuthId = String(voterProfile.auth_user_id)
-    const creatorAuthId = String(postCreatorAuthId)
-
     const { data, error } = await supabase.rpc("handle_post_vote", {
       p_post_id: postId,
-      p_voter_auth_id: voterAuthId,
-      p_post_creator_auth_id: creatorAuthId,
+      p_voter_auth_id: voterProfile.auth_user_id,
+      p_post_creator_auth_id: postCreatorAuthId,
       p_coin_amount: VOTE_COIN_AMOUNT,
     })
 
@@ -427,7 +423,7 @@ export async function toggleLikeCommentAction(commentId: number) {
   }
 }
 
-// --- Fetching Actions (with search) ---
+// --- Fetching Actions ---
 export async function fetchCommunityPosts(
   loggedInUserId?: string,
   options: {
