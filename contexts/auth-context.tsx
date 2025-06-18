@@ -1,9 +1,9 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { useRouter, usePathname, useSearchParams } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { clientAuth } from "@/lib/auth-utils"
-import { NavigationManager, ROUTES, getRedirectPath } from "@/lib/navigation-utils"
+import { NavigationManager, ROUTES } from "@/lib/navigation-utils"
 
 // Define types
 type UserTier = "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
@@ -57,7 +57,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const router = useRouter()
   const pathname = usePathname()
-  const searchParams = useSearchParams()
 
   // Create navigation manager
   const navigationManager = new NavigationManager(router, pathname)
@@ -82,8 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Handle post-initialization navigation for authenticated users
           if (navigationManager.isAuthRoute(pathname)) {
             // User is authenticated but on auth page, redirect to dashboard
-            const redirectPath = getRedirectPath(searchParams)
-            navigationManager.handlePostLoginNavigation(redirectPath)
+            navigationManager.handlePostLoginNavigation()
           }
         } else {
           setIsAuthenticated(false)
@@ -118,8 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Redirect away from auth routes if authenticated
       if (navigationManager.isAuthRoute(pathname)) {
-        const redirectPath = getRedirectPath(searchParams)
-        navigationManager.handlePostLoginNavigation(redirectPath)
+        navigationManager.handlePostLoginNavigation()
       }
     }
   }, [pathname, isAuthenticated, isInitialized])
@@ -189,11 +186,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAuthenticated(true)
 
       // Handle post-login navigation
-      const redirectPath = getRedirectPath(searchParams)
-
-      // Small delay to ensure state is updated before navigation
       setTimeout(() => {
-        navigationManager.handlePostLoginNavigation(redirectPath)
+        navigationManager.handlePostLoginNavigation()
       }, 100)
 
       return { success: true }
