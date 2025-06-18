@@ -180,10 +180,6 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId: string
   if (postData && postData.user_id === voterProfile.id) {
     return { success: false, error: "You cannot vote on your own post.", code: "SELF_VOTE" }
   }
-  // Or, if postCreatorAuthId is reliable and you want to compare auth IDs:
-  // if (voterProfile.auth_user_id === postCreatorAuthId) {
-  //   return { success: false, error: "You cannot vote on your own post.", code: "SELF_VOTE" }
-  // }
 
   const { data, error } = await supabase.rpc("handle_post_vote", {
     p_post_id: postId,
@@ -202,7 +198,6 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId: string
   if (data === false) return { success: false, error: "Voting process failed.", code: "VOTE_PROCESS_FAILED" }
 
   revalidatePath("/community")
-  // Realtime will update vote_count on client if subscribed
   return { success: true, message: `Voted successfully! ${VOTE_COIN_AMOUNT} coins transferred.` }
 }
 
@@ -217,8 +212,7 @@ export async function createCommentAction(postId: number, content: string, paren
   }
 
   if (!content.trim()) return { success: false, error: "Comment cannot be empty." }
-  // Sanitize if comments also use rich text, otherwise not strictly needed for plain text
-  const sanitizedContent = DOMPurify.sanitize(content) // Assuming comments can be rich text too
+  const sanitizedContent = DOMPurify.sanitize(content)
   if (!sanitizedContent.replace(/<[^>]*>?/gm, "").trim()) {
     return { success: false, error: "Comment content cannot be empty." }
   }
@@ -231,14 +225,13 @@ export async function createCommentAction(postId: number, content: string, paren
       content: sanitizedContent,
       parent_comment_id: parentCommentId || null,
     })
-    .select(`*, user:users!inner(id, auth_user_id, username, full_name, avatar_url, tier)`)
+    .select(`*, user:users!inner!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier)`) // Explicit FK name
     .single()
 
   if (error) return { success: false, error: error.message }
 
-  revalidatePath("/community") // Or specific post page
+  revalidatePath("/community")
   revalidatePath(`/community/post/${postId}`)
-  // Realtime will broadcast this insert.
   return { success: true, comment: newComment }
 }
 
@@ -261,12 +254,12 @@ export async function editCommentAction(commentId: number, content: string) {
     .update({ content: sanitizedContent, is_edited: true, updated_at: new Date().toISOString() })
     .eq("id", commentId)
     .eq("user_id", userProfile.id)
-    .select(`*, user:users!inner(id, auth_user_id, username, full_name, avatar_url, tier)`)
+    .select(`*, user:users!inner!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier)`) // Explicit FK name
     .single()
 
   if (error) return { success: false, error: error.message }
 
-  revalidatePath("/community") // Or specific post page
+  revalidatePath("/community")
   return { success: true, comment: data }
 }
 
@@ -281,13 +274,13 @@ export async function deleteCommentAction(commentId: number) {
 
   const { error } = await supabase
     .from("community_comments")
-    .update({ is_deleted: true, deleted_at: new Date().toISOString(), content: "[deleted]" }) // Soft delete
+    .update({ is_deleted: true, deleted_at: new Date().toISOString(), content: "[deleted]" })
     .eq("id", commentId)
     .eq("user_id", userProfile.id)
 
   if (error) return { success: false, error: error.message }
 
-  revalidatePath("/community") // Or specific post page
+  revalidatePath("/community")
   return { success: true }
 }
 
@@ -308,12 +301,10 @@ export async function toggleLikeCommentAction(commentId: number) {
     .maybeSingle()
 
   if (fetchError && fetchError.code !== "PGRST116") {
-    // PGRST116 is "Fetched result contains 0 rows"
     return { success: false, error: fetchError.message, liked: false }
   }
 
   if (existingLike) {
-    // Unlike
     const { error: deleteError } = await supabase
       .from("community_comment_likes")
       .delete()
@@ -323,7 +314,6 @@ export async function toggleLikeCommentAction(commentId: number) {
     revalidatePath("/community")
     return { success: true, liked: false }
   } else {
-    // Like
     const { error: insertError } = await supabase
       .from("community_comment_likes")
       .insert({ comment_id: commentId, user_id: userProfile.id })
@@ -362,7 +352,7 @@ export async function createReportAction(
 
 // --- Fetching Actions (with search) ---
 export async function fetchCommunityPosts(
-  loggedInUserInternalId: number | undefined, // This should be public.users.id (BIGINT)
+  loggedInUserInternalId: number | undefined,
   options: {
     categoryId?: number
     sortOrder?: string
@@ -379,8 +369,8 @@ export async function fetchCommunityPosts(
     .from("community_posts")
     .select(`
       *,
-      user:users!inner(id, auth_user_id, username, full_name, avatar_url, tier),
-      category:community_categories!inner(id, name, slug),
+      user:users!inner!community_posts_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
+      category:community_categories!inner!community_posts_category_id_fkey(id, name, slug),
       votes:community_post_votes(user_id)
     `)
     .eq("is_published", true)
@@ -389,8 +379,6 @@ export async function fetchCommunityPosts(
   if (categoryId) query = query.eq("category_id", categoryId)
 
   if (searchQuery) {
-    // Basic search on content. For better search, use pg_trgm or dedicated search.
-    // Or use .textSearch('content_fts', searchQuery) if you have a tsvector column 'content_fts'
     query = query.ilike("content", `%${searchQuery}%`)
   }
 
@@ -402,7 +390,7 @@ export async function fetchCommunityPosts(
   query = query.range(offset, offset + limit - 1)
 
   const { data, error, count } =
-    await query.returns<Array<CommunityPost & { user: any; category: any; votes: Array<{ user_id: string }> }>>()
+    await query.returns<Array<CommunityPost & { user: any; category: any; votes: Array<{ user_id: number }> }>>() // user_id in votes is number
 
   if (error) {
     console.error("Error fetching posts:", error)
@@ -416,21 +404,21 @@ export async function fetchCommunityPosts(
     has_voted: loggedInUserInternalId ? post.votes.some((vote) => vote.user_id === loggedInUserInternalId) : false,
   }))
 
-  return { posts: postsWithVoteStatus, count: count || data.length, error: null } // count might be null if not exact
+  return { posts: postsWithVoteStatus, count: count || data.length, error: null }
 }
 
-export async function fetchCommentsForPost(postId: number, userId?: string) {
+export async function fetchCommentsForPost(postId: number, loggedInUserInternalId?: number) { // Changed userId to loggedInUserInternalId for clarity
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase
     .from("community_comments")
     .select(`
       *,
-      user:users!inner(id, auth_user_id, username, full_name, avatar_url, tier),
+      user:users!inner!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
       likes:community_comment_likes(user_id)
     `)
     .eq("post_id", postId)
     .eq("is_deleted", false)
-    .is("parent_comment_id", null) // Fetch top-level comments
+    .is("parent_comment_id", null)
     .order("created_at", { ascending: true })
 
   if (error) {
@@ -438,17 +426,16 @@ export async function fetchCommentsForPost(postId: number, userId?: string) {
     return []
   }
 
-  // Fetch replies for each top-level comment (can lead to N+1, consider optimizing for deep nesting)
   const commentsWithReplies = await Promise.all(
     data.map(async (comment) => {
       const { data: repliesData, error: repliesError } = await supabase
         .from("community_comments")
         .select(`
           *,
-          user:users!inner(id, auth_user_id, username, full_name, avatar_url, tier),
+          user:users!inner!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
           likes:community_comment_likes(user_id)
         `)
-        .eq("post_id", postId) // ensure replies are for the same post
+        .eq("post_id", postId)
         .eq("parent_comment_id", comment.id)
         .eq("is_deleted", false)
         .order("created_at", { ascending: true })
@@ -456,13 +443,13 @@ export async function fetchCommentsForPost(postId: number, userId?: string) {
       return {
         ...comment,
         user: comment.user,
-        has_liked: userId ? comment.likes.some((like) => like.user_id === userId) : false,
+        has_liked: loggedInUserInternalId ? comment.likes.some((like: {user_id: number}) => like.user_id === loggedInUserInternalId) : false,
         replies: repliesError
           ? []
           : repliesData.map((r) => ({
               ...r,
               user: r.user,
-              has_liked: userId ? r.likes.some((like) => like.user_id === userId) : false,
+              has_liked: loggedInUserInternalId ? r.likes.some((like: {user_id: number}) => like.user_id === loggedInUserInternalId) : false,
             })),
       }
     }),
@@ -470,14 +457,12 @@ export async function fetchCommentsForPost(postId: number, userId?: string) {
   return commentsWithReplies as CommunityComment[]
 }
 
-// searchUsersForMention (from previous, if needed for Tiptap @mention extension)
 export async function searchUsersForMention(query: string) {
-  // ... (implementation from previous turn)
   if (!query || query.length < 2) return []
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase
     .from("users")
-    .select("id, username, full_name, avatar_url") // users.id is BIGINT
+    .select("id, username, full_name, avatar_url")
     .or(`username.ilike.%${query}%,full_name.ilike.%${query}%`)
     .limit(5)
 
@@ -485,6 +470,5 @@ export async function searchUsersForMention(query: string) {
     console.error("Error searching users:", error)
     return []
   }
-  // Format for Tiptap mention extension if using one that requires specific format
   return data.map((u) => ({ id: u.id, label: u.username, name: u.full_name, avatar: u.avatar_url }))
 }
