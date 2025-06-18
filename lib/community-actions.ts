@@ -9,11 +9,10 @@ import type {
   ReportReason,
   ReportTargetType,
 } from "@/types/database"
-import DOMPurify from "isomorphic-dompurify" // For server-side sanitization
+import DOMPurify from "isomorphic-dompurify"
 
 const VOTE_COIN_AMOUNT = 100
 
-// Helper to get current user's public profile (including public.users.id)
 async function getCurrentPublicUserProfile(
   supabaseClient: ReturnType<typeof createServerSupabaseClient>,
 ): Promise<PublicUser> {
@@ -48,17 +47,15 @@ export async function createCommunityPostAction(formData: FormData) {
     return { success: false, error: e.message }
   }
 
-  const rawContent = formData.get("content") as string // HTML from Tiptap
+  const rawContent = formData.get("content") as string
   const categoryId = formData.get("categoryId") as string
   const mediaFile = formData.get("mediaFile") as File | null
 
   if (!rawContent || !categoryId) {
     return { success: false, error: "Content and category are required." }
   }
-  // Sanitize HTML content before saving
   const sanitizedContent = DOMPurify.sanitize(rawContent)
   if (!sanitizedContent.replace(/<[^>]*>?/gm, "").trim() && !mediaFile) {
-    // Check if content is empty after stripping tags
     return { success: false, error: "Post content cannot be empty without media." }
   }
 
@@ -87,9 +84,9 @@ export async function createCommunityPostAction(formData: FormData) {
   }
 
   const postData = {
-    user_id: userProfile.id, // This is now the public.users.id (BIGINT)
+    user_id: userProfile.id, // Correct: public.users.id (BIGINT)
     category_id: Number.parseInt(categoryId),
-    content: sanitizedContent, // Save sanitized HTML
+    content: sanitizedContent,
     media_url,
     media_type,
     media_metadata,
@@ -98,9 +95,7 @@ export async function createCommunityPostAction(formData: FormData) {
   const { data: newPost, error } = await supabase.from("community_posts").insert(postData).select().single()
 
   if (error) return { success: false, error: error.message }
-
   revalidatePath("/community")
-  // For realtime, Supabase will broadcast this insert. Client needs to listen.
   return { success: true, post: newPost }
 }
 
@@ -225,7 +220,9 @@ export async function createCommentAction(postId: number, content: string, paren
       content: sanitizedContent,
       parent_comment_id: parentCommentId || null,
     })
-    .select(`*, user:users!inner!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier)`) // Explicit FK name
+    .select(
+      `*, user:users!inner!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier)`,
+    ) // Explicit FK name
     .single()
 
   if (error) return { success: false, error: error.message }
@@ -254,7 +251,9 @@ export async function editCommentAction(commentId: number, content: string) {
     .update({ content: sanitizedContent, is_edited: true, updated_at: new Date().toISOString() })
     .eq("id", commentId)
     .eq("user_id", userProfile.id)
-    .select(`*, user:users!inner!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier)`) // Explicit FK name
+    .select(
+      `*, user:users!inner!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier)`,
+    ) // Explicit FK name
     .single()
 
   if (error) return { success: false, error: error.message }
@@ -365,22 +364,25 @@ export async function fetchCommunityPosts(
   const supabase = createServerSupabaseClient()
   const offset = (page - 1) * limit
 
+  // IMPORTANT: Replace 'community_posts_user_id_fkey' and 'community_posts_category_id_fkey'
+  // with the ACTUAL names of your foreign key constraints if they are different.
+  const userJoinHint =
+    "user:users!inner!community_posts_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier)"
+  const categoryJoinHint = "category:community_categories!inner!community_posts_category_id_fkey(id, name, slug)"
+
   let query = supabase
     .from("community_posts")
     .select(`
       *,
-      user:users!inner!community_posts_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
-      category:community_categories!inner!community_posts_category_id_fkey(id, name, slug),
+      ${userJoinHint},
+      ${categoryJoinHint},
       votes:community_post_votes(user_id)
     `)
     .eq("is_published", true)
     .eq("is_deleted", false)
 
   if (categoryId) query = query.eq("category_id", categoryId)
-
-  if (searchQuery) {
-    query = query.ilike("content", `%${searchQuery}%`)
-  }
+  if (searchQuery) query = query.ilike("content", `%${searchQuery}%`)
 
   if (sortOrder === "newest") query = query.order("created_at", { ascending: false })
   else if (sortOrder === "oldest") query = query.order("created_at", { ascending: true })
@@ -390,10 +392,10 @@ export async function fetchCommunityPosts(
   query = query.range(offset, offset + limit - 1)
 
   const { data, error, count } =
-    await query.returns<Array<CommunityPost & { user: any; category: any; votes: Array<{ user_id: number }> }>>() // user_id in votes is number
+    await query.returns<Array<CommunityPost & { user: any; category: any; votes: Array<{ user_id: number }> }>>()
 
   if (error) {
-    console.error("Error fetching posts:", error)
+    console.error("Error fetching posts:", error.message) // Log the actual error message
     return { posts: [], count: 0, error: error.message }
   }
 
@@ -407,13 +409,18 @@ export async function fetchCommunityPosts(
   return { posts: postsWithVoteStatus, count: count || data.length, error: null }
 }
 
-export async function fetchCommentsForPost(postId: number, loggedInUserInternalId?: number) { // Changed userId to loggedInUserInternalId for clarity
+export async function fetchCommentsForPost(postId: number, loggedInUserInternalId?: number) {
   const supabase = createServerSupabaseClient()
+
+  // IMPORTANT: Replace 'community_comments_user_id_fkey' with the ACTUAL name
+  const userCommentJoinHint =
+    "user:users!inner!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier)"
+
   const { data, error } = await supabase
     .from("community_comments")
     .select(`
       *,
-      user:users!inner!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
+      ${userCommentJoinHint},
       likes:community_comment_likes(user_id)
     `)
     .eq("post_id", postId)
@@ -422,7 +429,7 @@ export async function fetchCommentsForPost(postId: number, loggedInUserInternalI
     .order("created_at", { ascending: true })
 
   if (error) {
-    console.error("Error fetching comments:", error)
+    console.error("Error fetching comments:", error.message)
     return []
   }
 
@@ -432,7 +439,7 @@ export async function fetchCommentsForPost(postId: number, loggedInUserInternalI
         .from("community_comments")
         .select(`
           *,
-          user:users!inner!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
+          ${userCommentJoinHint},
           likes:community_comment_likes(user_id)
         `)
         .eq("post_id", postId)
@@ -443,13 +450,17 @@ export async function fetchCommentsForPost(postId: number, loggedInUserInternalI
       return {
         ...comment,
         user: comment.user,
-        has_liked: loggedInUserInternalId ? comment.likes.some((like: {user_id: number}) => like.user_id === loggedInUserInternalId) : false,
+        has_liked: loggedInUserInternalId
+          ? comment.likes.some((like: { user_id: number }) => like.user_id === loggedInUserInternalId)
+          : false,
         replies: repliesError
           ? []
           : repliesData.map((r) => ({
               ...r,
               user: r.user,
-              has_liked: loggedInUserInternalId ? r.likes.some((like: {user_id: number}) => like.user_id === loggedInUserInternalId) : false,
+              has_liked: loggedInUserInternalId
+                ? r.likes.some((like: { user_id: number }) => like.user_id === loggedInUserInternalId)
+                : false,
             })),
       }
     }),

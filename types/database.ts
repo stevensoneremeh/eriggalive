@@ -655,7 +655,7 @@ export interface Database {
       }
       community_post_votes: {
         Row: CommunityPostVote
-        Insert: CommunityPostVote
+        Insert: CommunityPostVote & { user_id: number }
         Update: never
       }
       community_comments: {
@@ -682,7 +682,7 @@ export interface Database {
       }
       community_comment_likes: {
         Row: CommunityCommentLike
-        Insert: CommunityCommentLike
+        Insert: CommunityCommentLike & { user_id: number }
         Update: never
       }
       community_reports: {
