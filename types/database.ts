@@ -456,14 +456,53 @@ export interface UserSettings {
   updated_at: string
 }
 
+// New Community Types
+export interface CommunityCategory {
+  id: number
+  name: string
+  slug: string
+  description?: string
+  created_at: string
+}
+
+export interface CommunityPost {
+  id: number
+  user_id: string // UUID from auth.users
+  category_id: number
+  content: string
+  media_url?: string
+  media_type?: "image" | "audio" | "video"
+  media_metadata?: Record<string, any> // e.g., { width, height } for images, { duration } for audio/video
+  vote_count: number
+  comment_count: number
+  tags?: string[]
+  mentions?: { user_id: string; username: string; position: number }[]
+  is_published: boolean
+  is_deleted: boolean
+  deleted_at?: string
+  created_at: string
+  updated_at: string
+  // Joined data
+  user?: Pick<User, "id" | "username" | "full_name" | "avatar_url" | "tier"> // Assuming User type exists
+  category?: Pick<CommunityCategory, "id" | "name" | "slug">
+  has_voted?: boolean // Client-side enrichment: has the current user voted?
+}
+
+export interface CommunityPostVote {
+  post_id: number
+  user_id: string // UUID from auth.users
+  created_at: string
+}
+
 // Database response types
 export interface Database {
   public: {
     Tables: {
       users: {
-        Row: User
-        Insert: Omit<User, "id" | "created_at" | "updated_at">
-        Update: Partial<Omit<User, "id" | "created_at" | "updated_at">>
+        // Ensure this matches your actual public.users table structure
+        Row: User // Assuming User type is defined elsewhere and includes id, username, full_name, avatar_url, tier, coins
+        Insert: Partial<User>
+        Update: Partial<User>
       }
       albums: {
         Row: Album
@@ -540,6 +579,48 @@ export interface Database {
         Insert: Omit<UserSettings, "id" | "created_at" | "updated_at">
         Update: Partial<Omit<UserSettings, "id" | "created_at" | "updated_at">>
       }
+      community_categories: {
+        Row: CommunityCategory
+        Insert: Omit<CommunityCategory, "id" | "created_at">
+        Update: Partial<Omit<CommunityCategory, "id" | "created_at">>
+      }
+      community_posts: {
+        Row: CommunityPost
+        Insert: Omit<
+          CommunityPost,
+          | "id"
+          | "vote_count"
+          | "comment_count"
+          | "created_at"
+          | "updated_at"
+          | "is_published"
+          | "is_deleted"
+          | "user"
+          | "category"
+          | "has_voted"
+        > & { user_id: string }
+        Update: Partial<
+          Omit<CommunityPost, "id" | "user_id" | "created_at" | "updated_at" | "user" | "category" | "has_voted">
+        >
+      }
+      community_post_votes: {
+        Row: CommunityPostVote
+        Insert: CommunityPostVote
+        Update: never // Votes are usually not updated
+      }
     }
+    Functions: {
+      // Add the Supabase function if you use it directly via RPC
+      handle_post_vote: {
+        Args: {
+          p_post_id: number
+          p_voter_id: string
+          p_post_creator_id: string
+          p_coin_amount: number
+        }
+        Returns: boolean
+      }
+    }
+    // ... (Enums, CompositeTypes if any)
   }
 }

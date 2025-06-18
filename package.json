@@ -53,6 +53,8 @@
     "react-day-picker": "latest",
     "react-dom": "^19",
     "react-hook-form": "^7.54.1",
+    "react-intersection-observer": "latest",
+    "react-mentions": "latest",
     "react-resizable-panels": "latest",
     "recharts": "latest",
     "sonner": "latest",

@@ -1,22 +1,59 @@
-import { Home } from "lucide-react"
-import Link from "next/link"
+import { Suspense } from "react"
+import { CommunityLayout } from "@/components/community/community-layout"
+import { CreatePostForm } from "@/components/community/create-post-form"
+import { PostFeed, PostFeedSkeleton } from "@/components/community/post-feed"
+import { LeftSidebar, LeftSidebarSkeleton } from "@/components/community/left-sidebar"
+import { RightSidebar, RightSidebarSkeleton } from "@/components/community/right-sidebar"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 
-export default function CommunityPage() {
+export default async function CommunityPage({
+  searchParams,
+}: {
+  searchParams?: { category?: string; sort?: string }
+}) {
+  const supabase = createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { data: categories, error: categoriesError } = await supabase
+    .from("community_categories")
+    .select("*")
+    .order("name", { ascending: true })
+
+  if (categoriesError) {
+    console.error("Error fetching categories:", categoriesError)
+    // Handle error appropriately, maybe show an error message
+  }
+
+  const selectedCategorySlug = searchParams?.category
+  const currentCategory = categories?.find((cat) => cat.slug === selectedCategorySlug)
+
   return (
-    <main className="container relative">
-      {/* Breadcrumb Navigation */}
-      <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-6">
-        <Link href="/" className="hover:text-primary transition-colors flex items-center">
-          <Home className="h-4 w-4 mr-1" />
-          Home
-        </Link>
-        <span>/</span>
-        <span className="text-foreground">Community</span>
-      </nav>
-      <div>
-        <h1>Community Page</h1>
-        <p>Welcome to the community page!</p>
-      </div>
-    </main>
+    <div className="min-h-screen bg-background text-foreground">
+      <CommunityLayout
+        leftSidebar={
+          <Suspense fallback={<LeftSidebarSkeleton />}>
+            <LeftSidebar categories={categories || []} currentCategorySlug={selectedCategorySlug} />
+          </Suspense>
+        }
+        rightSidebar={
+          <Suspense fallback={<RightSidebarSkeleton />}>
+            <RightSidebar />
+          </Suspense>
+        }
+      >
+        <div className="space-y-6">
+          {user && <CreatePostForm categories={categories || []} userId={user.id} />}
+          <Suspense fallback={<PostFeedSkeleton />}>
+            <PostFeed
+              userId={user?.id}
+              categoryFilter={currentCategory?.id}
+              sortOrder={searchParams?.sort || "newest"}
+            />
+          </Suspense>
+        </div>
+      </CommunityLayout>
+    </div>
   )
 }
