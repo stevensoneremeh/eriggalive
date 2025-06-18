@@ -49,22 +49,16 @@ export default function SignUpPage() {
       return
     }
 
-    if (!username.trim()) {
-      setError("Username is required")
-      setLoading(false)
-      return
-    }
-
     try {
-      const { success, error } = await signUp(email, password, username, fullName)
+      const { error } = await signUp(email, password, username, fullName)
 
-      if (!success) {
-        setError(error?.message || "Failed to create account")
+      if (error) {
+        setError(error.message)
       } else {
         setSuccess(true)
         setTimeout(() => {
           router.push("/dashboard")
-        }, 3000) // Extended to 3 seconds for better UX
+        }, 2000)
       }
     } catch (err) {
       setError("An unexpected error occurred")
@@ -76,26 +70,16 @@ export default function SignUpPage() {
   if (success) {
     return (
       <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <Card className="max-w-md w-full bg-card/50 border-green-500/20 shadow-xl">
-          <CardContent className="p-8 text-center">
-            <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-              <Check className="h-10 w-10 text-white" />
+        <Card className="max-w-md w-full bg-card/50 border-green-500/20">
+          <CardContent className="p-6 text-center">
+            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Check className="h-8 w-8 text-white" />
             </div>
-            <h2 className="text-3xl font-bold mb-3 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-              Welcome to the Movement!
-            </h2>
-            <p className="text-muted-foreground mb-4 text-lg">
-              Your account has been created successfully, <span className="font-semibold text-primary">{fullName}</span>
-              !
+            <h2 className="text-2xl font-bold mb-2">Welcome to the Movement!</h2>
+            <p className="text-muted-foreground mb-4">
+              Your account has been created successfully. You're now part of the Erigga community.
             </p>
-            <div className="bg-primary/10 rounded-lg p-4 mb-6">
-              <p className="text-sm font-medium text-primary mb-2">🎉 Welcome Bonus</p>
-              <p className="text-xs text-muted-foreground">You've received 100 coins to get started!</p>
-            </div>
-            <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-              <span>Taking you to your dashboard...</span>
-            </div>
+            <p className="text-sm text-muted-foreground">Redirecting to your dashboard...</p>
           </CardContent>
         </Card>
       </div>
