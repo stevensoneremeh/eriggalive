@@ -285,40 +285,44 @@ export function UnifiedNavigation() {
       )}
     >
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
-            <DynamicLogo width={120} height={32} />
-          </Link>
+        <div className="flex items-center justify-between h-16 w-full">
+          {/* Logo - Always visible */}
+          <div className="flex items-center shrink-0">
+            <Link href="/" className="flex items-center space-x-2">
+              <DynamicLogo width={120} height={32} />
+            </Link>
+          </div>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center space-x-1">
-            {getDesktopItems().map((item) => {
-              const active = isActive(item.href)
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={cn(
-                    "relative px-3 py-2 text-sm font-medium rounded-md transition-all duration-200",
-                    active
-                      ? "text-primary bg-primary/10 shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
-                  )}
-                >
-                  {item.name}
-                  {item.badge && (
-                    <Badge variant="secondary" className="ml-2 text-xs bg-red-500 text-white">
-                      {item.badge}
-                    </Badge>
-                  )}
-                </Link>
-              )
-            })}
-          </nav>
+          {/* Desktop Navigation - Centered */}
+          {isAuthenticated && (
+            <nav className="hidden lg:flex items-center space-x-1 flex-1 justify-center max-w-2xl">
+              {getDesktopItems().map((item) => {
+                const active = isActive(item.href)
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={cn(
+                      "relative px-3 py-2 text-sm font-medium rounded-md transition-all duration-200",
+                      active
+                        ? "text-primary bg-primary/10 shadow-sm"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
+                    )}
+                  >
+                    {item.name}
+                    {item.badge && (
+                      <Badge variant="secondary" className="ml-2 text-xs bg-red-500 text-white">
+                        {item.badge}
+                      </Badge>
+                    )}
+                  </Link>
+                )
+              })}
+            </nav>
+          )}
 
           {/* Right Actions */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 shrink-0">
             {/* Theme Toggle */}
             <div className="hidden md:flex items-center space-x-1 mr-2">
               <Button
