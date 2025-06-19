@@ -3,7 +3,8 @@
 import type React from "react"
 import { createContext, useContext, useReducer, useCallback, useEffect } from "react"
 import type { CommunityPost, CommunityCategory } from "@/types/database"
-import { createClientSupabaseClient } from "@/lib/supabase/client"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/database"
 import { useAuth } from "./auth-context"
 
 interface CommunityState {
@@ -109,7 +110,7 @@ const CommunityContext = createContext<CommunityContextType | undefined>(undefin
 export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(communityReducer, initialState)
   const { user, profile } = useAuth()
-  const supabase = createClientSupabaseClient()
+  const supabase = createClientComponentClient<Database>()
 
   const loadCategories = useCallback(async () => {
     try {

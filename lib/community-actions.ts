@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import type { User as PublicUser, CommunityComment } from "@/types/database"
+import type { User as PublicUser, CommunityComment, ReportReason, ReportTargetType } from "@/types/database"
 import DOMPurify from "isomorphic-dompurify"
 
 const VOTE_COIN_AMOUNT = 100
@@ -424,6 +424,42 @@ export async function toggleLikeCommentAction(commentId: number) {
   } catch (error: any) {
     console.error("Toggle like action error:", error)
     return { success: false, error: error.message || "Failed to toggle like" }
+  }
+}
+
+// --- Report Actions ---
+export async function createReportAction(
+  targetId: number,
+  targetType: ReportTargetType,
+  reason: ReportReason,
+  additionalNotes = "",
+) {
+  try {
+    const supabase = createServerSupabaseClient()
+    const reporterProfile = await getCurrentPublicUserProfile(supabase)
+
+    if (!reason) {
+      return { success: false, error: "Please select a reason for the report." }
+    }
+
+    const { error } = await supabase.from("community_reports").insert({
+      reporter_user_id: reporterProfile.id,
+      target_id: targetId,
+      target_type: targetType,
+      reason,
+      additional_notes: additionalNotes || null,
+    })
+
+    if (error) {
+      console.error("Report creation error:", error)
+      return { success: false, error: error.message }
+    }
+
+    // We don't need to revalidate a specific path, but you can do so if you show reports somewhere
+    return { success: true }
+  } catch (error: any) {
+    console.error("Create report action error:", error)
+    return { success: false, error: error.message || "Failed to submit report" }
   }
 }
 

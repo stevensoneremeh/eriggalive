@@ -28,6 +28,8 @@ import { useToast } from "@/components/ui/use-toast"
 import DOMPurify from "isomorphic-dompurify"
 import { CommentSection } from "./comment-section"
 import { cn } from "@/lib/utils"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 
 interface PostCardProps {
   post: CommunityPost
@@ -169,6 +171,7 @@ export function PostCard({ post, currentUserId }: PostCardProps) {
   const { user } = useAuth()
   const { toast } = useToast()
   const [showComments, setShowComments] = useState(false)
+  const supabase = createClientComponentClient<Database>()
 
   const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true })
 

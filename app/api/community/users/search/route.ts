@@ -16,20 +16,23 @@ export async function GET(request: NextRequest) {
       .from("users")
       .select("id, username, full_name, avatar_url")
       .or(`username.ilike.%${query}%,full_name.ilike.%${query}%`)
-      .eq("is_active", true)
       .limit(5)
 
     if (error) {
-      console.error("User search error:", error)
+      console.error("Error searching users:", error)
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({
-      success: true,
-      users: data || [],
-    })
+    const users = (data || []).map((u) => ({
+      id: u.id,
+      username: u.username,
+      full_name: u.full_name,
+      avatar_url: u.avatar_url,
+    }))
+
+    return NextResponse.json({ success: true, users })
   } catch (error: any) {
-    console.error("API error:", error)
+    console.error("Search users API error:", error)
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }
 }
