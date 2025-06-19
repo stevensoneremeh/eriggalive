@@ -1,31 +1,26 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
-const VOTE_COIN_AMOUNT = 100
-
 export async function POST(request: NextRequest) {
   try {
     const supabase = createServerSupabaseClient()
 
-    // Get authenticated user
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
-
     if (authError || !user) {
-      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get user profile
-    const { data: voterProfile, error: profileError } = await supabase
+    const { data: userData, error: userError } = await supabase
       .from("users")
-      .select("*")
+      .select("id, coin_balance")
       .eq("auth_user_id", user.id)
       .single()
 
-    if (profileError || !voterProfile) {
-      return NextResponse.json({ success: false, error: "User profile not found" }, { status: 404 })
+    if (userError || !userData) {
+      return NextResponse.json({ success: false, error: "User not found" }, { status: 404 })
     }
 
     const { postId, postCreatorId } = await request.json()
@@ -34,32 +29,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 })
     }
 
-    // Check if trying to vote on own post
-    const { data: postData } = await supabase.from("community_posts").select("user_id").eq("id", postId).single()
-
-    if (postData && postData.user_id === voterProfile.id) {
-      return NextResponse.json({
-        success: false,
-        error: "You cannot vote on your own post.",
-        code: "SELF_VOTE",
-      })
-    }
-
-    // Check if user has enough coins
-    if (voterProfile.coins < VOTE_COIN_AMOUNT) {
-      return NextResponse.json({
-        success: false,
-        error: "Not enough Erigga Coins to vote.",
-        code: "INSUFFICIENT_FUNDS",
-      })
-    }
-
     // Check if user has already voted
     const { data: existingVote } = await supabase
       .from("community_post_votes")
       .select("id")
       .eq("post_id", postId)
-      .eq("user_id", voterProfile.id)
+      .eq("user_id", userData.id)
       .single()
 
     if (existingVote) {
@@ -68,69 +43,72 @@ export async function POST(request: NextRequest) {
         .from("community_post_votes")
         .delete()
         .eq("post_id", postId)
-        .eq("user_id", voterProfile.id)
+        .eq("user_id", userData.id)
 
       if (deleteError) {
-        return NextResponse.json({ success: false, error: deleteError.message }, { status: 500 })
+        return NextResponse.json({ success: false, error: "Failed to remove vote" }, { status: 500 })
       }
 
-      // Refund coins to voter
-      await supabase
-        .from("users")
-        .update({ coins: voterProfile.coins + VOTE_COIN_AMOUNT })
-        .eq("id", voterProfile.id)
+      // Decrease vote count
+      const { error: updateError } = await supabase
+        .from("community_posts")
+        .update({ vote_count: supabase.raw("vote_count - 1") })
+        .eq("id", postId)
 
-      // Remove coins from post creator
-      const { data: creatorData } = await supabase.from("users").select("coins").eq("id", postCreatorId).single()
-      if (creatorData) {
-        await supabase
-          .from("users")
-          .update({ coins: Math.max(0, creatorData.coins - VOTE_COIN_AMOUNT) })
-          .eq("id", postCreatorId)
+      if (updateError) {
+        return NextResponse.json({ success: false, error: "Failed to update vote count" }, { status: 500 })
       }
 
-      // Update post vote count
-      await supabase.rpc("decrement_post_votes", { post_id: postId })
-
-      return NextResponse.json({
-        success: true,
-        voted: false,
-        message: `Vote removed! ${VOTE_COIN_AMOUNT} coins refunded.`,
-      })
+      return NextResponse.json({ success: true, voted: false })
     } else {
+      // Check if user has enough coins
+      if (userData.coin_balance < 1) {
+        return NextResponse.json({ success: false, error: "Insufficient coins to vote" }, { status: 400 })
+      }
+
       // Add vote
-      const { error: insertError } = await supabase
-        .from("community_post_votes")
-        .insert({ post_id: postId, user_id: voterProfile.id })
+      const { error: insertError } = await supabase.from("community_post_votes").insert({
+        post_id: postId,
+        user_id: userData.id,
+      })
 
       if (insertError) {
-        return NextResponse.json({ success: false, error: insertError.message }, { status: 500 })
+        return NextResponse.json({ success: false, error: "Failed to add vote" }, { status: 500 })
       }
 
-      // Transfer coins from voter to post creator
-      await supabase
+      // Increase vote count and deduct coin
+      const { error: updateError } = await supabase
+        .from("community_posts")
+        .update({ vote_count: supabase.raw("vote_count + 1") })
+        .eq("id", postId)
+
+      if (updateError) {
+        return NextResponse.json({ success: false, error: "Failed to update vote count" }, { status: 500 })
+      }
+
+      // Deduct coin from voter
+      const { error: coinError } = await supabase
         .from("users")
-        .update({ coins: voterProfile.coins - VOTE_COIN_AMOUNT })
-        .eq("id", voterProfile.id)
+        .update({ coin_balance: supabase.raw("coin_balance - 1") })
+        .eq("id", userData.id)
 
-      const { data: creatorData } = await supabase.from("users").select("coins").eq("id", postCreatorId).single()
-      if (creatorData) {
-        await supabase
-          .from("users")
-          .update({ coins: creatorData.coins + VOTE_COIN_AMOUNT })
-          .eq("id", postCreatorId)
+      if (coinError) {
+        return NextResponse.json({ success: false, error: "Failed to deduct coin" }, { status: 500 })
       }
 
-      // Update post vote count
-      await supabase.rpc("increment_post_votes", { post_id: postId })
+      // Add coin to post creator
+      const { error: rewardError } = await supabase
+        .from("users")
+        .update({ coin_balance: supabase.raw("coin_balance + 1") })
+        .eq("id", postCreatorId)
 
-      return NextResponse.json({
-        success: true,
-        voted: true,
-        message: `Voted successfully! ${VOTE_COIN_AMOUNT} coins transferred.`,
-      })
+      if (rewardError) {
+        console.error("Failed to reward post creator:", rewardError)
+      }
+
+      return NextResponse.json({ success: true, voted: true })
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error("Vote API error:", error)
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }

@@ -1,94 +1,82 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import DOMPurify from "isomorphic-dompurify"
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = createServerSupabaseClient()
 
-    // Get authenticated user
+    // Get the authenticated user
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
-
     if (authError || !user) {
-      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get user profile
-    const { data: userProfile, error: profileError } = await supabase
+    // Get user's internal ID
+    const { data: userData, error: userError } = await supabase
       .from("users")
-      .select("*")
+      .select("id")
       .eq("auth_user_id", user.id)
       .single()
 
-    if (profileError || !userProfile) {
-      return NextResponse.json({ success: false, error: "User profile not found" }, { status: 404 })
+    if (userError || !userData) {
+      return NextResponse.json({ success: false, error: "User not found" }, { status: 404 })
     }
 
     const formData = await request.formData()
     const content = formData.get("content") as string
-    const categoryId = formData.get("categoryId") as string
+    const categoryId = Number.parseInt(formData.get("categoryId") as string)
     const mediaFile = formData.get("mediaFile") as File | null
 
-    if (!content?.trim() && !mediaFile) {
-      return NextResponse.json({ success: false, error: "Content or media is required" }, { status: 400 })
+    if (!content?.trim()) {
+      return NextResponse.json({ success: false, error: "Content is required" }, { status: 400 })
     }
 
     if (!categoryId) {
       return NextResponse.json({ success: false, error: "Category is required" }, { status: 400 })
     }
 
-    // Sanitize content
-    const sanitizedContent = content ? DOMPurify.sanitize(content) : ""
+    let mediaUrl = null
+    let mediaType = null
 
-    // Handle media upload
-    let mediaUrl: string | undefined
-    let mediaType: string | undefined
-    let mediaMetadata: Record<string, any> | undefined
-
+    // Handle media upload if present
     if (mediaFile && mediaFile.size > 0) {
       const fileExt = mediaFile.name.split(".").pop()
-      const fileName = `${userProfile.id}-${Date.now()}.${fileExt}`
-      const filePath = `community_media/${fileName}`
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+      const filePath = `community-media/${fileName}`
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("eriggalive-assets")
-        .upload(filePath, mediaFile)
+      const { data: uploadData, error: uploadError } = await supabase.storage.from("media").upload(filePath, mediaFile)
 
       if (uploadError) {
-        console.error("Media upload error:", uploadError)
-        return NextResponse.json(
-          { success: false, error: `Media upload failed: ${uploadError.message}` },
-          { status: 500 },
-        )
+        console.error("Upload error:", uploadError)
+        return NextResponse.json({ success: false, error: "Failed to upload media" }, { status: 500 })
       }
 
-      const { data: publicUrlData } = supabase.storage.from("eriggalive-assets").getPublicUrl(uploadData.path)
-      mediaUrl = publicUrlData.publicUrl
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("media").getPublicUrl(filePath)
+
+      mediaUrl = publicUrl
 
       if (mediaFile.type.startsWith("image/")) mediaType = "image"
-      else if (mediaFile.type.startsWith("audio/")) mediaType = "audio"
       else if (mediaFile.type.startsWith("video/")) mediaType = "video"
-
-      mediaMetadata = {
-        name: mediaFile.name,
-        size: mediaFile.size,
-        type: mediaFile.type,
-      }
+      else if (mediaFile.type.startsWith("audio/")) mediaType = "audio"
     }
 
-    // Create post
-    const { data: newPost, error: insertError } = await supabase
+    // Create the post
+    const { data: postData, error: postError } = await supabase
       .from("community_posts")
       .insert({
-        user_id: userProfile.id,
-        category_id: Number.parseInt(categoryId),
-        content: sanitizedContent,
+        user_id: userData.id,
+        category_id: categoryId,
+        content,
         media_url: mediaUrl,
         media_type: mediaType,
-        media_metadata: mediaMetadata,
+        is_published: true,
+        is_deleted: false,
+        vote_count: 0,
       })
       .select(`
         *,
@@ -97,16 +85,16 @@ export async function POST(request: NextRequest) {
       `)
       .single()
 
-    if (insertError) {
-      console.error("Post creation error:", insertError)
-      return NextResponse.json({ success: false, error: insertError.message }, { status: 500 })
+    if (postError) {
+      console.error("Post creation error:", postError)
+      return NextResponse.json({ success: false, error: "Failed to create post" }, { status: 500 })
     }
 
     return NextResponse.json({
       success: true,
-      post: { ...newPost, has_voted: false },
+      post: { ...postData, has_voted: false },
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error("API error:", error)
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }
@@ -119,22 +107,11 @@ export async function GET(request: NextRequest) {
 
     const page = Number.parseInt(searchParams.get("page") || "1")
     const limit = Number.parseInt(searchParams.get("limit") || "10")
-    const categoryId = searchParams.get("categoryId")
+    const category = searchParams.get("category")
     const sort = searchParams.get("sort") || "newest"
     const search = searchParams.get("search")
 
     const offset = (page - 1) * limit
-
-    // Get current user for vote status
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    let userInternalId: number | undefined
-    if (user) {
-      const { data: userData } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
-      userInternalId = userData?.id
-    }
 
     let query = supabase
       .from("community_posts")
@@ -147,25 +124,23 @@ export async function GET(request: NextRequest) {
       .eq("is_published", true)
       .eq("is_deleted", false)
 
-    if (categoryId) {
-      query = query.eq("category_id", Number.parseInt(categoryId))
+    if (category) {
+      query = query.eq("category_id", Number.parseInt(category))
     }
 
     if (search) {
       query = query.ilike("content", `%${search}%`)
     }
 
-    // Apply sorting
     switch (sort) {
-      case "newest":
-        query = query.order("created_at", { ascending: false })
-        break
       case "oldest":
         query = query.order("created_at", { ascending: true })
         break
       case "top":
         query = query.order("vote_count", { ascending: false }).order("created_at", { ascending: false })
         break
+      default:
+        query = query.order("created_at", { ascending: false })
     }
 
     query = query.range(offset, offset + limit - 1)
@@ -176,17 +151,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    const postsWithVoteStatus = (data || []).map((post: any) => ({
-      ...post,
-      has_voted: userInternalId ? post.votes.some((vote: any) => vote.user_id === userInternalId) : false,
-    }))
-
-    return NextResponse.json({
-      success: true,
-      posts: postsWithVoteStatus,
-      hasMore: postsWithVoteStatus.length === limit,
-    })
-  } catch (error: any) {
+    return NextResponse.json({ success: true, posts: data || [] })
+  } catch (error) {
     console.error("API error:", error)
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }
