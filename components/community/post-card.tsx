@@ -1,32 +1,37 @@
 "use client"
 
-import { useEffect, useRef, useState, useTransition } from "react"
+import { useState, useRef, useCallback } from "react"
 import Link from "next/link"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import type { RealtimeChannel } from "@supabase/supabase-js"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { UserTierBadge } from "@/components/user-tier-badge"
 import { formatDistanceToNow } from "date-fns"
-import { MessageSquare, MoreHorizontal, Flag, Edit, Trash2, LinkIcon, Play, Pause, Loader2 } from "lucide-react"
+import {
+  MessageSquare,
+  MoreHorizontal,
+  Flag,
+  Edit,
+  Trash2,
+  LinkIcon,
+  Play,
+  Pause,
+  ArrowBigUp,
+  Coins,
+} from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import type { CommunityPost, Database } from "@/types/database"
-import { VoteButton } from "./vote-button"
+import type { CommunityPost } from "@/types/database"
 import { useAuth } from "@/contexts/auth-context"
+import { useCommunity } from "@/contexts/community-context"
 import { useToast } from "@/components/ui/use-toast"
-import DOMPurify from "dompurify"
-import { CommentSection } from "./comment-section" // Import CommentSection
-import { RichTextEditor } from "./rich-text-editor" // For editing post
-import { deletePostAction, editPostAction } from "@/lib/community-actions"
-import { ReportDialog } from "./report-dialog" // To be created
+import DOMPurify from "isomorphic-dompurify"
+import { CommentSection } from "./comment-section"
+import { cn } from "@/lib/utils"
 
 interface PostCardProps {
   post: CommunityPost
   currentUserId?: string
-  onPostDeleted: (postId: number) => void
-  onPostUpdated: (updatedPost: CommunityPost) => void
 }
 
 function MediaPlayer({ url, type }: { url: string; type: "audio" | "video" }) {
@@ -45,15 +50,23 @@ function MediaPlayer({ url, type }: { url: string; type: "audio" | "video" }) {
 
   if (type === "audio") {
     return (
-      <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+      <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
         <Button size="icon" variant="ghost" onClick={togglePlay}>
           {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
         </Button>
-        <audio ref={audioRef} src={url} onEnded={() => setIsPlaying(false)} className="w-full hidden" />
+        <audio
+          ref={audioRef}
+          src={url}
+          onEnded={() => setIsPlaying(false)}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          className="hidden"
+        />
         <span className="text-sm text-muted-foreground">Audio track</span>
       </div>
     )
   }
+
   if (type === "video") {
     return (
       <video
@@ -63,56 +76,99 @@ function MediaPlayer({ url, type }: { url: string; type: "audio" | "video" }) {
         className="w-full rounded-lg border max-h-[500px]"
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
+        poster={url.replace(/\.[^/.]+$/, "_thumb.jpg")} // Assuming thumbnails exist
       />
     )
   }
+
   return null
 }
 
-export function PostCard({ post: initialPost, currentUserId, onPostDeleted, onPostUpdated }: PostCardProps) {
-  const supabase = createClientComponentClient<Database>()
-  const { user: authUser } = useAuth()
+function VoteButton({ post }: { post: CommunityPost }) {
+  const { user, profile } = useAuth()
+  const { voteOnPost } = useCommunity()
   const { toast } = useToast()
+  const [isVoting, setIsVoting] = useState(false)
 
-  const [post, setPost] = useState(initialPost) // Use state for post data to allow realtime updates
-  const [optimisticVoteCount, setOptimisticVoteCount] = useState(post.vote_count)
-  const [hasVotedOptimistic, setHasVotedOptimistic] = useState(post.has_voted || false)
-  const [showComments, setShowComments] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
-  const [editedContent, setEditedContent] = useState(post.content)
-  const [isDeleting, startDeleteTransition] = useTransition()
-  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
-
-  useEffect(() => {
-    setPost(initialPost)
-    setOptimisticVoteCount(initialPost.vote_count)
-    setHasVotedOptimistic(initialPost.has_voted || false)
-    setEditedContent(initialPost.content)
-  }, [initialPost])
-
-  // Realtime subscription for this specific post
-  useEffect(() => {
-    if (!post?.id) return
-
-    const postChannel: RealtimeChannel = supabase
-      .channel(`community_post:${post.id}`)
-      .on<CommunityPost>(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "community_posts", filter: `id=eq.${post.id}` },
-        (payload) => {
-          const updatedPost = payload.new as CommunityPost
-          setPost((prevPost) => ({ ...prevPost, ...updatedPost, user: prevPost.user, category: prevPost.category })) // Preserve joined data
-          setOptimisticVoteCount(updatedPost.vote_count)
-          // has_voted needs to be re-evaluated if another user's vote comes through,
-          // or if current user votes on another device. For simplicity, VoteButton handles its own optimistic state.
-        },
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(postChannel)
+  const handleVote = useCallback(async () => {
+    if (!user || !profile) {
+      toast({
+        title: "Login Required",
+        description: "Please login to vote on posts.",
+        variant: "destructive",
+      })
+      return
     }
-  }, [supabase, post?.id])
+
+    if (profile.coins < 100) {
+      toast({
+        title: "Insufficient Coins",
+        description: "You need at least 100 Erigga Coins to vote.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (post.user_id === profile.id) {
+      toast({
+        title: "Cannot Vote",
+        description: "You cannot vote on your own post.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsVoting(true)
+    try {
+      const result = await voteOnPost(post.id, post.user_id)
+      if (result.success) {
+        toast({
+          title: post.has_voted ? "Vote Removed!" : "Vote Added!",
+          description: "100 Erigga Coins transferred.",
+        })
+      } else {
+        toast({
+          title: "Vote Failed",
+          description: result.error,
+          variant: "destructive",
+        })
+      }
+    } catch (error: any) {
+      toast({
+        title: "Vote Failed",
+        description: "Something went wrong",
+        variant: "destructive",
+      })
+    } finally {
+      setIsVoting(false)
+    }
+  }, [user, profile, post, voteOnPost, toast])
+
+  const isOwnPost = profile?.id === post.user_id
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className={cn(
+        "flex items-center gap-2 text-muted-foreground hover:text-primary",
+        post.has_voted && "text-primary",
+        isOwnPost && "opacity-50 cursor-not-allowed",
+      )}
+      onClick={handleVote}
+      disabled={isVoting || isOwnPost || !user}
+    >
+      <ArrowBigUp className={cn("h-5 w-5", post.has_voted && "fill-current")} />
+      <span className="font-medium">{post.vote_count}</span>
+      <Coins className="h-4 w-4 text-yellow-500" />
+    </Button>
+  )
+}
+
+export function PostCard({ post, currentUserId }: PostCardProps) {
+  const { user } = useAuth()
+  const { toast } = useToast()
+  const [showComments, setShowComments] = useState(false)
 
   const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true })
 
@@ -122,40 +178,12 @@ export function PostCard({ post: initialPost, currentUserId, onPostDeleted, onPo
     return { __html: cleanHtml }
   }
 
-  const handleEditSubmit = async () => {
-    if (!editedContent.replace(/<[^>]*>?/gm, "").trim()) {
-      toast({ title: "Empty Post", description: "Post content cannot be empty.", variant: "destructive" })
-      return
-    }
-    const formData = new FormData()
-    formData.append("content", editedContent)
-
-    const result = await editPostAction(post.id, formData)
-    if (result.success && result.post) {
-      onPostUpdated(result.post as CommunityPost) // Notify parent feed
-      setPost((prev) => ({ ...prev, ...(result.post as CommunityPost) })) // Update local state
-      setIsEditing(false)
-      toast({ title: "Post Updated" })
-    } else {
-      toast({ title: "Error", description: result.error || "Failed to update post.", variant: "destructive" })
-    }
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(`${window.location.origin}/community/post/${post.id}`)
+    toast({ title: "Link Copied!", description: "Post link copied to clipboard." })
   }
 
-  const handleDelete = () => {
-    if (!confirm("Are you sure you want to delete this post? This action cannot be undone.")) return
-    startDeleteTransition(async () => {
-      const result = await deletePostAction(post.id)
-      if (result.success) {
-        onPostDeleted(post.id) // Notify parent feed
-        toast({ title: "Post Deleted" })
-        // The post will be removed from the feed by the parent.
-      } else {
-        toast({ title: "Error", description: result.error || "Failed to delete post.", variant: "destructive" })
-      }
-    })
-  }
-
-  if (post.is_deleted) return null // Don't render deleted posts
+  if (post.is_deleted) return null
 
   return (
     <Card className="shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden">
@@ -179,9 +207,7 @@ export function PostCard({ post: initialPost, currentUserId, onPostDeleted, onPo
               </div>
               <p className="text-xs text-muted-foreground">
                 {timeAgo}
-                {post.is_edited && !isEditing && (
-                  <span title={new Date(post.updated_at).toLocaleString()}> (edited)</span>
-                )}
+                {post.is_edited && <span title={new Date(post.updated_at).toLocaleString()}> (edited)</span>}
                 {post.category && (
                   <>
                     {" "}
@@ -194,7 +220,7 @@ export function PostCard({ post: initialPost, currentUserId, onPostDeleted, onPo
               </p>
             </div>
           </div>
-          {authUser && (
+          {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -202,37 +228,22 @@ export function PostCard({ post: initialPost, currentUserId, onPostDeleted, onPo
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {authUser.id === post.user_id ? (
+                {user.id === post.user?.auth_user_id ? (
                   <>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        setIsEditing(true)
-                        setEditedContent(post.content)
-                      }}
-                    >
+                    <DropdownMenuItem>
                       <Edit className="mr-2 h-4 w-4" /> Edit Post
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={handleDelete}
-                      disabled={isDeleting}
-                      className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                    >
-                      {isDeleting ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="mr-2 h-4 w-4" />
-                      )}{" "}
+                    <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                      <Trash2 className="mr-2 h-4 w-4" />
                       Delete Post
                     </DropdownMenuItem>
                   </>
                 ) : (
-                  <DropdownMenuItem onClick={() => setIsReportDialogOpen(true)}>
+                  <DropdownMenuItem>
                     <Flag className="mr-2 h-4 w-4" /> Report Post
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem
-                  onClick={() => navigator.clipboard.writeText(`${window.location.origin}/community/post/${post.id}`)}
-                >
+                <DropdownMenuItem onClick={handleCopyLink}>
                   <LinkIcon className="mr-2 h-4 w-4" /> Copy Link
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -242,29 +253,19 @@ export function PostCard({ post: initialPost, currentUserId, onPostDeleted, onPo
       </CardHeader>
 
       <CardContent className="px-4 pb-3 space-y-3">
-        {isEditing ? (
-          <div className="space-y-2">
-            <RichTextEditor content={editedContent} onChange={setEditedContent} placeholder="Edit your post..." />
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleEditSubmit}>
-                Save Changes
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div dangerouslySetInnerHTML={renderRichContent(post.content)} />
-        )}
+        <div
+          className="prose prose-sm max-w-none dark:prose-invert"
+          dangerouslySetInnerHTML={renderRichContent(post.content)}
+        />
 
-        {post.media_url && post.media_type && !isEditing && (
+        {post.media_url && post.media_type && (
           <div className="mt-3 rounded-lg overflow-hidden border">
             {post.media_type === "image" && (
               <img
                 src={post.media_url || "/placeholder.svg"}
                 alt="Post media"
                 className="w-full h-auto max-h-[600px] object-contain bg-muted"
+                loading="lazy"
               />
             )}
             {(post.media_type === "audio" || post.media_type === "video") && (
@@ -276,18 +277,7 @@ export function PostCard({ post: initialPost, currentUserId, onPostDeleted, onPo
 
       <CardFooter className="p-4 flex items-center justify-between border-t bg-muted/30">
         <div className="flex items-center space-x-4">
-          <VoteButton
-            postId={post.id}
-            postCreatorId={post.user_id}
-            initialVoteCount={optimisticVoteCount} // Use state variable
-            initialHasVoted={hasVotedOptimistic} // Use state variable
-            currentUserId={currentUserId}
-            onVoteSuccess={(newVoteCount, newHasVoted) => {
-              setOptimisticVoteCount(newVoteCount)
-              setHasVotedOptimistic(newHasVoted)
-              // Realtime will also update, this is for immediate UI feedback
-            }}
-          />
+          <VoteButton post={post} />
           <Button
             variant="ghost"
             size="sm"
@@ -314,17 +304,10 @@ export function PostCard({ post: initialPost, currentUserId, onPostDeleted, onPo
           <CommentSection postId={post.id} />
         </div>
       )}
-      <ReportDialog
-        isOpen={isReportDialogOpen}
-        onClose={() => setIsReportDialogOpen(false)}
-        targetId={post.id}
-        targetType="post"
-      />
     </Card>
   )
 }
 
-// PostCardSkeleton remains the same
 export function PostCardSkeleton() {
   return (
     <Card className="shadow-md">
