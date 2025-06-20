@@ -1,340 +1,257 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
-import Link from "next/link"
+import { useState } from "react"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { UserTierBadge } from "@/components/user-tier-badge"
+import { Separator } from "@/components/ui/separator"
 import { formatDistanceToNow } from "date-fns"
-import {
-  MessageSquare,
+import { 
+  Heart, 
+  MessageCircle, 
+  Share2, 
   MoreHorizontal,
-  Flag,
+  ThumbsUp,
+  Coins,
   Edit,
   Trash2,
-  LinkIcon,
-  Play,
-  Pause,
-  ArrowBigUp,
-  Coins,
+  Flag
 } from "lucide-react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import type { CommunityPost } from "@/types/database"
-import { useAuth } from "@/contexts/auth-context"
-import { useCommunity } from "@/contexts/community-context"
-import { useToast } from "@/components/ui/use-toast"
-import DOMPurify from "isomorphic-dompurify"
+import { VoteButton } from "./vote-button"
 import { CommentSection } from "./comment-section"
-import { cn } from "@/lib/utils"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import type { Database } from "@/types/supabase"
+import { useToast } from "@/components/ui/use-toast"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface PostCardProps {
-  post: CommunityPost
+  post: any
   currentUserId?: string
+  onVoteUpdate?: (postId: number, newVoteCount: number, hasVoted: boolean) => void
 }
 
-function MediaPlayer({ url, type }: { url: string; type: "audio" | "video" }) {
-  const [isPlaying, setIsPlaying] = useState(false)
-  const audioRef = useRef<HTMLAudioElement>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
-
-  const togglePlay = () => {
-    if (type === "audio" && audioRef.current) {
-      isPlaying ? audioRef.current.pause() : audioRef.current.play()
-    } else if (type === "video" && videoRef.current) {
-      isPlaying ? videoRef.current.pause() : videoRef.current.play()
-    }
-    setIsPlaying(!isPlaying)
-  }
-
-  if (type === "audio") {
-    return (
-      <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
-        <Button size="icon" variant="ghost" onClick={togglePlay}>
-          {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-        </Button>
-        <audio
-          ref={audioRef}
-          src={url}
-          onEnded={() => setIsPlaying(false)}
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-          className="hidden"
-        />
-        <span className="text-sm text-muted-foreground">Audio track</span>
-      </div>
-    )
-  }
-
-  if (type === "video") {
-    return (
-      <video
-        ref={videoRef}
-        src={url}
-        controls
-        className="w-full rounded-lg border max-h-[500px]"
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        poster={url.replace(/\.[^/.]+$/, "_thumb.jpg")} // Assuming thumbnails exist
-      />
-    )
-  }
-
-  return null
-}
-
-function VoteButton({ post }: { post: CommunityPost }) {
-  const { user, profile } = useAuth()
-  const { voteOnPost } = useCommunity()
+export function PostCard({ post, currentUserId, onVoteUpdate }: PostCardProps) {
+  const [showComments, setShowComments] = useState(false)
+  const [voteCount, setVoteCount] = useState(post.vote_count || 0)
+  const [hasVoted, setHasVoted] = useState(post.has_voted || false)
   const { toast } = useToast()
-  const [isVoting, setIsVoting] = useState(false)
 
-  const handleVote = useCallback(async () => {
-    if (!user || !profile) {
-      toast({
-        title: "Login Required",
-        description: "Please login to vote on posts.",
-        variant: "destructive",
-      })
-      return
-    }
+  const handleVoteSuccess = (newVoteCount: number, newHasVoted: boolean) => {
+    setVoteCount(newVoteCount)
+    setHasVoted(newHasVoted)
+    onVoteUpdate?.(post.id, newVoteCount, newHasVoted)
+  }
 
-    if (profile.coins < 100) {
-      toast({
-        title: "Insufficient Coins",
-        description: "You need at least 100 Erigga Coins to vote.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (post.user_id === profile.id) {
-      toast({
-        title: "Cannot Vote",
-        description: "You cannot vote on your own post.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsVoting(true)
+  const handleShare = async () => {
     try {
-      const result = await voteOnPost(post.id, post.user_id)
-      if (result.success) {
-        toast({
-          title: post.has_voted ? "Vote Removed!" : "Vote Added!",
-          description: "100 Erigga Coins transferred.",
+      if (navigator.share) {
+        await navigator.share({
+          title: `Post by ${post.user?.username}`,
+          text: post.content.slice(0, 100) + "...",
+          url: window.location.href,
         })
       } else {
+        await navigator.clipboard.writeText(window.location.href)
         toast({
-          title: "Vote Failed",
-          description: result.error,
-          variant: "destructive",
+          title: "Link Copied",
+          description: "Post link copied to clipboard",
         })
       }
-    } catch (error: any) {
-      toast({
-        title: "Vote Failed",
-        description: "Something went wrong",
-        variant: "destructive",
-      })
-    } finally {
-      setIsVoting(false)
+    } catch (error) {
+      console.error("Error sharing:", error)
     }
-  }, [user, profile, post, voteOnPost, toast])
-
-  const isOwnPost = profile?.id === post.user_id
-
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className={cn(
-        "flex items-center gap-2 text-muted-foreground hover:text-primary",
-        post.has_voted && "text-primary",
-        isOwnPost && "opacity-50 cursor-not-allowed",
-      )}
-      onClick={handleVote}
-      disabled={isVoting || isOwnPost || !user}
-    >
-      <ArrowBigUp className={cn("h-5 w-5", post.has_voted && "fill-current")} />
-      <span className="font-medium">{post.vote_count}</span>
-      <Coins className="h-4 w-4 text-yellow-500" />
-    </Button>
-  )
-}
-
-export function PostCard({ post, currentUserId }: PostCardProps) {
-  const { user } = useAuth()
-  const { toast } = useToast()
-  const [showComments, setShowComments] = useState(false)
-  const supabase = createClientComponentClient<Database>()
-
-  const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true })
-
-  const renderRichContent = (htmlContent: string) => {
-    if (typeof window === "undefined") return { __html: htmlContent }
-    const cleanHtml = DOMPurify.sanitize(htmlContent, { USE_PROFILES: { html: true } })
-    return { __html: cleanHtml }
   }
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/community/post/${post.id}`)
-    toast({ title: "Link Copied!", description: "Post link copied to clipboard." })
+  const renderMedia = () => {
+    if (!post.media_url) return null
+
+    switch (post.media_type) {
+      case "image":
+        return (
+          <div className="mt-3 rounded-lg overflow-hidden">
+            <img
+              src={post.media_url}
+              alt="Post media"
+              className="w-full h-auto max-h-96 object-cover"
+            />
+          </div>
+        )
+      case "video":
+        return (
+          <div className="mt-3 rounded-lg overflow-hidden">
+            <video
+              src={post.media_url}
+              controls
+              className="w-full h-auto max-h-96"
+            />
+          </div>
+        )
+      case "audio":
+        return (
+          <div className="mt-3 p-4 bg-muted rounded-lg">
+            <audio src={post.media_url} controls className="w-full" />
+          </div>
+        )
+      default:
+        return null
+    }
   }
 
-  if (post.is_deleted) return null
-
   return (
-    <Card className="shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden">
-      <CardHeader className="p-4">
+    <Card className="w-full">
+      <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-3">
-            <Link href={`/profile/${post.user?.username || post.user_id}`}>
-              <Avatar className="h-10 w-10 sm:h-11 sm:w-11">
-                <AvatarImage src={post.user?.avatar_url || "/placeholder-user.jpg"} alt={post.user?.username} />
-                <AvatarFallback>{post.user?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
-              </Avatar>
-            </Link>
+            <Avatar>
+              <AvatarImage 
+                src={post.user?.avatar_url || "/placeholder-user.jpg"} 
+                alt={post.user?.username} 
+              />
+              <AvatarFallback>
+                {post.user?.username?.charAt(0).toUpperCase() || "U"}
+              </AvatarFallback>
+            </Avatar>
             <div>
-              <div className="flex items-center gap-2">
-                <Link href={`/profile/${post.user?.username || post.user_id}`} className="hover:underline">
-                  <span className="font-semibold text-sm sm:text-base">
-                    {post.user?.full_name || post.user?.username}
-                  </span>
-                </Link>
-                {post.user?.tier && <UserTierBadge tier={post.user.tier} size="xs" />}
+              <div className="flex items-center space-x-2">
+                <h4 className="font-semibold text-sm">
+                  {post.user?.full_name || post.user?.username}
+                </h4>
+                <Badge variant="secondary" className="text-xs">
+                  {post.user?.tier || "grassroot"}
+                </Badge>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {timeAgo}
-                {post.is_edited && <span title={new Date(post.updated_at).toLocaleString()}> (edited)</span>}
+              <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                <span>@{post.user?.username}</span>
+                <span>•</span>
+                <span>{formatDistanceToNow(new Date(post.created_at))} ago</span>
                 {post.category && (
                   <>
-                    {" "}
-                    in{" "}
-                    <Link href={`/community?category=${post.category.slug}`} className="hover:underline text-primary">
+                    <span>•</span>
+                    <Badge variant="outline" className="text-xs">
                       {post.category.name}
-                    </Link>
+                    </Badge>
                   </>
                 )}
-              </p>
+              </div>
             </div>
           </div>
-          {user && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {user.id === post.user?.auth_user_id ? (
-                  <>
-                    <DropdownMenuItem>
-                      <Edit className="mr-2 h-4 w-4" /> Edit Post
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete Post
-                    </DropdownMenuItem>
-                  </>
-                ) : (
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {currentUserId === post.user?.auth_user_id && (
+                <>
                   <DropdownMenuItem>
-                    <Flag className="mr-2 h-4 w-4" /> Report Post
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit Post
                   </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={handleCopyLink}>
-                  <LinkIcon className="mr-2 h-4 w-4" /> Copy Link
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+                  <DropdownMenuItem className="text-destructive">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Post
+                  </DropdownMenuItem>
+                </>
+              )}
+              <DropdownMenuItem>
+                <Flag className="mr-2 h-4 w-4" />
+                Report Post
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </CardHeader>
 
-      <CardContent className="px-4 pb-3 space-y-3">
-        <div
-          className="prose prose-sm max-w-none dark:prose-invert"
-          dangerouslySetInnerHTML={renderRichContent(post.content)}
-        />
+      <CardContent className="pt-0">
+        <div className="space-y-3">
+          {/* Post Content */}
+          <div className="prose prose-sm max-w-none">
+            <p className="whitespace-pre-wrap">{post.content}</p>
+          </div>
 
-        {post.media_url && post.media_type && (
-          <div className="mt-3 rounded-lg overflow-hidden border">
-            {post.media_type === "image" && (
-              <img
-                src={post.media_url || "/placeholder.svg"}
-                alt="Post media"
-                className="w-full h-auto max-h-[600px] object-contain bg-muted"
-                loading="lazy"
+          {/* Media */}
+          {renderMedia()}
+
+          {/* Post Actions */}
+          <div className="flex items-center justify-between pt-3">
+            <div className="flex items-center space-x-4">
+              <VoteButton
+                postId={post.id}
+                postCreatorId={post.user?.auth_user_id}
+                initialVoteCount={voteCount}
+                initialHasVoted={hasVoted}
+                currentUserId={currentUserId}
+                onVoteSuccess={handleVoteSuccess}
               />
-            )}
-            {(post.media_type === "audio" || post.media_type === "video") && (
-              <MediaPlayer url={post.media_url} type={post.media_type} />
-            )}
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowComments(!showComments)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <MessageCircle className="mr-1.5 h-4 w-4" />
+                {post.comment_count || 0}
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleShare}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <Share2 className="mr-1.5 h-4 w-4" />
+                Share
+              </Button>
+            </div>
           </div>
-        )}
+
+          {/* Comments Section */}
+          {showComments && (
+            <>
+              <Separator />
+              <CommentSection 
+                postId={post.id} 
+                currentUserId={currentUserId}
+              />
+            </>
+          )}
+        </div>
       </CardContent>
-
-      <CardFooter className="p-4 flex items-center justify-between border-t bg-muted/30">
-        <div className="flex items-center space-x-4">
-          <VoteButton post={post} />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-primary"
-            onClick={() => setShowComments(!showComments)}
-          >
-            <MessageSquare className="mr-1.5 h-4 w-4" />
-            {post.comment_count || 0}
-          </Button>
-        </div>
-        {post.tags && post.tags.length > 0 && (
-          <div className="hidden sm:flex items-center gap-1.5">
-            {post.tags.slice(0, 3).map((tag) => (
-              <Badge key={tag} variant="secondary" className="text-xs">
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        )}
-      </CardFooter>
-
-      {showComments && (
-        <div className="p-4 border-t">
-          <CommentSection postId={post.id} />
-        </div>
-      )}
     </Card>
   )
 }
 
 export function PostCardSkeleton() {
   return (
-    <Card className="shadow-md">
-      <CardHeader className="p-4">
-        <div className="flex items-center space-x-3">
-          <div className="h-11 w-11 rounded-full bg-muted animate-pulse"></div>
-          <div>
-            <div className="h-5 w-32 bg-muted rounded animate-pulse mb-1.5"></div>
-            <div className="h-3 w-24 bg-muted rounded animate-pulse"></div>
+    <Card className="w-full">
+      <CardHeader className="pb-3">
+        <div className="flex items-start space-x-3">
+          <div className="w-10 h-10 bg-muted rounded-full animate-pulse" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 bg-muted rounded animate-pulse w-1/4" />
+            <div className="h-3 bg-muted rounded animate-pulse w-1/3" />
           </div>
         </div>
       </CardHeader>
-      <CardContent className="px-4 pb-3 space-y-2">
-        <div className="h-4 w-full bg-muted rounded animate-pulse"></div>
-        <div className="h-4 w-5/6 bg-muted rounded animate-pulse"></div>
-        <div className="h-4 w-4/6 bg-muted rounded animate-pulse"></div>
-        <div className="h-40 w-full bg-muted rounded-lg animate-pulse mt-3"></div>
-      </CardContent>
-      <CardFooter className="p-4 flex items-center justify-between border-t bg-muted/30">
-        <div className="flex items-center space-x-4">
-          <div className="h-8 w-20 bg-muted rounded animate-pulse"></div>
-          <div className="h-8 w-16 bg-muted rounded animate-pulse"></div>
+      <CardContent className="pt-0">
+        <div className="space-y-3">
+          <div className="h-4 bg-muted rounded animate-pulse w-full" />
+          <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
+          <div className="h-4 bg-muted rounded animate-pulse w-1/2" />
+          <div className="flex space-x-4 pt-3">
+            <div className="h-8 bg-muted rounded animate-pulse w-16" />
+            <div className="h-8 bg-muted rounded animate-pulse w-16" />
+            <div className="h-8 bg-muted rounded animate-pulse w-16" />
+          </div>
         </div>
-      </CardFooter>
+      </CardContent>
     </Card>
   )
 }

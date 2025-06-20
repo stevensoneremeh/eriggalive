@@ -1,290 +1,281 @@
+
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import type { RealtimeChannel } from "@supabase/supabase-js"
-import { CommentCard } from "./comment-card"
-import { CreateCommentForm } from "./create-comment-form"
-import type { CommunityComment, Database } from "@/types/database"
-import { fetchCommentsForPost } from "@/lib/community-actions"
-import { Skeleton } from "@/components/ui/skeleton"
-import { useAuth } from "@/contexts/auth-context"
+import { useState, useEffect } from "react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { formatDistanceToNow } from "date-fns"
+import { Heart, Reply, Send, Loader2 } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
+import { createCommentAction, fetchCommentsForPost } from "@/lib/community-actions"
 
 interface CommentSectionProps {
   postId: number
+  currentUserId?: string
 }
 
-export function CommentSection({ postId }: CommentSectionProps) {
-  const supabase = createClientComponentClient<Database>()
-  const { user: currentUser } = useAuth()
-  const [comments, setComments] = useState<CommunityComment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+interface Comment {
+  id: number
+  content: string
+  created_at: string
+  like_count: number
+  user: {
+    id: number
+    username: string
+    full_name: string
+    avatar_url?: string
+    tier: string
+  }
+  replies?: Comment[]
+  has_liked?: boolean
+}
 
-  const loadComments = useCallback(async () => {
-    setLoading(true)
-    try {
-      const fetchedComments = await fetchCommentsForPost(postId, currentUser?.id)
-      setComments(fetchedComments)
-      setError(null)
-    } catch (err: any) {
-      setError(err.message || "Failed to load comments.")
-      setComments([])
-    } finally {
-      setLoading(false)
-    }
-  }, [postId, currentUser?.id])
+export function CommentSection({ postId, currentUserId }: CommentSectionProps) {
+  const [comments, setComments] = useState<Comment[]>([])
+  const [newComment, setNewComment] = useState("")
+  const [replyingTo, setReplyingTo] = useState<number | null>(null)
+  const [replyContent, setReplyContent] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const { toast } = useToast()
 
   useEffect(() => {
     loadComments()
-  }, [loadComments])
+  }, [postId, currentUserId])
 
-  // Realtime subscriptions for comments
-  useEffect(() => {
-    const commentChannel: RealtimeChannel = supabase
-      .channel(`community_comments:${postId}`)
-      .on<CommunityComment>(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "community_comments", filter: `post_id=eq.${postId}` },
-        async (payload) => {
-          // Fetch the new comment with user data
-          const { data: newCommentData, error: fetchError } = await supabase
-            .from("community_comments")
-            .select(
-              `*, user:users!community_comments_user_id_fkey(id, username, full_name, avatar_url, tier), likes:community_comment_likes(user_id)`,
-            )
-            .eq("id", payload.new.id)
-            .single()
-
-          if (fetchError || !newCommentData) return
-
-          const newCommentWithDetails = {
-            ...newCommentData,
-            user: newCommentData.user,
-            has_liked: currentUser ? newCommentData.likes.some((l) => l.user_id === currentUser.id) : false,
-            replies: [], // New comments won't have replies initially
-          } as CommunityComment
-
-          setComments((prevComments) => {
-            if (newCommentWithDetails.parent_comment_id) {
-              // It's a reply
-              return prevComments.map((c) =>
-                c.id === newCommentWithDetails.parent_comment_id
-                  ? {
-                      ...c,
-                      replies: [...(c.replies || []), newCommentWithDetails],
-                      reply_count: (c.reply_count || 0) + 1,
-                    }
-                  : c,
-              )
-            } else {
-              // It's a top-level comment
-              return [newCommentWithDetails, ...prevComments] // Add to top or bottom based on sort
-            }
-          })
-        },
-      )
-      .on<CommunityComment>(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "community_comments", filter: `post_id=eq.${postId}` },
-        (payload) => {
-          setComments((prev) =>
-            prev
-              .map((c) =>
-                c.id === payload.new.id
-                  ? { ...c, ...payload.new, user: c.user, replies: c.replies, has_liked: c.has_liked }
-                  : c,
-              )
-              .map((pc) => {
-                if (pc.replies && pc.replies.find((r) => r.id === payload.new.id)) {
-                  return {
-                    ...pc,
-                    replies: pc.replies.map((r) =>
-                      r.id === payload.new.id ? { ...r, ...payload.new, user: r.user, has_liked: r.has_liked } : r,
-                    ),
-                  }
-                }
-                return pc
-              }),
-          )
-        },
-      )
-      .on<CommunityComment>(
-        // For soft deletes (is_deleted = true)
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "community_comments", filter: `post_id=eq.${postId}` },
-        (payload) => {
-          if (payload.new.is_deleted) {
-            handleCommentDeletedState(payload.new.id, payload.new.parent_comment_id)
-          }
-        },
-      )
-      // Realtime for comment likes (more complex, might need specific channel or careful filtering)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "community_comment_likes" }, // Broad, filter client-side
-        (payload) => {
-          const relevantCommentId = (payload.new as any)?.comment_id || (payload.old as any)?.comment_id
-          if (!relevantCommentId) return
-
-          setComments((prev) =>
-            prev.map((c) => {
-              let changed = false
-              let newLikeCount = c.like_count
-              let newHasLiked = c.has_liked
-
-              const updateLikes = (comment: CommunityComment) => {
-                if (comment.id === relevantCommentId) {
-                  changed = true
-                  if (payload.eventType === "INSERT" && (payload.new as any).user_id === currentUser?.id)
-                    newHasLiked = true
-                  if (payload.eventType === "DELETE" && (payload.old as any).user_id === currentUser?.id)
-                    newHasLiked = false
-                  // For like_count, ideally rely on DB trigger or re-fetch comment.
-                  // This is a rough approximation for realtime UI update.
-                  if (payload.eventType === "INSERT") newLikeCount = (comment.like_count || 0) + 1
-                  if (payload.eventType === "DELETE") newLikeCount = Math.max(0, (comment.like_count || 0) - 1)
-                  return { ...comment, like_count: newLikeCount, has_liked: newHasLiked }
-                }
-                return comment
-              }
-
-              const updatedComment = updateLikes(c)
-              if (c.replies) {
-                const updatedReplies = c.replies.map((r) => updateLikes(r))
-                if (updatedReplies.some((r, i) => r !== c.replies![i])) {
-                  // check if any reply changed
-                  return { ...updatedComment, replies: updatedReplies }
-                }
-              }
-              return updatedComment
-            }),
-          )
-        },
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(commentChannel)
-    }
-  }, [supabase, postId, currentUser?.id])
-
-  const handleCommentCreated = (newComment: CommunityComment) => {
-    // Optimistic update handled by Realtime, but this can be a fallback or for non-realtime
-    // For replies, ensure they are nested correctly.
-    if (newComment.parent_comment_id) {
-      setComments((prev) =>
-        prev.map((c) =>
-          c.id === newComment.parent_comment_id
-            ? { ...c, replies: [...(c.replies || []), newComment], reply_count: (c.reply_count || 0) + 1 }
-            : c,
-        ),
-      )
-    } else {
-      setComments((prev) => [newComment, ...prev]) // Add new top-level comments to the beginning
+  const loadComments = async () => {
+    setLoading(true)
+    try {
+      const fetchedComments = await fetchCommentsForPost(postId, currentUserId)
+      setComments(fetchedComments)
+    } catch (error) {
+      console.error("Error loading comments:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load comments.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleCommentDeletedState = (commentId: number, parentId?: number | null) => {
-    setComments((prev) => {
-      if (parentId) {
-        // It's a reply
-        return prev.map((c) =>
-          c.id === parentId
-            ? {
-                ...c,
-                replies: c.replies?.filter((r) => r.id !== commentId),
-                reply_count: Math.max(0, (c.reply_count || 0) - 1),
-              }
-            : c,
-        )
-      } else {
-        // It's a top-level comment
-        return prev.filter((c) => c.id !== commentId)
-      }
-    })
-  }
+  const handleSubmitComment = async (content: string, parentId?: number) => {
+    if (!currentUserId) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to comment.",
+        variant: "destructive",
+      })
+      return
+    }
 
-  const handleCommentUpdatedState = (updatedComment: CommunityComment) => {
-    setComments((prev) =>
-      prev.map((c) => {
-        if (c.id === updatedComment.id)
-          return { ...c, ...updatedComment, user: c.user, replies: c.replies, has_liked: c.has_liked } // Preserve user/replies if not in payload
-        if (c.replies) {
-          const replyIndex = c.replies.findIndex((r) => r.id === updatedComment.id)
-          if (replyIndex > -1) {
-            const newReplies = [...c.replies]
-            newReplies[replyIndex] = {
-              ...newReplies[replyIndex],
-              ...updatedComment,
-              user: newReplies[replyIndex].user,
-              has_liked: newReplies[replyIndex].has_liked,
-            }
-            return { ...c, replies: newReplies }
-          }
+    if (!content.trim()) {
+      toast({
+        title: "Empty Comment",
+        description: "Please write something before submitting.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const result = await createCommentAction(postId, content, parentId)
+      
+      if (result.success) {
+        toast({
+          title: "Comment Posted",
+          description: "Your comment has been added.",
+        })
+        
+        // Reset forms
+        if (parentId) {
+          setReplyContent("")
+          setReplyingTo(null)
+        } else {
+          setNewComment("")
         }
-        return c
-      }),
-    )
+        
+        // Reload comments to get the new one
+        await loadComments()
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to post comment.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error submitting comment:", error)
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-4 py-4">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="flex space-x-3">
-            <Skeleton className="h-9 w-9 rounded-full" />
-            <div className="flex-1 space-y-2">
-              <Skeleton className="h-4 w-1/4" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-4 w-1/2" />
-            </div>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  if (error) {
-    return <p className="text-destructive text-sm py-4">Error loading comments: {error}</p>
-  }
-
-  return (
-    <div className="py-4 space-y-3">
-      <h3 className="text-lg font-semibold mb-2">
-        Comments ({comments.reduce((acc, c) => acc + 1 + (c.replies?.length || 0), 0)})
-      </h3>
-      <CreateCommentForm postId={postId} onCommentCreated={handleCommentCreated} />
-      <div className="space-y-3 divide-y divide-border">
-        {comments.map((comment) => (
-          <div key={comment.id} className="pt-3">
-            <CommentCard
-              comment={comment}
-              postId={postId}
-              currentUserId={currentUser?.id}
-              onCommentDeleted={handleCommentDeletedState}
-              onCommentUpdated={handleCommentUpdatedState}
-              onReplyCreated={handleCommentCreated} // Replies are also new comments
+  const CommentCard = ({ comment, isReply = false }: { comment: Comment; isReply?: boolean }) => (
+    <Card className={`${isReply ? "ml-8 mt-2" : "mb-4"}`}>
+      <CardContent className="p-4">
+        <div className="flex items-start space-x-3">
+          <Avatar className="h-8 w-8">
+            <AvatarImage 
+              src={comment.user?.avatar_url || "/placeholder-user.jpg"} 
+              alt={comment.user?.username} 
             />
-            {comment.replies && comment.replies.length > 0 && (
-              <div className="ml-6 sm:ml-8 pl-3 sm:pl-4 border-l-2 space-y-3 mt-3">
-                {comment.replies.map((reply) => (
-                  <CommentCard
-                    key={reply.id}
-                    comment={reply}
-                    postId={postId}
-                    currentUserId={currentUser?.id}
-                    onCommentDeleted={handleCommentDeletedState}
-                    onCommentUpdated={handleCommentUpdatedState}
-                    onReplyCreated={handleCommentCreated}
-                  />
-                ))}
+            <AvatarFallback>
+              {comment.user?.username?.charAt(0).toUpperCase() || "U"}
+            </AvatarFallback>
+          </Avatar>
+          
+          <div className="flex-1">
+            <div className="flex items-center space-x-2 mb-2">
+              <span className="font-semibold text-sm">
+                {comment.user?.full_name || comment.user?.username}
+              </span>
+              <Badge variant="secondary" className="text-xs">
+                {comment.user?.tier || "grassroot"}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {formatDistanceToNow(new Date(comment.created_at))} ago
+              </span>
+            </div>
+            
+            <p className="text-sm mb-3 whitespace-pre-wrap">{comment.content}</p>
+            
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-foreground h-8 px-2"
+              >
+                <Heart className="mr-1 h-3 w-3" />
+                {comment.like_count || 0}
+              </Button>
+              
+              {!isReply && currentUserId && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+                  className="text-muted-foreground hover:text-foreground h-8 px-2"
+                >
+                  <Reply className="mr-1 h-3 w-3" />
+                  Reply
+                </Button>
+              )}
+            </div>
+            
+            {/* Reply Form */}
+            {replyingTo === comment.id && (
+              <div className="mt-3 space-y-2">
+                <Textarea
+                  placeholder="Write a reply..."
+                  value={replyContent}
+                  onChange={(e) => setReplyContent(e.target.value)}
+                  className="min-h-[80px] text-sm"
+                />
+                <div className="flex items-center space-x-2">
+                  <Button
+                    size="sm"
+                    onClick={() => handleSubmitComment(replyContent, comment.id)}
+                    disabled={submitting || !replyContent.trim()}
+                  >
+                    {submitting ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <Send className="mr-1 h-3 w-3" />
+                    )}
+                    Reply
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setReplyingTo(null)
+                      setReplyContent("")
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
               </div>
             )}
           </div>
-        ))}
-        {comments.length === 0 && <p className="text-sm text-muted-foreground">No comments yet. Be the first!</p>}
+        </div>
+      </CardContent>
+    </Card>
+  )
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 bg-muted rounded-full animate-pulse" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 bg-muted rounded animate-pulse w-1/4" />
+            <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
+          </div>
+        </div>
       </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* New Comment Form */}
+      {currentUserId && (
+        <div className="space-y-3">
+          <Textarea
+            placeholder="Write a comment..."
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            className="min-h-[80px]"
+          />
+          <Button
+            onClick={() => handleSubmitComment(newComment)}
+            disabled={submitting || !newComment.trim()}
+            size="sm"
+          >
+            {submitting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="mr-2 h-4 w-4" />
+            )}
+            Comment
+          </Button>
+        </div>
+      )}
+
+      {/* Comments List */}
+      {comments.length === 0 ? (
+        <p className="text-center text-muted-foreground py-8">
+          No comments yet. {currentUserId ? "Be the first to comment!" : "Sign in to add a comment."}
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {comments.map((comment) => (
+            <div key={comment.id}>
+              <CommentCard comment={comment} />
+              {/* Render replies */}
+              {comment.replies && comment.replies.length > 0 && (
+                <div className="ml-4">
+                  {comment.replies.map((reply) => (
+                    <CommentCard key={reply.id} comment={reply} isReply={true} />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -9,7 +9,7 @@ const VOTE_COIN_AMOUNT = 100
 
 async function getCurrentPublicUserProfile(
   supabaseClient: ReturnType<typeof createServerSupabaseClient>,
-): Promise<PublicUser> {
+): Promise<PublicUser | null> {
   try {
     const {
       data: { user: authUser },
@@ -17,9 +17,11 @@ async function getCurrentPublicUserProfile(
     } = await supabaseClient.auth.getUser()
 
     if (authError || !authUser) {
-      throw new Error("User not authenticated.")
+      console.error("Auth error:", authError)
+      return null
     }
 
+    // Try to get user profile
     const { data: userProfile, error: profileError } = await supabaseClient
       .from("users")
       .select("*")
@@ -27,14 +29,33 @@ async function getCurrentPublicUserProfile(
       .single()
 
     if (profileError || !userProfile) {
-      console.error("Public user profile not found for auth user:", authUser.id, profileError)
-      throw new Error("User profile not found. Please ensure you're properly logged in.")
+      console.error("User profile not found, creating one...")
+
+      // Create user profile if it doesn't exist
+      const { data: newProfile, error: createError } = await supabaseClient
+        .from("users")
+        .insert({
+          auth_user_id: authUser.id,
+          username: authUser.user_metadata?.username || authUser.email?.split('@')[0] || 'user',
+          full_name: authUser.user_metadata?.full_name || authUser.email || '',
+          email: authUser.email || '',
+          avatar_url: authUser.user_metadata?.avatar_url,
+        })
+        .select()
+        .single()
+
+      if (createError) {
+        console.error("Failed to create user profile:", createError)
+        return null
+      }
+
+      return newProfile
     }
 
     return userProfile
   } catch (error) {
     console.error("Error getting user profile:", error)
-    throw error
+    return null
   }
 }
 
@@ -43,6 +64,10 @@ export async function createCommunityPostAction(formData: FormData) {
   try {
     const supabase = createServerSupabaseClient()
     const userProfile = await getCurrentPublicUserProfile(supabase)
+
+    if (!userProfile) {
+      return { success: false, error: "User not authenticated or profile not found." }
+    }
 
     const rawContent = formData.get("content") as string
     const categoryId = formData.get("categoryId") as string
@@ -127,6 +152,10 @@ export async function editPostAction(postId: number, formData: FormData) {
     const supabase = createServerSupabaseClient()
     const userProfile = await getCurrentPublicUserProfile(supabase)
 
+    if (!userProfile) {
+      return { success: false, error: "User not authenticated or profile not found." }
+    }
+
     const rawContent = formData.get("content") as string
 
     if (!rawContent?.trim()) {
@@ -183,6 +212,10 @@ export async function deletePostAction(postId: number) {
     const supabase = createServerSupabaseClient()
     const userProfile = await getCurrentPublicUserProfile(supabase)
 
+    if (!userProfile) {
+      return { success: false, error: "User not authenticated or profile not found." }
+    }
+
     const { error } = await supabase
       .from("community_posts")
       .update({
@@ -210,6 +243,14 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId: string
     const supabase = createServerSupabaseClient()
     const voterProfile = await getCurrentPublicUserProfile(supabase)
 
+    if (!voterProfile) {
+      return {
+        success: false,
+        error: "User not authenticated.",
+        code: "NOT_AUTHENTICATED",
+      }
+    }
+
     // Check if trying to vote on own post
     const { data: postData } = await supabase.from("community_posts").select("user_id").eq("id", postId).single()
 
@@ -221,14 +262,27 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId: string
       }
     }
 
-    // Ensure auth IDs are properly formatted as strings
-    const voterAuthId = String(voterProfile.auth_user_id)
-    const creatorAuthId = String(postCreatorAuthId)
+    // Check if already voted
+    const { data: existingVote } = await supabase
+      .from("community_post_votes")
+      .select("*")
+      .eq("post_id", postId)
+      .eq("user_id", voterProfile.id)
+      .single()
 
+    if (existingVote) {
+      return {
+        success: false,
+        error: "You have already voted on this post.",
+        code: "ALREADY_VOTED",
+      }
+    }
+
+    // Call the RPC function
     const { data, error } = await supabase.rpc("handle_post_vote", {
       p_post_id: postId,
-      p_voter_auth_id: voterAuthId,
-      p_post_creator_auth_id: creatorAuthId,
+      p_voter_auth_id: voterProfile.auth_user_id,
+      p_post_creator_auth_id: postCreatorAuthId,
       p_coin_amount: VOTE_COIN_AMOUNT,
     })
 
@@ -275,6 +329,10 @@ export async function createCommentAction(postId: number, content: string, paren
     const supabase = createServerSupabaseClient()
     const userProfile = await getCurrentPublicUserProfile(supabase)
 
+    if (!userProfile) {
+      return { success: false, error: "User not authenticated." }
+    }
+
     if (!content?.trim()) {
       return { success: false, error: "Comment cannot be empty." }
     }
@@ -312,6 +370,10 @@ export async function editCommentAction(commentId: number, content: string) {
   try {
     const supabase = createServerSupabaseClient()
     const userProfile = await getCurrentPublicUserProfile(supabase)
+
+    if (!userProfile) {
+      return { success: false, error: "User not authenticated or profile not found." }
+    }
 
     if (!content?.trim()) {
       return { success: false, error: "Comment cannot be empty." }
@@ -352,6 +414,10 @@ export async function deleteCommentAction(commentId: number) {
     const supabase = createServerSupabaseClient()
     const userProfile = await getCurrentPublicUserProfile(supabase)
 
+    if (!userProfile) {
+      return { success: false, error: "User not authenticated or profile not found." }
+    }
+
     const { error } = await supabase
       .from("community_comments")
       .update({
@@ -379,6 +445,10 @@ export async function toggleLikeCommentAction(commentId: number) {
   try {
     const supabase = createServerSupabaseClient()
     const userProfile = await getCurrentPublicUserProfile(supabase)
+
+    if (!userProfile) {
+      return { success: false, error: "User not authenticated or profile not found." }
+    }
 
     const { data: existingLike, error: fetchError } = await supabase
       .from("community_comment_likes")
@@ -436,14 +506,18 @@ export async function createReportAction(
 ) {
   try {
     const supabase = createServerSupabaseClient()
-    const reporterProfile = await getCurrentPublicUserProfile(supabase)
+    const userProfile = await getCurrentPublicUserProfile(supabase)
+
+    if (!userProfile) {
+      return { success: false, error: "User not authenticated or profile not found." }
+    }
 
     if (!reason) {
       return { success: false, error: "Please select a reason for the report." }
     }
 
     const { error } = await supabase.from("community_reports").insert({
-      reporter_user_id: reporterProfile.id,
+      reporter_user_id: userProfile.id,
       target_id: targetId,
       target_type: targetType,
       reason,
@@ -516,7 +590,7 @@ export async function fetchCommunityPosts(
 
     query = query.range(offset, offset + limit - 1)
 
-    const { data, error, count } = await query
+    const { data, error } = await query
 
     if (error) {
       console.error("Error fetching posts:", error)
@@ -532,7 +606,7 @@ export async function fetchCommunityPosts(
         : false,
     }))
 
-    return { posts: postsWithVoteStatus, count: count || data?.length || 0, error: null }
+    return { posts: postsWithVoteStatus, count: data?.length || 0, error: null }
   } catch (error: any) {
     console.error("Fetch posts error:", error)
     return { posts: [], count: 0, error: error.message || "Failed to fetch posts" }
@@ -633,4 +707,76 @@ export async function searchUsersForMention(query: string) {
     console.error("Search users error:", error)
     return []
   }
+}
+
+// Dummy data for fallback
+export async function getDummyPosts() {
+  return [
+    {
+      id: 1,
+      user_id: 1,
+      category_id: 1,
+      content: "Welcome to the Erigga community! 🎵 Share your bars, stories, and connect with fellow fans.",
+      media_url: null,
+      media_type: null,
+      media_metadata: null,
+      vote_count: 12,
+      comment_count: 5,
+      tags: ["welcome", "community"],
+      mentions: null,
+      is_published: true,
+      is_edited: false,
+      is_deleted: false,
+      deleted_at: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      user: {
+        id: 1,
+        auth_user_id: "dummy-auth-id-1",
+        username: "eriggaofficial",
+        full_name: "Erigga",
+        avatar_url: "/placeholder-user.jpg",
+        tier: "blood" as const,
+      },
+      category: {
+        id: 1,
+        name: "General",
+        slug: "general",
+      },
+      has_voted: false,
+    },
+    {
+      id: 2,
+      user_id: 2,
+      category_id: 2,
+      content: "Just dropped some fire bars 🔥\n\n*They say I'm the king of my city*\n*But I tell them I'm just getting started*\n*Paper boy flow, now I'm paper rich*\n*From the streets to the studio, never departed*",
+      media_url: null,
+      media_type: null,
+      media_metadata: null,
+      vote_count: 8,
+      comment_count: 3,
+      tags: ["bars", "rap", "fire"],
+      mentions: null,
+      is_published: true,
+      is_edited: false,
+      is_deleted: false,
+      deleted_at: null,
+      created_at: new Date(Date.now() - 3600000).toISOString(),
+      updated_at: new Date(Date.now() - 3600000).toISOString(),
+      user: {
+        id: 2,
+        auth_user_id: "dummy-auth-id-2",
+        username: "warriking",
+        full_name: "Warri King",
+        avatar_url: "/placeholder-user.jpg",
+        tier: "pioneer" as const,
+      },
+      category: {
+        id: 2,
+        name: "Bars",
+        slug: "bars",
+      },
+      has_voted: false,
+    },
+  ]
 }

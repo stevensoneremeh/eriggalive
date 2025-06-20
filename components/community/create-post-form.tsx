@@ -1,3 +1,4 @@
+
 "use client"
 
 import type React from "react"
@@ -7,20 +8,18 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { useAuth } from "@/contexts/auth-context"
-import { useCommunity } from "@/contexts/community-context"
+import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { ImagePlus, Video, Mic, Send, Loader2, X, AtSign } from "lucide-react"
-import { RichTextEditor } from "./rich-text-editor"
+import { createCommunityPostAction, searchUsersForMention } from "@/lib/community-actions"
 
 interface CreatePostFormProps {
   categories: Array<{ id: number; name: string; slug: string }>
   userId: string
+  onPostCreated?: (post: any) => void
 }
 
-export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
-  const { profile } = useAuth()
-  const { createPost } = useCommunity()
+export function CreatePostForm({ categories, userId, onPostCreated }: CreatePostFormProps) {
   const { toast } = useToast()
 
   const [content, setContent] = useState("")
@@ -34,7 +33,6 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
   const [mentionUsers, setMentionUsers] = useState<any[]>([])
 
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handleMediaChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,7 +80,8 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
     }
   }, [])
 
-  const handleContentChange = useCallback((newContent: string) => {
+  const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newContent = e.target.value
     setContent(newContent)
 
     // Check for @ mentions
@@ -95,7 +94,6 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
       if (query.length >= 2) {
         setMentionQuery(query)
         setShowMentions(true)
-        // Search for users (you'd implement this API call)
         searchUsers(query)
       } else {
         setShowMentions(false)
@@ -107,11 +105,8 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
 
   const searchUsers = async (query: string) => {
     try {
-      const response = await fetch(`/api/community/users/search?q=${encodeURIComponent(query)}`)
-      const data = await response.json()
-      if (data.success) {
-        setMentionUsers(data.users)
-      }
+      const users = await searchUsersForMention(query)
+      setMentionUsers(users)
     } catch (error) {
       console.error("Error searching users:", error)
     }
@@ -121,7 +116,7 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
     const lastAtIndex = content.lastIndexOf("@")
     const beforeAt = content.slice(0, lastAtIndex)
     const afterMention = content.slice(lastAtIndex + mentionQuery.length + 1)
-    const newContent = `${beforeAt}@${user.username} ${afterMention}`
+    const newContent = `${beforeAt}@${user.label} ${afterMention}`
     setContent(newContent)
     setShowMentions(false)
   }
@@ -150,11 +145,14 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
     setIsSubmitting(true)
 
     try {
-      const result = await createPost({
-        content,
-        categoryId: Number.parseInt(selectedCategory),
-        mediaFile: mediaFile || undefined,
-      })
+      const formData = new FormData()
+      formData.append("content", content)
+      formData.append("categoryId", selectedCategory)
+      if (mediaFile) {
+        formData.append("mediaFile", mediaFile)
+      }
+
+      const result = await createCommunityPostAction(formData)
 
       if (result.success) {
         toast({
@@ -166,6 +164,11 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
         setContent("")
         setSelectedCategory("")
         removeMedia()
+
+        // Notify parent component
+        if (onPostCreated && result.post) {
+          onPostCreated(result.post)
+        }
       } else {
         toast({
           title: "Error",
@@ -185,31 +188,22 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
     }
   }
 
-  if (!profile) {
-    return (
-      <Card className="mb-6">
-        <CardContent className="p-4 text-center">
-          <p className="text-muted-foreground">Please log in to create posts.</p>
-        </CardContent>
-      </Card>
-    )
-  }
-
   return (
     <Card className="mb-6 shadow-md">
       <CardContent className="p-4">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex items-start space-x-3">
             <Avatar className="mt-1">
-              <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} alt={profile.username} />
-              <AvatarFallback>{profile.username?.charAt(0).toUpperCase()}</AvatarFallback>
+              <AvatarImage src="/placeholder-user.jpg" alt="You" />
+              <AvatarFallback>U</AvatarFallback>
             </Avatar>
             <div className="flex-1 relative">
-              <RichTextEditor
-                content={content}
+              <Textarea
+                value={content}
                 onChange={handleContentChange}
-                placeholder={`What's on your mind, ${profile.username}?`}
-                className="min-h-[100px]"
+                placeholder="What's on your mind?"
+                className="min-h-[100px] resize-none"
+                disabled={isSubmitting}
               />
 
               {/* Mention dropdown */}
@@ -223,12 +217,12 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
                       onClick={() => insertMention(user)}
                     >
                       <Avatar className="h-6 w-6">
-                        <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={user.username} />
-                        <AvatarFallback>{user.username.charAt(0).toUpperCase()}</AvatarFallback>
+                        <AvatarImage src={user.avatar || "/placeholder-user.jpg"} alt={user.label} />
+                        <AvatarFallback>{user.label.charAt(0).toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="font-medium text-sm">{user.username}</div>
-                        <div className="text-xs text-muted-foreground">{user.full_name}</div>
+                        <div className="font-medium text-sm">{user.label}</div>
+                        <div className="text-xs text-muted-foreground">{user.name}</div>
                       </div>
                     </button>
                   ))}
@@ -242,7 +236,7 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
             <div className="relative group w-full max-h-96 overflow-hidden rounded-lg border">
               {mediaType === "image" && (
                 <img
-                  src={mediaPreview || "/placeholder.svg"}
+                  src={mediaPreview}
                   alt="Media preview"
                   className="w-full h-auto object-contain max-h-96"
                 />
@@ -276,30 +270,10 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
                 variant="ghost"
                 size="icon"
                 onClick={() => fileInputRef.current?.click()}
-                title="Add Image"
+                title="Add Media"
                 disabled={isSubmitting}
               >
                 <ImagePlus className="h-5 w-5 text-blue-500" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => fileInputRef.current?.click()}
-                title="Add Video"
-                disabled={isSubmitting}
-              >
-                <Video className="h-5 w-5 text-red-500" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => fileInputRef.current?.click()}
-                title="Add Audio"
-                disabled={isSubmitting}
-              >
-                <Mic className="h-5 w-5 text-green-500" />
               </Button>
               <Button
                 type="button"
@@ -309,7 +283,6 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
                 disabled={isSubmitting}
                 onClick={() => {
                   setContent(content + "@")
-                  textareaRef.current?.focus()
                 }}
               >
                 <AtSign className="h-5 w-5 text-purple-500" />

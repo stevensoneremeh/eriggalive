@@ -1,67 +1,103 @@
+
 "use client"
 
-import { useEffect, useCallback } from "react"
-import { PostCard, PostCardSkeleton } from "./post-card"
-import { useCommunity } from "@/contexts/community-context"
+import { useState, useEffect, useCallback } from "react"
+import { PostCard } from "./post-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, Search, RefreshCw } from "lucide-react"
 import { useDebounce } from "@/hooks/use-debounce"
+import { fetchCommunityPosts } from "@/lib/community-actions"
 
 interface PostFeedProps {
+  initialPosts: any[]
   userId?: string
+  onVoteUpdate?: (postId: number, newVoteCount: number, hasVoted: boolean) => void
+  categories: any[]
   categoryFilter?: number
   sortOrder?: string
 }
 
-export function PostFeed({ userId, categoryFilter, sortOrder = "newest" }: PostFeedProps) {
-  const { state, loadPosts, setFilters } = useCommunity()
-  const { posts, loading, error, hasMore, filters } = state
+export function PostFeed({ 
+  initialPosts, 
+  userId, 
+  onVoteUpdate,
+  categories,
+  categoryFilter,
+  sortOrder = "newest" 
+}: PostFeedProps) {
+  const [posts, setPosts] = useState(initialPosts)
+  const [loading, setLoading] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedSort, setSelectedSort] = useState(sortOrder)
+  const [selectedCategory, setSelectedCategory] = useState<number | undefined>(categoryFilter)
+  const [hasMore, setHasMore] = useState(true)
+  const [page, setPage] = useState(1)
 
-  const debouncedSearchQuery = useDebounce(filters.search, 500)
+  const debouncedSearchQuery = useDebounce(searchQuery, 500)
 
-  // Update filters when props change
-  useEffect(() => {
-    setFilters({
-      category: categoryFilter,
-      sort: sortOrder as "newest" | "oldest" | "top",
-    })
-  }, [categoryFilter, sortOrder, setFilters])
+  const loadPosts = useCallback(async (isRefresh = false) => {
+    setLoading(true)
+    
+    try {
+      const currentPage = isRefresh ? 1 : page
+      const result = await fetchCommunityPosts(userId, {
+        categoryFilter: selectedCategory,
+        sortOrder: selectedSort,
+        page: currentPage,
+        limit: 10,
+        searchQuery: debouncedSearchQuery,
+      })
 
-  // Load posts when debounced search changes
-  useEffect(() => {
-    if (debouncedSearchQuery !== filters.search) {
-      setFilters({ search: debouncedSearchQuery })
+      if (result.error) {
+        console.error("Error loading posts:", result.error)
+        return
+      }
+
+      if (isRefresh) {
+        setPosts(result.posts)
+        setPage(2)
+      } else {
+        setPosts(prev => [...prev, ...result.posts])
+        setPage(prev => prev + 1)
+      }
+
+      setHasMore(result.posts.length === 10)
+    } catch (error) {
+      console.error("Error loading posts:", error)
+    } finally {
+      setLoading(false)
     }
-  }, [debouncedSearchQuery, filters.search, setFilters])
+  }, [userId, selectedCategory, selectedSort, debouncedSearchQuery, page])
 
-  const handleLoadMore = useCallback(() => {
+  useEffect(() => {
+    setPosts(initialPosts)
+  }, [initialPosts])
+
+  useEffect(() => {
+    if (debouncedSearchQuery !== searchQuery || selectedSort !== sortOrder || selectedCategory !== categoryFilter) {
+      loadPosts(true)
+    }
+  }, [debouncedSearchQuery, selectedSort, selectedCategory])
+
+  const handleLoadMore = () => {
     if (!loading && hasMore) {
       loadPosts(false)
     }
-  }, [loading, hasMore, loadPosts])
+  }
 
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = () => {
     loadPosts(true)
-  }, [loadPosts])
+  }
 
-  const handleSearchChange = useCallback(
-    (value: string) => {
-      setFilters({ search: value })
-    },
-    [setFilters],
-  )
-
-  const handleSortChange = useCallback(
-    (value: string) => {
-      setFilters({ sort: value as "newest" | "oldest" | "top" })
-    },
-    [setFilters],
-  )
-
-  if (loading && posts.length === 0) {
-    return <PostFeedSkeleton count={5} />
+  const handleVoteUpdate = (postId: number, newVoteCount: number, hasVoted: boolean) => {
+    setPosts(prev => prev.map(post => 
+      post.id === postId 
+        ? { ...post, vote_count: newVoteCount, has_voted: hasVoted }
+        : post
+    ))
+    onVoteUpdate?.(postId, newVoteCount, hasVoted)
   }
 
   return (
@@ -73,14 +109,28 @@ export function PostFeed({ userId, categoryFilter, sortOrder = "newest" }: PostF
           <Input
             type="search"
             placeholder="Search posts..."
-            value={filters.search}
-            onChange={(e) => handleSearchChange(e.target.value)}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
           />
         </div>
 
         <div className="flex items-center gap-2">
-          <Select value={filters.sort} onValueChange={handleSortChange}>
+          <Select value={selectedCategory?.toString() || ""} onValueChange={(value) => setSelectedCategory(value ? Number(value) : undefined)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Categories</SelectItem>
+              {categories.map((category) => (
+                <SelectItem key={category.id} value={category.id.toString()}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedSort} onValueChange={setSelectedSort}>
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
@@ -97,27 +147,22 @@ export function PostFeed({ userId, categoryFilter, sortOrder = "newest" }: PostF
         </div>
       </div>
 
-      {/* Error State */}
-      {error && (
-        <div className="text-center py-10 text-destructive">
-          <p>Error: {error}</p>
-          <Button variant="outline" onClick={handleRefresh} className="mt-4">
-            Try Again
-          </Button>
-        </div>
-      )}
-
       {/* Empty State */}
-      {!loading && posts.length === 0 && !error && (
+      {!loading && posts.length === 0 && (
         <div className="text-center py-10 text-muted-foreground">
-          <p>No posts found. {filters.search ? "Try adjusting your search." : "Be the first to post!"}</p>
+          <p>No posts found. {searchQuery ? "Try adjusting your search." : "Be the first to post!"}</p>
         </div>
       )}
 
       {/* Posts */}
       <div className="space-y-6">
         {posts.map((post) => (
-          <PostCard key={post.id} post={post} currentUserId={userId} />
+          <PostCard 
+            key={post.id} 
+            post={post} 
+            currentUserId={userId}
+            onVoteUpdate={handleVoteUpdate}
+          />
         ))}
       </div>
 
@@ -141,28 +186,6 @@ export function PostFeed({ userId, categoryFilter, sortOrder = "newest" }: PostF
       {!hasMore && posts.length > 0 && (
         <p className="text-center text-muted-foreground py-4">You've reached the end!</p>
       )}
-    </div>
-  )
-}
-
-export function PostFeedSkeleton({ count = 3 }: { count?: number }) {
-  return (
-    <div className="space-y-6">
-      {/* Controls skeleton */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center">
-        <div className="relative flex-grow">
-          <div className="h-10 bg-muted rounded-md animate-pulse" />
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="h-10 w-[140px] bg-muted rounded-md animate-pulse" />
-          <div className="h-10 w-10 bg-muted rounded-md animate-pulse" />
-        </div>
-      </div>
-
-      {/* Posts skeleton */}
-      {[...Array(count)].map((_, i) => (
-        <PostCardSkeleton key={i} />
-      ))}
     </div>
   )
 }
