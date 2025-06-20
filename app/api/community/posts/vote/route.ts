@@ -1,41 +1,69 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+
+import { NextRequest, NextResponse } from "next/server"
+import { createServerSupabaseClient } from "@/lib/supabase-utils"
+import { revalidatePath } from "next/cache"
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = createServerSupabaseClient()
 
+    // Get authenticated user
     const {
-      data: { user },
+      data: { user: authUser },
       error: authError,
     } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
+
+    if (authError || !authUser) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
-    const { data: userData, error: userError } = await supabase
+    // Get user profile
+    const { data: userProfile, error: profileError } = await supabase
       .from("users")
-      .select("id, coin_balance")
-      .eq("auth_user_id", user.id)
+      .select("*")
+      .eq("auth_user_id", authUser.id)
       .single()
 
-    if (userError || !userData) {
-      return NextResponse.json({ success: false, error: "User not found" }, { status: 404 })
+    if (profileError || !userProfile) {
+      return NextResponse.json({ error: "User profile not found" }, { status: 404 })
     }
 
-    const { postId, postCreatorId } = await request.json()
+    const { postId } = await request.json()
 
-    if (!postId || !postCreatorId) {
-      return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 })
+    if (!postId) {
+      return NextResponse.json({ error: "Post ID is required" }, { status: 400 })
+    }
+
+    // Check if post exists and get post details
+    const { data: post, error: postError } = await supabase
+      .from("community_posts")
+      .select("user_id")
+      .eq("id", postId)
+      .single()
+
+    if (postError || !post) {
+      return NextResponse.json({ error: "Post not found" }, { status: 404 })
+    }
+
+    // Check if user is trying to vote on their own post
+    if (post.user_id === userProfile.id) {
+      return NextResponse.json({ error: "You cannot vote on your own post" }, { status: 400 })
     }
 
     // Check if user has already voted
-    const { data: existingVote } = await supabase
+    const { data: existingVote, error: voteCheckError } = await supabase
       .from("community_post_votes")
-      .select("id")
+      .select("*")
       .eq("post_id", postId)
-      .eq("user_id", userData.id)
-      .single()
+      .eq("user_id", userProfile.id)
+      .maybeSingle()
+
+    if (voteCheckError && voteCheckError.code !== "PGRST116") {
+      console.error("Error checking existing vote:", voteCheckError)
+      return NextResponse.json({ error: "Database error" }, { status: 500 })
+    }
+
+    let voted = false
 
     if (existingVote) {
       // Remove vote
@@ -43,10 +71,11 @@ export async function POST(request: NextRequest) {
         .from("community_post_votes")
         .delete()
         .eq("post_id", postId)
-        .eq("user_id", userData.id)
+        .eq("user_id", userProfile.id)
 
       if (deleteError) {
-        return NextResponse.json({ success: false, error: "Failed to remove vote" }, { status: 500 })
+        console.error("Error removing vote:", deleteError)
+        return NextResponse.json({ error: "Failed to remove vote" }, { status: 500 })
       }
 
       // Decrease vote count
@@ -56,60 +85,45 @@ export async function POST(request: NextRequest) {
         .eq("id", postId)
 
       if (updateError) {
-        return NextResponse.json({ success: false, error: "Failed to update vote count" }, { status: 500 })
+        console.error("Error updating vote count:", updateError)
       }
 
-      return NextResponse.json({ success: true, voted: false })
+      voted = false
     } else {
-      // Check if user has enough coins
-      if (userData.coin_balance < 1) {
-        return NextResponse.json({ success: false, error: "Insufficient coins to vote" }, { status: 400 })
-      }
-
       // Add vote
-      const { error: insertError } = await supabase.from("community_post_votes").insert({
-        post_id: postId,
-        user_id: userData.id,
-      })
+      const { error: insertError } = await supabase
+        .from("community_post_votes")
+        .insert({
+          post_id: postId,
+          user_id: userProfile.id,
+        })
 
       if (insertError) {
-        return NextResponse.json({ success: false, error: "Failed to add vote" }, { status: 500 })
+        console.error("Error adding vote:", insertError)
+        return NextResponse.json({ error: "Failed to add vote" }, { status: 500 })
       }
 
-      // Increase vote count and deduct coin
+      // Increase vote count
       const { error: updateError } = await supabase
         .from("community_posts")
         .update({ vote_count: supabase.raw("vote_count + 1") })
         .eq("id", postId)
 
       if (updateError) {
-        return NextResponse.json({ success: false, error: "Failed to update vote count" }, { status: 500 })
+        console.error("Error updating vote count:", updateError)
       }
 
-      // Deduct coin from voter
-      const { error: coinError } = await supabase
-        .from("users")
-        .update({ coin_balance: supabase.raw("coin_balance - 1") })
-        .eq("id", userData.id)
-
-      if (coinError) {
-        return NextResponse.json({ success: false, error: "Failed to deduct coin" }, { status: 500 })
-      }
-
-      // Add coin to post creator
-      const { error: rewardError } = await supabase
-        .from("users")
-        .update({ coin_balance: supabase.raw("coin_balance + 1") })
-        .eq("id", postCreatorId)
-
-      if (rewardError) {
-        console.error("Failed to reward post creator:", rewardError)
-      }
-
-      return NextResponse.json({ success: true, voted: true })
+      voted = true
     }
-  } catch (error) {
-    console.error("Vote API error:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
+
+    revalidatePath("/community")
+    return NextResponse.json({
+      success: true,
+      voted,
+      message: voted ? "Vote added successfully!" : "Vote removed successfully!",
+    })
+  } catch (error: any) {
+    console.error("API Error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
