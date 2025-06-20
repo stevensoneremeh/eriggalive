@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef, useEffect } from "react"
+import type { ComponentType, SVGProps } from "react"
 import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -55,6 +56,9 @@ const REACTIONS = [
   { type: "sad", icon: Frown, label: "Sad", color: "text-gray-500" },
   { type: "angry", icon: Angry, label: "Angry", color: "text-red-600" },
 ]
+
+type ReactionIcon = ComponentType<SVGProps<SVGSVGElement>>
+const getReactionIcon = (type?: string): ReactionIcon | undefined => REACTIONS.find((r) => r.type === type)?.icon
 
 export function CompletePostCard({ post, onPostUpdate, onPostDelete }: PostCardProps) {
   const { user, profile } = useAuth()
@@ -325,6 +329,8 @@ export function CompletePostCard({ post, onPostUpdate, onPostDelete }: PostCardP
 
   const totalReactions = Object.values(reactions).reduce((sum: number, count: any) => sum + count, 0)
 
+  const CurrentReactionIcon = getReactionIcon(userReaction)
+
   return (
     <Card className="shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden border-0 bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl">
       <CardHeader className="p-6">
@@ -345,7 +351,9 @@ export function CompletePostCard({ post, onPostUpdate, onPostDelete }: PostCardP
                 </Link>
                 <span className="text-muted-foreground text-sm">@{post.user?.username}</span>
                 {post.user?.tier && <UserTierBadge tier={post.user.tier} size="sm" />}
-                {post.user?.id !== profile?.id && <FollowButton userId={post.user?.id} username={post.user?.username} />}
+                {post.user?.id !== profile?.id && (
+                  <FollowButton userId={post.user?.id} username={post.user?.username} />
+                )}
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                 <span>{timeAgo}</span>
@@ -478,10 +486,9 @@ export function CompletePostCard({ post, onPostUpdate, onPostDelete }: PostCardP
               className="text-muted-foreground hover:text-primary hover:bg-primary/10"
               onClick={() => setShowReactions(!showReactions)}
             >
-              {userReaction ? (
+              {CurrentReactionIcon ? (
                 <>
-                  {REACTIONS.find((r) => r.type === userReaction)?.icon && (\
-                    <REACTIONS.find((r) => r.type === userReaction)!.icon className="mr-2 h-4 w-4" />}
+                  <CurrentReactionIcon className="mr-2 h-4 w-4" />
                   {totalReactions}
                 </>
               ) : (
@@ -497,18 +504,21 @@ export function CompletePostCard({ post, onPostUpdate, onPostDelete }: PostCardP
                 ref={reactionsRef}
                 className="absolute bottom-full left-0 mb-2 bg-white dark:bg-slate-800 border rounded-lg shadow-lg p-2 flex gap-1 z-10"
               >
-                {REACTIONS.map((reaction) => (
-                  <Button
-                    key={reaction.type}
-                    variant="ghost"
-                    size="sm"
-                    className={cn("p-2", reaction.color)}
-                    onClick={() => handleReaction(reaction.type)}
-                    title={reaction.label}
-                  >
-                    <reaction.icon className="h-5 w-5" />
-                  </Button>
-                ))}
+                {REACTIONS.map((reaction) => {
+                  const Icon = reaction.icon
+                  return (
+                    <Button
+                      key={reaction.type}
+                      variant="ghost"
+                      size="sm"
+                      className={cn("p-2", reaction.color)}
+                      onClick={() => handleReaction(reaction.type)}
+                      title={reaction.label}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </Button>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -542,7 +552,10 @@ export function CompletePostCard({ post, onPostUpdate, onPostDelete }: PostCardP
             <span>{viewCount}</span>
           </div>
           {post.is_trending && (
-            <Badge variant="secondary" className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+            <Badge
+              variant="secondary"
+              className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
+            >
               🔥 Trending
             </Badge>
           )}
