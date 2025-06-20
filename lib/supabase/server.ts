@@ -314,3 +314,6 @@ export const isProduction = () => {
 export const isDevelopment = () => {
   return process.env.NODE_ENV === "development"
 }
+
+// Alias for backward-compatibility – other modules expect `createServerSupabaseClient`
+export const createClient = createServerSupabaseClient
