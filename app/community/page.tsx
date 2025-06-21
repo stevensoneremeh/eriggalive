@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Heart, MessageCircle, Share2, MoreHorizontal, TrendingUp, Users, Hash } from "lucide-react"
+import { Heart, MessageCircle, Share2, MoreHorizontal, TrendingUp, Users, Hash, Mic } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { toast } from "sonner"
 import { CreatePostFormWorking } from "@/components/community/create-post-form-working"
@@ -420,8 +420,12 @@ export default function CommunityPage() {
         .eq("is_published", true)
         .eq("is_deleted", false)
 
-      if (selectedCategory !== "all") {
-        query = query.eq("category_id", parseInt(selectedCategory))
+      // Apply category filter only if not "all"
+      if (selectedCategory !== "all" && selectedCategory !== "") {
+        const categoryId = parseInt(selectedCategory)
+        if (!isNaN(categoryId)) {
+          query = query.eq("category_id", categoryId)
+        }
       }
 
       // Apply sorting
@@ -431,22 +435,48 @@ export default function CommunityPage() {
         query = query.order("created_at", { ascending: true })
       } else if (sortBy === "top") {
         query = query.order("vote_count", { ascending: false })
+      } else {
+        // Default to newest
+        query = query.order("created_at", { ascending: false })
       }
 
-      query = query.limit(20)
+      query = query.limit(50) // Increased limit to show more posts
+
+      console.log('Loading posts with query...', { selectedCategory, sortBy })
 
       const { data, error } = await query
 
       if (error) {
         console.error("Error loading posts:", error)
+        // Try to show sample posts if database fails
         setPosts(getSamplePosts())
         return
       }
 
+      console.log('Loaded posts:', data)
+
       if (!data || data.length === 0) {
+        // Only show sample posts if no real data exists
         setPosts(getSamplePosts())
       } else {
-        setPosts(data as CommunityPost[])
+        // Transform data to match expected format
+        const transformedPosts = data.map(post => ({
+          ...post,
+          has_voted: false, // Default value, could be enhanced with user voting data
+          user: post.user || {
+            id: 'unknown',
+            username: 'unknown',
+            full_name: 'Unknown User',
+            avatar_url: null,
+            tier: 'grassroot'
+          },
+          category: post.category || {
+            id: 1,
+            name: 'General',
+            slug: 'general'
+          }
+        }))
+        setPosts(transformedPosts as CommunityPost[])
       }
     } catch (error) {
       console.error("Error loading posts:", error)
@@ -486,8 +516,9 @@ export default function CommunityPage() {
     }
   }
 
-  const handlePostCreated = () => {
-    loadPosts()
+  const handlePostCreated = async () => {
+    // Reload posts to show the new post immediately
+    await loadPosts()
     toast.success("Post created successfully!")
   }
 

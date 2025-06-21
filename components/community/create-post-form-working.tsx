@@ -215,55 +215,44 @@ export function CreatePostFormWorking({ categories, userProfile, supabaseUser, o
     setUploadProgress(0)
 
     try {
-      let mediaUrls: string[] = []
+      let primaryMediaUrl: string | null = null
+      let primaryMediaType: string | null = null
 
       // Upload media files if present
       if (mediaFiles.length > 0) {
         toast.info("Uploading media files...")
+        setUploadProgress(10)
         
-        for (let i = 0; i < mediaFiles.length; i++) {
-          const file = mediaFiles[i]
-          const mediaUrl = await uploadMediaToSupabase(file, activeUser.id)
-          
-          if (!mediaUrl) {
-            toast.error(`Failed to upload ${file.name}. Please try again.`)
-            setIsSubmitting(false)
-            return
-          }
-          
-          mediaUrls.push(mediaUrl)
+        const file = mediaFiles[0] // Use first file as primary media
+        const mediaUrl = await uploadMediaToSupabase(file, activeUser.id)
+        
+        if (!mediaUrl) {
+          toast.error(`Failed to upload ${file.name}. Please try again.`)
+          setIsSubmitting(false)
+          setUploadProgress(0)
+          return
         }
+        
+        primaryMediaUrl = mediaUrl
+        primaryMediaType = file.type.split('/')[0] // 'image', 'video', 'audio'
+        setUploadProgress(90)
       }
 
-      // Determine primary media for backward compatibility
-      const primaryMediaUrl = mediaUrls.length > 0 ? mediaUrls[0] : null
-      const primaryMediaType = primaryMediaUrl && mediaFiles.length > 0 
-        ? mediaFiles[0].type.split('/')[0] 
-        : null
+      // Get or create user profile
+      let userId: string
 
-      // Create the post data
-      const postData = {
-        content: content.trim(),
-        category_id: parseInt(selectedCategory),
-        media_url: primaryMediaUrl,
-        media_type: primaryMediaType,
-        is_published: true,
-        is_deleted: false
-      }
-
-      // Add user_id based on available profile
       if (activeProfile?.id) {
-        postData.user_id = activeProfile.id
+        userId = activeProfile.id
       } else {
-        // Create or get user profile for Supabase auth user
-        const { data: existingUser } = await supabase
+        // Try to find existing user profile
+        const { data: existingUser, error: findError } = await supabase
           .from('users')
           .select('id')
           .eq('auth_user_id', activeUser.id)
           .single()
 
         if (existingUser) {
-          postData.user_id = existingUser.id
+          userId = existingUser.id
         } else {
           // Create new user profile
           const { data: newUser, error: userError } = await supabase
@@ -273,52 +262,80 @@ export function CreatePostFormWorking({ categories, userProfile, supabaseUser, o
               username: activeUser.email?.split('@')[0] || 'user',
               full_name: activeUser.user_metadata?.full_name || activeUser.email?.split('@')[0] || 'User',
               email: activeUser.email || '',
-              tier: 'grassroot'
+              tier: 'grassroot',
+              coins: 1000,
+              reputation_score: 0,
+              posts_count: 0
             })
             .select('id')
             .single()
 
           if (userError || !newUser) {
+            console.error('User creation error:', userError)
             toast.error("Failed to create user profile. Please try again.")
             setIsSubmitting(false)
+            setUploadProgress(0)
             return
           }
 
-          postData.user_id = newUser.id
+          userId = newUser.id
         }
       }
 
-      // Create post
+      // Create the post data
+      const postData = {
+        user_id: userId,
+        category_id: parseInt(selectedCategory),
+        content: content.trim(),
+        media_url: primaryMediaUrl,
+        media_type: primaryMediaType,
+        is_published: true,
+        is_deleted: false,
+        vote_count: 0,
+        comment_count: 0,
+        view_count: 0
+      }
+
+      console.log('Creating post with data:', postData)
+
+      // Create post in database
       const { data: newPost, error: postError } = await supabase
         .from('community_posts')
         .insert(postData)
         .select(`
           *,
-          user:users!community_posts_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
+          user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
           category:community_categories!community_posts_category_id_fkey(id, name, slug)
         `)
         .single()
 
       if (postError) {
         console.error('Post creation error:', postError)
-        toast.error("Failed to create post. Please try again.")
+        toast.error(`Failed to create post: ${postError.message}`)
         setIsSubmitting(false)
+        setUploadProgress(0)
         return
       }
 
+      console.log('Post created successfully:', newPost)
       toast.success("Post created successfully!")
+      setUploadProgress(100)
 
-      // Reset form
+      // Reset form completely
       setContent("")
       setSelectedCategory("")
       setMediaFiles([])
       setMediaPreviews([])
       setUrlValidationError(null)
-      setUploadProgress(0)
 
       if (fileInputRef.current) {
         fileInputRef.current.value = ""
       }
+
+      // Small delay to show 100% progress
+      setTimeout(() => {
+        setUploadProgress(0)
+      }, 1000)
 
       // Notify parent component to refresh feed
       if (onPostCreated) {
@@ -327,10 +344,9 @@ export function CreatePostFormWorking({ categories, userProfile, supabaseUser, o
 
     } catch (error: any) {
       console.error("Submit error:", error)
-      toast.error("Something went wrong. Please try again.")
+      toast.error(`Something went wrong: ${error.message || 'Unknown error'}`)
     } finally {
       setIsSubmitting(false)
-      setUploadProgress(0)
     }
   }
 
