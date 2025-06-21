@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase-utils"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { revalidatePath } from "next/cache"
 
 export async function GET(request: NextRequest) {
@@ -10,13 +10,13 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get("sortBy") || "newest"
     const limit = parseInt(searchParams.get("limit") || "20")
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createClientComponentClient()
 
     let query = supabase
       .from("community_posts")
       .select(`
         *,
-        user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
+        user:user_profiles!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
         category:community_categories!community_posts_category_id_fkey(id, name, slug)
       `)
       .eq("is_published", true)
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = createClientComponentClient()
 
     // Get authenticated user
     const {
@@ -73,9 +73,9 @@ export async function POST(request: NextRequest) {
 
     // Get user profile
     const { data: userProfile, error: profileError } = await supabase
-      .from("users")
+      .from("user_profiles")
       .select("*")
-      .eq("auth_user_id", authUser.id)
+      .eq("id", authUser.id)
       .single()
 
     if (profileError || !userProfile) {
@@ -94,6 +94,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Category is required" }, { status: 400 })
     }
 
+    // Validate content for URLs
+    const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi
+    if (urlRegex.test(content)) {
+      return NextResponse.json({ error: "Posts cannot contain external links or URLs" }, { status: 400 })
+    }
+
     const postData = {
       user_id: userProfile.id,
       category_id: parseInt(categoryId),
@@ -107,7 +113,7 @@ export async function POST(request: NextRequest) {
       .insert(postData)
       .select(`
         *,
-        user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
+        user:user_profiles!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
         category:community_categories!community_posts_category_id_fkey(id, name, slug)
       `)
       .single()

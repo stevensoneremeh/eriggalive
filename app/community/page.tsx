@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Heart, MessageCircle, Share2, MoreHorizontal, Plus, TrendingUp, Users, Hash } from "lucide-react"
+import { Heart, MessageCircle, Share2, MoreHorizontal, Plus, TrendingUp, Users, Hash, Upload, X, Play, Pause } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { toast } from "sonner"
 import type { Database } from "@/types/database"
@@ -29,7 +29,7 @@ type CommunityPost = {
   media_url?: string
   media_type?: string
   user: {
-    id: number
+    id: string
     username: string
     full_name: string
     avatar_url?: string
@@ -49,6 +49,14 @@ type Category = {
   slug: string
   description?: string
   is_active: boolean
+}
+
+type UserProfile = {
+  id: string
+  username: string
+  full_name: string
+  avatar_url?: string
+  tier: string
 }
 
 function LoadingSkeleton() {
@@ -82,9 +90,45 @@ function LoadingSkeleton() {
   )
 }
 
+function MediaPlayer({ mediaUrl, mediaType }: { mediaUrl: string; mediaType: string }) {
+  const [isPlaying, setIsPlaying] = useState(false)
+
+  if (mediaType === "image") {
+    return (
+      <div className="mb-4 rounded-lg overflow-hidden">
+        <img src={mediaUrl} alt="Post media" className="w-full h-auto max-h-96 object-cover" />
+      </div>
+    )
+  }
+
+  if (mediaType === "video") {
+    return (
+      <div className="mb-4 rounded-lg overflow-hidden">
+        <video controls className="w-full h-auto max-h-96">
+          <source src={mediaUrl} type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+      </div>
+    )
+  }
+
+  if (mediaType === "audio") {
+    return (
+      <div className="mb-4 p-4 bg-gray-100 rounded-lg">
+        <audio controls className="w-full">
+          <source src={mediaUrl} type="audio/mpeg" />
+          Your browser does not support the audio tag.
+        </audio>
+      </div>
+    )
+  }
+
+  return null
+}
+
 function PostCard({ post, onVote }: { post: CommunityPost; onVote: (postId: number) => void }) {
   const getTierColor = (tier: string) => {
-    switch (tier) {
+    switch (tier.toLowerCase()) {
       case "blood": return "bg-red-500"
       case "pioneer": return "bg-blue-500"
       case "grassroot": return "bg-green-500"
@@ -123,24 +167,8 @@ function PostCard({ post, onVote }: { post: CommunityPost; onVote: (postId: numb
       <CardContent className="pt-0">
         <p className="text-gray-800 mb-4 whitespace-pre-wrap">{post.content}</p>
         
-        {post.media_url && (
-          <div className="mb-4 rounded-lg overflow-hidden">
-            {post.media_type === "image" && (
-              <img src={post.media_url} alt="Post media" className="w-full h-auto max-h-96 object-cover" />
-            )}
-            {post.media_type === "video" && (
-              <video controls className="w-full h-auto max-h-96">
-                <source src={post.media_url} type="video/mp4" />
-                Your browser does not support the video tag.
-              </video>
-            )}
-            {post.media_type === "audio" && (
-              <audio controls className="w-full">
-                <source src={post.media_url} type="audio/mpeg" />
-                Your browser does not support the audio tag.
-              </audio>
-            )}
-          </div>
+        {post.media_url && post.media_type && (
+          <MediaPlayer mediaUrl={post.media_url} mediaType={post.media_type} />
         )}
 
         <div className="flex items-center justify-between">
@@ -169,44 +197,159 @@ function PostCard({ post, onVote }: { post: CommunityPost; onVote: (postId: numb
   )
 }
 
-function CreatePostDialog({ categories, onPostCreated }: { categories: Category[]; onPostCreated: () => void }) {
+function CreatePostDialog({ 
+  categories, 
+  onPostCreated, 
+  userProfile 
+}: { 
+  categories: Category[]
+  onPostCreated: () => void
+  userProfile: UserProfile
+}) {
   const [isOpen, setIsOpen] = useState(false)
   const [content, setContent] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [mediaFile, setMediaFile] = useState<File | null>(null)
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null)
+  const [mediaType, setMediaType] = useState<string | null>(null)
+  const supabase = createClientComponentClient<Database>()
+
+  const validateContent = (text: string): boolean => {
+    // Check for URLs
+    const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi
+    if (urlRegex.test(text)) {
+      toast.error("Posts cannot contain external links or URLs")
+      return false
+    }
+    return true
+  }
+
+  const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    const supportedTypes = [
+      'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+      'video/mp4', 'video/webm', 'video/ogg',
+      'audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/ogg'
+    ]
+
+    if (!supportedTypes.includes(file.type)) {
+      toast.error("Unsupported file type. Please use images (JPG, PNG, GIF, WebP), videos (MP4, WebM, OGG), or audio (MP3, WAV, OGG)")
+      return
+    }
+
+    // Check file size (50MB max)
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("File too large. Please choose a file smaller than 50MB")
+      return
+    }
+
+    setMediaFile(file)
+    
+    // Create preview
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setMediaPreview(e.target?.result as string)
+    }
+    reader.readAsDataURL(file)
+
+    // Set media type
+    if (file.type.startsWith('image/')) setMediaType('image')
+    else if (file.type.startsWith('video/')) setMediaType('video')
+    else if (file.type.startsWith('audio/')) setMediaType('audio')
+  }
+
+  const removeMedia = () => {
+    setMediaFile(null)
+    setMediaPreview(null)
+    setMediaType(null)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!content.trim() || !selectedCategory) {
-      toast.error("Please fill in all fields")
+    
+    if (!content.trim() && !mediaFile) {
+      toast.error("Please add some content or upload media")
+      return
+    }
+
+    if (!selectedCategory) {
+      toast.error("Please select a category")
+      return
+    }
+
+    if (content.trim() && !validateContent(content)) {
       return
     }
 
     setIsSubmitting(true)
+
     try {
-      const formData = new FormData()
-      formData.append("content", content)
-      formData.append("categoryId", selectedCategory)
+      let mediaUrl = null
+      let uploadedMediaType = null
 
-      const response = await fetch("/api/community/posts", {
-        method: "POST",
-        body: formData,
-      })
+      // Upload media if present
+      if (mediaFile) {
+        const fileExt = mediaFile.name.split('.').pop()
+        const fileName = `${userProfile.id}-${Date.now()}.${fileExt}`
+        const filePath = `community_media/${fileName}`
 
-      const result = await response.json()
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('eriggalive-assets')
+          .upload(filePath, mediaFile)
 
-      if (result.success) {
-        toast.success("Post created successfully!")
-        setContent("")
-        setSelectedCategory("")
-        setIsOpen(false)
-        onPostCreated()
-      } else {
-        toast.error(result.error || "Failed to create post")
+        if (uploadError) {
+          console.error('Upload error:', uploadError)
+          toast.error("Failed to upload media. Please try again.")
+          return
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('eriggalive-assets')
+          .getPublicUrl(uploadData.path)
+
+        mediaUrl = publicUrl
+        uploadedMediaType = mediaType
       }
+
+      // Create post
+      const { data: newPost, error: postError } = await supabase
+        .from('community_posts')
+        .insert({
+          user_id: userProfile.id,
+          category_id: parseInt(selectedCategory),
+          content: content.trim(),
+          media_url: mediaUrl,
+          media_type: uploadedMediaType,
+          is_published: true,
+          is_deleted: false
+        })
+        .select(`
+          *,
+          user:user_profiles!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
+          category:community_categories!community_posts_category_id_fkey(id, name, slug)
+        `)
+        .single()
+
+      if (postError) {
+        console.error('Post creation error:', postError)
+        toast.error("Failed to create post. Please try again.")
+        return
+      }
+
+      toast.success("Post created successfully!")
+      setContent("")
+      setSelectedCategory("")
+      removeMedia()
+      setIsOpen(false)
+      onPostCreated()
+
     } catch (error) {
-      console.error("Error creating post:", error)
-      toast.error("Failed to create post")
+      console.error('Error creating post:', error)
+      toast.error("Something went wrong. Please try again.")
     } finally {
       setIsSubmitting(false)
     }
@@ -220,11 +363,22 @@ function CreatePostDialog({ categories, onPostCreated }: { categories: Category[
           Create Post
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Post</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+            <Avatar className="w-10 h-10">
+              <AvatarImage src={userProfile.avatar_url || "/placeholder-user.jpg"} />
+              <AvatarFallback>{userProfile.username.charAt(0).toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-semibold text-sm">{userProfile.username}</p>
+              <p className="text-xs text-gray-500">Posting as {userProfile.tier}</p>
+            </div>
+          </div>
+
           <div>
             <label className="text-sm font-medium mb-2 block">Category</label>
             <Select value={selectedCategory} onValueChange={setSelectedCategory} required>
@@ -240,18 +394,75 @@ function CreatePostDialog({ categories, onPostCreated }: { categories: Category[
               </SelectContent>
             </Select>
           </div>
+
           <div>
             <label className="text-sm font-medium mb-2 block">Content</label>
             <Textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="What's on your mind?"
+              placeholder="What's on your mind? (No external links allowed)"
               rows={4}
-              required
+              className="resize-none"
             />
           </div>
-          <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+
+          {/* Media Upload */}
+          <div>
+            <label className="text-sm font-medium mb-2 block">Media (Optional)</label>
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+              {!mediaFile ? (
+                <div className="text-center">
+                  <Upload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-600 mb-2">Upload an image, video, or audio file</p>
+                  <Input
+                    type="file"
+                    accept="image/*,video/*,audio/*"
+                    onChange={handleMediaChange}
+                    className="hidden"
+                    id="media-upload"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById('media-upload')?.click()}
+                  >
+                    Choose File
+                  </Button>
+                  <p className="text-xs text-gray-500 mt-2">Max 50MB • JPG, PNG, GIF, WebP, MP4, WebM, OGG, MP3, WAV</p>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="absolute top-2 right-2 z-10"
+                    onClick={removeMedia}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                  
+                  {mediaType === 'image' && mediaPreview && (
+                    <img src={mediaPreview} alt="Preview" className="w-full h-auto max-h-64 object-cover rounded" />
+                  )}
+                  
+                  {mediaType === 'video' && mediaPreview && (
+                    <video src={mediaPreview} controls className="w-full h-auto max-h-64 rounded" />
+                  )}
+                  
+                  {mediaType === 'audio' && (
+                    <div className="p-4 bg-gray-100 rounded text-center">
+                      <p className="text-sm font-medium mb-2">{mediaFile.name}</p>
+                      {mediaPreview && <audio src={mediaPreview} controls className="w-full" />}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={isSubmitting}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
@@ -328,13 +539,35 @@ function TrendingSidebar() {
 }
 
 export default function CommunityPage() {
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const [posts, setPosts] = useState<CommunityPost[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [sortBy, setSortBy] = useState("newest")
   const supabase = createClientComponentClient<Database>()
+
+  const loadUserProfile = async () => {
+    if (!user) return
+
+    try {
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single()
+
+      if (error) {
+        console.error("Error loading user profile:", error)
+        return
+      }
+
+      setUserProfile(data)
+    } catch (error) {
+      console.error("Error loading user profile:", error)
+    }
+  }
 
   const loadCategories = async () => {
     try {
@@ -357,28 +590,61 @@ export default function CommunityPage() {
     }
   }
 
+  const getSamplePosts = (): CommunityPost[] => [
+    {
+      id: 1,
+      content: "Welcome to the Erigga community! 🎵 Share your bars, stories, and connect with fellow fans. This is where real music lovers gather!",
+      created_at: new Date().toISOString(),
+      vote_count: 12,
+      comment_count: 5,
+      view_count: 45,
+      user: {
+        id: "sample-1",
+        username: "eriggaofficial",
+        full_name: "Erigga",
+        avatar_url: "/placeholder-user.jpg",
+        tier: "blood",
+      },
+      category: {
+        id: 1,
+        name: "General",
+        slug: "general",
+      },
+      has_voted: false,
+    },
+    {
+      id: 2,
+      content: "Just dropped some fire bars 🔥\n\n*They say I'm the king of my city*\n*But I tell them I'm just getting started*\n*Paper boy flow, now I'm paper rich*\n*From the streets to the studio, never departed*",
+      created_at: new Date(Date.now() - 3600000).toISOString(),
+      vote_count: 8,
+      comment_count: 3,
+      view_count: 28,
+      user: {
+        id: "sample-2",
+        username: "warriking",
+        full_name: "Warri King",
+        avatar_url: "/placeholder-user.jpg",
+        tier: "pioneer",
+      },
+      category: {
+        id: 2,
+        name: "Bars",
+        slug: "bars",
+      },
+      has_voted: false,
+    }
+  ]
+
   const loadPosts = async () => {
     try {
       setLoading(true)
-      
-      // Get current user's internal ID for vote status
-      let userInternalId: number | undefined
-      if (user) {
-        const { data: userData } = await supabase
-          .from("users")
-          .select("id")
-          .eq("auth_user_id", user.id)
-          .single()
-        userInternalId = userData?.id
-      }
 
       let query = supabase
         .from("community_posts")
         .select(`
           *,
-          user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
-          category:community_categories!community_posts_category_id_fkey(id, name, slug),
-          votes:community_post_votes(user_id)
+          user:user_profiles!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
+          category:community_categories!community_posts_category_id_fkey(id, name, slug)
         `)
         .eq("is_published", true)
         .eq("is_deleted", false)
@@ -400,47 +666,27 @@ export default function CommunityPage() {
 
       const { data, error } = await query
 
-      if (error) throw error
+      if (error) {
+        console.error("Error loading posts:", error)
+        setPosts(getSamplePosts())
+        return
+      }
 
-      const postsWithVoteStatus = (data || []).map((post: any) => ({
-        ...post,
-        has_voted: userInternalId ? post.votes.some((vote: any) => vote.user_id === userInternalId) : false,
-      }))
-
-      setPosts(postsWithVoteStatus)
+      if (!data || data.length === 0) {
+        setPosts(getSamplePosts())
+      } else {
+        setPosts(data as CommunityPost[])
+      }
     } catch (error) {
       console.error("Error loading posts:", error)
-      // Set dummy posts as fallback
-      setPosts([
-        {
-          id: 1,
-          content: "Welcome to the Erigga community! 🎵 Share your bars, stories, and connect with fellow fans.",
-          created_at: new Date().toISOString(),
-          vote_count: 12,
-          comment_count: 5,
-          view_count: 45,
-          user: {
-            id: 1,
-            username: "eriggaofficial",
-            full_name: "Erigga",
-            avatar_url: "/placeholder-user.jpg",
-            tier: "blood",
-          },
-          category: {
-            id: 1,
-            name: "General",
-            slug: "general",
-          },
-          has_voted: false,
-        },
-      ])
+      setPosts(getSamplePosts())
     } finally {
       setLoading(false)
     }
   }
 
   const handleVote = async (postId: number) => {
-    if (!user || !profile) {
+    if (!user || !userProfile) {
       toast.error("Please log in to vote")
       return
     }
@@ -482,8 +728,14 @@ export default function CommunityPage() {
   }, [])
 
   useEffect(() => {
+    if (user) {
+      loadUserProfile()
+    }
+  }, [user])
+
+  useEffect(() => {
     loadPosts()
-  }, [selectedCategory, sortBy, user])
+  }, [selectedCategory, sortBy])
 
   if (!user) {
     return (
@@ -517,9 +769,13 @@ export default function CommunityPage() {
             </div>
 
             {/* Create Post */}
-            {categories.length > 0 && (
+            {categories.length > 0 && userProfile && (
               <div className="mb-6">
-                <CreatePostDialog categories={categories} onPostCreated={loadPosts} />
+                <CreatePostDialog 
+                  categories={categories} 
+                  onPostCreated={loadPosts} 
+                  userProfile={userProfile}
+                />
               </div>
             )}
 

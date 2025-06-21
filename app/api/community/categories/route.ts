@@ -1,10 +1,10 @@
 
 import { NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase-utils"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export async function GET() {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = createClientComponentClient()
 
     const { data: categories, error } = await supabase
       .from("community_categories")
@@ -14,26 +14,21 @@ export async function GET() {
 
     if (error) {
       console.error("Error fetching categories:", error)
-      // Return default categories as fallback
-      return NextResponse.json({
-        categories: [
-          { id: 1, name: "General", slug: "general", description: "General discussions", is_active: true },
-          { id: 2, name: "Bars", slug: "bars", description: "Share your bars and lyrics", is_active: true },
-          { id: 3, name: "Discussion", slug: "discussion", description: "Music discussions", is_active: true },
-        ],
-      })
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ categories: categories || [] })
+    // Return default categories if none exist
+    const defaultCategories = [
+      { id: 1, name: "General", slug: "general", is_active: true },
+      { id: 2, name: "Bars", slug: "bars", is_active: true },
+      { id: 3, name: "Music Discussion", slug: "music-discussion", is_active: true },
+    ]
+
+    return NextResponse.json({ 
+      categories: categories && categories.length > 0 ? categories : defaultCategories 
+    })
   } catch (error: any) {
     console.error("API Error:", error)
-    // Return default categories as fallback
-    return NextResponse.json({
-      categories: [
-        { id: 1, name: "General", slug: "general", description: "General discussions", is_active: true },
-        { id: 2, name: "Bars", slug: "bars", description: "Share your bars and lyrics", is_active: true },
-        { id: 3, name: "Discussion", slug: "discussion", description: "Music discussions", is_active: true },
-      ],
-    })
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
