@@ -10,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { ImagePlus, Video, Mic, Send, Loader2, X, AtSign } from "lucide-react"
-import { createCommunityPostAction, searchUsersForMention } from "@/lib/community-actions"
+import { ImagePlus, Video, Mic, Send, Loader2, X, AlertTriangle } from "lucide-react"
+import { createCommunityPostAction } from "@/lib/community-actions"
+import { createClient } from "@/lib/supabase/client"
 
 interface CreatePostFormProps {
   categories: Array<{ id: number; name: string; slug: string }>
@@ -21,6 +22,7 @@ interface CreatePostFormProps {
 
 export function CreatePostForm({ categories, userId, onPostCreated }: CreatePostFormProps) {
   const { toast } = useToast()
+  const supabase = createClient()
 
   const [content, setContent] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("")
@@ -28,11 +30,34 @@ export function CreatePostForm({ categories, userId, onPostCreated }: CreatePost
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
   const [mediaType, setMediaType] = useState<"image" | "video" | "audio" | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showMentions, setShowMentions] = useState(false)
-  const [mentionQuery, setMentionQuery] = useState("")
-  const [mentionUsers, setMentionUsers] = useState<any[]>([])
+  const [urlValidationError, setUrlValidationError] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // URL validation function
+  const validateContent = useCallback((text: string) => {
+    const urlPatterns = [
+      /https?:\/\/[^\s]+/gi,
+      /www\.[^\s]+/gi,
+      /[^\s]+\.(com|net|org|edu|gov|mil|int|co\.uk|io|app|dev)[^\s]*/gi
+    ]
+    
+    for (const pattern of urlPatterns) {
+      if (pattern.test(text)) {
+        return "URLs are not allowed in posts for security reasons. Please remove any links or website addresses."
+      }
+    }
+    return null
+  }, [])
+
+  const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newContent = e.target.value
+    setContent(newContent)
+    
+    // Validate content for URLs
+    const error = validateContent(newContent)
+    setUrlValidationError(error)
+  }, [validateContent])
 
   const handleMediaChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,6 +73,22 @@ export function CreatePostForm({ categories, userId, onPostCreated }: CreatePost
           return
         }
 
+        // Validate file type
+        const allowedTypes = [
+          'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+          'video/mp4', 'video/webm', 'video/ogg',
+          'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/mpeg'
+        ]
+
+        if (!allowedTypes.includes(file.type)) {
+          toast({
+            title: "Unsupported File Type",
+            description: "Please select an image (JPEG, PNG, GIF, WebP), video (MP4, WebM, OGG), or audio (MP3, WAV, OGG) file.",
+            variant: "destructive",
+          })
+          return
+        }
+
         setMediaFile(file)
         const reader = new FileReader()
         reader.onloadend = () => {
@@ -58,14 +99,6 @@ export function CreatePostForm({ categories, userId, onPostCreated }: CreatePost
         if (file.type.startsWith("image/")) setMediaType("image")
         else if (file.type.startsWith("video/")) setMediaType("video")
         else if (file.type.startsWith("audio/")) setMediaType("audio")
-        else {
-          toast({
-            title: "Unsupported File Type",
-            description: "Please select an image, video, or audio file.",
-            variant: "destructive",
-          })
-          setMediaType(null)
-        }
       }
     },
     [toast],
@@ -80,45 +113,30 @@ export function CreatePostForm({ categories, userId, onPostCreated }: CreatePost
     }
   }, [])
 
-  const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newContent = e.target.value
-    setContent(newContent)
-
-    // Check for @ mentions
-    const lastAtIndex = newContent.lastIndexOf("@")
-    if (lastAtIndex !== -1) {
-      const textAfterAt = newContent.slice(lastAtIndex + 1)
-      const spaceIndex = textAfterAt.indexOf(" ")
-      const query = spaceIndex === -1 ? textAfterAt : textAfterAt.slice(0, spaceIndex)
-
-      if (query.length >= 2) {
-        setMentionQuery(query)
-        setShowMentions(true)
-        searchUsers(query)
-      } else {
-        setShowMentions(false)
-      }
-    } else {
-      setShowMentions(false)
-    }
-  }, [])
-
-  const searchUsers = async (query: string) => {
+  const uploadMediaToSupabase = async (file: File): Promise<string | null> => {
     try {
-      const users = await searchUsersForMention(query)
-      setMentionUsers(users)
-    } catch (error) {
-      console.error("Error searching users:", error)
-    }
-  }
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`
+      const filePath = `community_media/${userId}/${fileName}`
 
-  const insertMention = (user: any) => {
-    const lastAtIndex = content.lastIndexOf("@")
-    const beforeAt = content.slice(0, lastAtIndex)
-    const afterMention = content.slice(lastAtIndex + mentionQuery.length + 1)
-    const newContent = `${beforeAt}@${user.label} ${afterMention}`
-    setContent(newContent)
-    setShowMentions(false)
+      const { data, error } = await supabase.storage
+        .from('eriggalive-assets')
+        .upload(filePath, file)
+
+      if (error) {
+        console.error('Upload error:', error)
+        return null
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('eriggalive-assets')
+        .getPublicUrl(data.path)
+
+      return publicUrlData.publicUrl
+    } catch (error) {
+      console.error('Media upload error:', error)
+      return null
+    }
   }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -128,6 +146,15 @@ export function CreatePostForm({ categories, userId, onPostCreated }: CreatePost
       toast({
         title: "Empty Post",
         description: "Please write something or add media.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (urlValidationError) {
+      toast({
+        title: "Invalid Content",
+        description: urlValidationError,
         variant: "destructive",
       })
       return
@@ -145,37 +172,97 @@ export function CreatePostForm({ categories, userId, onPostCreated }: CreatePost
     setIsSubmitting(true)
 
     try {
-      const formData = new FormData()
-      formData.append("content", content)
-      formData.append("categoryId", selectedCategory)
+      let mediaUrl: string | null = null
+
+      // Upload media if present
       if (mediaFile) {
-        formData.append("mediaFile", mediaFile)
+        mediaUrl = await uploadMediaToSupabase(mediaFile)
+        if (!mediaUrl) {
+          toast({
+            title: "Upload Failed",
+            description: "Failed to upload media. Please try again.",
+            variant: "destructive",
+          })
+          setIsSubmitting(false)
+          return
+        }
       }
 
-      const result = await createCommunityPostAction(formData)
-
-      if (result.success) {
+      // Get current user
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError || !user) {
         toast({
-          title: "Post Created!",
-          description: "Your post has been shared with the community.",
-        })
-
-        // Reset form
-        setContent("")
-        setSelectedCategory("")
-        removeMedia()
-
-        // Notify parent component
-        if (onPostCreated && result.post) {
-          onPostCreated(result.post)
-        }
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to create post.",
+          title: "Authentication Error",
+          description: "Please log in to create a post.",
           variant: "destructive",
         })
+        setIsSubmitting(false)
+        return
       }
+
+      // Get user's internal ID
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single()
+
+      if (userError || !userData) {
+        toast({
+          title: "User Error",
+          description: "User profile not found. Please try logging in again.",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
+      // Create post
+      const { data: newPost, error: postError } = await supabase
+        .from('community_posts')
+        .insert({
+          user_id: userData.id,
+          category_id: parseInt(selectedCategory),
+          content: content.trim(),
+          media_url: mediaUrl,
+          media_type: mediaType,
+          is_published: true,
+          is_deleted: false
+        })
+        .select(`
+          *,
+          user:users!community_posts_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
+          category:community_categories!community_posts_category_id_fkey(id, name, slug)
+        `)
+        .single()
+
+      if (postError) {
+        console.error('Post creation error:', postError)
+        toast({
+          title: "Error",
+          description: "Failed to create post. Please try again.",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
+      toast({
+        title: "Post Created!",
+        description: "Your post has been shared with the community.",
+      })
+
+      // Reset form
+      setContent("")
+      setSelectedCategory("")
+      removeMedia()
+      setUrlValidationError(null)
+
+      // Notify parent component
+      if (onPostCreated && newPost) {
+        onPostCreated(newPost)
+      }
+
     } catch (error: any) {
       console.error("Submit error:", error)
       toast({
@@ -197,37 +284,28 @@ export function CreatePostForm({ categories, userId, onPostCreated }: CreatePost
               <AvatarImage src="/placeholder-user.jpg" alt="You" />
               <AvatarFallback>U</AvatarFallback>
             </Avatar>
-            <div className="flex-1 relative">
+            <div className="flex-1">
               <Textarea
                 value={content}
                 onChange={handleContentChange}
-                placeholder="What's on your mind?"
-                className="min-h-[100px] resize-none"
+                placeholder="What's on your mind? Share your thoughts with the community..."
+                className={`min-h-[120px] resize-none ${
+                  urlValidationError ? 'border-red-500 focus:border-red-500' : ''
+                }`}
                 disabled={isSubmitting}
+                maxLength={2000}
               />
-
-              {/* Mention dropdown */}
-              {showMentions && mentionUsers.length > 0 && (
-                <div className="absolute top-full left-0 right-0 bg-background border rounded-md shadow-lg z-50 max-h-48 overflow-y-auto">
-                  {mentionUsers.map((user) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      className="w-full px-3 py-2 text-left hover:bg-muted flex items-center space-x-2"
-                      onClick={() => insertMention(user)}
-                    >
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={user.avatar || "/placeholder-user.jpg"} alt={user.label} />
-                        <AvatarFallback>{user.label.charAt(0).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium text-sm">{user.label}</div>
-                        <div className="text-xs text-muted-foreground">{user.name}</div>
-                      </div>
-                    </button>
-                  ))}
+              <div className="flex justify-between items-center mt-2 text-sm">
+                <div>
+                  {urlValidationError && (
+                    <div className="flex items-center gap-1 text-red-500">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span>{urlValidationError}</span>
+                    </div>
+                  )}
                 </div>
-              )}
+                <span className="text-muted-foreground">{content.length}/2000</span>
+              </div>
             </div>
           </div>
 
@@ -246,8 +324,16 @@ export function CreatePostForm({ categories, userId, onPostCreated }: CreatePost
               )}
               {mediaType === "audio" && (
                 <div className="p-4 bg-muted rounded-lg">
-                  <audio src={mediaPreview} controls className="w-full" />
-                  <p className="text-sm text-muted-foreground mt-2">Audio: {mediaFile?.name}</p>
+                  <div className="flex items-center space-x-3">
+                    <Mic className="h-8 w-8 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">{mediaFile?.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {mediaFile && (mediaFile.size / (1024 * 1024)).toFixed(2)} MB
+                      </p>
+                    </div>
+                  </div>
+                  <audio src={mediaPreview} controls className="w-full mt-3" />
                 </div>
               )}
               <Button
@@ -275,23 +361,11 @@ export function CreatePostForm({ categories, userId, onPostCreated }: CreatePost
               >
                 <ImagePlus className="h-5 w-5 text-blue-500" />
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                title="Mention User"
-                disabled={isSubmitting}
-                onClick={() => {
-                  setContent(content + "@")
-                }}
-              >
-                <AtSign className="h-5 w-5 text-purple-500" />
-              </Button>
               <Input
                 type="file"
                 ref={fileInputRef}
                 className="hidden"
-                accept="image/*,video/*,audio/*"
+                accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/ogg,audio/mp3,audio/wav,audio/ogg,audio/mpeg"
                 onChange={handleMediaChange}
                 disabled={isSubmitting}
               />
@@ -311,8 +385,16 @@ export function CreatePostForm({ categories, userId, onPostCreated }: CreatePost
                 </SelectContent>
               </Select>
 
-              <Button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primary/90">
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+              <Button 
+                type="submit" 
+                disabled={isSubmitting || !!urlValidationError} 
+                className="bg-primary hover:bg-primary/90"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="mr-2 h-4 w-4" />
+                )}
                 {isSubmitting ? "Posting..." : "Post"}
               </Button>
             </div>
