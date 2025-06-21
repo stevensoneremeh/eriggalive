@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
+import { User } from "@supabase/supabase-js"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -90,16 +91,23 @@ function MediaPlayer({ mediaUrl, mediaType }: { mediaUrl: string; mediaType: str
   if (mediaType === "image") {
     return (
       <div className="mb-4 rounded-lg overflow-hidden">
-        <img src={mediaUrl} alt="Post media" className="w-full h-auto max-h-96 object-cover" />
+        <img 
+          src={mediaUrl} 
+          alt="Post media" 
+          className="w-full h-auto max-h-96 object-cover cursor-pointer hover:scale-105 transition-transform" 
+          onClick={() => window.open(mediaUrl, '_blank')}
+        />
       </div>
     )
   }
 
   if (mediaType === "video") {
     return (
-      <div className="mb-4 rounded-lg overflow-hidden">
-        <video controls className="w-full h-auto max-h-96">
+      <div className="mb-4 rounded-lg overflow-hidden bg-black">
+        <video controls className="w-full h-auto max-h-96" preload="metadata">
           <source src={mediaUrl} type="video/mp4" />
+          <source src={mediaUrl} type="video/webm" />
+          <source src={mediaUrl} type="video/ogg" />
           Your browser does not support the video tag.
         </video>
       </div>
@@ -108,9 +116,15 @@ function MediaPlayer({ mediaUrl, mediaType }: { mediaUrl: string; mediaType: str
 
   if (mediaType === "audio") {
     return (
-      <div className="mb-4 p-4 bg-gray-100 rounded-lg">
+      <div className="mb-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+        <div className="flex items-center space-x-3 mb-3">
+          <Mic className="h-6 w-6 text-blue-500" />
+          <span className="font-medium">Audio</span>
+        </div>
         <audio controls className="w-full">
           <source src={mediaUrl} type="audio/mpeg" />
+          <source src={mediaUrl} type="audio/wav" />
+          <source src={mediaUrl} type="audio/ogg" />
           Your browser does not support the audio tag.
         </audio>
       </div>
@@ -259,23 +273,64 @@ export default function CommunityPage() {
   const [posts, setPosts] = useState<CommunityPost[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [supabaseUser, setSupabaseUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [sortBy, setSortBy] = useState("newest")
   const supabase = createClient()
 
-  const loadUserProfile = async () => {
-    if (!user) return
+  const loadSupabaseSession = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        setSupabaseUser(session.user)
+        return session.user
+      }
+      return null
+    } catch (error) {
+      console.error("Error loading Supabase session:", error)
+      return null
+    }
+  }
+
+  const loadUserProfile = async (authUser?: User) => {
+    const currentUser = authUser || supabaseUser || user
+    if (!currentUser) return
 
     try {
-      const { data, error } = await supabase
+      // Try to find user by auth_user_id first (Supabase Auth)
+      let query = supabase
         .from("users")
         .select("*")
-        .eq("auth_user_id", user.id)
-        .single()
+      
+      if (supabaseUser) {
+        query = query.eq("auth_user_id", supabaseUser.id)
+      } else if (user) {
+        query = query.eq("auth_user_id", user.id)
+      } else {
+        return
+      }
+
+      const { data, error } = await query.single()
 
       if (error) {
         console.error("Error loading user profile:", error)
+        // Create a mock profile for development
+        if (currentUser) {
+          const mockProfile = {
+            id: currentUser.id,
+            auth_user_id: currentUser.id,
+            username: currentUser.email?.split('@')[0] || 'user',
+            full_name: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'User',
+            email: currentUser.email || '',
+            avatar_url: currentUser.user_metadata?.avatar_url,
+            tier: 'grassroot',
+            coins: 1000,
+            reputation_score: 0,
+            posts_count: 0
+          }
+          setUserProfile(mockProfile)
+        }
         return
       }
 
@@ -438,13 +493,31 @@ export default function CommunityPage() {
 
   useEffect(() => {
     loadCategories()
+    loadSupabaseSession()
+    
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          if (session?.user) {
+            setSupabaseUser(session.user)
+            await loadUserProfile(session.user)
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setSupabaseUser(null)
+          setUserProfile(null)
+        }
+      }
+    )
+
+    return () => subscription.unsubscribe()
   }, [])
 
   useEffect(() => {
-    if (user) {
+    if (user || supabaseUser) {
       loadUserProfile()
     }
-  }, [user])
+  }, [user, supabaseUser])
 
   useEffect(() => {
     loadPosts()
@@ -465,6 +538,7 @@ export default function CommunityPage() {
             <CreatePostFormWorking 
               categories={categories} 
               userProfile={userProfile}
+              supabaseUser={supabaseUser}
               onPostCreated={handlePostCreated} 
             />
 
