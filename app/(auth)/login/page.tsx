@@ -39,13 +39,27 @@ function LoginFormWithSearchParams() {
   const [redirectPath, setRedirectPath] = useState(ROUTES.DASHBOARD)
 
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { signIn, isAuthenticated, isLoading, isInitialized } = useAuth()
 
-  // Set redirect path after component mounts
+  // Use a safer approach for search params
+  const [searchParamsReady, setSearchParamsReady] = useState(false)
+  let searchParams: URLSearchParams | null = null
+  
+  try {
+    searchParams = useSearchParams()
+    if (!searchParamsReady) {
+      setSearchParamsReady(true)
+    }
+  } catch (error) {
+    console.warn("SearchParams not available during SSR, will use default redirect")
+  }
+
+  // Set redirect path after component mounts and search params are ready
   useEffect(() => {
-    setRedirectPath(getRedirectPath(searchParams))
-  }, [searchParams])
+    if (searchParamsReady && searchParams) {
+      setRedirectPath(getRedirectPath(searchParams))
+    }
+  }, [searchParams, searchParamsReady])
 
   // Handle already authenticated users
   useEffect(() => {
@@ -216,7 +230,7 @@ function LoginFormWithSearchParams() {
   )
 }
 
-// Main login page component with double Suspense boundary
+// Main login page component with enhanced error boundary
 export default function LoginPage() {
   return (
     <Suspense fallback={<LoginPageSkeleton />}>
