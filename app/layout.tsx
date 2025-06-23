@@ -16,7 +16,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Erigga Live - Official Fan Platform",
   description: "The official fan platform for Erigga - Music, Community, and Exclusive Content",
-  generator: "v0.dev",
+    generator: 'v0.dev'
 }
 
 export default function RootLayout({

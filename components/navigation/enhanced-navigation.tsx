@@ -23,7 +23,6 @@ import {
   Bookmark,
   Heart,
   TrendingUp,
-  LayoutDashboard,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -48,7 +47,6 @@ import { cn } from "@/lib/utils"
 
 const NAVIGATION_ITEMS = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }, // Add dashboard
   { href: "/community", label: "Community", icon: Users },
   { href: "/chronicles", label: "Chronicles", icon: BookOpen },
   { href: "/vault", label: "Vault", icon: Vault },
