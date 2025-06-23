@@ -202,9 +202,9 @@ function TrendingSidebar() {
             {[
               { username: "eriggaofficial", votes: 2500, tier: "blood", avatar: "/placeholder-user.jpg" },
               { username: "warriking", votes: 1800, tier: "pioneer", avatar: "/placeholder-user.jpg" },
-              { username: "southsouth", votes: 1200, tier: "grassroot", avatar: "/placeholder-user.jpg" },
-              { username: "naijafan", votes: 950, tier: "elder", avatar: "/placeholder-user.jpg" },
-              { username: "musiclover", votes: 780, tier: "pioneer", avatar: "/placeholder-user.jpg" },
+              { username: "naijafan", votes: 1200, tier: "grassroot", avatar: "/placeholder-user.jpg" },
+              { username: "musiclover", votes: 950, tier: "elder", avatar: "/placeholder-user.jpg" },
+              { username: "southsouth", votes: 780, tier: "pioneer", avatar: "/placeholder-user.jpg" },
             ].map((user, index) => (
               <div
                 key={user.username}
@@ -283,34 +283,40 @@ export default function CommunityPage() {
   const loadCategories = async () => {
     try {
       setError(null)
+
+      // Fixed query order: select -> order -> filter
       const { data, error: fetchError } = await supabase
         .from("community_categories")
         .select("*")
+        .order("display_order", { ascending: true })
         .eq("is_active", true)
-        .order("name", { ascending: true })
 
       if (fetchError) {
         console.error("Error loading categories:", fetchError)
         // Set default categories as fallback
         setCategories([
-          { id: 1, name: "General", slug: "general", is_active: true },
-          { id: 2, name: "Bars", slug: "bars", is_active: true },
-          { id: 3, name: "Discussion", slug: "discussion", is_active: true },
-          { id: 4, name: "Music", slug: "music", is_active: true },
-          { id: 5, name: "Events", slug: "events", is_active: true },
+          { id: 1, name: "General Discussion", slug: "general", is_active: true },
+          { id: 2, name: "Music & Lyrics", slug: "music", is_active: true },
+          { id: 3, name: "Events & Shows", slug: "events", is_active: true },
+          { id: 4, name: "Freestyle Corner", slug: "freestyle", is_active: true },
+          { id: 5, name: "Fan Art", slug: "art", is_active: true },
+          { id: 6, name: "News & Updates", slug: "news", is_active: true },
+          { id: 7, name: "Community Support", slug: "support", is_active: true },
         ])
       } else {
         setCategories(data || [])
       }
     } catch (error: any) {
       console.error("Error loading categories:", error)
-      setError("Failed to load categories")
+      setError("Failed to load categories. Using default categories.")
       setCategories([
-        { id: 1, name: "General", slug: "general", is_active: true },
-        { id: 2, name: "Bars", slug: "bars", is_active: true },
-        { id: 3, name: "Discussion", slug: "discussion", is_active: true },
-        { id: 4, name: "Music", slug: "music", is_active: true },
-        { id: 5, name: "Events", slug: "events", is_active: true },
+        { id: 1, name: "General Discussion", slug: "general", is_active: true },
+        { id: 2, name: "Music & Lyrics", slug: "music", is_active: true },
+        { id: 3, name: "Events & Shows", slug: "events", is_active: true },
+        { id: 4, name: "Freestyle Corner", slug: "freestyle", is_active: true },
+        { id: 5, name: "Fan Art", slug: "art", is_active: true },
+        { id: 6, name: "News & Updates", slug: "news", is_active: true },
+        { id: 7, name: "Community Support", slug: "support", is_active: true },
       ])
     } finally {
       setLoading(false)
@@ -372,7 +378,7 @@ export default function CommunityPage() {
 
         {/* Error Alert */}
         {error && (
-          <Alert variant="destructive" className="mb-6">
+          <Alert className="mb-6">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
