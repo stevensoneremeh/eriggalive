@@ -288,8 +288,8 @@ export default function CommunityPage() {
       const { data, error: fetchError } = await supabase
         .from("community_categories")
         .select("*")
-        .order("display_order", { ascending: true })
         .eq("is_active", true)
+        .order("display_order", { ascending: true })
 
       if (fetchError) {
         console.error("Error loading categories:", fetchError)
