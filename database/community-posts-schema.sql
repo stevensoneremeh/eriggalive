@@ -1,4 +1,3 @@
-
 -- Community Posts Database Schema
 -- This creates all necessary tables for the community post system
 

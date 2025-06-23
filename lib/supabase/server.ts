@@ -1,4 +1,3 @@
-
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 import { cookies } from "next/headers"

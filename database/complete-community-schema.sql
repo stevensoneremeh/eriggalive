@@ -1,4 +1,3 @@
-
 -- Complete Community System Schema
 -- This creates all necessary tables and functions for the community features
 

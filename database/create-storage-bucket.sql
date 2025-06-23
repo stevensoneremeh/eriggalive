@@ -1,4 +1,3 @@
-
 -- Create storage bucket for community media uploads
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('eriggalive-assets', 'eriggalive-assets', true)
