@@ -1,46 +1,31 @@
 "use client"
 
-import { Suspense, useEffect, useState } from "react"
+import { Suspense, useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { useAuth } from "@/contexts/auth-context"
-import { User } from "@supabase/supabase-js"
-import { Button } from "@/components/ui/button"
+import { EnhancedCreatePostForm } from "@/components/community/enhanced-create-post-form"
+import { EnhancedPostFeed } from "@/components/community/enhanced-post-feed"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Heart, MessageCircle, Share2, MoreHorizontal, TrendingUp, Users, Hash, Mic } from "lucide-react"
-import { formatDistanceToNow } from "date-fns"
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  TrendingUp,
+  Users,
+  Hash,
+  Crown,
+  Activity,
+  MessageSquare,
+  Heart,
+  Eye,
+  RefreshCw,
+  AlertCircle,
+} from "lucide-react"
 import { toast } from "sonner"
-import { CreatePostFormWorking } from "@/components/community/create-post-form-working"
+import { cn } from "@/lib/utils"
 
-type CommunityPost = {
-  id: number
-  content: string
-  created_at: string
-  vote_count: number
-  comment_count: number
-  view_count: number
-  media_url?: string
-  media_type?: string
-  user: {
-    id: string
-    username: string
-    full_name: string
-    avatar_url?: string
-    tier: string
-  }
-  category: {
-    id: number
-    name: string
-    slug: string
-  }
-  has_voted: boolean
-}
-
-type Category = {
+interface Category {
   id: number
   name: string
   slug: string
@@ -48,12 +33,13 @@ type Category = {
   is_active: boolean
 }
 
-type UserProfile = {
-  id: string
-  username: string
-  full_name: string
-  avatar_url?: string
-  tier: string
+interface CommunityStats {
+  totalMembers: number
+  postsToday: number
+  activeNow: number
+  totalPosts: number
+  totalVotes: number
+  totalComments: number
 }
 
 function LoadingSkeleton() {
@@ -63,22 +49,18 @@ function LoadingSkeleton() {
         <Card key={i} className="animate-pulse">
           <CardHeader>
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gray-300 rounded-full" />
+              <Skeleton className="w-12 h-12 rounded-full" />
               <div className="space-y-2">
-                <div className="h-4 bg-gray-300 rounded w-24" />
-                <div className="h-3 bg-gray-300 rounded w-16" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-24" />
               </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="h-4 bg-gray-300 rounded w-full" />
-              <div className="h-4 bg-gray-300 rounded w-3/4" />
-              <div className="flex space-x-4">
-                <div className="h-8 bg-gray-300 rounded w-16" />
-                <div className="h-8 bg-gray-300 rounded w-16" />
-                <div className="h-8 bg-gray-300 rounded w-16" />
-              </div>
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-48 w-full" />
             </div>
           </CardContent>
         </Card>
@@ -87,127 +69,92 @@ function LoadingSkeleton() {
   )
 }
 
-function MediaPlayer({ mediaUrl, mediaType }: { mediaUrl: string; mediaType: string }) {
-  if (mediaType === "image") {
-    return (
-      <div className="mb-4 rounded-lg overflow-hidden">
-        <img 
-          src={mediaUrl} 
-          alt="Post media" 
-          className="w-full h-auto max-h-96 object-cover cursor-pointer hover:scale-105 transition-transform" 
-          onClick={() => window.open(mediaUrl, '_blank')}
-        />
-      </div>
-    )
-  }
+function TrendingSidebar() {
+  const [stats, setStats] = useState<CommunityStats>({
+    totalMembers: 12450,
+    postsToday: 89,
+    activeNow: 234,
+    totalPosts: 5678,
+    totalVotes: 23456,
+    totalComments: 8901,
+  })
+  const [loading, setLoading] = useState(false)
 
-  if (mediaType === "video") {
-    return (
-      <div className="mb-4 rounded-lg overflow-hidden bg-black">
-        <video controls className="w-full h-auto max-h-96" preload="metadata">
-          <source src={mediaUrl} type="video/mp4" />
-          <source src={mediaUrl} type="video/webm" />
-          <source src={mediaUrl} type="video/ogg" />
-          Your browser does not support the video tag.
-        </video>
-      </div>
-    )
-  }
-
-  if (mediaType === "audio") {
-    return (
-      <div className="mb-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
-        <div className="flex items-center space-x-3 mb-3">
-          <Mic className="h-6 w-6 text-blue-500" />
-          <span className="font-medium">Audio</span>
-        </div>
-        <audio controls className="w-full">
-          <source src={mediaUrl} type="audio/mpeg" />
-          <source src={mediaUrl} type="audio/wav" />
-          <source src={mediaUrl} type="audio/ogg" />
-          Your browser does not support the audio tag.
-        </audio>
-      </div>
-    )
-  }
-
-  return null
-}
-
-function PostCard({ post, onVote }: { post: CommunityPost; onVote: (postId: number) => void }) {
-  const getTierColor = (tier: string) => {
-    switch (tier.toLowerCase()) {
-      case "blood": return "bg-red-500"
-      case "pioneer": return "bg-blue-500"
-      case "grassroot": return "bg-green-500"
-      default: return "bg-gray-500"
+  const refreshStats = useCallback(async () => {
+    setLoading(true)
+    try {
+      // Simulate API call - replace with actual stats fetching
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      setStats((prev) => ({
+        ...prev,
+        postsToday: prev.postsToday + Math.floor(Math.random() * 5),
+        activeNow: prev.activeNow + Math.floor(Math.random() * 10) - 5,
+      }))
+    } catch (error) {
+      console.error("Error refreshing stats:", error)
+    } finally {
+      setLoading(false)
     }
-  }
+  }, [])
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Avatar className="w-10 h-10">
-              <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
-              <AvatarFallback>{post.user.username.charAt(0).toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-semibold text-sm">{post.user.username}</span>
-                <Badge className={`${getTierColor(post.user.tier)} text-white text-xs px-2 py-0.5`}>
-                  {post.user.tier}
-                </Badge>
+    <div className="space-y-6">
+      {/* Community Stats */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="flex items-center text-lg">
+            <Activity className="w-5 h-5 mr-2" />
+            Community Stats
+          </CardTitle>
+          <Button variant="ghost" size="sm" onClick={refreshStats} disabled={loading}>
+            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-3 bg-blue-50 rounded-lg">
+                <div className="flex items-center justify-center mb-1">
+                  <Users className="h-4 w-4 text-blue-600 mr-1" />
+                </div>
+                <div className="text-2xl font-bold text-blue-600">{stats.totalMembers.toLocaleString()}</div>
+                <div className="text-xs text-blue-600">Members</div>
               </div>
-              <div className="flex items-center space-x-2 text-xs text-gray-500">
-                <span>{post.category.name}</span>
-                <span>•</span>
-                <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
+              <div className="text-center p-3 bg-green-50 rounded-lg">
+                <div className="flex items-center justify-center mb-1">
+                  <MessageSquare className="h-4 w-4 text-green-600 mr-1" />
+                </div>
+                <div className="text-2xl font-bold text-green-600">{stats.postsToday}</div>
+                <div className="text-xs text-green-600">Posts Today</div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Active Now</span>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                  <span className="font-semibold text-green-600">{stats.activeNow}</span>
+                </div>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Total Posts</span>
+                <span className="font-semibold">{stats.totalPosts.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Total Votes</span>
+                <span className="font-semibold">{stats.totalVotes.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Total Comments</span>
+                <span className="font-semibold">{stats.totalComments.toLocaleString()}</span>
               </div>
             </div>
           </div>
-          <Button variant="ghost" size="sm">
-            <MoreHorizontal className="w-4 h-4" />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <p className="text-gray-800 mb-4 whitespace-pre-wrap">{post.content}</p>
+        </CardContent>
+      </Card>
 
-        {post.media_url && post.media_type && (
-          <MediaPlayer mediaUrl={post.media_url} mediaType={post.media_type} />
-        )}
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant={post.has_voted ? "default" : "ghost"}
-              size="sm"
-              onClick={() => onVote(post.id)}
-              className="flex items-center space-x-1"
-            >
-              <Heart className={`w-4 h-4 ${post.has_voted ? "fill-current" : ""}`} />
-              <span>{post.vote_count}</span>
-            </Button>
-            <Button variant="ghost" size="sm" className="flex items-center space-x-1">
-              <MessageCircle className="w-4 h-4" />
-              <span>{post.comment_count}</span>
-            </Button>
-            <Button variant="ghost" size="sm" className="flex items-center space-x-1">
-              <Share2 className="w-4 h-4" />
-            </Button>
-          </div>
-          <span className="text-xs text-gray-500">{post.view_count || 0} views</span>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function TrendingSidebar() {
-  return (
-    <div className="space-y-6">
+      {/* Trending Topics */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center text-lg">
@@ -217,50 +164,104 @@ function TrendingSidebar() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {["#EriggaLive", "#NewMusic", "#Community", "#Bars", "#Nigeria"].map((tag, index) => (
-              <div key={tag} className="flex items-center justify-between">
+            {[
+              { tag: "#EriggaLive", posts: "10k", trend: "+15%" },
+              { tag: "#NewMusic", posts: "8k", trend: "+12%" },
+              { tag: "#Community", posts: "6k", trend: "+8%" },
+              { tag: "#Bars", posts: "4k", trend: "+5%" },
+              { tag: "#Nigeria", posts: "2k", trend: "+3%" },
+            ].map((item, index) => (
+              <div
+                key={item.tag}
+                className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+              >
                 <div className="flex items-center space-x-2">
                   <Hash className="w-4 h-4 text-gray-500" />
-                  <span className="font-medium">{tag}</span>
+                  <span className="font-medium">{item.tag}</span>
                 </div>
-                <span className="text-sm text-gray-500">{(5 - index) * 2}k posts</span>
+                <div className="text-right">
+                  <div className="text-sm font-medium">{item.posts}</div>
+                  <div className="text-xs text-green-600">{item.trend}</div>
+                </div>
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
 
+      {/* Top Contributors */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center text-lg">
-            <Users className="w-5 h-5 mr-2" />
+            <Crown className="w-5 h-5 mr-2" />
             Top Contributors
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {[
-              { username: "eriggaofficial", votes: 2500, tier: "blood" },
-              { username: "warriking", votes: 1800, tier: "pioneer" },
-              { username: "southsouth", votes: 1200, tier: "grassroot" },
+              { username: "eriggaofficial", votes: 2500, tier: "blood", avatar: "/placeholder-user.jpg" },
+              { username: "warriking", votes: 1800, tier: "pioneer", avatar: "/placeholder-user.jpg" },
+              { username: "southsouth", votes: 1200, tier: "grassroot", avatar: "/placeholder-user.jpg" },
+              { username: "naijafan", votes: 950, tier: "elder", avatar: "/placeholder-user.jpg" },
+              { username: "musiclover", votes: 780, tier: "pioneer", avatar: "/placeholder-user.jpg" },
             ].map((user, index) => (
-              <div key={user.username} className="flex items-center justify-between">
+              <div
+                key={user.username}
+                className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+              >
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm font-medium text-gray-500">#{index + 1}</span>
+                  <span className="text-sm font-medium text-gray-500 w-6">#{index + 1}</span>
                   <Avatar className="w-8 h-8">
-                    <AvatarImage src="/placeholder-user.jpg" />
+                    <AvatarImage src={user.avatar || "/placeholder.svg"} />
                     <AvatarFallback>{user.username.charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div>
                     <div className="font-medium text-sm">{user.username}</div>
-                    <div className="text-xs text-gray-500">{user.votes} votes</div>
+                    <div className="text-xs text-gray-500 flex items-center">
+                      <Heart className="h-3 w-3 mr-1" />
+                      {user.votes} votes
+                    </div>
                   </div>
                 </div>
-                <Badge className={`${user.tier === "blood" ? "bg-red-500" : user.tier === "pioneer" ? "bg-blue-500" : "bg-green-500"} text-white text-xs`}>
+                <Badge
+                  className={`${
+                    user.tier === "blood"
+                      ? "bg-red-500"
+                      : user.tier === "pioneer"
+                        ? "bg-blue-500"
+                        : user.tier === "elder"
+                          ? "bg-purple-500"
+                          : "bg-green-500"
+                  } text-white text-xs`}
+                >
                   {user.tier}
                 </Badge>
               </div>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Button variant="outline" className="w-full justify-start" size="sm">
+              <Hash className="h-4 w-4 mr-2" />
+              Browse Topics
+            </Button>
+            <Button variant="outline" className="w-full justify-start" size="sm">
+              <Users className="h-4 w-4 mr-2" />
+              Find Users
+            </Button>
+            <Button variant="outline" className="w-full justify-start" size="sm">
+              <Eye className="h-4 w-4 mr-2" />
+              View Guidelines
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -269,365 +270,137 @@ function TrendingSidebar() {
 }
 
 export default function CommunityPage() {
-  const { user } = useAuth()
-  const [posts, setPosts] = useState<CommunityPost[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
-  const [supabaseUser, setSupabaseUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [selectedCategory, setSelectedCategory] = useState("all")
-  const [sortBy, setSortBy] = useState("newest")
   const supabase = createClient()
+  const [categories, setCategories] = useState<Category[]>([])
+  const [posts, setPosts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const loadSupabaseSession = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
-        setSupabaseUser(session.user)
-        return session.user
-      }
-      return null
-    } catch (error) {
-      console.error("Error loading Supabase session:", error)
-      return null
-    }
-  }
-
-  const loadUserProfile = async (authUser?: User) => {
-    const currentUser = authUser || supabaseUser || user
-    if (!currentUser) return
-
-    try {
-      // Try to find user by auth_user_id first (Supabase Auth)
-      let query = supabase
-        .from("users")
-        .select("*")
-      
-      if (supabaseUser) {
-        query = query.eq("auth_user_id", supabaseUser.id)
-      } else if (user) {
-        query = query.eq("auth_user_id", user.id)
-      } else {
-        return
-      }
-
-      const { data, error } = await query.single()
-
-      if (error) {
-        console.error("Error loading user profile:", error)
-        // Create a mock profile for development
-        if (currentUser) {
-          const mockProfile = {
-            id: currentUser.id,
-            auth_user_id: currentUser.id,
-            username: currentUser.email?.split('@')[0] || 'user',
-            full_name: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'User',
-            email: currentUser.email || '',
-            avatar_url: currentUser.user_metadata?.avatar_url,
-            tier: 'grassroot',
-            coins: 1000,
-            reputation_score: 0,
-            posts_count: 0
-          }
-          setUserProfile(mockProfile)
-        }
-        return
-      }
-
-      setUserProfile(data)
-    } catch (error) {
-      console.error("Error loading user profile:", error)
-    }
-  }
+  useEffect(() => {
+    loadCategories()
+  }, [])
 
   const loadCategories = async () => {
     try {
-      const { data, error } = await supabase
+      setError(null)
+      const { data, error: fetchError } = await supabase
         .from("community_categories")
         .select("*")
         .eq("is_active", true)
-        .order("display_order", { ascending: true })
+        .order("name", { ascending: true })
 
-      if (error) throw error
-      setCategories(data || [])
-    } catch (error) {
+      if (fetchError) {
+        console.error("Error loading categories:", fetchError)
+        // Set default categories as fallback
+        setCategories([
+          { id: 1, name: "General", slug: "general", is_active: true },
+          { id: 2, name: "Bars", slug: "bars", is_active: true },
+          { id: 3, name: "Discussion", slug: "discussion", is_active: true },
+          { id: 4, name: "Music", slug: "music", is_active: true },
+          { id: 5, name: "Events", slug: "events", is_active: true },
+        ])
+      } else {
+        setCategories(data || [])
+      }
+    } catch (error: any) {
       console.error("Error loading categories:", error)
-      // Set default categories as fallback
+      setError("Failed to load categories")
       setCategories([
         { id: 1, name: "General", slug: "general", is_active: true },
         { id: 2, name: "Bars", slug: "bars", is_active: true },
         { id: 3, name: "Discussion", slug: "discussion", is_active: true },
+        { id: 4, name: "Music", slug: "music", is_active: true },
+        { id: 5, name: "Events", slug: "events", is_active: true },
       ])
-    }
-  }
-
-  const getSamplePosts = (): CommunityPost[] => [
-    {
-      id: 1,
-      content: "Welcome to the Erigga community! 🎵 Share your bars, stories, and connect with fellow fans. This is where real music lovers gather!",
-      created_at: new Date().toISOString(),
-      vote_count: 12,
-      comment_count: 5,
-      view_count: 45,
-      user: {
-        id: "sample-1",
-        username: "eriggaofficial",
-        full_name: "Erigga",
-        avatar_url: "/placeholder-user.jpg",
-        tier: "blood",
-      },
-      category: {
-        id: 1,
-        name: "General",
-        slug: "general",
-      },
-      has_voted: false,
-    },
-    {
-      id: 2,
-      content: "Just dropped some fire bars 🔥\n\n*They say I'm the king of my city*\n*But I tell them I'm just getting started*\n*Paper boy flow, now I'm paper rich*\n*From the streets to the studio, never departed*",
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-      vote_count: 8,
-      comment_count: 3,
-      view_count: 28,
-      user: {
-        id: "sample-2",
-        username: "warriking",
-        full_name: "Warri King",
-        avatar_url: "/placeholder-user.jpg",
-        tier: "pioneer",
-      },
-      category: {
-        id: 2,
-        name: "Bars",
-        slug: "bars",
-      },
-      has_voted: false,
-    }
-  ]
-
-  const loadPosts = async () => {
-    try {
-      setLoading(true)
-
-      let query = supabase
-        .from("community_posts")
-        .select(`
-          *,
-          user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
-          category:community_categories!community_posts_category_id_fkey(id, name, slug)
-        `)
-        .eq("is_published", true)
-        .eq("is_deleted", false)
-
-      // Apply category filter only if not "all"
-      if (selectedCategory !== "all" && selectedCategory !== "") {
-        const categoryId = parseInt(selectedCategory)
-        if (!isNaN(categoryId)) {
-          query = query.eq("category_id", categoryId)
-        }
-      }
-
-      // Apply sorting
-      if (sortBy === "newest") {
-        query = query.order("created_at", { ascending: false })
-      } else if (sortBy === "oldest") {
-        query = query.order("created_at", { ascending: true })
-      } else if (sortBy === "top") {
-        query = query.order("vote_count", { ascending: false })
-      } else {
-        // Default to newest
-        query = query.order("created_at", { ascending: false })
-      }
-
-      query = query.limit(50) // Increased limit to show more posts
-
-      console.log('Loading posts with query...', { selectedCategory, sortBy })
-
-      const { data, error } = await query
-
-      if (error) {
-        console.error("Error loading posts:", error)
-        // Try to show sample posts if database fails
-        setPosts(getSamplePosts())
-        return
-      }
-
-      console.log('Loaded posts:', data)
-
-      if (!data || data.length === 0) {
-        // Only show sample posts if no real data exists
-        setPosts(getSamplePosts())
-      } else {
-        // Transform data to match expected format
-        const transformedPosts = data.map(post => ({
-          ...post,
-          has_voted: false, // Default value, could be enhanced with user voting data
-          user: post.user || {
-            id: 'unknown',
-            username: 'unknown',
-            full_name: 'Unknown User',
-            avatar_url: null,
-            tier: 'grassroot'
-          },
-          category: post.category || {
-            id: 1,
-            name: 'General',
-            slug: 'general'
-          }
-        }))
-        setPosts(transformedPosts as CommunityPost[])
-      }
-    } catch (error) {
-      console.error("Error loading posts:", error)
-      setPosts(getSamplePosts())
     } finally {
       setLoading(false)
     }
   }
 
-  const handleVote = async (postId: number) => {
-    if (!user || !userProfile) {
-      toast.error("Please log in to vote")
-      return
-    }
-
-    try {
-      // Update optimistically
-      setPosts(prevPosts =>
-        prevPosts.map(post =>
-          post.id === postId
-            ? {
-                ...post,
-                vote_count: post.has_voted ? post.vote_count - 1 : post.vote_count + 1,
-                has_voted: !post.has_voted,
-              }
-            : post
-        )
-      )
-
-      // You can implement actual voting logic here
-      toast.success("Vote recorded!")
-    } catch (error) {
-      console.error("Error voting:", error)
-      toast.error("Failed to vote")
-      // Revert optimistic update on error
-      loadPosts()
-    }
-  }
-
-  const handlePostCreated = async () => {
-    // Reload posts to show the new post immediately
-    await loadPosts()
-    toast.success("Post created successfully!")
-  }
-
-  useEffect(() => {
-    loadCategories()
-    loadSupabaseSession()
-    
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          if (session?.user) {
-            setSupabaseUser(session.user)
-            await loadUserProfile(session.user)
-          }
-        } else if (event === 'SIGNED_OUT') {
-          setSupabaseUser(null)
-          setUserProfile(null)
-        }
-      }
-    )
-
-    return () => subscription.unsubscribe()
+  const handlePostCreated = useCallback((newPost: any) => {
+    // Add the new post to the beginning of the posts array
+    setPosts((prevPosts) => [newPost, ...prevPosts])
+    toast.success("Post created successfully! 🎉")
   }, [])
 
-  useEffect(() => {
-    if (user || supabaseUser) {
-      loadUserProfile()
-    }
-  }, [user, supabaseUser])
-
-  useEffect(() => {
-    loadPosts()
-  }, [selectedCategory, sortBy])
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="container mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <div className="lg:col-span-3">
+              <div className="mb-6">
+                <Skeleton className="h-8 w-64 mb-2" />
+                <Skeleton className="h-4 w-96" />
+              </div>
+              <LoadingSkeleton />
+            </div>
+            <div className="hidden lg:block">
+              <div className="space-y-6">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardHeader>
+                      <Skeleton className="h-6 w-32" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-3/4" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-3">Community</h1>
+          <p className="text-lg text-gray-600 max-w-2xl">
+            Connect with fellow Erigga fans, share your passion for music, and join the conversation. Everyone is
+            welcome to participate and share their thoughts!
+          </p>
+        </div>
+
+        {/* Error Alert */}
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-3">
-            <div className="mb-6">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Community</h1>
-              <p className="text-gray-600">Connect with fellow Erigga fans and share your passion for music</p>
-            </div>
-
             {/* Create Post Form */}
-            <CreatePostFormWorking 
-              categories={categories} 
-              userProfile={userProfile}
-              supabaseUser={supabaseUser}
-              onPostCreated={handlePostCreated} 
-            />
-
-            {/* Filters */}
-            <div className="mb-6">
-              <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="all">All</TabsTrigger>
-                  {categories.slice(0, 3).map((category) => (
-                    <TabsTrigger key={category.id} value={category.id.toString()}>
-                      {category.name}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-
-              <div className="mt-4 flex items-center justify-between">
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="newest">Newest</SelectItem>
-                    <SelectItem value="oldest">Oldest</SelectItem>
-                    <SelectItem value="top">Most Voted</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            <EnhancedCreatePostForm categories={categories} onPostCreated={handlePostCreated} className="mb-8" />
 
             {/* Posts Feed */}
             <Suspense fallback={<LoadingSkeleton />}>
-              {loading ? (
-                <LoadingSkeleton />
-              ) : (
-                <div className="space-y-6">
-                  {posts.map((post) => (
-                    <PostCard key={post.id} post={post} onVote={handleVote} />
-                  ))}
-                  {posts.length === 0 && (
-                    <Card>
-                      <CardContent className="text-center py-12">
-                        <p className="text-gray-500 mb-4">No posts found</p>
-                        <p className="text-sm text-gray-400">
-                          Be the first to start a conversation in this category!
-                        </p>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              )}
+              <EnhancedPostFeed categories={categories} initialPosts={posts} />
             </Suspense>
           </div>
 
           {/* Sidebar */}
           <div className="hidden lg:block">
-            <TrendingSidebar />
+            <div className="sticky top-24">
+              <TrendingSidebar />
+            </div>
           </div>
+        </div>
+
+        {/* Mobile Sidebar */}
+        <div className="lg:hidden mt-8">
+          <TrendingSidebar />
         </div>
       </div>
     </div>

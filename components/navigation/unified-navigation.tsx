@@ -162,12 +162,13 @@ export function UnifiedNavigation() {
 
   const isActive = (path: string) => {
     if (path === "/") {
-      return pathname === "/"
+      return pathname === "/" // Only active when exactly on home page
     }
     if (path === "/dashboard") {
       return pathname === "/dashboard" || pathname?.startsWith("/dashboard/")
     }
-    return pathname?.startsWith(path)
+    // For other routes, check if pathname starts with the path (but not for home)
+    return pathname?.startsWith(path) && pathname !== "/"
   }
 
   const getVisibleItems = () => {
@@ -186,8 +187,15 @@ export function UnifiedNavigation() {
   }
 
   const handleNavigation = (href: string) => {
+    // Smooth transition
+    document.documentElement.style.scrollBehavior = "smooth"
     router.push(href)
     setIsMobileMenuOpen(false)
+
+    // Reset scroll behavior after navigation
+    setTimeout(() => {
+      document.documentElement.style.scrollBehavior = "auto"
+    }, 1000)
   }
 
   const handleSignOut = async () => {
