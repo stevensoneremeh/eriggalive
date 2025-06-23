@@ -80,10 +80,10 @@ function NavigationContent() {
 
   const navItems = [
     { name: "Home", href: "/", icon: <Home className="h-5 w-5" /> },
+    { name: "Dashboard", href: "/dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
     { name: "Community", href: "/community", icon: <Users className="h-5 w-5" /> },
     { name: "Chronicles", href: "/chronicles", icon: <BookOpen className="h-5 w-5" /> },
     { name: "Media Vault", href: "/vault", icon: <Music className="h-5 w-5" /> },
-    { name: "Dashboard", href: "/dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
     { name: "Tickets", href: "/tickets", icon: <Ticket className="h-5 w-5" /> },
     { name: "Premium", href: "/premium", icon: <Crown className="h-5 w-5" /> },
     { name: "Merch", href: "/merch", icon: <ShoppingBag className="h-5 w-5" /> },
@@ -91,7 +91,7 @@ function NavigationContent() {
 
   const isActive = (path: string) => {
     if (path === "/") {
-      return pathname === "/"
+      return pathname === "/" // Only active when exactly on home page
     }
     if (path === "/dashboard") {
       return pathname === "/dashboard" || pathname?.startsWith("/dashboard/")

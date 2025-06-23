@@ -30,6 +30,7 @@ import {
   LogOut,
   User,
   MoreHorizontal,
+  LayoutDashboard,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useTheme } from "@/contexts/theme-context"
@@ -50,9 +51,16 @@ interface SidebarItem {
 // Updated sidebarItems: "Coins" item is removed.
 const sidebarItems: SidebarItem[] = [
   {
+    name: "Home",
+    href: "/",
+    icon: Home,
+    description: "Back to main site",
+    category: "main",
+  },
+  {
     name: "Dashboard",
     href: "/dashboard",
-    icon: Home, // Main dashboard uses Home icon
+    icon: LayoutDashboard, // Changed from Home to LayoutDashboard
     description: "Overview and stats",
     category: "main",
   },
@@ -181,6 +189,9 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
   }, [updateScreenSize])
 
   const isActive = (href: string) => {
+    if (href === "/") {
+      return pathname === "/" // Only active when exactly on home page
+    }
     if (href === "/dashboard") {
       return pathname === "/dashboard" || pathname?.startsWith("/dashboard/")
     }
@@ -366,7 +377,7 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
                     <DynamicLogo width={32} height={32} />
                   </Link>
                 </TooltipTrigger>
-                <TooltipContent side="right">Erigga Live</TooltipContent>
+                <TooltipContent side="right">Go to Home</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           )}
