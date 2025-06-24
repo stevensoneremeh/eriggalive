@@ -1,180 +1,106 @@
-import { createClient } from "@/lib/supabase/client"
-import type { CommunityPost, CommunityCategory, User } from "@/types/database"
+// lib/community-actions-ultra-safe.ts
 
-const supabase = createClient()
+import { auth } from "@/auth"
+import { db } from "@/db"
+import { revalidatePath } from "next/cache"
+import { redirect } from "next/navigation"
+import { z } from "zod"
 
-// Ultra-safe function to get or create user profile
-export async function getOrCreateUserProfile(): Promise<User | null> {
+const CreateCommunitySchema = z.object({
+  name: z.string().min(3).max(255),
+})
+
+export async function createCommunity(formData: FormData) {
+  const session = await auth()
+
+  if (!session?.user) {
+    return redirect("/auth/signin")
+  }
+
+  const result = CreateCommunitySchema.safeParse({
+    name: formData.get("name"),
+  })
+
+  if (!result.success) {
+    return { errors: result.error.flatten().fieldErrors }
+  }
+
   try {
-    // Get current auth user
-    const {
-      data: { user: authUser },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !authUser) {
-      console.error("Auth error:", authError)
-      return null
-    }
-
-    // Try to get existing profile
-    const { data: existingProfile, error: profileError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("auth_user_id", authUser.id)
-      .single()
-
-    if (existingProfile && !profileError) {
-      return existingProfile
-    }
-
-    // If profile doesn't exist, call the database function to create it
-    const { data: createdProfile, error: createError } = await supabase.rpc("get_or_create_user_profile_safe", {
-      user_auth_id: authUser.id,
+    await db.community.create({
+      data: {
+        name: result.data.name,
+        creatorId: session.user.id,
+      },
     })
-
-    if (createError) {
-      console.error("Error creating profile:", createError)
-      return null
+  } catch (e: any) {
+    if (e.code === "P2002") {
+      return { errors: { name: ["Community name already taken."] } }
     }
-
-    return createdProfile
-  } catch (error) {
-    console.error("Error in getOrCreateUserProfile:", error)
-    return null
+    return { message: "Failed to create community." }
   }
+
+  revalidatePath("/")
+  redirect("/")
 }
 
-// Safe function to create a post
-export async function createPost(content: string, categoryId: number): Promise<{ success: boolean; error?: string }> {
-  try {
-    // Get or create user profile
-    const userProfile = await getOrCreateUserProfile()
+const UpdateCommunitySchema = z.object({
+  name: z.string().min(3).max(255),
+})
 
-    if (!userProfile) {
-      return { success: false, error: "Unable to get user profile" }
-    }
+export async function updateCommunity(id: string, formData: FormData) {
+  const session = await auth()
 
-    // Create the post
-    const { data, error } = await supabase
-      .from("community_posts")
-      .insert({
-        user_id: userProfile.id,
-        category_id: categoryId,
-        content: content,
-        is_published: true,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error("Error creating post:", error)
-      return { success: false, error: error.message }
-    }
-
-    return { success: true }
-  } catch (error) {
-    console.error("Error in createPost:", error)
-    return { success: false, error: "Failed to create post" }
+  if (!session?.user) {
+    return redirect("/auth/signin")
   }
+
+  const result = UpdateCommunitySchema.safeParse({
+    name: formData.get("name"),
+  })
+
+  if (!result.success) {
+    return { errors: result.error.flatten().fieldErrors }
+  }
+
+  try {
+    await db.community.update({
+      where: {
+        id,
+        creatorId: session.user.id,
+      },
+      data: {
+        name: result.data.name,
+      },
+    })
+  } catch (e: any) {
+    if (e.code === "P2002") {
+      return { errors: { name: ["Community name already taken."] } }
+    }
+    return { message: "Failed to update community." }
+  }
+
+  revalidatePath("/")
+  redirect("/")
 }
 
-// Get posts with user info
-export async function getPosts(): Promise<CommunityPost[]> {
-  try {
-    const { data, error } = await supabase
-      .from("community_posts")
-      .select(`
-        *,
-        user:users!community_posts_user_id_fkey (
-          id,
-          username,
-          full_name,
-          avatar_url,
-          tier
-        ),
-        category:community_categories!community_posts_category_id_fkey (
-          id,
-          name,
-          slug
-        )
-      `)
-      .eq("is_published", true)
-      .eq("is_deleted", false)
-      .order("created_at", { ascending: false })
+export async function deleteCommunity(id: string) {
+  const session = await auth()
 
-    if (error) {
-      console.error("Error fetching posts:", error)
-      return []
-    }
-
-    return data || []
-  } catch (error) {
-    console.error("Error in getPosts:", error)
-    return []
+  if (!session?.user) {
+    return redirect("/auth/signin")
   }
-}
 
-// Get categories
-export async function getCategories(): Promise<CommunityCategory[]> {
   try {
-    const { data, error } = await supabase.from("community_categories").select("*").order("name")
-
-    if (error) {
-      console.error("Error fetching categories:", error)
-      return []
-    }
-
-    return data || []
-  } catch (error) {
-    console.error("Error in getCategories:", error)
-    return []
+    await db.community.delete({
+      where: {
+        id,
+        creatorId: session.user.id,
+      },
+    })
+  } catch (e: any) {
+    return { message: "Failed to delete community." }
   }
-}
 
-// Vote on a post
-export async function voteOnPost(postId: number): Promise<{ success: boolean; error?: string }> {
-  try {
-    const userProfile = await getOrCreateUserProfile()
-
-    if (!userProfile) {
-      return { success: false, error: "Unable to get user profile" }
-    }
-
-    // Check if user already voted
-    const { data: existingVote } = await supabase
-      .from("community_post_votes")
-      .select("*")
-      .eq("post_id", postId)
-      .eq("user_id", userProfile.id)
-      .single()
-
-    if (existingVote) {
-      // Remove vote
-      const { error: deleteError } = await supabase
-        .from("community_post_votes")
-        .delete()
-        .eq("post_id", postId)
-        .eq("user_id", userProfile.id)
-
-      if (deleteError) {
-        return { success: false, error: deleteError.message }
-      }
-    } else {
-      // Add vote
-      const { error: insertError } = await supabase.from("community_post_votes").insert({
-        post_id: postId,
-        user_id: userProfile.id,
-      })
-
-      if (insertError) {
-        return { success: false, error: insertError.message }
-      }
-    }
-
-    return { success: true }
-  } catch (error) {
-    console.error("Error voting on post:", error)
-    return { success: false, error: "Failed to vote on post" }
-  }
+  revalidatePath("/")
+  redirect("/")
 }

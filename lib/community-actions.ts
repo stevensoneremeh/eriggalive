@@ -1,5 +1,3 @@
-"use server"
-
 import { revalidatePath } from "next/cache"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import type { User as PublicUser, CommunityComment, ReportReason, ReportTargetType } from "@/types/database"
@@ -36,9 +34,9 @@ async function getCurrentPublicUserProfile(
         .from("users")
         .insert({
           auth_user_id: authUser.id,
-          username: authUser.user_metadata?.username || authUser.email?.split('@')[0] || 'user',
-          full_name: authUser.user_metadata?.full_name || authUser.email || '',
-          email: authUser.email || '',
+          username: authUser.user_metadata?.username || authUser.email?.split("@")[0] || "user",
+          full_name: authUser.user_metadata?.full_name || authUser.email || "",
+          email: authUser.email || "",
           avatar_url: authUser.user_metadata?.avatar_url,
         })
         .select()
@@ -749,7 +747,8 @@ export async function getDummyPosts() {
       id: 2,
       user_id: 2,
       category_id: 2,
-      content: "Just dropped some fire bars 🔥\n\n*They say I'm the king of my city*\n*But I tell them I'm just getting started*\n*Paper boy flow, now I'm paper rich*\n*From the streets to the studio, never departed*",
+      content:
+        "Just dropped some fire bars 🔥\n\n*They say I'm the king of my city*\n*But I tell them I'm just getting started*\n*Paper boy flow, now I'm paper rich*\n*From the streets to the studio, never departed*",
       media_url: null,
       media_type: null,
       media_metadata: null,
