@@ -1,5 +1,3 @@
-"use server"
-
 import { revalidatePath } from "next/cache"
 import { getOrCreateUserProfile } from "@/lib/auth-sync"
 import { createServerSupabaseClient } from "@/lib/supabase/server"

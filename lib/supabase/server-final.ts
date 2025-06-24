@@ -1,11 +1,37 @@
 "use server"
 
 import { cookies } from "next/headers"
-import { createServerClient } from "@supabase/ssr"
-import type { Database } from "@/types/database"
+import { createClient } from "@supabase/supabase-js"
 
-export async function createClient() {
-  return createServerClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    cookies,
+/**
+ * Returns a Supabase client that forwards the
+ * user's cookies (auth session) on each request.
+ */
+export async function createServerSupabaseClient() {
+  const cookieStore = cookies()
+
+  // ❶ `async` is required only to satisfy the “use server” rule;
+  //    we return synchronously.
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    global: {
+      headers: {
+        // Forward cookies (if any) to Supabase auth middleware
+        Cookie: cookieStore
+          .getAll()
+          .map((c) => `${c.name}=${c.value}`)
+          .join("; "),
+      },
+    },
   })
+}
+
+/**
+ * Service-role client — **never** expose this on the client side.
+ */
+export async function createAdminSupabaseClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    // Service-role key is required for elevated privileges
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
 }
