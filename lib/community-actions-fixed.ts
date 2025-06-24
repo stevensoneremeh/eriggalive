@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import type { User as PublicUser, CommunityComment } from "@/types/database"
+import type { User as PublicUser } from "@/types/database"
 import DOMPurify from "isomorphic-dompurify"
 
 const VOTE_COIN_AMOUNT = 100
@@ -20,15 +20,55 @@ async function getCurrentPublicUserProfile(
       throw new Error("User not authenticated.")
     }
 
+    // Try to get existing user profile
     const { data: userProfile, error: profileError } = await supabaseClient
       .from("users")
       .select("*")
       .eq("auth_user_id", authUser.id)
       .single()
 
-    if (profileError || !userProfile) {
-      console.error("Public user profile not found for auth user:", authUser.id, profileError)
-      throw new Error("User profile not found. Please ensure you're properly logged in.")
+    if (profileError && profileError.code !== "PGRST116") {
+      console.error("Error fetching user profile:", profileError)
+      throw new Error("Failed to fetch user profile")
+    }
+
+    if (!userProfile) {
+      // Create user profile if it doesn't exist
+      const newUserData = {
+        auth_user_id: authUser.id,
+        username: authUser.user_metadata?.username || authUser.email?.split("@")[0] || `user_${Date.now()}`,
+        full_name:
+          authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email || "Anonymous User",
+        email: authUser.email || "",
+        avatar_url: authUser.user_metadata?.avatar_url || null,
+        tier: "grassroot" as const,
+        role: "user" as const,
+        level: 1,
+        points: 0,
+        coins: 1000, // Starting coins
+        is_verified: false,
+        is_active: true,
+        is_banned: false,
+        login_count: 1,
+        email_verified: authUser.email_confirmed_at ? true : false,
+        phone_verified: false,
+        two_factor_enabled: false,
+        preferences: {},
+        metadata: {},
+      }
+
+      const { data: newProfile, error: createError } = await supabaseClient
+        .from("users")
+        .insert(newUserData)
+        .select()
+        .single()
+
+      if (createError) {
+        console.error("Failed to create user profile:", createError)
+        throw new Error("Failed to create user profile")
+      }
+
+      return newProfile
     }
 
     return userProfile
@@ -97,6 +137,13 @@ export async function createCommunityPostAction(formData: FormData) {
       media_url,
       media_type,
       media_metadata,
+      is_published: true,
+      is_deleted: false,
+      is_edited: false,
+      vote_count: 0,
+      comment_count: 0,
+      tags: [],
+      mentions: null,
     }
 
     const { data: newPost, error } = await supabase
@@ -119,89 +166,6 @@ export async function createCommunityPostAction(formData: FormData) {
   } catch (error: any) {
     console.error("Create post action error:", error)
     return { success: false, error: error.message || "Failed to create post" }
-  }
-}
-
-export async function editPostAction(postId: number, formData: FormData) {
-  try {
-    const supabase = createServerSupabaseClient()
-    const userProfile = await getCurrentPublicUserProfile(supabase)
-
-    const rawContent = formData.get("content") as string
-
-    if (!rawContent?.trim()) {
-      return { success: false, error: "Content cannot be empty." }
-    }
-
-    const sanitizedContent = DOMPurify.sanitize(rawContent)
-
-    const { data: existingPost, error: fetchError } = await supabase
-      .from("community_posts")
-      .select("user_id")
-      .eq("id", postId)
-      .single()
-
-    if (fetchError || !existingPost) {
-      return { success: false, error: "Post not found." }
-    }
-
-    if (existingPost.user_id !== userProfile.id) {
-      return { success: false, error: "Not authorized to edit this post." }
-    }
-
-    const { data, error } = await supabase
-      .from("community_posts")
-      .update({
-        content: sanitizedContent,
-        is_edited: true,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", postId)
-      .eq("user_id", userProfile.id)
-      .select(`
-        *,
-        user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
-        category:community_categories!community_posts_category_id_fkey(id, name, slug)
-      `)
-      .single()
-
-    if (error) {
-      console.error("Post edit error:", error)
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath("/community")
-    return { success: true, post: data }
-  } catch (error: any) {
-    console.error("Edit post action error:", error)
-    return { success: false, error: error.message || "Failed to edit post" }
-  }
-}
-
-export async function deletePostAction(postId: number) {
-  try {
-    const supabase = createServerSupabaseClient()
-    const userProfile = await getCurrentPublicUserProfile(supabase)
-
-    const { error } = await supabase
-      .from("community_posts")
-      .update({
-        is_deleted: true,
-        deleted_at: new Date().toISOString(),
-      })
-      .eq("id", postId)
-      .eq("user_id", userProfile.id)
-
-    if (error) {
-      console.error("Post delete error:", error)
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath("/community")
-    return { success: true }
-  } catch (error: any) {
-    console.error("Delete post action error:", error)
-    return { success: false, error: error.message || "Failed to delete post" }
   }
 }
 
@@ -244,6 +208,13 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId: string
           code: "SELF_VOTE",
         }
       }
+      if (error.message.includes("Already voted")) {
+        return {
+          success: false,
+          error: "You have already voted on this post.",
+          code: "ALREADY_VOTED",
+        }
+      }
       return {
         success: false,
         error: `Voting failed: ${error.message}`,
@@ -255,171 +226,11 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId: string
     return {
       success: true,
       voted: data,
-      message: data
-        ? `Voted successfully! ${VOTE_COIN_AMOUNT} coins transferred.`
-        : `Vote removed! ${VOTE_COIN_AMOUNT} coins refunded.`,
+      message: `Voted successfully! ${VOTE_COIN_AMOUNT} coins transferred.`,
     }
   } catch (error: any) {
     console.error("Vote action error:", error)
     return { success: false, error: error.message || "Failed to vote" }
-  }
-}
-
-// --- Comment Actions ---
-export async function createCommentAction(postId: number, content: string, parentCommentId?: number | null) {
-  try {
-    const supabase = createServerSupabaseClient()
-    const userProfile = await getCurrentPublicUserProfile(supabase)
-
-    if (!content?.trim()) {
-      return { success: false, error: "Comment cannot be empty." }
-    }
-
-    const sanitizedContent = DOMPurify.sanitize(content)
-
-    const { data: newComment, error } = await supabase
-      .from("community_comments")
-      .insert({
-        post_id: postId,
-        user_id: userProfile.id,
-        content: sanitizedContent,
-        parent_comment_id: parentCommentId || null,
-      })
-      .select(`
-        *,
-        user:users!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier)
-      `)
-      .single()
-
-    if (error) {
-      console.error("Comment creation error:", error)
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath("/community")
-    return { success: true, comment: newComment }
-  } catch (error: any) {
-    console.error("Create comment action error:", error)
-    return { success: false, error: error.message || "Failed to create comment" }
-  }
-}
-
-export async function editCommentAction(commentId: number, content: string) {
-  try {
-    const supabase = createServerSupabaseClient()
-    const userProfile = await getCurrentPublicUserProfile(supabase)
-
-    if (!content?.trim()) {
-      return { success: false, error: "Comment cannot be empty." }
-    }
-
-    const sanitizedContent = DOMPurify.sanitize(content)
-
-    const { data, error } = await supabase
-      .from("community_comments")
-      .update({
-        content: sanitizedContent,
-        is_edited: true,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", commentId)
-      .eq("user_id", userProfile.id)
-      .select(`
-        *,
-        user:users!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier)
-      `)
-      .single()
-
-    if (error) {
-      console.error("Comment edit error:", error)
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath("/community")
-    return { success: true, comment: data }
-  } catch (error: any) {
-    console.error("Edit comment action error:", error)
-    return { success: false, error: error.message || "Failed to edit comment" }
-  }
-}
-
-export async function deleteCommentAction(commentId: number) {
-  try {
-    const supabase = createServerSupabaseClient()
-    const userProfile = await getCurrentPublicUserProfile(supabase)
-
-    const { error } = await supabase
-      .from("community_comments")
-      .update({
-        is_deleted: true,
-        deleted_at: new Date().toISOString(),
-        content: "[deleted]",
-      })
-      .eq("id", commentId)
-      .eq("user_id", userProfile.id)
-
-    if (error) {
-      console.error("Comment delete error:", error)
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath("/community")
-    return { success: true }
-  } catch (error: any) {
-    console.error("Delete comment action error:", error)
-    return { success: false, error: error.message || "Failed to delete comment" }
-  }
-}
-
-export async function toggleLikeCommentAction(commentId: number) {
-  try {
-    const supabase = createServerSupabaseClient()
-    const userProfile = await getCurrentPublicUserProfile(supabase)
-
-    const { data: existingLike, error: fetchError } = await supabase
-      .from("community_comment_likes")
-      .select("comment_id")
-      .eq("comment_id", commentId)
-      .eq("user_id", userProfile.id)
-      .maybeSingle()
-
-    if (fetchError && fetchError.code !== "PGRST116") {
-      console.error("Like fetch error:", fetchError)
-      return { success: false, error: fetchError.message, liked: false }
-    }
-
-    if (existingLike) {
-      // Remove like
-      const { error: deleteError } = await supabase
-        .from("community_comment_likes")
-        .delete()
-        .eq("comment_id", commentId)
-        .eq("user_id", userProfile.id)
-
-      if (deleteError) {
-        console.error("Like delete error:", deleteError)
-        return { success: false, error: deleteError.message, liked: true }
-      }
-
-      revalidatePath("/community")
-      return { success: true, liked: false }
-    } else {
-      // Add like
-      const { error: insertError } = await supabase
-        .from("community_comment_likes")
-        .insert({ comment_id: commentId, user_id: userProfile.id })
-
-      if (insertError) {
-        console.error("Like insert error:", insertError)
-        return { success: false, error: insertError.message, liked: false }
-      }
-
-      revalidatePath("/community")
-      return { success: true, liked: true }
-    }
-  } catch (error: any) {
-    console.error("Toggle like action error:", error)
-    return { success: false, error: error.message || "Failed to toggle like" }
   }
 }
 
@@ -499,98 +310,14 @@ export async function fetchCommunityPosts(
   }
 }
 
-export async function fetchCommentsForPost(postId: number, loggedInUserId?: string) {
-  try {
-    const supabase = createServerSupabaseClient()
-
-    // Get logged in user's internal ID if provided
-    let loggedInUserInternalId: number | undefined
-    if (loggedInUserId) {
-      const { data: userData } = await supabase.from("users").select("id").eq("auth_user_id", loggedInUserId).single()
-      loggedInUserInternalId = userData?.id
-    }
-
-    const { data, error } = await supabase
-      .from("community_comments")
-      .select(`
-        *,
-        user:users!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
-        likes:community_comment_likes(user_id)
-      `)
-      .eq("post_id", postId)
-      .eq("is_deleted", false)
-      .is("parent_comment_id", null)
-      .order("created_at", { ascending: true })
-
-    if (error) {
-      console.error("Error fetching comments:", error)
-      return []
-    }
-
-    const commentsWithReplies = await Promise.all(
-      (data || []).map(async (comment: any) => {
-        const { data: repliesData, error: repliesError } = await supabase
-          .from("community_comments")
-          .select(`
-            *,
-            user:users!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
-            likes:community_comment_likes(user_id)
-          `)
-          .eq("post_id", postId)
-          .eq("parent_comment_id", comment.id)
-          .eq("is_deleted", false)
-          .order("created_at", { ascending: true })
-
-        return {
-          ...comment,
-          user: comment.user,
-          has_liked: loggedInUserInternalId
-            ? comment.likes.some((like: any) => like.user_id === loggedInUserInternalId)
-            : false,
-          replies: repliesError
-            ? []
-            : (repliesData || []).map((r: any) => ({
-                ...r,
-                user: r.user,
-                has_liked: loggedInUserInternalId
-                  ? r.likes.some((like: any) => like.user_id === loggedInUserInternalId)
-                  : false,
-              })),
-        }
-      }),
-    )
-
-    return commentsWithReplies as CommunityComment[]
-  } catch (error: any) {
-    console.error("Fetch comments error:", error)
-    return []
-  }
-}
-
-export async function searchUsersForMention(query: string) {
-  try {
-    if (!query || query.length < 2) return []
-
-    const supabase = createServerSupabaseClient()
-    const { data, error } = await supabase
-      .from("users")
-      .select("id, username, full_name, avatar_url")
-      .or(`username.ilike.%${query}%,full_name.ilike.%${query}%`)
-      .limit(5)
-
-    if (error) {
-      console.error("Error searching users:", error)
-      return []
-    }
-
-    return (data || []).map((u) => ({
-      id: u.id,
-      label: u.username,
-      name: u.full_name,
-      avatar: u.avatar_url,
-    }))
-  } catch (error: any) {
-    console.error("Search users error:", error)
-    return []
-  }
-}
+// Export other functions from the original file
+export {
+  editPostAction,
+  deletePostAction,
+  createCommentAction,
+  editCommentAction,
+  deleteCommentAction,
+  toggleLikeCommentAction,
+  fetchCommentsForPost,
+  searchUsersForMention,
+} from "./community-actions"
