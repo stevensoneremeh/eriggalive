@@ -1,112 +1,108 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { Volume2, VolumeX, Pause, Play, X, Settings } from "lucide-react"
+import { useState, useRef, useEffect } from "react"
+import { Volume2, VolumeX, Play, Pause, X, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import Image from "next/image"
 
 interface EriggaRadioProps {
   className?: string
 }
 
-const sampleLyrics = [
-  "🎵 Welcome to Erigga Radio - Your home for the hottest beats",
-  "🔥 Paper Boi in the building with that street wisdom",
-  "💯 From Warri to the world - we keep it real",
-  "🎤 Erigga Live bringing you exclusive content 24/7",
-  "⚡ The movement never stops - join the community",
-  "🌟 New music, behind the scenes, and more coming soon",
-  "🎶 This is your soundtrack to the streets",
+const SAMPLE_LYRICS = [
+  "🎵 Welcome to Erigga Live Radio 🎵",
+  "The Paper Boi is back with the hottest tracks",
+  "From Warri to the world, we keep it real",
+  "Erigga Live - Your number one destination for authentic Nigerian music",
+  "Stay tuned for the latest hits and exclusive content",
+  "This is where the streets meet the beats",
+  "Erigga Live Radio - Always on, always fresh",
 ]
 
-export function EriggaRadio({ className }: EriggaRadioProps) {
-  const [isVisible, setIsVisible] = useState(true)
-  const [isMuted, setIsMuted] = useState(true)
+export default function EriggaRadio({ className = "" }: EriggaRadioProps) {
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isMuted, setIsMuted] = useState(true)
   const [isAnimationPaused, setIsAnimationPaused] = useState(false)
+  const [isVisible, setIsVisible] = useState(true)
   const [currentLyricIndex, setCurrentLyricIndex] = useState(0)
-  const [audioLoaded, setAudioLoaded] = useState(false)
   const [showControls, setShowControls] = useState(false)
+  const [audioLoaded, setAudioLoaded] = useState(false)
 
   const audioRef = useRef<HTMLAudioElement>(null)
   const lyricIntervalRef = useRef<NodeJS.Timeout>()
 
-  // Initialize audio
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
 
     const handleCanPlay = () => {
       setAudioLoaded(true)
-      // Auto-start playing (muted for browser compliance)
-      audio.play().catch(console.error)
-      setIsPlaying(true)
-    }
-
-    const handleEnded = () => {
-      setIsPlaying(false)
-      // Loop the audio
-      audio.currentTime = 0
+      // Auto-start playing (muted) when audio is ready
       audio.play().catch(console.error)
       setIsPlaying(true)
     }
 
     const handleError = () => {
+      console.error("Audio failed to load")
       setAudioLoaded(false)
+    }
+
+    const handleEnded = () => {
       setIsPlaying(false)
     }
 
     audio.addEventListener("canplay", handleCanPlay)
-    audio.addEventListener("ended", handleEnded)
     audio.addEventListener("error", handleError)
+    audio.addEventListener("ended", handleEnded)
 
     return () => {
       audio.removeEventListener("canplay", handleCanPlay)
-      audio.removeEventListener("ended", handleEnded)
       audio.removeEventListener("error", handleError)
+      audio.removeEventListener("ended", handleEnded)
     }
   }, [])
 
-  // Lyrics rotation
   useEffect(() => {
-    if (!audioLoaded || !isPlaying) {
+    if (isPlaying && audioLoaded) {
+      lyricIntervalRef.current = setInterval(() => {
+        setCurrentLyricIndex((prev) => (prev + 1) % SAMPLE_LYRICS.length)
+      }, 4000) // Change lyrics every 4 seconds
+    } else {
       if (lyricIntervalRef.current) {
         clearInterval(lyricIntervalRef.current)
       }
-      return
     }
-
-    lyricIntervalRef.current = setInterval(() => {
-      setCurrentLyricIndex((prev) => (prev + 1) % sampleLyrics.length)
-    }, 4000) // Change lyrics every 4 seconds
 
     return () => {
       if (lyricIntervalRef.current) {
         clearInterval(lyricIntervalRef.current)
       }
     }
-  }, [audioLoaded, isPlaying])
+  }, [isPlaying, audioLoaded])
+
+  const togglePlay = async () => {
+    const audio = audioRef.current
+    if (!audio || !audioLoaded) return
+
+    try {
+      if (isPlaying) {
+        await audio.pause()
+        setIsPlaying(false)
+      } else {
+        await audio.play()
+        setIsPlaying(true)
+      }
+    } catch (error) {
+      console.error("Error toggling audio:", error)
+    }
+  }
 
   const toggleMute = () => {
     const audio = audioRef.current
     if (!audio) return
 
-    const newMutedState = !isMuted
-    setIsMuted(newMutedState)
-    audio.muted = newMutedState
-  }
-
-  const togglePlayPause = () => {
-    const audio = audioRef.current
-    if (!audio) return
-
-    if (isPlaying) {
-      audio.pause()
-      setIsPlaying(false)
-    } else {
-      audio.play().catch(console.error)
-      setIsPlaying(true)
-    }
+    audio.muted = !isMuted
+    setIsMuted(!isMuted)
   }
 
   const toggleAnimation = () => {
@@ -125,58 +121,45 @@ export function EriggaRadio({ className }: EriggaRadioProps) {
   if (!isVisible) return null
 
   return (
-    <div
-      className={cn(
-        "fixed bottom-4 right-4 z-50 transition-all duration-300 ease-in-out",
-        "hover:scale-105 group",
-        className,
-      )}
-      onMouseEnter={() => setShowControls(true)}
-      onMouseLeave={() => setShowControls(false)}
-    >
-      {/* Audio Element */}
-      <audio ref={audioRef} src="/audio/erigga-radio-sample.mp3" muted={isMuted} loop preload="auto" />
-
-      {/* Main Radio Container */}
-      <div className="relative">
+    <div className={`fixed bottom-4 right-4 z-50 ${className}`}>
+      {/* Radio Container */}
+      <div
+        className={`relative group transition-all duration-300 hover:scale-105 ${
+          isAnimationPaused ? "" : "animate-bounce"
+        }`}
+        onMouseEnter={() => setShowControls(true)}
+        onMouseLeave={() => setShowControls(false)}
+        onTouchStart={() => setShowControls(true)}
+      >
         {/* Radio GIF */}
-        <div
-          className={cn(
-            "relative w-24 h-24 md:w-32 md:h-32 transition-all duration-300",
-            isAnimationPaused && "animate-pulse",
-            !isAnimationPaused && isPlaying && "animate-bounce",
-          )}
-        >
-          <img
+        <div className="relative w-20 h-20 md:w-24 md:h-24">
+          <Image
             src="/images/radio-man.gif"
             alt="Erigga Radio"
-            className={cn("w-full h-full object-contain rounded-lg shadow-lg", isAnimationPaused && "grayscale")}
-            style={{
-              animationPlayState: isAnimationPaused ? "paused" : "running",
-            }}
+            fill
+            className="object-contain rounded-lg shadow-lg"
+            priority
+            unoptimized // Allow GIF animation
           />
 
           {/* Status Indicator */}
-          <div
-            className={cn(
-              "absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white",
-              isPlaying && !isMuted ? "bg-green-500 animate-pulse" : "bg-red-500",
-            )}
-          />
+          <div className="absolute -top-1 -right-1">
+            <div className={`w-3 h-3 rounded-full ${isPlaying ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
+          </div>
         </div>
 
         {/* Controls Overlay */}
         <div
-          className={cn(
-            "absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center gap-1 transition-opacity duration-200",
-            showControls ? "opacity-100" : "opacity-0 pointer-events-none",
-          )}
+          className={`absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center gap-1 transition-opacity duration-200 ${
+            showControls ? "opacity-100" : "opacity-0"
+          }`}
         >
           <Button
             size="sm"
             variant="ghost"
             className="h-6 w-6 p-0 text-white hover:bg-white/20"
-            onClick={togglePlayPause}
+            onClick={togglePlay}
+            disabled={!audioLoaded}
             aria-label={isPlaying ? "Pause radio" : "Play radio"}
           >
             {isPlaying ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
@@ -199,7 +182,7 @@ export function EriggaRadio({ className }: EriggaRadioProps) {
             onClick={toggleAnimation}
             aria-label={isAnimationPaused ? "Resume animation" : "Pause animation"}
           >
-            <Settings className="h-3 w-3" />
+            <RotateCcw className="h-3 w-3" />
           </Button>
 
           <Button
@@ -215,40 +198,39 @@ export function EriggaRadio({ className }: EriggaRadioProps) {
       </div>
 
       {/* Lyrics Scroll Bar */}
-      {audioLoaded && isPlaying && (
-        <div
-          className={cn(
-            "absolute -left-2 top-1/2 -translate-y-1/2 -translate-x-full",
-            "w-48 md:w-64 bg-gradient-to-r from-brand-teal to-brand-lime",
-            "text-white text-xs md:text-sm font-medium py-2 px-3 rounded-l-full",
-            "shadow-lg border border-white/20",
-            "transition-all duration-300 ease-in-out",
-          )}
-        >
-          <div
-            className="whitespace-nowrap animate-pulse"
-            key={currentLyricIndex} // Force re-render for animation
-          >
-            <div className="animate-marquee">{sampleLyrics[currentLyricIndex]}</div>
+      {isPlaying && audioLoaded && (
+        <div className="mt-2 bg-black/80 text-white px-3 py-1 rounded-full text-xs max-w-xs overflow-hidden">
+          <div className="animate-pulse">
+            <div
+              className="whitespace-nowrap animate-scroll"
+              style={{
+                animation: "scroll 15s linear infinite",
+              }}
+            >
+              {SAMPLE_LYRICS[currentLyricIndex]}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Mobile-specific adjustments */}
+      {/* Audio Element */}
+      <audio ref={audioRef} loop muted={isMuted} preload="auto" className="hidden">
+        <source src="/audio/erigga-radio-sample.mp3" type="audio/mpeg" />
+        Your browser does not support the audio element.
+      </audio>
+
+      {/* Custom CSS for scrolling animation */}
       <style jsx>{`
-        @keyframes marquee {
-          0% { transform: translateX(100%); }
-          100% { transform: translateX(-100%); }
-        }
-        
-        .animate-marquee {
-          animation: marquee 8s linear infinite;
-        }
-        
-        @media (max-width: 768px) {
-          .animate-marquee {
-            animation-duration: 6s;
+        @keyframes scroll {
+          0% {
+            transform: translateX(100%);
           }
+          100% {
+            transform: translateX(-100%);
+          }
+        }
+        .animate-scroll {
+          animation: scroll 15s linear infinite;
         }
       `}</style>
     </div>

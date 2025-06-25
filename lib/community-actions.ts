@@ -1,6 +1,8 @@
+"use server"
+
 import { revalidatePath } from "next/cache"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import type { User as PublicUser, CommunityComment, ReportReason, ReportTargetType } from "@/types/database"
+import type { User as PublicUser, CommunityComment } from "@/types/database"
 import DOMPurify from "isomorphic-dompurify"
 
 const VOTE_COIN_AMOUNT = 100
@@ -145,97 +147,6 @@ export async function createCommunityPostAction(formData: FormData) {
   }
 }
 
-export async function editPostAction(postId: number, formData: FormData) {
-  try {
-    const supabase = createServerSupabaseClient()
-    const userProfile = await getCurrentPublicUserProfile(supabase)
-
-    if (!userProfile) {
-      return { success: false, error: "User not authenticated or profile not found." }
-    }
-
-    const rawContent = formData.get("content") as string
-
-    if (!rawContent?.trim()) {
-      return { success: false, error: "Content cannot be empty." }
-    }
-
-    const sanitizedContent = DOMPurify.sanitize(rawContent)
-
-    const { data: existingPost, error: fetchError } = await supabase
-      .from("community_posts")
-      .select("user_id")
-      .eq("id", postId)
-      .single()
-
-    if (fetchError || !existingPost) {
-      return { success: false, error: "Post not found." }
-    }
-
-    if (existingPost.user_id !== userProfile.id) {
-      return { success: false, error: "Not authorized to edit this post." }
-    }
-
-    const { data, error } = await supabase
-      .from("community_posts")
-      .update({
-        content: sanitizedContent,
-        is_edited: true,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", postId)
-      .eq("user_id", userProfile.id)
-      .select(`
-        *,
-        user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
-        category:community_categories!community_posts_category_id_fkey(id, name, slug)
-      `)
-      .single()
-
-    if (error) {
-      console.error("Post edit error:", error)
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath("/community")
-    return { success: true, post: data }
-  } catch (error: any) {
-    console.error("Edit post action error:", error)
-    return { success: false, error: error.message || "Failed to edit post" }
-  }
-}
-
-export async function deletePostAction(postId: number) {
-  try {
-    const supabase = createServerSupabaseClient()
-    const userProfile = await getCurrentPublicUserProfile(supabase)
-
-    if (!userProfile) {
-      return { success: false, error: "User not authenticated or profile not found." }
-    }
-
-    const { error } = await supabase
-      .from("community_posts")
-      .update({
-        is_deleted: true,
-        deleted_at: new Date().toISOString(),
-      })
-      .eq("id", postId)
-      .eq("user_id", userProfile.id)
-
-    if (error) {
-      console.error("Post delete error:", error)
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath("/community")
-    return { success: true }
-  } catch (error: any) {
-    console.error("Delete post action error:", error)
-    return { success: false, error: error.message || "Failed to delete post" }
-  }
-}
-
 export async function voteOnPostAction(postId: number, postCreatorAuthId: string) {
   try {
     const supabase = createServerSupabaseClient()
@@ -321,221 +232,6 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId: string
   }
 }
 
-// --- Comment Actions ---
-export async function createCommentAction(postId: number, content: string, parentCommentId?: number | null) {
-  try {
-    const supabase = createServerSupabaseClient()
-    const userProfile = await getCurrentPublicUserProfile(supabase)
-
-    if (!userProfile) {
-      return { success: false, error: "User not authenticated." }
-    }
-
-    if (!content?.trim()) {
-      return { success: false, error: "Comment cannot be empty." }
-    }
-
-    const sanitizedContent = DOMPurify.sanitize(content)
-
-    const { data: newComment, error } = await supabase
-      .from("community_comments")
-      .insert({
-        post_id: postId,
-        user_id: userProfile.id,
-        content: sanitizedContent,
-        parent_comment_id: parentCommentId || null,
-      })
-      .select(`
-        *,
-        user:users!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier)
-      `)
-      .single()
-
-    if (error) {
-      console.error("Comment creation error:", error)
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath("/community")
-    return { success: true, comment: newComment }
-  } catch (error: any) {
-    console.error("Create comment action error:", error)
-    return { success: false, error: error.message || "Failed to create comment" }
-  }
-}
-
-export async function editCommentAction(commentId: number, content: string) {
-  try {
-    const supabase = createServerSupabaseClient()
-    const userProfile = await getCurrentPublicUserProfile(supabase)
-
-    if (!userProfile) {
-      return { success: false, error: "User not authenticated or profile not found." }
-    }
-
-    if (!content?.trim()) {
-      return { success: false, error: "Comment cannot be empty." }
-    }
-
-    const sanitizedContent = DOMPurify.sanitize(content)
-
-    const { data, error } = await supabase
-      .from("community_comments")
-      .update({
-        content: sanitizedContent,
-        is_edited: true,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", commentId)
-      .eq("user_id", userProfile.id)
-      .select(`
-        *,
-        user:users!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier)
-      `)
-      .single()
-
-    if (error) {
-      console.error("Comment edit error:", error)
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath("/community")
-    return { success: true, comment: data }
-  } catch (error: any) {
-    console.error("Edit comment action error:", error)
-    return { success: false, error: error.message || "Failed to edit comment" }
-  }
-}
-
-export async function deleteCommentAction(commentId: number) {
-  try {
-    const supabase = createServerSupabaseClient()
-    const userProfile = await getCurrentPublicUserProfile(supabase)
-
-    if (!userProfile) {
-      return { success: false, error: "User not authenticated or profile not found." }
-    }
-
-    const { error } = await supabase
-      .from("community_comments")
-      .update({
-        is_deleted: true,
-        deleted_at: new Date().toISOString(),
-        content: "[deleted]",
-      })
-      .eq("id", commentId)
-      .eq("user_id", userProfile.id)
-
-    if (error) {
-      console.error("Comment delete error:", error)
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath("/community")
-    return { success: true }
-  } catch (error: any) {
-    console.error("Delete comment action error:", error)
-    return { success: false, error: error.message || "Failed to delete comment" }
-  }
-}
-
-export async function toggleLikeCommentAction(commentId: number) {
-  try {
-    const supabase = createServerSupabaseClient()
-    const userProfile = await getCurrentPublicUserProfile(supabase)
-
-    if (!userProfile) {
-      return { success: false, error: "User not authenticated or profile not found." }
-    }
-
-    const { data: existingLike, error: fetchError } = await supabase
-      .from("community_comment_likes")
-      .select("comment_id")
-      .eq("comment_id", commentId)
-      .eq("user_id", userProfile.id)
-      .maybeSingle()
-
-    if (fetchError && fetchError.code !== "PGRST116") {
-      console.error("Like fetch error:", fetchError)
-      return { success: false, error: fetchError.message, liked: false }
-    }
-
-    if (existingLike) {
-      // Remove like
-      const { error: deleteError } = await supabase
-        .from("community_comment_likes")
-        .delete()
-        .eq("comment_id", commentId)
-        .eq("user_id", userProfile.id)
-
-      if (deleteError) {
-        console.error("Like delete error:", deleteError)
-        return { success: false, error: deleteError.message, liked: true }
-      }
-
-      revalidatePath("/community")
-      return { success: true, liked: false }
-    } else {
-      // Add like
-      const { error: insertError } = await supabase
-        .from("community_comment_likes")
-        .insert({ comment_id: commentId, user_id: userProfile.id })
-
-      if (insertError) {
-        console.error("Like insert error:", insertError)
-        return { success: false, error: insertError.message, liked: false }
-      }
-
-      revalidatePath("/community")
-      return { success: true, liked: true }
-    }
-  } catch (error: any) {
-    console.error("Toggle like action error:", error)
-    return { success: false, error: error.message || "Failed to toggle like" }
-  }
-}
-
-// --- Report Actions ---
-export async function createReportAction(
-  targetId: number,
-  targetType: ReportTargetType,
-  reason: ReportReason,
-  additionalNotes = "",
-) {
-  try {
-    const supabase = createServerSupabaseClient()
-    const userProfile = await getCurrentPublicUserProfile(supabase)
-
-    if (!userProfile) {
-      return { success: false, error: "User not authenticated or profile not found." }
-    }
-
-    if (!reason) {
-      return { success: false, error: "Please select a reason for the report." }
-    }
-
-    const { error } = await supabase.from("community_reports").insert({
-      reporter_user_id: userProfile.id,
-      target_id: targetId,
-      target_type: targetType,
-      reason,
-      additional_notes: additionalNotes || null,
-    })
-
-    if (error) {
-      console.error("Report creation error:", error)
-      return { success: false, error: error.message }
-    }
-
-    // We don't need to revalidate a specific path, but you can do so if you show reports somewhere
-    return { success: true }
-  } catch (error: any) {
-    console.error("Create report action error:", error)
-    return { success: false, error: error.message || "Failed to submit report" }
-  }
-}
-
-// --- Fetching Actions (with search) ---
 export async function fetchCommunityPosts(
   loggedInUserId?: string,
   options: {
@@ -611,6 +307,48 @@ export async function fetchCommunityPosts(
   }
 }
 
+export async function createCommentAction(postId: number, content: string, parentCommentId?: number | null) {
+  try {
+    const supabase = createServerSupabaseClient()
+    const userProfile = await getCurrentPublicUserProfile(supabase)
+
+    if (!userProfile) {
+      return { success: false, error: "User not authenticated." }
+    }
+
+    if (!content?.trim()) {
+      return { success: false, error: "Comment cannot be empty." }
+    }
+
+    const sanitizedContent = DOMPurify.sanitize(content)
+
+    const { data: newComment, error } = await supabase
+      .from("community_comments")
+      .insert({
+        post_id: postId,
+        user_id: userProfile.id,
+        content: sanitizedContent,
+        parent_comment_id: parentCommentId || null,
+      })
+      .select(`
+        *,
+        user:users!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier)
+      `)
+      .single()
+
+    if (error) {
+      console.error("Comment creation error:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/community")
+    return { success: true, comment: newComment }
+  } catch (error: any) {
+    console.error("Create comment action error:", error)
+    return { success: false, error: error.message || "Failed to create comment" }
+  }
+}
+
 export async function fetchCommentsForPost(postId: number, loggedInUserId?: string) {
   try {
     const supabase = createServerSupabaseClient()
@@ -677,105 +415,4 @@ export async function fetchCommentsForPost(postId: number, loggedInUserId?: stri
     console.error("Fetch comments error:", error)
     return []
   }
-}
-
-export async function searchUsersForMention(query: string) {
-  try {
-    if (!query || query.length < 2) return []
-
-    const supabase = createServerSupabaseClient()
-    const { data, error } = await supabase
-      .from("users")
-      .select("id, username, full_name, avatar_url")
-      .or(`username.ilike.%${query}%,full_name.ilike.%${query}%`)
-      .limit(5)
-
-    if (error) {
-      console.error("Error searching users:", error)
-      return []
-    }
-
-    return (data || []).map((u) => ({
-      id: u.id,
-      label: u.username,
-      name: u.full_name,
-      avatar: u.avatar_url,
-    }))
-  } catch (error: any) {
-    console.error("Search users error:", error)
-    return []
-  }
-}
-
-// Dummy data for fallback
-export async function getDummyPosts() {
-  return [
-    {
-      id: 1,
-      user_id: 1,
-      category_id: 1,
-      content: "Welcome to the Erigga community! 🎵 Share your bars, stories, and connect with fellow fans.",
-      media_url: null,
-      media_type: null,
-      media_metadata: null,
-      vote_count: 12,
-      comment_count: 5,
-      tags: ["welcome", "community"],
-      mentions: null,
-      is_published: true,
-      is_edited: false,
-      is_deleted: false,
-      deleted_at: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      user: {
-        id: 1,
-        auth_user_id: "dummy-auth-id-1",
-        username: "eriggaofficial",
-        full_name: "Erigga",
-        avatar_url: "/placeholder-user.jpg",
-        tier: "blood" as const,
-      },
-      category: {
-        id: 1,
-        name: "General",
-        slug: "general",
-      },
-      has_voted: false,
-    },
-    {
-      id: 2,
-      user_id: 2,
-      category_id: 2,
-      content:
-        "Just dropped some fire bars 🔥\n\n*They say I'm the king of my city*\n*But I tell them I'm just getting started*\n*Paper boy flow, now I'm paper rich*\n*From the streets to the studio, never departed*",
-      media_url: null,
-      media_type: null,
-      media_metadata: null,
-      vote_count: 8,
-      comment_count: 3,
-      tags: ["bars", "rap", "fire"],
-      mentions: null,
-      is_published: true,
-      is_edited: false,
-      is_deleted: false,
-      deleted_at: null,
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-      updated_at: new Date(Date.now() - 3600000).toISOString(),
-      user: {
-        id: 2,
-        auth_user_id: "dummy-auth-id-2",
-        username: "warriking",
-        full_name: "Warri King",
-        avatar_url: "/placeholder-user.jpg",
-        tier: "pioneer" as const,
-      },
-      category: {
-        id: 2,
-        name: "Bars",
-        slug: "bars",
-      },
-      has_voted: false,
-    },
-  ]
 }
