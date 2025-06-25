@@ -5,21 +5,18 @@ import { Volume2, VolumeX, Play, Pause, X, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 
+const SAMPLE_LYRICS = [
+  "Lyric 1",
+  "Lyric 2",
+  "Lyric 3",
+  // Add more lyrics here
+]
+
 interface EriggaRadioProps {
   className?: string
 }
 
-const SAMPLE_LYRICS = [
-  "🎵 Welcome to Erigga Live Radio 🎵",
-  "The Paper Boi is back with the hottest tracks",
-  "From Warri to the world, we keep it real",
-  "Erigga Live - Your number one destination for authentic Nigerian music",
-  "Stay tuned for the latest hits and exclusive content",
-  "This is where the streets meet the beats",
-  "Erigga Live Radio - Always on, always fresh",
-]
-
-export default function EriggaRadio({ className = "" }: EriggaRadioProps) {
+export function EriggaRadio({ className = "" }: EriggaRadioProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
   const [isAnimationPaused, setIsAnimationPaused] = useState(false)
@@ -236,3 +233,5 @@ export default function EriggaRadio({ className = "" }: EriggaRadioProps) {
     </div>
   )
 }
+
+export default EriggaRadio
