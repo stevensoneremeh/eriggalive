@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import type { User as PublicUser, CommunityComment } from "@/types/database"
 import DOMPurify from "isomorphic-dompurify"
+import { deleteCommentAction, editCommentAction, toggleLikeCommentAction, createReportAction, searchUsersForMention } from "@/lib/community-actions-legacy"
 
 const VOTE_COIN_AMOUNT = 100
 
@@ -416,3 +417,11 @@ export async function fetchCommentsForPost(postId: number, loggedInUserId?: stri
     return []
   }
 }
+
+// --- Compatibility re-exports for legacy imports ---------------------------
+
+export { deleteCommentAction }
+export { editCommentAction }
+export { toggleLikeCommentAction }
+export { createReportAction }
+export { searchUsersForMention }
