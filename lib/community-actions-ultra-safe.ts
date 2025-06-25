@@ -1,5 +1,7 @@
 // lib/community-actions-ultra-safe.ts
 
+"use server"
+
 import { auth } from "@/auth"
 import { db } from "@/db"
 import { revalidatePath } from "next/cache"
@@ -104,3 +106,9 @@ export async function deleteCommunity(id: string) {
   revalidatePath("/")
   redirect("/")
 }
+
+export {
+  createCommunityPostAction,
+  voteOnPostAction,
+  fetchCommunityPosts,
+} from "./community-actions-final-fix"

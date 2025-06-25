@@ -1,7 +1,10 @@
-import { createClient } from "@/lib/supabase/server"
-import { revalidatePath } from "next/cache"
+"use server"
 
-export async function createPost(formData: FormData) {
+import { createClient } from "@/lib/supabase/server"
+
+const VOTE_COIN_AMOUNT = 100
+
+export async function createCommunityPostAction(formData: FormData) {
   const supabase = await createClient()
 
   try {
@@ -89,6 +92,7 @@ export async function createPost(formData: FormData) {
       })
       .eq("id", Number.parseInt(categoryId))
 
+    const { revalidatePath } = await import("next/cache")
     revalidatePath("/community")
     return { success: true, post }
   } catch (error) {
@@ -97,9 +101,7 @@ export async function createPost(formData: FormData) {
   }
 }
 
-const VOTE_COIN_AMOUNT = 100
-
-export async function voteOnPost(postId: number) {
+export async function voteOnPostAction(postId: number) {
   const supabase = await createClient()
 
   try {
@@ -148,6 +150,7 @@ export async function voteOnPost(postId: number) {
       throw new Error(data.error || "Vote failed")
     }
 
+    const { revalidatePath } = await import("next/cache")
     revalidatePath("/community")
     return { success: true, voted: data.voted, action: data.action }
   } catch (error) {
@@ -200,6 +203,8 @@ export async function bookmarkPost(postId: number) {
     if (existingBookmark) {
       // Remove bookmark
       await supabase.from("user_bookmarks").delete().eq("user_id", userData.id).eq("post_id", postId)
+      const { revalidatePath } = await import("next/cache")
+      revalidatePath("/community")
 
       return { success: true, bookmarked: false }
     } else {
@@ -208,6 +213,8 @@ export async function bookmarkPost(postId: number) {
         user_id: userData.id,
         post_id: postId,
       })
+      const { revalidatePath } = await import("next/cache")
+      revalidatePath("/community")
 
       return { success: true, bookmarked: true }
     }
@@ -273,10 +280,43 @@ export async function addComment(postId: number, content: string, parentCommentI
       .update({ comment_count: supabase.raw("COALESCE(comment_count, 0) + 1") })
       .eq("id", postId)
 
+    const { revalidatePath } = await import("next/cache")
     revalidatePath("/community")
     return { success: true, comment }
   } catch (error) {
     console.error("Error adding comment:", error)
     return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
+}
+
+export async function fetchCommunityPosts() {
+  const supabase = await createClient()
+
+  try {
+    const { data: posts, error } = await supabase.from("community_posts").select("*")
+
+    if (error) {
+      console.error("Error fetching community posts:", error)
+      throw new Error("Failed to fetch community posts")
+    }
+
+    return { success: true, posts }
+  } catch (error) {
+    console.error("Error fetching community posts:", error)
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
+  }
+}
+
+/**
+ * Legacy aliases expected elsewhere in the code-base
+ * --------------------------------------------------
+ * They simply forward to the real async actions above
+ * so we still comply with the `"use server"` rule.
+ */
+export async function createPost(formData: FormData) {
+  return createCommunityPostAction(formData)
+}
+
+export async function voteOnPost(postId: number, postCreatorAuthId?: string) {
+  return voteOnPostAction(postId, postCreatorAuthId)
 }
