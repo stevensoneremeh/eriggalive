@@ -1,4 +1,4 @@
-import { fetchCommunityPosts } from "@/lib/actions/community"
+import { fetchCommunityPosts } from "@/lib/community-actions-final-fix"
 
 async function CommunityPage() {
   const posts = await fetchCommunityPosts()
@@ -6,18 +6,13 @@ async function CommunityPage() {
   return (
     <div>
       <h1>Community Page</h1>
-      {posts.length > 0 ? (
-        <ul>
-          {posts.map((post) => (
-            <li key={post.id}>
-              <h2>{post.title}</h2>
-              <p>{post.content}</p>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p>No posts yet.</p>
-      )}
+      {posts.map((post) => (
+        <div key={post.id}>
+          <h2>{post.title}</h2>
+          <p>{post.content}</p>
+          <p>Author: {post.authorId}</p>
+        </div>
+      ))}
     </div>
   )
 }

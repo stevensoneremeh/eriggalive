@@ -9,7 +9,6 @@ import { Music, Video, Newspaper, Users, ShoppingBag, Calendar } from "lucide-re
 import { cn } from "@/lib/utils"
 import { SafeHeroVideoCarousel } from "@/components/safe-hero-video-carousel"
 import { getOptimizedVideoSources } from "@/utils/video-utils"
-import { EriggaRadio } from "@/components/erigga-radio"
 
 export default function HomePage() {
   const { theme } = useTheme()
@@ -447,9 +446,6 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
-
-      {/* Erigga Radio - Only on Home Page */}
-      <EriggaRadio />
     </div>
   )
 }

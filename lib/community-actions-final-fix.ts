@@ -1,88 +1,19 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { getOrCreateUserProfile } from "@/lib/auth-sync"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import type { User as PublicUser } from "@/types/database"
 import DOMPurify from "isomorphic-dompurify"
 
 const VOTE_COIN_AMOUNT = 100
-
-async function getCurrentPublicUserProfile(
-  supabaseClient: ReturnType<typeof createServerSupabaseClient>,
-): Promise<PublicUser> {
-  try {
-    const {
-      data: { user: authUser },
-      error: authError,
-    } = await supabaseClient.auth.getUser()
-
-    if (authError || !authUser) {
-      throw new Error("User not authenticated.")
-    }
-
-    // Try to get existing user profile
-    const { data: userProfile, error: profileError } = await supabaseClient
-      .from("users")
-      .select("*")
-      .eq("auth_user_id", authUser.id)
-      .single()
-
-    if (profileError && profileError.code !== "PGRST116") {
-      console.error("Error fetching user profile:", profileError)
-      throw new Error("Failed to fetch user profile")
-    }
-
-    if (!userProfile) {
-      // Create user profile if it doesn't exist
-      const newUserData = {
-        auth_user_id: authUser.id,
-        username: authUser.user_metadata?.username || authUser.email?.split("@")[0] || `user_${Date.now()}`,
-        full_name:
-          authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email || "Anonymous User",
-        email: authUser.email || "",
-        avatar_url: authUser.user_metadata?.avatar_url || null,
-        tier: "grassroot" as const,
-        role: "user" as const,
-        level: 1,
-        points: 0,
-        coins: 1000, // Starting coins
-        is_verified: false,
-        is_active: true,
-        is_banned: false,
-        login_count: 1,
-        email_verified: authUser.email_confirmed_at ? true : false,
-        phone_verified: false,
-        two_factor_enabled: false,
-        preferences: {},
-        metadata: {},
-      }
-
-      const { data: newProfile, error: createError } = await supabaseClient
-        .from("users")
-        .insert(newUserData)
-        .select()
-        .single()
-
-      if (createError) {
-        console.error("Failed to create user profile:", createError)
-        throw new Error("Failed to create user profile")
-      }
-
-      return newProfile
-    }
-
-    return userProfile
-  } catch (error) {
-    console.error("Error getting user profile:", error)
-    throw error
-  }
-}
 
 // --- Post Actions ---
 export async function createCommunityPostAction(formData: FormData) {
   try {
     const supabase = createServerSupabaseClient()
-    const userProfile = await getCurrentPublicUserProfile(supabase)
+
+    // Use the new auth sync function
+    const userProfile = await getOrCreateUserProfile()
 
     const rawContent = formData.get("content") as string
     const categoryId = formData.get("categoryId") as string
@@ -172,7 +103,7 @@ export async function createCommunityPostAction(formData: FormData) {
 export async function voteOnPostAction(postId: number, postCreatorAuthId: string) {
   try {
     const supabase = createServerSupabaseClient()
-    const voterProfile = await getCurrentPublicUserProfile(supabase)
+    const voterProfile = await getOrCreateUserProfile()
 
     // Check if trying to vote on own post
     const { data: postData } = await supabase.from("community_posts").select("user_id").eq("id", postId).single()
@@ -185,6 +116,15 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId: string
       }
     }
 
+    // Check if user has enough coins
+    if (voterProfile.coins < VOTE_COIN_AMOUNT) {
+      return {
+        success: false,
+        error: "Not enough Erigga Coins to vote.",
+        code: "INSUFFICIENT_FUNDS",
+      }
+    }
+
     const { data, error } = await supabase.rpc("handle_post_vote", {
       p_post_id: postId,
       p_voter_auth_id: voterProfile.auth_user_id,
@@ -194,27 +134,6 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId: string
 
     if (error) {
       console.error("Vote error:", error)
-      if (error.message.includes("Insufficient coins")) {
-        return {
-          success: false,
-          error: "Not enough Erigga Coins to vote.",
-          code: "INSUFFICIENT_FUNDS",
-        }
-      }
-      if (error.message.includes("Cannot vote on own post")) {
-        return {
-          success: false,
-          error: "You cannot vote on your own post.",
-          code: "SELF_VOTE",
-        }
-      }
-      if (error.message.includes("Already voted")) {
-        return {
-          success: false,
-          error: "You have already voted on this post.",
-          code: "ALREADY_VOTED",
-        }
-      }
       return {
         success: false,
         error: `Voting failed: ${error.message}`,
@@ -234,7 +153,6 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId: string
   }
 }
 
-// --- Fetching Actions ---
 export async function fetchCommunityPosts(
   loggedInUserId?: string,
   options: {
@@ -287,7 +205,7 @@ export async function fetchCommunityPosts(
 
     query = query.range(offset, offset + limit - 1)
 
-    const { data, error, count } = await query
+    const { data, error } = await query
 
     if (error) {
       console.error("Error fetching posts:", error)
@@ -303,14 +221,14 @@ export async function fetchCommunityPosts(
         : false,
     }))
 
-    return { posts: postsWithVoteStatus, count: count || data?.length || 0, error: null }
+    return { posts: postsWithVoteStatus, count: data?.length || 0, error: null }
   } catch (error: any) {
     console.error("Fetch posts error:", error)
     return { posts: [], count: 0, error: error.message || "Failed to fetch posts" }
   }
 }
 
-// Export other functions from the original file
+// Re-export other functions that don't need auth changes
 export {
   editPostAction,
   deletePostAction,
@@ -320,4 +238,4 @@ export {
   toggleLikeCommentAction,
   fetchCommentsForPost,
   searchUsersForMention,
-} from "./community-actions"
+} from "./community-actions-fixed"
