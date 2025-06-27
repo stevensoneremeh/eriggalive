@@ -525,16 +525,6 @@ export async function bookmarkPost(postId: number) {
   }
 }
 
-// Re-export other functions that don't need auth changes
-export {
-  createCommentAction,
-  editCommentAction,
-  deleteCommentAction,
-  toggleLikeCommentAction,
-  fetchCommentsForPost,
-  searchUsersForMention,
-} from "./community-actions-fixed"
-
 // Alias exports for backward compatibility
 export async function createPost(formData: FormData) {
   return await createCommunityPostAction(formData)
