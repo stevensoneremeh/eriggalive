@@ -1,13 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ShoppingCart, Heart, Star, Coins, CreditCard } from "lucide-react"
+import { ShoppingCart, Heart, Star, Coins, CreditCard, Gift, Clock, Calendar } from "lucide-react"
 import { CoinBalance } from "@/components/coin-balance"
 import {
   Dialog,
@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/dialog"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
+import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
 
 // Mock product data - in a real app, this would come from the API
 const products = [
@@ -108,6 +110,24 @@ const products = [
     reviews: 78,
   },
 ]
+
+interface Freebie {
+  id: number
+  title: string
+  description: string
+  image_url: string
+  available_until: string
+  max_claims: number
+  current_claims: number
+  created_at: string
+}
+
+interface FreebiesClaim {
+  id: number
+  user_id: number
+  freebie_id: number
+  claimed_at: string
+}
 
 interface ProductCardProps {
   product: (typeof products)[0]
@@ -288,7 +308,7 @@ function ProductCard({ product, onAddToCart }: ProductCardProps) {
                     Add to Cart
                   </Button>
 
-                  <Button variant="outline" className="flex-1" onClick={() => setIsDialogOpen(false)}>
+                  <Button variant="outline" className="flex-1 bg-transparent" onClick={() => setIsDialogOpen(false)}>
                     Cancel
                   </Button>
                 </div>
@@ -299,6 +319,229 @@ function ProductCard({ product, onAddToCart }: ProductCardProps) {
           <Button disabled className="w-full">
             {product.required_tier?.toUpperCase()} Members Only
           </Button>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function FreebiesBasket() {
+  const { profile } = useAuth()
+  const [freebies, setFreebies] = useState<Freebie[]>([])
+  const [userClaims, setUserClaims] = useState<FreebiesClaim[]>([])
+  const [loading, setLoading] = useState(true)
+  const [timeToEndOfMonth, setTimeToEndOfMonth] = useState("")
+
+  // Calculate countdown to end of month
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date()
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+      const diff = endOfMonth.getTime() - now.getTime()
+
+      if (diff > 0) {
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+
+        setTimeToEndOfMonth(`${days}d ${hours}h ${minutes}m`)
+      } else {
+        setTimeToEndOfMonth("Expired")
+      }
+    }
+
+    updateCountdown()
+    const interval = setInterval(updateCountdown, 60000) // Update every minute
+
+    return () => clearInterval(interval)
+  }, [])
+
+  // Fetch freebies and user claims
+  useEffect(() => {
+    const fetchFreebies = async () => {
+      try {
+        const supabase = createClient()
+
+        // Fetch current month's freebies
+        const now = new Date()
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+
+        const { data: freebiesData, error: freebiesError } = await supabase
+          .from("freebies")
+          .select("*")
+          .gte("available_until", startOfMonth.toISOString())
+          .lte("available_until", endOfMonth.toISOString())
+          .eq("is_active", true)
+
+        if (freebiesError) {
+          console.error("Error fetching freebies:", freebiesError)
+          return
+        }
+
+        setFreebies(freebiesData || [])
+
+        // Fetch user claims if authenticated
+        if (profile) {
+          const { data: claimsData, error: claimsError } = await supabase
+            .from("freebie_claims")
+            .select("*")
+            .eq("user_id", profile.id)
+            .gte("claimed_at", startOfMonth.toISOString())
+
+          if (claimsError) {
+            console.error("Error fetching claims:", claimsError)
+            return
+          }
+
+          setUserClaims(claimsData || [])
+        }
+      } catch (error) {
+        console.error("Error in fetchFreebies:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchFreebies()
+  }, [profile])
+
+  const handleClaimFreebie = async (freebieId: number) => {
+    if (!profile) {
+      toast.error("Please log in to claim freebies")
+      return
+    }
+
+    try {
+      const supabase = createClient()
+
+      // Check if user already claimed this freebie
+      const alreadyClaimed = userClaims.some((claim) => claim.freebie_id === freebieId)
+      if (alreadyClaimed) {
+        toast.error("You've already claimed this freebie this month")
+        return
+      }
+
+      // Create claim record
+      const { error } = await supabase.from("freebie_claims").insert({
+        user_id: profile.id,
+        freebie_id: freebieId,
+        claimed_at: new Date().toISOString(),
+      })
+
+      if (error) {
+        console.error("Error claiming freebie:", error)
+        toast.error("Failed to claim freebie. Please try again.")
+        return
+      }
+
+      // Update local state
+      setUserClaims((prev) => [
+        ...prev,
+        {
+          id: Date.now(), // Temporary ID
+          user_id: profile.id,
+          freebie_id: freebieId,
+          claimed_at: new Date().toISOString(),
+        },
+      ])
+
+      toast.success("Freebie claimed successfully! Check your account.")
+    } catch (error) {
+      console.error("Error in handleClaimFreebie:", error)
+      toast.error("An error occurred. Please try again.")
+    }
+  }
+
+  if (loading) {
+    return (
+      <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Gift className="h-5 w-5 text-green-500" />🎁 Monthly Freebies Basket
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 bg-muted rounded w-3/4"></div>
+            <div className="h-4 bg-muted rounded w-1/2"></div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Gift className="h-5 w-5 text-green-500" />🎁 Monthly Freebies Basket
+        </CardTitle>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Clock className="h-4 w-4" />
+          <span>Ends in: {timeToEndOfMonth}</span>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {freebies.length === 0 ? (
+          <div className="text-center py-8">
+            <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">No freebies right now. Come back soon!</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {freebies.map((freebie) => {
+              const alreadyClaimed = userClaims.some((claim) => claim.freebie_id === freebie.id)
+              const isAvailable = new Date(freebie.available_until) > new Date()
+              const canClaim = profile && !alreadyClaimed && isAvailable && freebie.current_claims < freebie.max_claims
+
+              return (
+                <div
+                  key={freebie.id}
+                  className="flex items-center gap-4 p-4 bg-background/50 rounded-lg border border-green-500/20"
+                >
+                  <img
+                    src={freebie.image_url || "/placeholder.svg?height=80&width=80"}
+                    alt={freebie.title}
+                    className="w-16 h-16 object-cover rounded-lg"
+                  />
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-green-600">{freebie.title}</h4>
+                    <p className="text-sm text-muted-foreground">{freebie.description}</p>
+                    <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                      <span>
+                        {freebie.current_claims}/{freebie.max_claims} claimed
+                      </span>
+                      <span>Until: {new Date(freebie.available_until).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {alreadyClaimed ? (
+                      <Badge variant="secondary" className="bg-green-500/20 text-green-600">
+                        Claimed ✓
+                      </Badge>
+                    ) : canClaim ? (
+                      <Button
+                        size="sm"
+                        className="bg-green-500 hover:bg-green-600 text-white"
+                        onClick={() => handleClaimFreebie(freebie.id)}
+                      >
+                        Claim Now
+                      </Button>
+                    ) : !profile ? (
+                      <Button size="sm" variant="outline" disabled>
+                        Login to Claim
+                      </Button>
+                    ) : !isAvailable ? (
+                      <Badge variant="destructive">Expired</Badge>
+                    ) : (
+                      <Badge variant="secondary">Sold Out</Badge>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         )}
       </CardContent>
     </Card>
@@ -341,7 +584,7 @@ export default function MerchPage() {
     })
 
     // Show success message
-    alert(`${product.name} (${size}) added to cart!`)
+    toast.success(`${product.name} (${size}) added to cart!`)
   }
 
   return (
@@ -356,11 +599,16 @@ export default function MerchPage() {
 
           <div className="flex items-center gap-4">
             {profile && <CoinBalance size="md" />}
-            <Button variant="outline" className="relative">
+            <Button variant="outline" className="relative bg-transparent">
               <ShoppingCart className="h-4 w-4 mr-2" />
               Cart ({cart.reduce((sum, item) => sum + item.quantity, 0)})
             </Button>
           </div>
+        </div>
+
+        {/* Freebies Basket */}
+        <div className="mb-8">
+          <FreebiesBasket />
         </div>
 
         {/* Category Filter */}

@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils"
 import { SafeHeroVideoCarousel } from "@/components/safe-hero-video-carousel"
 import { getOptimizedVideoSources } from "@/utils/video-utils"
 import EriggaRadio from "@/components/erigga-radio"
+import { Suspense } from "react"
 
 export default function HomePage() {
   const { theme } = useTheme()
@@ -170,94 +171,68 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen">
+      {/* Hero Section */}
+      <section className="relative">
+        <Suspense fallback={<div className="h-screen bg-gradient-to-br from-orange-500 to-red-600" />}>
+          <SafeHeroVideoCarousel images={heroImages} videoUrl={primaryVideoUrl} />
+        </Suspense>
+      </section>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-16">
+        {/* Welcome Section */}
+        <section className="text-center mb-16">
+          <h1 className="font-street text-4xl md:text-6xl lg:text-8xl text-gradient mb-6">
+            WELCOME TO THE ERIGGA UNIVERSE
+          </h1>
+          <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
+            Experience the authentic street chronicles, exclusive content, and connect with the Paper Boi community.
+            From Warri to the world - this is where real music lives.
+          </p>
+        </section>
+
+        {/* Features Grid */}
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+          {features.map((feature, index) => (
+            <Link key={index} href={feature.href}>
+              <Card
+                className={cn(
+                  "h-full transition-all duration-300 hover:scale-105 overflow-hidden",
+                  theme === "dark" ? "harkonnen-card" : "border border-gray-200",
+                )}
+              >
+                <CardContent className="p-6 flex flex-col h-full">
+                  <div
+                    className={cn(
+                      "w-12 h-12 rounded-full mb-4 flex items-center justify-center bg-gradient-to-br",
+                      feature.color,
+                    )}
+                  >
+                    <feature.icon className={cn("h-6 w-6", theme === "dark" ? "text-black" : "text-white")} />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
+                  <p className="text-muted-foreground flex-grow">{feature.description}</p>
+                  <div className="mt-4 flex items-center text-sm font-medium text-brand-teal dark:text-white">
+                    Learn more
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4 ml-1"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </section>
+      </main>
+
       {/* Erigga Radio Widget - Only on home page */}
       <EriggaRadio />
-
-      {/* Hero Section */}
-      <section className="relative h-[80vh] w-full">
-        <SafeHeroVideoCarousel images={heroImages} videoUrl={primaryVideoUrl} className="absolute inset-0" />
-
-        <div className="absolute inset-0 flex items-center justify-center z-10">
-          <div className="text-center max-w-3xl px-4">
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 drop-shadow-lg">
-              Welcome to the Official Erigga Fan Platform
-            </h1>
-            <p className="text-xl md:text-2xl text-white/90 mb-8 drop-shadow-md">
-              Join the community and get exclusive access to music, videos, and events
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/signup" className="inline-block">
-                <div
-                  className={cn(
-                    "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
-                    "transform hover:scale-105 hover:shadow-xl",
-                    theme === "dark"
-                      ? "bg-white text-harkonnen-black hover:bg-gray-200"
-                      : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
-                  )}
-                >
-                  Join Now
-                </div>
-              </Link>
-              <Link href="/vault" className="inline-block">
-                <div
-                  className={cn(
-                    "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
-                    "transform hover:scale-105 hover:shadow-xl",
-                    theme === "dark"
-                      ? "bg-transparent border-2 border-white text-white hover:bg-white/10"
-                      : "bg-brand-teal text-white hover:bg-brand-teal-dark",
-                  )}
-                >
-                  Explore Content
-                </div>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Rest of the home page content */}
-      <section className="py-12 px-4 bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12 text-gray-900 dark:text-white">Explore the Platform</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Media Vault</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Access exclusive music, videos, and behind-the-scenes content
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/vault">Explore Vault</Link>
-                </Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Community</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Connect with other fans, share content, and join discussions
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/community">Join Community</Link>
-                </Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Chronicles</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Follow Erigga's journey through exclusive stories and updates
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/chronicles">Read Chronicles</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
 
       {/* Features Section */}
       <section className="py-20 bg-background">

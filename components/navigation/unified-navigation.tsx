@@ -225,7 +225,7 @@ export function UnifiedNavigation() {
           )}
         >
           <div className="flex items-center justify-between px-4 h-14">
-            {/* Logo */}
+            {/* Logo - Always goes to home */}
             <Link href="/" className="flex items-center">
               <DynamicLogo width={100} height={28} />
             </Link>
@@ -317,7 +317,7 @@ export function UnifiedNavigation() {
     >
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 w-full">
-          {/* Logo - Always visible */}
+          {/* Logo - Always visible and always goes to home */}
           <div className="flex items-center shrink-0">
             <Link href="/" className="flex items-center space-x-2">
               <DynamicLogo width={120} height={32} />
@@ -399,7 +399,7 @@ export function UnifiedNavigation() {
                       <UserTierBadge tier={profile.tier} />
                     </div>
                     <Link href="/dashboard">
-                      <Button variant="outline" size="sm" className="hidden md:flex">
+                      <Button variant="outline" size="sm" className="hidden md:flex bg-transparent">
                         <User className="h-4 w-4 mr-2" />
                         Dashboard
                       </Button>
@@ -417,7 +417,7 @@ export function UnifiedNavigation() {
                 ) : (
                   <>
                     <Link href="/login">
-                      <Button variant="outline" size="sm" className="hidden md:flex">
+                      <Button variant="outline" size="sm" className="hidden md:flex bg-transparent">
                         <LogIn className="h-4 w-4 mr-2" />
                         Login
                       </Button>
@@ -544,11 +544,19 @@ export function UnifiedNavigation() {
           {/* Auth Actions */}
           {isAuthenticated ? (
             <div className="space-y-2">
-              <Button variant="outline" className="w-full justify-start" onClick={() => handleNavigation("/coins")}>
+              <Button
+                variant="outline"
+                className="w-full justify-start bg-transparent"
+                onClick={() => handleNavigation("/coins")}
+              >
                 <CreditCard className="h-4 w-4 mr-2" />
                 Manage Coins
               </Button>
-              <Button variant="outline" className="w-full justify-start" onClick={() => handleNavigation("/settings")}>
+              <Button
+                variant="outline"
+                className="w-full justify-start bg-transparent"
+                onClick={() => handleNavigation("/settings")}
+              >
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
               </Button>
@@ -563,7 +571,11 @@ export function UnifiedNavigation() {
             </div>
           ) : (
             <div className="space-y-2">
-              <Button variant="outline" className="w-full justify-start" onClick={() => handleNavigation("/login")}>
+              <Button
+                variant="outline"
+                className="w-full justify-start bg-transparent"
+                onClick={() => handleNavigation("/login")}
+              >
                 <LogIn className="h-4 w-4 mr-2" />
                 Login
               </Button>
