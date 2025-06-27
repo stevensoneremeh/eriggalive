@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Music, Video, Newspaper, Users, ShoppingBag, Calendar } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { SafeHeroVideoCarousel } from "@/components/safe-hero-video-carousel"
-import { getOptimizedVideoSources } from "@/utils/video-utils"
-import EriggaRadio from "@/components/erigga-radio"
+import { HeroVideoCarousel } from "@/components/hero-video-carousel"
+import { CommunityContent } from "@/components/community-content"
+import { EriggaRadio } from "@/components/erigga-radio"
 import { Suspense } from "react"
 
 export default function HomePage() {
@@ -174,7 +174,7 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative">
         <Suspense fallback={<div className="h-screen bg-gradient-to-br from-orange-500 to-red-600" />}>
-          <SafeHeroVideoCarousel images={heroImages} videoUrl={primaryVideoUrl} />
+          <HeroVideoCarousel />
         </Suspense>
       </section>
 
@@ -230,6 +230,13 @@ export default function HomePage() {
           ))}
         </section>
       </main>
+
+      {/* Community Content Section */}
+      <section className="py-20 bg-background">
+        <div className="container mx-auto px-4">
+          <CommunityContent />
+        </div>
+      </section>
 
       {/* Erigga Radio Widget - Only on home page */}
       <EriggaRadio />
@@ -427,4 +434,8 @@ export default function HomePage() {
       </section>
     </div>
   )
+}
+
+function getOptimizedVideoSources() {
+  // Implementation of getOptimizedVideoSources
 }
