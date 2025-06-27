@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import DOMPurify from "isomorphic-dompurify"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { getOrCreateUserProfile } from "@/lib/auth-sync"
@@ -7,11 +8,10 @@ import { getOrCreateUserProfile } from "@/lib/auth-sync"
 const VOTE_COIN_AMOUNT = 100
 
 async function revalidateCommunityPath() {
-  const { revalidatePath } = await import("next/cache")
   revalidatePath("/community")
 }
 
-export async function createCommunityPostAction(formData: FormData) {
+export async function createPost(formData: FormData) {
   try {
     const supabase = await createServerSupabaseClient()
     const userProfile = await getOrCreateUserProfile()
@@ -48,7 +48,6 @@ export async function createCommunityPostAction(formData: FormData) {
       }
 
       const { data: publicData } = supabase.storage.from("eriggalive-assets").getPublicUrl(uploaded.path)
-
       media_url = publicData.publicUrl
       media_type = mediaFile.type.startsWith("image/")
         ? "image"
@@ -57,12 +56,7 @@ export async function createCommunityPostAction(formData: FormData) {
           : mediaFile.type.startsWith("video/")
             ? "video"
             : undefined
-
-      media_metadata = {
-        name: mediaFile.name,
-        size: mediaFile.size,
-        type: mediaFile.type,
-      }
+      media_metadata = { name: mediaFile.name, size: mediaFile.size, type: mediaFile.type }
     }
 
     const { data: newPost, error } = await supabase
@@ -75,16 +69,12 @@ export async function createCommunityPostAction(formData: FormData) {
         media_type,
         media_metadata,
         is_published: true,
-        vote_count: 0,
-        comment_count: 0,
       })
-      .select(
-        `
+      .select(`
         *,
         user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
         category:community_categories!community_posts_category_id_fkey(id, name, slug)
-      `,
-      )
+      `)
       .single()
 
     if (error) {
@@ -100,14 +90,21 @@ export async function createCommunityPostAction(formData: FormData) {
   }
 }
 
-export async function voteOnPostAction(postId: number, postCreatorAuthId: string) {
+export async function voteOnPost(postId: number, postCreatorAuthId: string) {
   try {
     const supabase = await createServerSupabaseClient()
     const voterProfile = await getOrCreateUserProfile()
 
-    const { data: postData } = await supabase.from("community_posts").select("user_id").eq("id", postId).single()
+    const { data: postData, error: postFetchError } = await supabase
+      .from("community_posts")
+      .select("user_id")
+      .eq("id", postId)
+      .single()
+    if (postFetchError || !postData) {
+      return { success: false, error: "Post not found." }
+    }
 
-    if (postData && postData.user_id === voterProfile.id) {
+    if (postData.user_id === voterProfile.id) {
       return { success: false, error: "You cannot vote on your own post." }
     }
 
@@ -144,34 +141,103 @@ export async function bookmarkPost(postId: number) {
     const supabase = await createServerSupabaseClient()
     const profile = await getOrCreateUserProfile()
 
-    const { data: existing } = await supabase
+    const { data: existing, error: fetchError } = await supabase
       .from("user_bookmarks")
       .select("id")
       .eq("user_id", profile.id)
       .eq("post_id", postId)
       .single()
 
-    if (existing) {
-      await supabase.from("user_bookmarks").delete().eq("id", existing.id)
-      await revalidateCommunityPath()
-      return { success: true, bookmarked: false }
+    if (fetchError && fetchError.code !== "PGRST116") {
+      // PGRST116 = no rows found
+      console.error("Bookmark fetch error:", fetchError)
+      return { success: false, error: "Could not check bookmark status." }
     }
 
-    await supabase.from("user_bookmarks").insert({ user_id: profile.id, post_id: postId })
-    await revalidateCommunityPath()
-    return { success: true, bookmarked: true }
+    if (existing) {
+      const { error: deleteError } = await supabase.from("user_bookmarks").delete().eq("id", existing.id)
+      if (deleteError) {
+        console.error("Bookmark delete error:", deleteError)
+        return { success: false, error: "Could not remove bookmark." }
+      }
+      await revalidateCommunityPath()
+      return { success: true, bookmarked: false, message: "Bookmark removed." }
+    } else {
+      const { error: insertError } = await supabase
+        .from("user_bookmarks")
+        .insert({ user_id: profile.id, post_id: postId })
+      if (insertError) {
+        console.error("Bookmark insert error:", insertError)
+        return { success: false, error: "Could not add bookmark." }
+      }
+      await revalidateCommunityPath()
+      return { success: true, bookmarked: true, message: "Post bookmarked." }
+    }
   } catch (err: any) {
-    console.error("Bookmark error:", err)
-    return { success: false, error: err.message || "Failed to bookmark" }
+    console.error("Bookmark action error:", err)
+    return { success: false, error: err.message || "Failed to update bookmark" }
+  }
+}
+
+export async function addComment(postId: number, content: string, parentCommentId?: number) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    const profile = await getOrCreateUserProfile()
+
+    if (!content.trim()) {
+      return { success: false, error: "Comment cannot be empty." }
+    }
+
+    const sanitizedContent = DOMPurify.sanitize(content)
+
+    const { data: comment, error } = await supabase
+      .from("community_comments")
+      .insert({
+        post_id: postId,
+        user_id: profile.id,
+        content: sanitizedContent,
+        parent_comment_id: parentCommentId,
+      })
+      .select(`
+                *,
+                user:users!community_comments_user_id_fkey(id, username, full_name, avatar_url, tier)
+            `)
+      .single()
+
+    if (error) {
+      console.error("Add comment error:", error)
+      return { success: false, error: `Failed to add comment: ${error.message}` }
+    }
+
+    const { error: updateError } = await supabase.rpc("increment", {
+      table_name: "community_posts",
+      field_name: "comment_count",
+      row_id: postId,
+    })
+    if (updateError) {
+      console.error("Failed to increment comment count:", updateError)
+    }
+
+    await revalidateCommunityPath()
+    return { success: true, comment }
+  } catch (err: any) {
+    console.error("Add comment action error:", err)
+    return { success: false, error: err.message || "Failed to add comment" }
   }
 }
 
 export async function fetchCommunityPosts(
-  loggedInAuthId?: string,
-  opts: { categoryFilter?: number; sortOrder?: string; page?: number; limit?: number; searchQuery?: string } = {},
+  opts: {
+    loggedInAuthId?: string
+    categoryFilter?: number
+    sortOrder?: string
+    page?: number
+    limit?: number
+    searchQuery?: string
+  } = {},
 ) {
   try {
-    const { categoryFilter, sortOrder = "newest", page = 1, limit = 10, searchQuery } = opts
+    const { loggedInAuthId, categoryFilter, sortOrder = "newest", page = 1, limit = 10, searchQuery } = opts
     const supabase = await createServerSupabaseClient()
     const offset = (page - 1) * limit
 
@@ -188,7 +254,8 @@ export async function fetchCommunityPosts(
         *,
         user:users!community_posts_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
         category:community_categories!community_posts_category_id_fkey(id, name, slug),
-        votes:community_post_votes(user_id)
+        votes:community_post_votes(user_id),
+        bookmarks:user_bookmarks(user_id)
       `,
       )
       .eq("is_published", true)
@@ -209,24 +276,23 @@ export async function fetchCommunityPosts(
       return { posts: [], totalCount: 0, error: error.message }
     }
 
-    const postsWithVoteStatus = (data || []).map((post: any) => ({
+    const postsWithStatus = (data || []).map((post: any) => ({
       ...post,
       has_voted: loggedInUserInternalId
         ? post.votes.some((vote: any) => vote.user_id === loggedInUserInternalId)
         : false,
+      is_bookmarked: loggedInUserInternalId
+        ? post.bookmarks.some((bookmark: any) => bookmark.user_id === loggedInUserInternalId)
+        : false,
     }))
 
-    return { posts: postsWithVoteStatus, totalCount: count ?? data?.length ?? 0, error: null }
+    return { posts: postsWithStatus, totalCount: count ?? 0, error: null }
   } catch (err: any) {
     console.error("Fetch posts exception:", err)
     return { posts: [], totalCount: 0, error: err.message || "Failed to fetch posts" }
   }
 }
 
-export async function createPost(formData: FormData) {
-  return createCommunityPostAction(formData)
-}
-
-export async function voteOnPost(postId: number, postCreatorAuthId: string) {
-  return voteOnPostAction(postId, postCreatorAuthId)
-}
+export { createPost as createCommunityPostAction }
+export { voteOnPost as voteOnPostAction }
+export { bookmarkPost as bookmarkPostAction }
