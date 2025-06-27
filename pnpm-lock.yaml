@@ -102,7 +102,7 @@ importers:
         specifier: latest
         version: 2.50.2
       '@tiptap/core':
-        specifier: ^2.22.0
+        specifier: latest
         version: 2.23.0(@tiptap/pm@2.23.0)
       '@tiptap/extension-link':
         specifier: latest
@@ -114,7 +114,7 @@ importers:
         specifier: latest
         version: 2.23.0(@tiptap/core@2.23.0(@tiptap/pm@2.23.0))(@tiptap/pm@2.23.0)
       '@tiptap/pm':
-        specifier: ^2.22.0
+        specifier: latest
         version: 2.23.0
       '@tiptap/react':
         specifier: latest
@@ -143,9 +143,6 @@ importers:
       embla-carousel-react:
         specifier: latest
         version: 8.6.0(react@19.0.0)
-      framer-motion:
-        specifier: ^11.11.17
-        version: 11.11.17(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       input-otp:
         specifier: latest
         version: 1.4.2(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -194,9 +191,6 @@ importers:
       vaul:
         specifier: latest
         version: 1.1.2(@types/react-dom@19.0.0)(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
-      zod:
-        specifier: ^3.24.1
-        version: 3.25.67
     devDependencies:
       '@types/node':
         specifier: ^22
@@ -2244,20 +2238,6 @@ packages:
   fraction.js@4.3.7:
     resolution: {integrity: sha512-ZsDfxO51wGAXREY55a7la9LScWpwv9RxIrYABrlvOFBlH/ShPnrtsXeuUIfXKKOVicNxQ+o8JTbJvjS4M89yew==}
 
-  framer-motion@11.11.17:
-    resolution: {integrity: sha512-O8QzvoKiuzI5HSAHbcYuL6xU+ZLXbrH7C8Akaato4JzQbX2ULNeniqC2Vo5eiCtFktX9XsJ+7nUhxcl2E2IjpA==}
-    peerDependencies:
-      '@emotion/is-prop-valid': '*'
-      react: ^18.0.0
-      react-dom: ^18.0.0
-    peerDependenciesMeta:
-      '@emotion/is-prop-valid':
-        optional: true
-      react:
-        optional: true
-      react-dom:
-        optional: true
-
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -3493,9 +3473,6 @@ packages:
   yocto-queue@0.1.0:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
-
-  zod@3.25.67:
-    resolution: {integrity: sha512-idA2YXwpCdqUSKRCACDE6ItZD9TZzy3OZMtpfLoh6oPR47lipysRrJfjzMqFxQ3uJuUPyUeWe1r9vLH33xO/Qw==}
 
 snapshots:
 
@@ -5704,13 +5681,6 @@ snapshots:
 
   fraction.js@4.3.7: {}
 
-  framer-motion@11.11.17(react-dom@19.0.0(react@19.0.0))(react@19.0.0):
-    dependencies:
-      tslib: 2.8.1
-    optionalDependencies:
-      react: 19.0.0
-      react-dom: 19.0.0(react@19.0.0)
-
   fsevents@2.3.3:
     optional: true
 
@@ -7144,5 +7114,3 @@ snapshots:
   yaml@2.8.0: {}
 
   yocto-queue@0.1.0: {}
-
-  zod@3.25.67: {}
