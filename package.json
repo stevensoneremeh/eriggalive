@@ -1,10 +1,11 @@
 {
-  "name": "my-v0-project",
-  "version": "0.1.0",
+  "name": "erigga-fan-platform",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "build": "next build",
     "dev": "next dev",
+    "postinstall": "npm run build",
     "lint": "next lint",
     "start": "next start"
   },
@@ -80,5 +81,9 @@
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
   }
 }
