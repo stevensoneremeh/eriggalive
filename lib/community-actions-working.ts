@@ -1,6 +1,8 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { fetchCommunityPosts as fetchCommunityPostsFinal } from "./community-actions-final-fix"
+import { bookmarkPostAction } from "./community-actions-final-fix" // Declare the variable before using it
 
 const VOTE_COIN_AMOUNT = 100
 
@@ -101,7 +103,7 @@ export async function createCommunityPostAction(formData: FormData) {
   }
 }
 
-export async function voteOnPostAction(postId: number) {
+export async function voteOnPostAction(postId: number, postCreatorAuthId?: string) {
   const supabase = await createClient()
 
   try {
@@ -139,6 +141,7 @@ export async function voteOnPostAction(postId: number) {
       p_post_id: postId,
       p_voter_id: userData.id,
       p_coin_amount: VOTE_COIN_AMOUNT,
+      p_post_creator_auth_id: postCreatorAuthId,
     })
 
     if (error) {
@@ -289,22 +292,21 @@ export async function addComment(postId: number, content: string, parentCommentI
   }
 }
 
-export async function fetchCommunityPosts() {
-  const supabase = await createClient()
+export async function fetchCommunityPosts(
+  loggedInUserId?: string,
+  options?: { categoryFilter?: number; sortOrder?: string; page?: number; limit?: number; searchQuery?: string },
+) {
+  return fetchCommunityPostsFinal(loggedInUserId, options)
+}
 
-  try {
-    const { data: posts, error } = await supabase.from("community_posts").select("*")
+export async function createPost(formData: FormData) {
+  const { createCommunityPostAction } = await import("./community-actions-final-fix")
+  return createCommunityPostAction(formData)
+}
 
-    if (error) {
-      console.error("Error fetching community posts:", error)
-      throw new Error("Failed to fetch community posts")
-    }
-
-    return { success: true, posts }
-  } catch (error) {
-    console.error("Error fetching community posts:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
-  }
+export async function voteOnPost(postId: number, postCreatorAuthId?: string) {
+  const { voteOnPostAction } = await import("./community-actions-final-fix")
+  return voteOnPostAction(postId, postCreatorAuthId || "")
 }
 
 /**
@@ -313,8 +315,8 @@ export async function fetchCommunityPosts() {
  * They simply forward to the real async actions above
  * so we still comply with the `"use server"` rule.
  */
-const createPost = createCommunityPostAction
-const voteOnPost = voteOnPostAction
-const bookmarkPostAction = bookmarkPost
+const createPostAlias = createCommunityPostAction
+const voteOnPostAlias = voteOnPostAction
+const bookmarkPostActionAlias = bookmarkPostAction // Use the declared variable
 
-export { createPost, voteOnPost, bookmarkPostAction }
+export { bookmarkPostAction }

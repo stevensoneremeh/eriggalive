@@ -1,17 +1,34 @@
 "use server"
 
-/**
- * Legacy proxy – keeps old import paths working.
- * Re-exports ONLY async functions from the canonical module.
- */
-export {
-  /* legacy names */
-  createCommunityPostAction as createPost,
-  voteOnPostAction as voteOnPost,
-  bookmarkPost,
-  /* full API */
-  createCommunityPostAction,
-  voteOnPostAction,
-  bookmarkPost as bookmarkPostAction,
-  fetchCommunityPosts,
-} from "./community-actions-final-fix"
+export async function createPost(formData: FormData) {
+  const { createCommunityPostAction } = await import("./community-actions-final-fix")
+  return createCommunityPostAction(formData)
+}
+
+export async function voteOnPost(postId: number, postCreatorAuthId?: string) {
+  const { voteOnPostAction } = await import("./community-actions-final-fix")
+  return voteOnPostAction(postId, postCreatorAuthId || "")
+}
+
+export async function bookmarkPost(postId: number) {
+  const { bookmarkPost } = await import("./community-actions-final-fix")
+  return bookmarkPost(postId)
+}
+
+export async function createCommunityPostAction(formData: FormData) {
+  const { createCommunityPostAction } = await import("./community-actions-final-fix")
+  return createCommunityPostAction(formData)
+}
+
+export async function voteOnPostAction(postId: number, postCreatorAuthId?: string) {
+  const { voteOnPostAction } = await import("./community-actions-final-fix")
+  return voteOnPostAction(postId, postCreatorAuthId || "")
+}
+
+export async function fetchCommunityPosts(
+  loggedInUserId?: string,
+  options?: { categoryFilter?: number; sortOrder?: string; page?: number; limit?: number; searchQuery?: string },
+) {
+  const { fetchCommunityPosts } = await import("./community-actions-final-fix")
+  return fetchCommunityPosts(loggedInUserId, options)
+}
