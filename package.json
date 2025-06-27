@@ -5,7 +5,6 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
-    "postinstall": "npm run build",
     "lint": "next lint",
     "start": "next start"
   },
@@ -82,6 +81,7 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5"
   },
+  "packageManager": "npm@10.0.0",
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=8.0.0"
