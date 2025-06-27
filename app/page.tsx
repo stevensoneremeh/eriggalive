@@ -11,12 +11,14 @@ import { HeroVideoCarousel } from "@/components/hero-video-carousel"
 import { CommunityContent } from "@/components/community-content"
 import { EriggaRadio } from "@/components/erigga-radio"
 import { Suspense } from "react"
+import { getOptimizedVideoSources } from "@/utils/video-utils"
 
 export default function HomePage() {
   const { theme } = useTheme()
   const [currentSlide, setCurrentSlide] = useState(0)
   const [mounted, setMounted] = useState(false)
-  const videoSources = getOptimizedVideoSources()
+  // Ensure we always have an array
+  const videoSources = getOptimizedVideoSources() ?? []
   const primaryVideoUrl = videoSources[0]?.src || "/videos/erigga-hero-video.mp4"
 
   // Hero images
@@ -434,8 +436,4 @@ export default function HomePage() {
       </section>
     </div>
   )
-}
-
-function getOptimizedVideoSources() {
-  // Implementation of getOptimizedVideoSources
 }
