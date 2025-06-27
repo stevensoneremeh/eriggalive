@@ -176,7 +176,7 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative">
         <Suspense fallback={<div className="h-screen bg-gradient-to-br from-orange-500 to-red-600" />}>
-          <HeroVideoCarousel />
+          <HeroVideoCarousel images={heroImages} videoUrl={primaryVideoUrl} />
         </Suspense>
       </section>
 
