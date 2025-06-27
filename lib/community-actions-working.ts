@@ -320,3 +320,5 @@ export async function createPost(formData: FormData) {
 export async function voteOnPost(postId: number, postCreatorAuthId?: string) {
   return voteOnPostAction(postId, postCreatorAuthId)
 }
+
+export { bookmarkPost as bookmarkPostAction } from "./community-actions-final-fix"

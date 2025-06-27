@@ -1,50 +1,58 @@
 "use server"
 
 import DOMPurify from "isomorphic-dompurify"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { getOrCreateUserProfile } from "@/lib/auth-sync"
-import { createServerSupabaseClient } from "@/lib/supabase/server" // Assuming this uses server-final.ts or similar cookie-forwarding client
 
 const VOTE_COIN_AMOUNT = 100
 
-/**
- * Dynamically import `revalidatePath` at runtime to avoid bundling it on the client.
- * This function should be called INSIDE other async server actions.
- */
+/* -------------------------------------------------------------------------- */
+/*  Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
 async function revalidateCommunityPath() {
   const { revalidatePath } = await import("next/cache")
   revalidatePath("/community")
 }
 
-// --- Post Actions ---
+/* -------------------------------------------------------------------------- */
+/*  Primary Community Server Actions                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Create a new community post (with optional media upload).
+ */
 export async function createCommunityPostAction(formData: FormData) {
   try {
-    const supabase = await createServerSupabaseClient() // Ensure this is the server client
+    const supabase = await createServerSupabaseClient()
     const userProfile = await getOrCreateUserProfile()
 
-    const rawContent = formData.get("content") as string | null
+    const rawContent = (formData.get("content") as string | null) ?? ""
     const categoryId = formData.get("categoryId") as string | null
     const mediaFile = formData.get("mediaFile") as File | null
 
-    if (!rawContent?.trim() && !mediaFile) {
+    if (!rawContent.trim() && !mediaFile) {
       return { success: false, error: "Please provide content or upload media." }
     }
     if (!categoryId) {
       return { success: false, error: "Please select a category." }
     }
 
-    const sanitizedContent = rawContent ? DOMPurify.sanitize(rawContent) : ""
+    /* -------- Sanitize content & optionally upload media ------------------ */
 
-    let media_url: string | undefined = undefined
-    let media_type: string | undefined = undefined
-    let media_metadata: Record<string, any> | undefined = undefined
+    const sanitizedContent = DOMPurify.sanitize(rawContent)
+
+    let media_url: string | undefined
+    let media_type: string | undefined
+    let media_metadata: Record<string, any> | undefined
 
     if (mediaFile && mediaFile.size > 0) {
-      const fileExt = mediaFile.name.split(".").pop()
-      const fileName = `${userProfile.id}-${Date.now()}.${fileExt}`
+      const ext = mediaFile.name.split(".").pop()
+      const fileName = `${userProfile.id}-${Date.now()}.${ext}`
       const filePath = `community_media/${fileName}`
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("eriggalive-assets") // Ensure this bucket exists and has correct policies
+      const { error: uploadError, data: uploaded } = await supabase.storage
+        .from("eriggalive-assets")
         .upload(filePath, mediaFile)
 
       if (uploadError) {
@@ -52,12 +60,16 @@ export async function createCommunityPostAction(formData: FormData) {
         return { success: false, error: `Media upload failed: ${uploadError.message}` }
       }
 
-      const { data: publicUrlData } = supabase.storage.from("eriggalive-assets").getPublicUrl(uploadData.path)
-      media_url = publicUrlData.publicUrl
+      const { data: publicData } = supabase.storage.from("eriggalive-assets").getPublicUrl(uploaded.path)
 
-      if (mediaFile.type.startsWith("image/")) media_type = "image"
-      else if (mediaFile.type.startsWith("audio/")) media_type = "audio"
-      else if (mediaFile.type.startsWith("video/")) media_type = "video"
+      media_url = publicData.publicUrl
+      media_type = mediaFile.type.startsWith("image/")
+        ? "image"
+        : mediaFile.type.startsWith("audio/")
+          ? "audio"
+          : mediaFile.type.startsWith("video/")
+            ? "video"
+            : undefined
 
       media_metadata = {
         name: mediaFile.name,
@@ -66,30 +78,28 @@ export async function createCommunityPostAction(formData: FormData) {
       }
     }
 
-    const postData = {
-      user_id: userProfile.id,
-      category_id: Number.parseInt(categoryId),
-      content: sanitizedContent,
-      media_url,
-      media_type,
-      media_metadata,
-      is_published: true,
-      is_deleted: false,
-      is_edited: false,
-      vote_count: 0,
-      comment_count: 0,
-      // tags: [], // Ensure your DB schema handles this or remove if not used
-      // mentions: null, // Ensure your DB schema handles this or remove if not used
-    }
+    /* ---------------------------- Insert Post ----------------------------- */
 
     const { data: newPost, error } = await supabase
       .from("community_posts")
-      .insert(postData)
-      .select(`
+      .insert({
+        user_id: userProfile.id,
+        category_id: Number(categoryId),
+        content: sanitizedContent,
+        media_url,
+        media_type,
+        media_metadata,
+        is_published: true,
+        vote_count: 0,
+        comment_count: 0,
+      })
+      .select(
+        `
         *,
         user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
         category:community_categories!community_posts_category_id_fkey(id, name, slug)
-      `)
+      `,
+      )
       .single()
 
     if (error) {
@@ -99,113 +109,135 @@ export async function createCommunityPostAction(formData: FormData) {
 
     await revalidateCommunityPath()
     return { success: true, post: newPost }
-  } catch (error: any) {
-    console.error("Create post action error:", error)
-    return { success: false, error: error.message || "Failed to create post" }
+  } catch (err: any) {
+    console.error("Create post action error:", err)
+    return { success: false, error: err.message || "Failed to create post" }
   }
 }
 
+/**
+ * Vote on a post (transfers `VOTE_COIN_AMOUNT` between users via RPC).
+ */
 export async function voteOnPostAction(postId: number, postCreatorAuthId: string) {
   try {
     const supabase = await createServerSupabaseClient()
     const voterProfile = await getOrCreateUserProfile()
 
-    const { data: postDataToCheck } = await supabase.from("community_posts").select("user_id").eq("id", postId).single()
-    if (postDataToCheck && postDataToCheck.user_id === voterProfile.id) {
-      return { success: false, error: "You cannot vote on your own post.", code: "SELF_VOTE" }
+    /* -- Disallow self-vote ------------------------------------------------ */
+    const { data: postData } = await supabase.from("community_posts").select("user_id").eq("id", postId).single()
+
+    if (postData && postData.user_id === voterProfile.id) {
+      return { success: false, error: "You cannot vote on your own post." }
     }
 
+    /* -- Ensure voter has enough coins ------------------------------------ */
     if (voterProfile.coins < VOTE_COIN_AMOUNT) {
-      return { success: false, error: "Not enough Erigga Coins to vote.", code: "INSUFFICIENT_FUNDS" }
+      return { success: false, error: "Not enough Erigga Coins to vote." }
     }
 
-    const { data, error } = await supabase.rpc("handle_post_vote", {
+    /* -- Call RPC ---------------------------------------------------------- */
+    const { error, data } = await supabase.rpc("handle_post_vote", {
       p_post_id: postId,
-      p_voter_auth_id: voterProfile.auth_user_id, // Ensure your RPC uses auth_user_id if users.id is different
+      p_voter_auth_id: voterProfile.auth_user_id,
       p_post_creator_auth_id: postCreatorAuthId,
       p_coin_amount: VOTE_COIN_AMOUNT,
     })
 
     if (error) {
-      console.error("Vote error:", error)
-      return { success: false, error: `Voting failed: ${error.message}`, code: "VOTE_FAILED" }
+      console.error("Vote RPC error:", error)
+      return { success: false, error: `Voting failed: ${error.message}` }
     }
 
     await revalidateCommunityPath()
-    return { success: true, voted: data, message: `Voted successfully! ${VOTE_COIN_AMOUNT} coins transferred.` }
-  } catch (error: any) {
-    console.error("Vote action error:", error)
-    return { success: false, error: error.message || "Failed to vote" }
+    return {
+      success: true,
+      voted: data,
+      message: `Voted successfully! ${VOTE_COIN_AMOUNT} coins transferred.`,
+    }
+  } catch (err: any) {
+    console.error("Vote action error:", err)
+    return { success: false, error: err.message || "Failed to vote" }
   }
 }
 
-export async function fetchCommunityPosts(
-  loggedInUserId?: string, // This should be the auth_user_id
-  options: {
-    categoryFilter?: number
-    sortOrder?: string
-    page?: number
-    limit?: number
-    searchQuery?: string
-  } = {},
-) {
+/**
+ * Bookmark / un-bookmark a post for the current user.
+ */
+export async function bookmarkPost(postId: number) {
   try {
-    const { categoryFilter, sortOrder = "newest", page = 1, limit = 10, searchQuery } = options
-    const supabase = await createServerSupabaseClient() // Use server client for RSC or server actions
-    const offset = (page - 1) * limit
+    const supabase = await createServerSupabaseClient()
+    const profile = await getOrCreateUserProfile()
 
-    let loggedInUserInternalId: number | undefined
-    if (loggedInUserId) {
-      // Fetch internal user ID if your 'votes' table uses it
-      const { data: userData } = await supabase.from("users").select("id").eq("auth_user_id", loggedInUserId).single()
-      loggedInUserInternalId = userData?.id
+    const { data: existing } = await supabase
+      .from("user_bookmarks")
+      .select("id")
+      .eq("user_id", profile.id)
+      .eq("post_id", postId)
+      .single()
+
+    if (existing) {
+      await supabase.from("user_bookmarks").delete().eq("id", existing.id)
+      await revalidateCommunityPath()
+      return { success: true, bookmarked: false }
     }
 
-    let query = supabase
+    await supabase.from("user_bookmarks").insert({ user_id: profile.id, post_id: postId })
+    await revalidateCommunityPath()
+    return { success: true, bookmarked: true }
+  } catch (err: any) {
+    console.error("Bookmark error:", err)
+    return { success: false, error: err.message || "Failed to bookmark" }
+  }
+}
+
+/**
+ * Fetch paginated posts (optionally filtered).
+ */
+export async function fetchCommunityPosts(
+  loggedInAuthId?: string,
+  opts: { categoryId?: number; page?: number; limit?: number } = {},
+) {
+  try {
+    const { categoryId, page = 1, limit = 10 } = opts
+    const supabase = await createServerSupabaseClient()
+    const offset = (page - 1) * limit
+
+    const query = supabase
       .from("community_posts")
-      .select(`
+      .select(
+        `
         *,
-        user:users!community_posts_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
-        category:community_categories!community_posts_category_id_fkey(id, name, slug),
-        votes:community_post_votes(user_id)
-      `)
+        user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
+        category:community_categories!community_posts_category_id_fkey(id, name, slug)
+      `,
+      )
       .eq("is_published", true)
       .eq("is_deleted", false)
 
-    if (categoryFilter) query = query.eq("category_id", categoryFilter)
-    if (searchQuery) query = query.ilike("content", `%${searchQuery}%`) // Ensure 'content' is the correct column for search
+    if (categoryId) query.eq("category_id", categoryId)
 
-    if (sortOrder === "newest") query = query.order("created_at", { ascending: false })
-    else if (sortOrder === "oldest") query = query.order("created_at", { ascending: true })
-    else if (sortOrder === "top")
-      query = query.order("vote_count", { ascending: false }).order("created_at", { ascending: false })
-
-    query = query.range(offset, offset + limit - 1)
-
-    const { data, error, count } = await query
+    const { data, error } = await query.range(offset, offset + limit - 1).order("created_at", { ascending: false })
 
     if (error) {
-      console.error("Error fetching posts:", error)
-      return { posts: [], totalCount: 0, error: error.message }
+      console.error("Fetch posts error:", error)
+      return { success: false, error: error.message }
     }
 
-    const postsWithVoteStatus = (data || []).map((post: any) => ({
-      ...post,
-      has_voted: loggedInUserInternalId
-        ? post.votes.some((vote: any) => vote.user_id === loggedInUserInternalId)
-        : false,
-    }))
-    // Note: Supabase count might need to be fetched separately for total if range is applied
-    // For simplicity, returning length of current page. For true pagination, fetch total count without range.
-    return { posts: postsWithVoteStatus, totalCount: count ?? data?.length ?? 0, error: null }
-  } catch (error: any) {
-    console.error("Fetch posts error:", error)
-    return { posts: [], totalCount: 0, error: error.message || "Failed to fetch posts" }
+    return { success: true, posts: data }
+  } catch (err: any) {
+    console.error("Fetch posts exception:", err)
+    return { success: false, error: err.message || "Failed to fetch posts" }
   }
 }
 
-// NOTE: The re-exports from "./community-actions-fixed" have been removed.
-// If those actions (editPostAction, deletePostAction, etc.) are needed,
-// they should be imported directly from "lib/community-actions-fixed.ts"
-// by client components, and "lib/community-actions-fixed.ts" MUST
-// be structured as a proper server actions module (see next file).
+/* -------------------------------------------------------------------------- */
+/*  Legacy Aliases (createPost, voteOnPost) so existing imports keep working  */
+/* -------------------------------------------------------------------------- */
+
+export async function createPost(formData: FormData) {
+  return createCommunityPostAction(formData)
+}
+
+export async function voteOnPost(postId: number, postCreatorAuthId: string) {
+  return voteOnPostAction(postId, postCreatorAuthId)
+}

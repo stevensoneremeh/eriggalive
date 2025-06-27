@@ -46,6 +46,19 @@ export async function exampleOtherAction(postId: number, newData: any) {
   }
 }
 
+// Proxy module that keeps old import paths working.
+// It simply re-exports the async actions from the main file.
+export {
+  createPost,
+  voteOnPost,
+  bookmarkPost,
+  /* full API */
+  createCommunityPostAction,
+  voteOnPostAction,
+  bookmarkPost as bookmarkPostAction,
+  fetchCommunityPosts,
+} from "./community-actions-final-fix"
+
 // Add other actions like:
 // export async function editPostAction(...) { /* ... */ }
 // export async function deletePostAction(...) { /* ... */ }
