@@ -146,7 +146,6 @@ export default function EriggaRadio() {
         }}
       >
         <source src="/audio/erigga-radio-stream.mp3" type="audio/mpeg" />
-        <source src="https://www.soundjay.com/misc/sounds/bell-ringing-05.wav" type="audio/wav" />
         Your browser does not support the audio element.
       </audio>
 
