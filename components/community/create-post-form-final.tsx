@@ -133,3 +133,4 @@ function CreatePostForm() {
 }
 
 export default CreatePostForm
+export { CreatePostForm }

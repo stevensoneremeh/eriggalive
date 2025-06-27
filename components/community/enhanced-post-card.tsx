@@ -84,4 +84,8 @@ const EnhancedPostCard: React.FC<EnhancedPostCardProps> = ({
   )
 }
 
+export function PostCardSkeleton() {
+  return <div className="w-full rounded-lg bg-slate-200 dark:bg-slate-700 animate-pulse h-44" />
+}
+
 export default EnhancedPostCard

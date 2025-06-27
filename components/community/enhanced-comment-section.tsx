@@ -70,3 +70,4 @@ const EnhancedCommentSection: React.FC<EnhancedCommentSectionProps> = ({ postId 
 }
 
 export default EnhancedCommentSection
+export { EnhancedCommentSection as CommentSection }

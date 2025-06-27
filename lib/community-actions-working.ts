@@ -1,65 +1,46 @@
 "use server"
 
 /**
- * Thin compatibility layer – forwards legacy imports to the new
- * canonical implementation in `lib/actions/community.ts`.
- *
- * KEEPING THIS FILE means we can refactor internally without touching
- * dozens of existing import statements across the app.
+ * Legacy shim - keeps old imports alive while delegating
+ * to the new canonical helpers in `lib/actions/community.ts`.
  */
 
-const load = () => import("./actions/community")
+import { revalidatePath } from "next/cache"
+import {
+  createPost,
+  voteOnPost,
+  bookmarkPost,
+  addComment,
+  type CreatePostArgs,
+  type VoteArgs,
+  type BookmarkArgs,
+} from "./actions/community"
 
-export async function createCommunityPostAction(formData: FormData) {
-  const { createCommunityPostAction } = await load()
-  return createCommunityPostAction(formData)
+/* ────────────────────────────────────────────────────────── */
+/* Aliases expected by the existing codebase                 */
+
+export async function createCommunityPostAction(args: CreatePostArgs & { path?: string }) {
+  const result = await createPost(args)
+  // Path may be omitted by callers; default to the community root
+  revalidatePath(args.path || "/community")
+  return result
 }
 
-export async function createPost(formData: FormData) {
-  // alias used by some components
-  const { createPost } = await load()
-  return createPost(formData)
+export async function voteOnPostAction(args: VoteArgs & { path?: string }) {
+  const result = await voteOnPost(args)
+  revalidatePath(args.path || "/community")
+  return result
 }
 
-export async function voteOnPostAction(postId: number, postCreatorAuthId = "") {
-  const { voteOnPostAction } = await load()
-  return voteOnPostAction(postId, postCreatorAuthId)
+export async function bookmarkPostAction(args: BookmarkArgs & { path?: string }) {
+  const result = await bookmarkPost(args)
+  revalidatePath(args.path || "/community")
+  return result
 }
 
-export async function voteOnPost(postId: number, postCreatorAuthId = "") {
-  // alias
-  const { voteOnPost } = await load()
-  return voteOnPost(postId, postCreatorAuthId)
-}
+export { addComment } // no revalidation necessary here
 
-export async function bookmarkPostAction(postId: number) {
-  const { bookmarkPostAction } = await load()
-  return bookmarkPostAction(postId)
-}
-
-export async function bookmarkPost(postId: number) {
-  const { bookmarkPost } = await load()
-  return bookmarkPost(postId)
-}
-
-export async function addComment(postId: number, content: string, parentCommentId?: number) {
-  const { addComment } = await load()
-  return addComment(postId, content, parentCommentId)
-}
-
-export async function fetchCommunityPosts(
-  loggedInAuthId?: string,
-  opts?: {
-    categoryFilter?: number
-    sortOrder?: string
-    page?: number
-    limit?: number
-    searchQuery?: string
-  },
-) {
-  const { fetchCommunityPosts } = await load()
-  return fetchCommunityPosts({ loggedInAuthId, ...opts })
-}
-
-/* Re-export everything else (future-proof) */
-export * from "./actions/community"
+/* Backwards-compatibility names */
+export { createCommunityPostAction as createPost }
+export { voteOnPostAction as voteOnPost }
+export { bookmarkPostAction as bookmarkPost }
