@@ -21,51 +21,8 @@ const PROTECTED_PATHS = [
   "/admin",
 ]
 
-// Define tier-protected paths
-const TIER_PROTECTED_PATHS = {
-  "/vault/premium": "pioneer",
-  "/vault/exclusive": "elder",
-  "/vault/vip": "blood",
-  "/community/vip": "elder",
-  "/premium/backstage": "blood",
-}
-
 // Define auth paths that authenticated users should be redirected away from
 const AUTH_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password"]
-
-// Tier rank mapping
-const TIER_RANKS = {
-  grassroot: 0,
-  pioneer: 1,
-  elder: 2,
-  blood: 3,
-}
-
-function getUserTierFromCookie(request: NextRequest) {
-  const authCookie = request.cookies.get("erigga_auth")?.value
-  const sessionCookie = request.cookies.get("erigga_auth_session")?.value
-
-  try {
-    if (authCookie) {
-      const authData = JSON.parse(authCookie)
-      return authData.profile?.tier || "grassroot"
-    }
-    if (sessionCookie) {
-      const sessionData = JSON.parse(sessionCookie)
-      return sessionData.profile?.tier || "grassroot"
-    }
-  } catch {
-    // Invalid cookie data
-  }
-
-  return "grassroot"
-}
-
-function checkTierAccess(userTier: string, requiredTier: string): boolean {
-  const userRank = TIER_RANKS[userTier as keyof typeof TIER_RANKS] ?? 0
-  const requiredRank = TIER_RANKS[requiredTier as keyof typeof TIER_RANKS] ?? 0
-  return userRank >= requiredRank
-}
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -113,11 +70,6 @@ export function middleware(request: NextRequest) {
 
   // Check if the path is an auth path
   const isAuthPath = AUTH_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
-
-  // Check for tier-protected paths
-  const tierProtectedPath = Object.keys(TIER_PROTECTED_PATHS).find(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
-  )
 
   // Handle authenticated users accessing auth pages
   if (isAuthenticated && isAuthPath) {
@@ -167,22 +119,6 @@ export function middleware(request: NextRequest) {
     })
 
     return redirectResponse
-  }
-
-  // Handle tier-protected paths
-  if (tierProtectedPath && isAuthenticated) {
-    const requiredTier = TIER_PROTECTED_PATHS[tierProtectedPath as keyof typeof TIER_PROTECTED_PATHS]
-    const userTier = getUserTierFromCookie(request)
-
-    if (!checkTierAccess(userTier, requiredTier)) {
-      // Redirect to premium page with upgrade prompt
-      const upgradeUrl = new URL("/premium", request.url)
-      upgradeUrl.searchParams.set("upgrade", "true")
-      upgradeUrl.searchParams.set("required", requiredTier)
-      upgradeUrl.searchParams.set("path", pathname)
-
-      return NextResponse.redirect(upgradeUrl)
-    }
   }
 
   // Handle root path redirect for authenticated users

@@ -1,183 +1,173 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { useRef, useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+import { createCommunityPostAction } from "@/lib/community-actions" // Updated import
 import { Button } from "@/components/ui/button"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { UserTierBadge } from "@/components/user-tier-badge"
+import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { Send, Hash } from "lucide-react"
+import { Loader2 } from "lucide-react"
+import type { CommunityCategory } from "@/types/database"
+
+const formSchema = z
+  .object({
+    content: z.string().min(1, { message: "Content cannot be empty unless media is provided." }).max(5000).optional(),
+    categoryId: z.string().min(1, { message: "Please select a category." }),
+    mediaFile: z.custom<FileList>((val) => val instanceof FileList, "Please upload a file.").optional(),
+  })
+  .refine((data) => data.content || data.mediaFile?.[0], {
+    message: "Either content or a media file must be provided.",
+    path: ["content"], // Show error on content field or a general form error
+  })
 
 interface CreatePostFormProps {
-  categories: any[]
-  profile: any
+  categories: CommunityCategory[]
+  onPostCreated?: (newPost: any) => void // Callback after successful post creation
 }
 
-export function CreatePostForm({ categories, profile }: CreatePostFormProps) {
-  const [content, setContent] = useState("")
-  const [categoryId, setCategoryId] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
+export function CreatePostFormFinal({ categories, onPostCreated }: CreatePostFormProps) {
   const { toast } = useToast()
   const router = useRouter()
-  const supabase = createClient()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      content: "",
+      categoryId: "",
+      mediaFile: undefined,
+    },
+  })
 
-    if (!content.trim() || !categoryId) {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setIsSubmitting(true)
+
+    const formData = new FormData()
+    if (values.content) formData.append("content", values.content)
+    formData.append("categoryId", values.categoryId)
+    if (values.mediaFile && values.mediaFile[0]) {
+      formData.append("mediaFile", values.mediaFile[0])
+    }
+
+    if (!values.content && (!values.mediaFile || !values.mediaFile[0])) {
       toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
+        title: "Cannot create empty post",
+        description: "Please provide some content or upload a media file.",
         variant: "destructive",
       })
+      setIsSubmitting(false)
       return
     }
 
-    setIsSubmitting(true)
+    const result = await createCommunityPostAction(formData)
+    setIsSubmitting(false)
 
-    try {
-      // Extract hashtags from content
-      const hashtags = content.match(/#\w+/g)?.map((tag) => tag.slice(1)) || []
-
-      // Create post
-      const { data, error } = await supabase
-        .from("community_posts")
-        .insert({
-          user_id: profile.id,
-          category_id: Number.parseInt(categoryId),
-          content: content.trim(),
-          hashtags,
-        })
-        .select()
-        .single()
-
-      if (error) {
-        throw error
-      }
-
-      // Update user post count
-      await supabase
-        .from("users")
-        .update({
-          posts_count: profile.posts_count + 1,
-        })
-        .eq("id", profile.id)
-
+    if (result.success) {
       toast({
-        title: "Post Created! 🎉",
-        description: "Your post has been shared with the community.",
+        title: "Post created successfully!",
       })
-
-      // Reset form
-      setContent("")
-      setCategoryId("")
-
-      // Refresh page to show new post
-      router.refresh()
-    } catch (error) {
-      console.error("Error creating post:", error)
+      form.reset()
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "" // Clear file input
+      }
+      if (onPostCreated && result.post) {
+        onPostCreated(result.post)
+      } else {
+        // Fallback to router.refresh() if no callback, or if you want to ensure full page data refresh
+        router.refresh() // Or revalidatePath can be called from server action
+      }
+    } else {
       toast({
-        title: "Failed to Create Post",
-        description: "Something went wrong. Please try again.",
+        title: "Something went wrong!",
+        description: result.error || "Failed to create post.",
         variant: "destructive",
       })
-    } finally {
-      setIsSubmitting(false)
     }
-  }
-
-  const getTierColor = (tier: string) => {
-    const colors = {
-      admin: "bg-red-500",
-      blood_brotherhood: "bg-red-600",
-      elder: "bg-purple-500",
-      pioneer: "bg-blue-500",
-      grassroot: "bg-green-500",
-    }
-    return colors[tier as keyof typeof colors] || "bg-gray-500"
   }
 
   return (
-    <Card className="shadow-lg border-0 bg-white dark:bg-gray-800">
-      <CardHeader className="pb-4">
-        <div className="flex items-center gap-4">
-          <Avatar className="h-12 w-12">
-            <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} alt={profile?.username} />
-            <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold">
-              {profile?.username?.charAt(0).toUpperCase() || "U"}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">{profile?.full_name}</span>
-              <UserTierBadge tier={profile?.tier} size="sm" />
-            </div>
-            <p className="text-sm text-gray-500">@{profile?.username}</p>
-          </div>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 p-4 border rounded-lg bg-card">
+        <FormField
+          control={form.control}
+          name="content"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>What's on your mind?</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder="Share your thoughts, bars, or stories..."
+                  className="resize-none min-h-[100px]"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="categoryId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Category</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id.toString()}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="mediaFile"
+            render={({ field: { onChange, value, ...restField } }) => (
+              <FormItem>
+                <FormLabel>Upload Media (Optional)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="file"
+                    accept="image/*,audio/*,video/*"
+                    onChange={(event) => {
+                      onChange(event.target.files)
+                    }}
+                    ref={fileInputRef}
+                    className="pt-[5px]" // Minor style adjustment for file input
+                    {...restField}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
-      </CardHeader>
 
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="What's on your mind? Share your thoughts with the community... Use #hashtags and @mentions!"
-              className="min-h-[120px] resize-none border-0 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500"
-              maxLength={2000}
-              required
-            />
-            <div className="flex justify-between items-center mt-2 text-sm text-gray-500">
-              <div className="flex items-center gap-4">
-                <span className="flex items-center gap-1">
-                  <Hash className="h-4 w-4" />
-                  Use hashtags
-                </span>
-              </div>
-              <span>{content.length}/2000</span>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between gap-4">
-            <Select value={categoryId} onValueChange={setCategoryId} required>
-              <SelectTrigger className="w-64">
-                <SelectValue placeholder="Select a category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((category) => (
-                  <SelectItem key={category.id} value={category.id.toString()}>
-                    <div className="flex items-center gap-2">
-                      <span>{category.icon}</span>
-                      <span>{category.name}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Button type="submit" disabled={isSubmitting || !content.trim() || !categoryId} className="px-8">
-              {isSubmitting ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Posting...
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Send className="h-4 w-4" />
-                  Share Post
-                </div>
-              )}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+        <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
+          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {isSubmitting ? "Posting..." : "Create Post"}
+        </Button>
+      </form>
+    </Form>
   )
 }

@@ -1,5 +1,3 @@
-"use server"
-
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
@@ -99,6 +97,8 @@ export async function createPost(formData: FormData) {
   }
 }
 
+const VOTE_COIN_AMOUNT = 100
+
 export async function voteOnPost(postId: number) {
   const supabase = await createClient()
 
@@ -136,7 +136,7 @@ export async function voteOnPost(postId: number) {
     const { data, error } = await supabase.rpc("handle_post_vote_safe", {
       p_post_id: postId,
       p_voter_id: userData.id,
-      p_coin_amount: 100,
+      p_coin_amount: VOTE_COIN_AMOUNT,
     })
 
     if (error) {

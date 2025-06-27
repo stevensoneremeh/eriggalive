@@ -49,13 +49,6 @@ interface SidebarItem {
 
 // Updated sidebarItems: "Coins" item is removed.
 const sidebarItems: SidebarItem[] = [
-{
-    name: "Home",
-    href: "/",
-    icon: Home, // Main dashboard uses Home icon
-    description: "Overview and stats",
-    category: "main",
-  },
   {
     name: "Dashboard",
     href: "/dashboard",
