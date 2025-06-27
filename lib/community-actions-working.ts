@@ -1,10 +1,8 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
-import { fetchCommunityPosts as fetchCommunityPostsFinal } from "./community-actions-final-fix"
-import { bookmarkPostAction } from "./community-actions-final-fix" // Declare the variable before using it
-
-const VOTE_COIN_AMOUNT = 100
+import { bookmarkPostAction } from "./community-actions-final-fix"
+import { VOTE_COIN_AMOUNT } from "./community-actions-final-fix" // Declare the variable before using it
 
 export async function createCommunityPostAction(formData: FormData) {
   const supabase = await createClient()
@@ -162,71 +160,6 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId?: strin
   }
 }
 
-export async function bookmarkPost(postId: number) {
-  const supabase = await createClient()
-
-  try {
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (authError || !user) {
-      throw new Error("Authentication required")
-    }
-
-    // Get user's internal ID
-    let userData
-    try {
-      const { data: standardUser } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
-
-      if (standardUser) {
-        userData = standardUser
-      } else {
-        const { data: directUser } = await supabase.from("users").select("id").eq("id", user.id).single()
-
-        if (directUser) {
-          userData = directUser
-        } else {
-          throw new Error("User profile not found")
-        }
-      }
-    } catch (error) {
-      throw new Error("User profile not found")
-    }
-
-    // Check if already bookmarked
-    const { data: existingBookmark } = await supabase
-      .from("user_bookmarks")
-      .select("id")
-      .eq("user_id", userData.id)
-      .eq("post_id", postId)
-      .single()
-
-    if (existingBookmark) {
-      // Remove bookmark
-      await supabase.from("user_bookmarks").delete().eq("user_id", userData.id).eq("post_id", postId)
-      const { revalidatePath } = await import("next/cache")
-      revalidatePath("/community")
-
-      return { success: true, bookmarked: false }
-    } else {
-      // Add bookmark
-      await supabase.from("user_bookmarks").insert({
-        user_id: userData.id,
-        post_id: postId,
-      })
-      const { revalidatePath } = await import("next/cache")
-      revalidatePath("/community")
-
-      return { success: true, bookmarked: true }
-    }
-  } catch (error) {
-    console.error("Error bookmarking post:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
-  }
-}
-
 export async function addComment(postId: number, content: string, parentCommentId?: number) {
   const supabase = await createClient()
 
@@ -292,31 +225,25 @@ export async function addComment(postId: number, content: string, parentCommentI
   }
 }
 
-export async function fetchCommunityPosts(
-  loggedInUserId?: string,
-  options?: { categoryFilter?: number; sortOrder?: string; page?: number; limit?: number; searchQuery?: string },
-) {
-  return fetchCommunityPostsFinal(loggedInUserId, options)
-}
+const mod = () => import("./community-actions-final-fix")
 
 export async function createPost(formData: FormData) {
-  const { createCommunityPostAction } = await import("./community-actions-final-fix")
+  const { createCommunityPostAction } = await mod()
   return createCommunityPostAction(formData)
 }
 
-export async function voteOnPost(postId: number, postCreatorAuthId?: string) {
-  const { voteOnPostAction } = await import("./community-actions-final-fix")
-  return voteOnPostAction(postId, postCreatorAuthId || "")
+export async function voteOnPost(postId: number, postCreatorAuthId = "") {
+  const { voteOnPostAction } = await mod()
+  return voteOnPostAction(postId, postCreatorAuthId)
 }
 
-/**
- * Legacy aliases expected elsewhere in the code-base
- * --------------------------------------------------
- * They simply forward to the real async actions above
- * so we still comply with the `"use server"` rule.
- */
-const createPostAlias = createCommunityPostAction
-const voteOnPostAlias = voteOnPostAction
-const bookmarkPostActionAlias = bookmarkPostAction // Use the declared variable
-
+/* keep old “*Action” names alive */
 export { bookmarkPostAction }
+
+export async function fetchCommunityPosts(
+  userId?: string,
+  opts?: { categoryFilter?: number; sortOrder?: string; page?: number; limit?: number; searchQuery?: string },
+) {
+  const { fetchCommunityPosts } = await mod()
+  return fetchCommunityPosts(userId, opts)
+}
