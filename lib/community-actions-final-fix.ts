@@ -1,80 +1,52 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { getOrCreateUserProfile } from "@/lib/auth-sync"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import DOMPurify from "isomorphic-dompurify"
+import { createClient } from "@/lib/supabase/server"
 
 const VOTE_COIN_AMOUNT = 100
 
 // --- Post Actions ---
 export async function createCommunityPostAction(formData: FormData) {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = await createClient()
 
-    // Use the new auth sync function
-    const userProfile = await getOrCreateUserProfile()
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: "User not authenticated." }
+    }
+
+    // Get user profile
+    const { data: userProfile } = await supabase.from("users").select("*").eq("auth_user_id", user.id).single()
+
+    if (!userProfile) {
+      return { success: false, error: "User profile not found." }
+    }
 
     const rawContent = formData.get("content") as string
     const categoryId = formData.get("categoryId") as string
-    const mediaFile = formData.get("mediaFile") as File | null
 
-    if (!rawContent?.trim() && !mediaFile) {
-      return { success: false, error: "Please provide content or upload media." }
+    if (!rawContent?.trim()) {
+      return { success: false, error: "Content is required." }
     }
 
     if (!categoryId) {
       return { success: false, error: "Please select a category." }
     }
 
-    const sanitizedContent = rawContent ? DOMPurify.sanitize(rawContent) : ""
-
-    let media_url: string | undefined = undefined
-    let media_type: string | undefined = undefined
-    let media_metadata: Record<string, any> | undefined = undefined
-
-    if (mediaFile && mediaFile.size > 0) {
-      const fileExt = mediaFile.name.split(".").pop()
-      const fileName = `${userProfile.id}-${Date.now()}.${fileExt}`
-      const filePath = `community_media/${fileName}`
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("eriggalive-assets")
-        .upload(filePath, mediaFile)
-
-      if (uploadError) {
-        console.error("Media upload error:", uploadError)
-        return { success: false, error: `Media upload failed: ${uploadError.message}` }
-      }
-
-      const { data: publicUrlData } = supabase.storage.from("eriggalive-assets").getPublicUrl(uploadData.path)
-      media_url = publicUrlData.publicUrl
-
-      if (mediaFile.type.startsWith("image/")) media_type = "image"
-      else if (mediaFile.type.startsWith("audio/")) media_type = "audio"
-      else if (mediaFile.type.startsWith("video/")) media_type = "video"
-
-      media_metadata = {
-        name: mediaFile.name,
-        size: mediaFile.size,
-        type: mediaFile.type,
-      }
-    }
-
     const postData = {
       user_id: userProfile.id,
       category_id: Number.parseInt(categoryId),
-      content: sanitizedContent,
-      media_url,
-      media_type,
-      media_metadata,
+      content: rawContent.trim(),
       is_published: true,
       is_deleted: false,
       is_edited: false,
       vote_count: 0,
       comment_count: 0,
-      tags: [],
-      mentions: null,
     }
 
     const { data: newPost, error } = await supabase
@@ -82,7 +54,7 @@ export async function createCommunityPostAction(formData: FormData) {
       .insert(postData)
       .select(`
         *,
-        user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
+        user:users!community_posts_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
         category:community_categories!community_posts_category_id_fkey(id, name, slug)
       `)
       .single()
@@ -100,10 +72,34 @@ export async function createCommunityPostAction(formData: FormData) {
   }
 }
 
-export async function voteOnPostAction(postId: number, postCreatorAuthId: string) {
+export async function voteOnPostAction(postId: number, postCreatorAuthId = "") {
   try {
-    const supabase = createServerSupabaseClient()
-    const voterProfile = await getOrCreateUserProfile()
+    const supabase = await createClient()
+
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return {
+        success: false,
+        error: "User not authenticated.",
+        code: "NOT_AUTHENTICATED",
+      }
+    }
+
+    // Get user profile
+    const { data: voterProfile } = await supabase.from("users").select("*").eq("auth_user_id", user.id).single()
+
+    if (!voterProfile) {
+      return {
+        success: false,
+        error: "User profile not found.",
+        code: "PROFILE_NOT_FOUND",
+      }
+    }
 
     // Check if trying to vote on own post
     const { data: postData } = await supabase.from("community_posts").select("user_id").eq("id", postId).single()
@@ -165,7 +161,7 @@ export async function fetchCommunityPosts(
 ) {
   try {
     const { categoryFilter, sortOrder = "newest", page = 1, limit = 10, searchQuery } = options
-    const supabase = createServerSupabaseClient()
+    const supabase = await createClient()
     const offset = (page - 1) * limit
 
     // Get logged in user's internal ID if provided
@@ -228,10 +224,309 @@ export async function fetchCommunityPosts(
   }
 }
 
+export async function deletePost(postId: number) {
+  try {
+    const supabase = await createClient()
+
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: "User not authenticated." }
+    }
+
+    // Get user profile
+    const { data: userProfile } = await supabase.from("users").select("*").eq("auth_user_id", user.id).single()
+
+    if (!userProfile) {
+      return { success: false, error: "User profile not found." }
+    }
+
+    // Check if user owns the post
+    const { data: post } = await supabase.from("community_posts").select("user_id").eq("id", postId).single()
+
+    if (!post || post.user_id !== userProfile.id) {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    // Soft delete the post
+    const { error } = await supabase
+      .from("community_posts")
+      .update({
+        is_deleted: true,
+        deleted_at: new Date().toISOString(),
+      })
+      .eq("id", postId)
+
+    if (error) {
+      console.error("Error deleting post:", error)
+      return { success: false, error: "Failed to delete post" }
+    }
+
+    revalidatePath("/community")
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error in deletePost:", error)
+    return { success: false, error: error.message || "Failed to delete post" }
+  }
+}
+
+export async function editPost(postId: number, content: string) {
+  try {
+    const supabase = await createClient()
+
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: "User not authenticated." }
+    }
+
+    // Get user profile
+    const { data: userProfile } = await supabase.from("users").select("*").eq("auth_user_id", user.id).single()
+
+    if (!userProfile) {
+      return { success: false, error: "User profile not found." }
+    }
+
+    if (!content?.trim()) {
+      return { success: false, error: "Content is required" }
+    }
+
+    // Check if user owns the post
+    const { data: post } = await supabase.from("community_posts").select("user_id").eq("id", postId).single()
+
+    if (!post || post.user_id !== userProfile.id) {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    // Update the post
+    const { error } = await supabase
+      .from("community_posts")
+      .update({
+        content: content.trim(),
+        is_edited: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", postId)
+
+    if (error) {
+      console.error("Error editing post:", error)
+      return { success: false, error: "Failed to edit post" }
+    }
+
+    revalidatePath("/community")
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error in editPost:", error)
+    return { success: false, error: error.message || "Failed to edit post" }
+  }
+}
+
+export async function reportPost(postId: number, reason: string) {
+  try {
+    const supabase = await createClient()
+
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: "User not authenticated." }
+    }
+
+    // Get user profile
+    const { data: userProfile } = await supabase.from("users").select("*").eq("auth_user_id", user.id).single()
+
+    if (!userProfile) {
+      return { success: false, error: "User profile not found." }
+    }
+
+    if (!reason?.trim()) {
+      return { success: false, error: "Reason is required" }
+    }
+
+    // Create report
+    const { error } = await supabase.from("community_reports").insert({
+      post_id: postId,
+      user_id: userProfile.id,
+      reason: reason.trim(),
+      created_at: new Date().toISOString(),
+    })
+
+    if (error) {
+      console.error("Error reporting post:", error)
+      return { success: false, error: "Failed to report post" }
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error in reportPost:", error)
+    return { success: false, error: error.message || "Failed to report post" }
+  }
+}
+
+export async function followUser(targetUserId: string) {
+  try {
+    const supabase = await createClient()
+
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: "User not authenticated." }
+    }
+
+    // Get user profile
+    const { data: userProfile } = await supabase.from("users").select("*").eq("auth_user_id", user.id).single()
+
+    if (!userProfile) {
+      return { success: false, error: "User profile not found." }
+    }
+
+    if (!targetUserId || targetUserId === userProfile.id.toString()) {
+      return { success: false, error: "Invalid user ID" }
+    }
+
+    // Check if already following
+    const { data: existingFollow } = await supabase
+      .from("community_follows")
+      .select("*")
+      .eq("follower_id", userProfile.id)
+      .eq("following_id", targetUserId)
+      .single()
+
+    if (existingFollow) {
+      return { success: false, error: "Already following this user" }
+    }
+
+    // Create follow relationship
+    const { error } = await supabase.from("community_follows").insert({
+      follower_id: userProfile.id,
+      following_id: targetUserId,
+      created_at: new Date().toISOString(),
+    })
+
+    if (error) {
+      console.error("Error following user:", error)
+      return { success: false, error: "Failed to follow user" }
+    }
+
+    revalidatePath("/community")
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error in followUser:", error)
+    return { success: false, error: error.message || "Failed to follow user" }
+  }
+}
+
+export async function unfollowUser(targetUserId: string) {
+  try {
+    const supabase = await createClient()
+
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: "User not authenticated." }
+    }
+
+    // Get user profile
+    const { data: userProfile } = await supabase.from("users").select("*").eq("auth_user_id", user.id).single()
+
+    if (!userProfile) {
+      return { success: false, error: "User profile not found." }
+    }
+
+    if (!targetUserId) {
+      return { success: false, error: "User ID is required" }
+    }
+
+    // Remove follow relationship
+    const { error } = await supabase
+      .from("community_follows")
+      .delete()
+      .eq("follower_id", userProfile.id)
+      .eq("following_id", targetUserId)
+
+    if (error) {
+      console.error("Error unfollowing user:", error)
+      return { success: false, error: "Failed to unfollow user" }
+    }
+
+    revalidatePath("/community")
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error in unfollowUser:", error)
+    return { success: false, error: error.message || "Failed to unfollow user" }
+  }
+}
+
+export async function bookmarkPost(postId: number) {
+  try {
+    const supabase = await createClient()
+
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: "User not authenticated." }
+    }
+
+    // Get user profile
+    const { data: userProfile } = await supabase.from("users").select("*").eq("auth_user_id", user.id).single()
+
+    if (!userProfile) {
+      return { success: false, error: "User profile not found." }
+    }
+
+    // Check if already bookmarked
+    const { data: existingBookmark } = await supabase
+      .from("user_bookmarks")
+      .select("id")
+      .eq("user_id", userProfile.id)
+      .eq("post_id", postId)
+      .single()
+
+    if (existingBookmark) {
+      // Remove bookmark
+      await supabase.from("user_bookmarks").delete().eq("user_id", userProfile.id).eq("post_id", postId)
+
+      return { success: true, bookmarked: false }
+    } else {
+      // Add bookmark
+      await supabase.from("user_bookmarks").insert({
+        user_id: userProfile.id,
+        post_id: postId,
+      })
+
+      return { success: true, bookmarked: true }
+    }
+  } catch (error: any) {
+    console.error("Bookmark error:", error)
+    return { success: false, error: error.message || "Failed to bookmark" }
+  }
+}
+
 // Re-export other functions that don't need auth changes
 export {
-  editPostAction,
-  deletePostAction,
   createCommentAction,
   editCommentAction,
   deleteCommentAction,
@@ -239,3 +534,12 @@ export {
   fetchCommentsForPost,
   searchUsersForMention,
 } from "./community-actions-fixed"
+
+// Alias exports for backward compatibility
+export async function createPost(formData: FormData) {
+  return await createCommunityPostAction(formData)
+}
+
+export async function voteOnPost(postId: number, postCreatorAuthId = "") {
+  return await voteOnPostAction(postId, postCreatorAuthId)
+}

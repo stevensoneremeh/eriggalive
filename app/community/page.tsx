@@ -1,20 +1,10 @@
-import { fetchCommunityPosts } from "@/lib/community-actions-final-fix"
+import { Suspense } from "react"
+import { CommunityPageClient } from "./community-page-client"
 
-async function CommunityPage() {
-  const posts = await fetchCommunityPosts()
-
+export default function CommunityPage() {
   return (
-    <div>
-      <h1>Community Page</h1>
-      {posts.map((post) => (
-        <div key={post.id}>
-          <h2>{post.title}</h2>
-          <p>{post.content}</p>
-          <p>Author: {post.authorId}</p>
-        </div>
-      ))}
-    </div>
+    <Suspense fallback={<div>Loading community...</div>}>
+      <CommunityPageClient />
+    </Suspense>
   )
 }
-
-export default CommunityPage

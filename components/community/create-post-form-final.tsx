@@ -1,96 +1,161 @@
 "use client"
 
+import type React from "react"
+
+import { useState } from "react"
 import { createCommunityPostAction } from "@/lib/community-actions-final-fix"
-
 import { Button } from "@/components/ui/button"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-import { useForm } from "react-hook-form"
-import * as z from "zod"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useToast } from "@/components/ui/use-toast"
-import { useRouter } from "next/navigation"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Send, Loader2, AlertCircle, CheckCircle } from "lucide-react"
+import { toast } from "sonner"
 
-const formSchema = z.object({
-  title: z.string().min(2, {
-    message: "Title must be at least 2 characters.",
-  }),
-  content: z.string().min(10, {
-    message: "Content must be at least 10 characters.",
-  }),
-})
-
-interface CreatePostFormProps {
-  communityId: string
+interface Category {
+  id: number
+  name: string
+  slug: string
 }
 
-export function CreatePostForm({ communityId }: CreatePostFormProps) {
-  const { toast } = useToast()
-  const router = useRouter()
+interface CreatePostFormProps {
+  categories: Category[]
+  onPostCreated?: (post: any) => void
+}
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      title: "",
-      content: "",
-    },
-  })
+export function CreatePostForm({ categories, onPostCreated }: CreatePostFormProps) {
+  const [content, setContent] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!content.trim()) {
+      setError("Content is required")
+      return
+    }
+
+    if (!selectedCategory) {
+      setError("Please select a category")
+      return
+    }
+
+    setIsSubmitting(true)
+    setError(null)
+
     try {
-      await createCommunityPostAction({
-        communityId: communityId,
-        title: values.title,
-        content: values.content,
-      })
+      const formData = new FormData()
+      formData.append("content", content.trim())
+      formData.append("categoryId", selectedCategory)
 
-      toast({
-        title: "Post created successfully!",
-      })
+      const result = await createCommunityPostAction(formData)
 
-      router.refresh()
-      form.reset()
+      if (result.success) {
+        setContent("")
+        setSelectedCategory("")
+        setSuccess(true)
+        toast.success("Post created successfully!")
+
+        if (onPostCreated && result.post) {
+          onPostCreated(result.post)
+        }
+
+        // Reset success state after delay
+        setTimeout(() => setSuccess(false), 3000)
+      } else {
+        setError(result.error || "Failed to create post")
+        toast.error(result.error || "Failed to create post")
+      }
     } catch (error: any) {
-      toast({
-        title: "Something went wrong!",
-        description: error.message,
-        variant: "destructive",
-      })
+      console.error("Error creating post:", error)
+      setError(error.message || "Failed to create post")
+      toast.error(error.message || "Failed to create post")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <FormField
-          control={form.control}
-          name="title"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Title</FormLabel>
-              <FormControl>
-                <Input placeholder="Enter post title" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
+    <Card className="w-full mb-6">
+      <CardHeader>
+        <CardTitle>Create Post</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Error Alert */}
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
-        />
-        <FormField
-          control={form.control}
-          name="content"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Content</FormLabel>
-              <FormControl>
-                <Textarea placeholder="Write something insightful..." className="resize-none" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
+
+          {/* Success Alert */}
+          {success && (
+            <Alert className="border-green-200 bg-green-50">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">Post created successfully!</AlertDescription>
+            </Alert>
           )}
-        />
-        <Button type="submit">Create Post</Button>
-      </form>
-    </Form>
+
+          {/* Content Input */}
+          <div className="space-y-2">
+            <Textarea
+              placeholder="What's on your mind? Share your thoughts with the community..."
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="min-h-[100px] resize-none"
+              disabled={isSubmitting}
+              maxLength={2000}
+            />
+            <div className="flex justify-between items-center text-sm text-gray-500">
+              <span>No external links allowed for security</span>
+              <span>{content.length}/2000</span>
+            </div>
+          </div>
+
+          {/* Category Selection */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Category</label>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id.toString()}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Submit Button */}
+          <div className="flex justify-end">
+            <Button
+              type="submit"
+              disabled={isSubmitting || !content.trim() || !selectedCategory}
+              className="min-w-[120px]"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Posting...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Post
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   )
 }
