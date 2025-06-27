@@ -66,8 +66,8 @@ export async function deleteCommunity(id: string) {
 
 /* --------- Re-export main post actions so older imports keep working ------ */
 export {
-  createPost,
-  voteOnPost,
+  createCommunityPostAction as createPost,
+  voteOnPostAction as voteOnPost,
   bookmarkPost,
   createCommunityPostAction,
   voteOnPostAction,

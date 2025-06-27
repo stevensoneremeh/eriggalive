@@ -313,12 +313,8 @@ export async function fetchCommunityPosts() {
  * They simply forward to the real async actions above
  * so we still comply with the `"use server"` rule.
  */
-export async function createPost(formData: FormData) {
-  return createCommunityPostAction(formData)
-}
+const createPost = createCommunityPostAction
+const voteOnPost = voteOnPostAction
+const bookmarkPostAction = bookmarkPost
 
-export async function voteOnPost(postId: number, postCreatorAuthId?: string) {
-  return voteOnPostAction(postId, postCreatorAuthId)
-}
-
-export { bookmarkPost as bookmarkPostAction } from "./community-actions-final-fix"
+export { createPost, voteOnPost, bookmarkPostAction }
