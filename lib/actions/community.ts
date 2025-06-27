@@ -1,90 +1,164 @@
 "use server"
 
-/**
- * Centralised community-related server actions.
- * These helpers talk to Supabase directly and are **server-only**.
- */
-import { createClient } from "@supabase/supabase-js"
+import { createServerClient } from "@/lib/supabase/server"
+import { revalidatePath } from "next/cache"
+import { cookies } from "next/headers"
+import type { PostgrestError } from "@supabase/supabase-js"
 
-const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-
-/* ────────────────────────────────────────────────────────── */
-/* Types                                                     */
-export interface CreatePostArgs {
-  communityId: string
-  title: string
-  content: string
-  authorId: string
-  path?: string // used by the proxy for revalidatePath
+export interface FormState {
+  success: boolean
+  message: string
+  errors?: Record<string, string[] | undefined>
 }
 
-export interface VoteArgs {
-  postId: string | number
-  voterId: string
-  type: "upvote" | "downvote"
-}
+// --- CREATE POST ---
+export async function createPostAction(prevState: FormState, formData: FormData): Promise<FormState> {
+  const cookieStore = cookies()
+  const supabase = createServerClient(cookieStore)
 
-export interface BookmarkArgs {
-  postId: string | number
-  userId: string
-}
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-export interface AddCommentArgs {
-  postId: string | number
-  authorId: string
-  text: string
-}
+  if (!user) {
+    return { success: false, message: "Authentication error: User not found." }
+  }
 
-/* ────────────────────────────────────────────────────────── */
-/* Action Implementations                                    */
-export async function createPost({ communityId, title, content, authorId }: CreatePostArgs) {
-  const { data, error } = await supabase
-    .from("community_posts")
-    .insert({
-      community_id: communityId,
-      title,
-      content,
-      author_id: authorId,
-    })
-    .select()
-    .single()
+  const content = formData.get("content") as string
+  const category = formData.get("category") as string
 
-  if (error) throw new Error(error.message)
-  return data
-}
+  if (!content || content.trim().length === 0) {
+    return {
+      success: false,
+      message: "Validation error: Content cannot be empty.",
+      errors: { content: ["Content is required."] },
+    }
+  }
 
-export async function voteOnPost({ postId, voterId, type }: VoteArgs) {
-  const { data, error } = await supabase.rpc("vote_on_post", {
-    p_post_id: postId,
-    p_voter_id: voterId,
-    p_vote_type: type,
+  const { error } = await supabase.from("community_posts").insert({
+    user_id: user.id,
+    content: content,
+    category_id: category || null,
   })
-  if (error) throw new Error(error.message)
-  return data
+
+  if (error) {
+    console.error("Error creating post:", error)
+    return { success: false, message: `Database error: ${error.message}` }
+  }
+
+  revalidatePath("/community")
+  return { success: true, message: "Post created successfully!" }
 }
 
-export async function bookmarkPost({ postId, userId }: BookmarkArgs) {
-  const { data, error } = await supabase
-    .from("post_bookmarks")
-    .upsert({ post_id: postId, user_id: userId }, { onConflict: "post_id,user_id" })
-    .select()
-    .single()
+// --- VOTE ON POST ---
+export async function voteOnPostAction(
+  postId: string,
+  voteType: "up" | "down",
+): Promise<{ success: boolean; message: string; error?: PostgrestError | null }> {
+  const cookieStore = cookies()
+  const supabase = createServerClient(cookieStore)
 
-  if (error) throw new Error(error.message)
-  return data
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: "You must be logged in to vote." }
+
+  const { error } = await supabase.rpc("handle_vote", {
+    p_post_id: postId,
+    p_user_id: user.id,
+    p_vote_type: voteType,
+  })
+
+  if (error) {
+    console.error("Error handling vote:", error)
+    return { success: false, message: error.message, error }
+  }
+
+  revalidatePath("/community")
+  revalidatePath(`/post/${postId}`)
+  return { success: true, message: "Vote recorded." }
 }
 
-export async function addComment({ postId, authorId, text }: AddCommentArgs) {
-  const { data, error } = await supabase
-    .from("post_comments")
-    .insert({
-      post_id: postId,
-      author_id: authorId,
-      content: text,
-    })
-    .select()
-    .single()
+// --- BOOKMARK POST ---
+export async function bookmarkPostAction(postId: string): Promise<{ success: boolean; message: string }> {
+  const cookieStore = cookies()
+  const supabase = createServerClient(cookieStore)
 
-  if (error) throw new Error(error.message)
-  return data
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, message: "You must be logged in to bookmark." }
+  }
+
+  // Check if bookmark exists
+  const { data: existingBookmark, error: fetchError } = await supabase
+    .from("community_bookmarks")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("post_id", postId)
+    .maybeSingle()
+
+  if (fetchError) {
+    console.error("Error checking bookmark:", fetchError)
+    return { success: false, message: "Database error." }
+  }
+
+  if (existingBookmark) {
+    // Delete bookmark
+    const { error: deleteError } = await supabase
+      .from("community_bookmarks")
+      .delete()
+      .match({ user_id: user.id, post_id: postId })
+    if (deleteError) {
+      return { success: false, message: "Failed to remove bookmark." }
+    }
+    revalidatePath("/community")
+    return { success: true, message: "Bookmark removed." }
+  } else {
+    // Create bookmark
+    const { error: insertError } = await supabase
+      .from("community_bookmarks")
+      .insert({ user_id: user.id, post_id: postId })
+    if (insertError) {
+      return { success: false, message: "Failed to add bookmark." }
+    }
+    revalidatePath("/community")
+    return { success: true, message: "Post bookmarked." }
+  }
+}
+
+// --- ADD COMMENT ---
+export async function addCommentAction(prevState: FormState, formData: FormData): Promise<FormState> {
+  const cookieStore = cookies()
+  const supabase = createServerClient(cookieStore)
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { success: false, message: "You must be logged in to comment." }
+
+  const content = formData.get("content") as string
+  const postId = formData.get("postId") as string
+
+  if (!content || content.trim().length === 0) {
+    return { success: false, message: "Comment cannot be empty." }
+  }
+  if (!postId) {
+    return { success: false, message: "Post ID is missing." }
+  }
+
+  const { error } = await supabase.from("community_comments").insert({
+    post_id: postId,
+    user_id: user.id,
+    content: content,
+  })
+
+  if (error) {
+    return { success: false, message: `Failed to add comment: ${error.message}` }
+  }
+
+  revalidatePath(`/post/${postId}`)
+  revalidatePath("/community")
+  return { success: true, message: "Comment added." }
 }

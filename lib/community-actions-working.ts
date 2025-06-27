@@ -44,3 +44,8 @@ export { addComment } // no revalidation necessary here
 export { createCommunityPostAction as createPost }
 export { voteOnPostAction as voteOnPost }
 export { bookmarkPostAction as bookmarkPost }
+
+// This file acts as a compatibility layer.
+// It re-exports all actions from the new centralized location
+// to ensure older components that import from this path do not break.
+export * from "./actions/community"
