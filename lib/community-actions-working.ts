@@ -2,15 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
-import {
-  deletePost as deletePostImpl,
-  editPost as editPostImpl,
-  reportPost as reportPostImpl,
-  followUser as followUserImpl,
-  unfollowUser as unfollowUserImpl,
-} from "./community-actions-final-fix"
 
-// All exports must be async functions in "use server" files
 export async function createPost(formData: FormData) {
   const supabase = await createClient()
 
@@ -28,13 +20,21 @@ export async function createPost(formData: FormData) {
     let userData
     try {
       // First try the standard users table
-      const { data: standardUser } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
+      const { data: standardUser, error: standardError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .single()
 
       if (standardUser) {
         userData = standardUser
       } else {
         // Fallback: try direct match with user ID
-        const { data: directUser } = await supabase.from("users").select("id").eq("id", user.id).single()
+        const { data: directUser, error: directError } = await supabase
+          .from("users")
+          .select("id")
+          .eq("id", user.id)
+          .single()
 
         if (directUser) {
           userData = directUser
@@ -217,7 +217,7 @@ export async function bookmarkPost(postId: number) {
   }
 }
 
-export async function createComment(postId: string, content: string, parentId?: string) {
+export async function addComment(postId: number, content: string, parentCommentId?: number) {
   const supabase = await createClient()
 
   try {
@@ -254,9 +254,9 @@ export async function createComment(postId: string, content: string, parentId?: 
     const { data: comment, error: commentError } = await supabase
       .from("community_comments")
       .insert({
-        post_id: Number.parseInt(postId),
+        post_id: postId,
         user_id: userData.id,
-        parent_comment_id: parentId ? Number.parseInt(parentId) : null,
+        parent_comment_id: parentCommentId,
         content,
       })
       .select()
@@ -271,7 +271,7 @@ export async function createComment(postId: string, content: string, parentId?: 
     await supabase
       .from("community_posts")
       .update({ comment_count: supabase.raw("COALESCE(comment_count, 0) + 1") })
-      .eq("id", Number.parseInt(postId))
+      .eq("id", postId)
 
     revalidatePath("/community")
     return { success: true, comment }
@@ -279,37 +279,4 @@ export async function createComment(postId: string, content: string, parentId?: 
     console.error("Error adding comment:", error)
     return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
-}
-
-export async function deletePost(postId: string) {
-  return await deletePostImpl(postId)
-}
-
-export async function editPost(postId: string, content: string) {
-  return await editPostImpl(postId, content)
-}
-
-export async function reportPost(postId: string, reason: string) {
-  return await reportPostImpl(postId, reason)
-}
-
-export async function followUser(userId: string) {
-  return await followUserImpl(userId)
-}
-
-export async function unfollowUser(userId: string) {
-  return await unfollowUserImpl(userId)
-}
-
-// Legacy aliases for backward compatibility
-export async function createPostAction(formData: FormData) {
-  return await createPost(formData)
-}
-
-export async function voteOnPostAction(postId: string, voteType: "up" | "down") {
-  return await voteOnPost(Number.parseInt(postId))
-}
-
-export async function bookmarkPostAction(postId: string) {
-  return await bookmarkPost(Number.parseInt(postId))
 }

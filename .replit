@@ -5,7 +5,7 @@ run = "npm run dev"
 channel = "stable-24_05"
 
 [deployment]
-run = ["sh", "-c", "npm run build && npm start"]
+run = ["sh", "-c", "npm run dev"]
 
 [[ports]]
 localPort = 3000
@@ -26,8 +26,3 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm run dev"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run build"
-waitForPort = 3000

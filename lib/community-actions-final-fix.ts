@@ -1,28 +1,19 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { createClient } from "@/lib/supabase/server"
+import { getOrCreateUserProfile } from "@/lib/auth-sync"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
+import DOMPurify from "isomorphic-dompurify"
 
+const VOTE_COIN_AMOUNT = 100
+
+// --- Post Actions ---
 export async function createCommunityPostAction(formData: FormData) {
   try {
-    const supabase = await createClient()
+    const supabase = createServerSupabaseClient()
 
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: "User not authenticated." }
-    }
-
-    // Get user profile
-    const { data: userProfile } = await supabase.from("users").select("*").eq("auth_user_id", user.id).single()
-
-    if (!userProfile) {
-      return { success: false, error: "User profile not found." }
-    }
+    // Use the new auth sync function
+    const userProfile = await getOrCreateUserProfile()
 
     const rawContent = formData.get("content") as string
     const categoryId = formData.get("categoryId") as string
@@ -36,7 +27,7 @@ export async function createCommunityPostAction(formData: FormData) {
       return { success: false, error: "Please select a category." }
     }
 
-    const sanitizedContent = rawContent || ""
+    const sanitizedContent = rawContent ? DOMPurify.sanitize(rawContent) : ""
 
     let media_url: string | undefined = undefined
     let media_type: string | undefined = undefined
@@ -109,34 +100,10 @@ export async function createCommunityPostAction(formData: FormData) {
   }
 }
 
-export async function voteOnPostAction(postId: number, postCreatorAuthId = "") {
+export async function voteOnPostAction(postId: number, postCreatorAuthId: string) {
   try {
-    const supabase = await createClient()
-
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return {
-        success: false,
-        error: "User not authenticated.",
-        code: "NOT_AUTHENTICATED",
-      }
-    }
-
-    // Get user profile
-    const { data: voterProfile } = await supabase.from("users").select("*").eq("auth_user_id", user.id).single()
-
-    if (!voterProfile) {
-      return {
-        success: false,
-        error: "User profile not found.",
-        code: "PROFILE_NOT_FOUND",
-      }
-    }
+    const supabase = createServerSupabaseClient()
+    const voterProfile = await getOrCreateUserProfile()
 
     // Check if trying to vote on own post
     const { data: postData } = await supabase.from("community_posts").select("user_id").eq("id", postId).single()
@@ -150,7 +117,6 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId = "") {
     }
 
     // Check if user has enough coins
-    const VOTE_COIN_AMOUNT = 100
     if (voterProfile.coins < VOTE_COIN_AMOUNT) {
       return {
         success: false,
@@ -187,55 +153,6 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId = "") {
   }
 }
 
-export async function bookmarkPostAction(postId: number) {
-  try {
-    const supabase = await createClient()
-
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: "User not authenticated." }
-    }
-
-    // Get user profile
-    const { data: userProfile } = await supabase.from("users").select("*").eq("auth_user_id", user.id).single()
-
-    if (!userProfile) {
-      return { success: false, error: "User profile not found." }
-    }
-
-    // Check if already bookmarked
-    const { data: existingBookmark } = await supabase
-      .from("user_bookmarks")
-      .select("id")
-      .eq("user_id", userProfile.id)
-      .eq("post_id", postId)
-      .single()
-
-    if (existingBookmark) {
-      // Remove bookmark
-      await supabase.from("user_bookmarks").delete().eq("user_id", userProfile.id).eq("post_id", postId)
-
-      return { success: true, bookmarked: false }
-    } else {
-      // Add bookmark
-      await supabase.from("user_bookmarks").insert({
-        user_id: userProfile.id,
-        post_id: postId,
-      })
-
-      return { success: true, bookmarked: true }
-    }
-  } catch (error: any) {
-    console.error("Bookmark error:", error)
-    return { success: false, error: error.message || "Failed to bookmark" }
-  }
-}
-
 export async function fetchCommunityPosts(
   loggedInUserId?: string,
   options: {
@@ -248,7 +165,7 @@ export async function fetchCommunityPosts(
 ) {
   try {
     const { categoryFilter, sortOrder = "newest", page = 1, limit = 10, searchQuery } = options
-    const supabase = await createClient()
+    const supabase = createServerSupabaseClient()
     const offset = (page - 1) * limit
 
     // Get logged in user's internal ID if provided
@@ -311,268 +228,14 @@ export async function fetchCommunityPosts(
   }
 }
 
-// Required exports that were missing
-export async function deletePost(postId: number) {
-  try {
-    const supabase = await createClient()
-
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: "User not authenticated." }
-    }
-
-    // Get user profile
-    const { data: userProfile } = await supabase.from("users").select("*").eq("auth_user_id", user.id).single()
-
-    if (!userProfile) {
-      return { success: false, error: "User profile not found." }
-    }
-
-    // Check if user owns the post
-    const { data: post } = await supabase.from("community_posts").select("user_id").eq("id", postId).single()
-
-    if (!post || post.user_id !== userProfile.id) {
-      return { success: false, error: "Unauthorized" }
-    }
-
-    // Soft delete the post
-    const { error } = await supabase
-      .from("community_posts")
-      .update({
-        is_deleted: true,
-        deleted_at: new Date().toISOString(),
-      })
-      .eq("id", postId)
-
-    if (error) {
-      console.error("Error deleting post:", error)
-      return { success: false, error: "Failed to delete post" }
-    }
-
-    revalidatePath("/community")
-    return { success: true }
-  } catch (error: any) {
-    console.error("Error in deletePost:", error)
-    return { success: false, error: error.message || "Failed to delete post" }
-  }
-}
-
-export async function editPost(postId: number, content: string) {
-  try {
-    const supabase = await createClient()
-
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: "User not authenticated." }
-    }
-
-    // Get user profile
-    const { data: userProfile } = await supabase.from("users").select("*").eq("auth_user_id", user.id).single()
-
-    if (!userProfile) {
-      return { success: false, error: "User profile not found." }
-    }
-
-    if (!content?.trim()) {
-      return { success: false, error: "Content is required" }
-    }
-
-    // Check if user owns the post
-    const { data: post } = await supabase.from("community_posts").select("user_id").eq("id", postId).single()
-
-    if (!post || post.user_id !== userProfile.id) {
-      return { success: false, error: "Unauthorized" }
-    }
-
-    // Update the post
-    const { error } = await supabase
-      .from("community_posts")
-      .update({
-        content: content.trim(),
-        is_edited: true,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", postId)
-
-    if (error) {
-      console.error("Error editing post:", error)
-      return { success: false, error: "Failed to edit post" }
-    }
-
-    revalidatePath("/community")
-    return { success: true }
-  } catch (error: any) {
-    console.error("Error in editPost:", error)
-    return { success: false, error: error.message || "Failed to edit post" }
-  }
-}
-
-export async function reportPost(postId: number, reason: string) {
-  try {
-    const supabase = await createClient()
-
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: "User not authenticated." }
-    }
-
-    // Get user profile
-    const { data: userProfile } = await supabase.from("users").select("*").eq("auth_user_id", user.id).single()
-
-    if (!userProfile) {
-      return { success: false, error: "User profile not found." }
-    }
-
-    if (!reason?.trim()) {
-      return { success: false, error: "Reason is required" }
-    }
-
-    // Create report
-    const { error } = await supabase.from("community_reports").insert({
-      post_id: postId,
-      user_id: userProfile.id,
-      reason: reason.trim(),
-      created_at: new Date().toISOString(),
-    })
-
-    if (error) {
-      console.error("Error reporting post:", error)
-      return { success: false, error: "Failed to report post" }
-    }
-
-    return { success: true }
-  } catch (error: any) {
-    console.error("Error in reportPost:", error)
-    return { success: false, error: error.message || "Failed to report post" }
-  }
-}
-
-export async function followUser(targetUserId: string) {
-  try {
-    const supabase = await createClient()
-
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: "User not authenticated." }
-    }
-
-    // Get user profile
-    const { data: userProfile } = await supabase.from("users").select("*").eq("auth_user_id", user.id).single()
-
-    if (!userProfile) {
-      return { success: false, error: "User profile not found." }
-    }
-
-    if (!targetUserId || targetUserId === userProfile.id.toString()) {
-      return { success: false, error: "Invalid user ID" }
-    }
-
-    // Check if already following
-    const { data: existingFollow } = await supabase
-      .from("community_follows")
-      .select("*")
-      .eq("follower_id", userProfile.id)
-      .eq("following_id", targetUserId)
-      .single()
-
-    if (existingFollow) {
-      return { success: false, error: "Already following this user" }
-    }
-
-    // Create follow relationship
-    const { error } = await supabase.from("community_follows").insert({
-      follower_id: userProfile.id,
-      following_id: targetUserId,
-      created_at: new Date().toISOString(),
-    })
-
-    if (error) {
-      console.error("Error following user:", error)
-      return { success: false, error: "Failed to follow user" }
-    }
-
-    revalidatePath("/community")
-    return { success: true }
-  } catch (error: any) {
-    console.error("Error in followUser:", error)
-    return { success: false, error: error.message || "Failed to follow user" }
-  }
-}
-
-export async function unfollowUser(targetUserId: string) {
-  try {
-    const supabase = await createClient()
-
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: "User not authenticated." }
-    }
-
-    // Get user profile
-    const { data: userProfile } = await supabase.from("users").select("*").eq("auth_user_id", user.id).single()
-
-    if (!userProfile) {
-      return { success: false, error: "User profile not found." }
-    }
-
-    if (!targetUserId) {
-      return { success: false, error: "User ID is required" }
-    }
-
-    // Remove follow relationship
-    const { error } = await supabase
-      .from("community_follows")
-      .delete()
-      .eq("follower_id", userProfile.id)
-      .eq("following_id", targetUserId)
-
-    if (error) {
-      console.error("Error unfollowing user:", error)
-      return { success: false, error: "Failed to unfollow user" }
-    }
-
-    revalidatePath("/community")
-    return { success: true }
-  } catch (error: any) {
-    console.error("Error in unfollowUser:", error)
-    return { success: false, error: error.message || "Failed to unfollow user" }
-  }
-}
-
-// Alias exports for backward compatibility
-export async function createPost(formData: FormData) {
-  return await createCommunityPostAction(formData)
-}
-
-export async function voteOnPost(postId: number, postCreatorAuthId = "") {
-  return await voteOnPostAction(postId, postCreatorAuthId)
-}
-
-export async function bookmarkPost(postId: number) {
-  return await bookmarkPostAction(postId)
-}
+// Re-export other functions that don't need auth changes
+export {
+  editPostAction,
+  deletePostAction,
+  createCommentAction,
+  editCommentAction,
+  deleteCommentAction,
+  toggleLikeCommentAction,
+  fetchCommentsForPost,
+  searchUsersForMention,
+} from "./community-actions-fixed"
