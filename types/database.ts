@@ -19,6 +19,7 @@ export interface User {
   avatar_url?: string
   cover_image_url?: string
   tier: UserTier
+  tier_id?: number
   role: UserRole
   level: number
   points: number
@@ -46,6 +47,60 @@ export interface User {
   two_factor_secret?: string
   preferences: Record<string, any>
   metadata: Record<string, any>
+  created_at: string
+  updated_at: string
+}
+
+export interface Tier {
+  id: number
+  name: string
+  slug: string
+  description?: string
+  price: number
+  benefits: string[]
+  rank: number
+  is_active: boolean
+  metadata: Record<string, any>
+  created_at: string
+  updated_at: string
+}
+
+export interface Payment {
+  id: number
+  user_id: number
+  tier_id: number
+  amount: number
+  currency: string
+  status: PaymentStatus
+  payment_method: string
+  reference: string
+  paystack_reference?: string
+  metadata: Record<string, any>
+  processed_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface TierUpgrade {
+  id: number
+  user_id: number
+  from_tier_id?: number
+  to_tier_id: number
+  payment_id?: number
+  status: "pending" | "approved" | "rejected" | "completed"
+  upgrade_pending: boolean
+  admin_notes?: string
+  approved_by?: number
+  approved_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface SystemConfig {
+  id: number
+  key: string
+  value: any
+  description?: string
   created_at: string
   updated_at: string
 }
@@ -549,6 +604,26 @@ export interface Database {
         Insert: Partial<User>
         Update: Partial<User>
       }
+      tiers: {
+        Row: Tier
+        Insert: Omit<Tier, "id" | "created_at" | "updated_at">
+        Update: Partial<Omit<Tier, "id" | "created_at" | "updated_at">>
+      }
+      payments: {
+        Row: Payment
+        Insert: Omit<Payment, "id" | "created_at" | "updated_at">
+        Update: Partial<Omit<Payment, "id" | "created_at" | "updated_at">>
+      }
+      tier_upgrades: {
+        Row: TierUpgrade
+        Insert: Omit<TierUpgrade, "id" | "created_at" | "updated_at">
+        Update: Partial<Omit<TierUpgrade, "id" | "created_at" | "updated_at">>
+      }
+      system_config: {
+        Row: SystemConfig
+        Insert: Omit<SystemConfig, "id" | "created_at" | "updated_at">
+        Update: Partial<Omit<SystemConfig, "id" | "created_at" | "updated_at">>
+      }
       albums: {
         Row: Album
         Insert: Omit<Album, "id" | "created_at" | "updated_at">
@@ -703,6 +778,10 @@ export interface Database {
           p_coin_amount: number
         }
         Returns: boolean
+      }
+      handle_tier_upgrade: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       // Add other functions if you call them via RPC
     }
