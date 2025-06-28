@@ -1,7 +1,4 @@
-export type UserTier = "grassroot" | "pioneer" | "elder" | "blood"
-export type FreebieStatus = "pending" | "approved" | "shipped" | "delivered" | "rejected"
-
-export interface FreebieItem {
+export interface Freebie {
   id: number
   name: string
   slug: string
@@ -12,7 +9,7 @@ export interface FreebieItem {
   category: string
   subcategory?: string
   brand: string
-  required_tier: UserTier
+  required_tier: "grassroot" | "pioneer" | "elder" | "blood"
   stock_quantity: number
   max_per_user: number
   claim_count: number
@@ -21,26 +18,43 @@ export interface FreebieItem {
   is_featured: boolean
   requires_shipping: boolean
   weight?: number
-  dimensions: Record<string, any>
+  dimensions?: Record<string, any>
   tags: string[]
   expires_at?: string
-  metadata: Record<string, any>
+  metadata?: Record<string, any>
   created_at: string
   updated_at: string
 }
 
-export interface FreebieClaim {
-  id: number
-  user_id: number
+export interface FreebieClaimRequest {
   freebie_id: number
-  status: FreebieStatus
   shipping_address: {
-    fullName: string
-    address: string
+    full_name: string
+    address_line_1: string
+    address_line_2?: string
     city: string
     state: string
-    postalCode: string
-    phone: string
+    postal_code: string
+    country: string
+    phone_number?: string
+  }
+  notes?: string
+}
+
+export interface FreebieClaim {
+  id: number
+  user_id: string
+  freebie_id: number
+  status: "pending" | "approved" | "shipped" | "delivered" | "rejected"
+  shipping_address: {
+    full_name: string
+    address_line_1: string
+    address_line_2?: string
+    city: string
+    state: string
+    postal_code: string
+    country: string
+    phone_number?: string
   }
   tracking_number?: string
   notes?: string
@@ -50,27 +64,21 @@ export interface FreebieClaim {
   delivered_at?: string
   created_at: string
   updated_at: string
-  // Joined data
-  freebie?: FreebieItem
-  user?: {
-    id: number
-    username: string
-    full_name: string
-    email: string
-    tier: UserTier
-  }
+  freebie?: Freebie
 }
 
-export interface FreebieFormData {
-  name: string
-  description: string
-  category: string
-  required_tier: UserTier
-  stock_quantity: number
-  max_per_user: number
-  is_active: boolean
-  is_featured: boolean
-  requires_shipping: boolean
-  expires_at: string
-  images: string[]
+export interface FreebieFilters {
+  category?: string
+  required_tier?: "grassroot" | "pioneer" | "elder" | "blood"
+  is_featured?: boolean
+  search?: string
+}
+
+export interface FreebieStats {
+  total_freebies: number
+  active_freebies: number
+  total_claims: number
+  pending_claims: number
+  shipped_claims: number
+  delivered_claims: number
 }

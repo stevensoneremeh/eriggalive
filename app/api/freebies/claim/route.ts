@@ -1,55 +1,47 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const body = await request.json()
-    const { freebieId, shippingAddress } = body
-
-    // Get authenticated user
+    const supabase = createClient()
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
+
     if (authError || !user) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
-    // Get user profile
-    const { data: profile, error: profileError } = await supabase
-      .from("user_profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single()
+    const body = await request.json()
+    const { freebie_id, shipping_address, notes } = body
 
-    if (profileError || !profile) {
-      return NextResponse.json({ error: "User profile not found" }, { status: 404 })
+    if (!freebie_id || !shipping_address) {
+      return NextResponse.json({ error: "Freebie ID and shipping address are required" }, { status: 400 })
     }
 
-    // Get freebie details
+    // Check if freebie exists and is active
     const { data: freebie, error: freebieError } = await supabase
       .from("freebies")
       .select("*")
-      .eq("id", freebieId)
+      .eq("id", freebie_id)
+      .eq("is_active", true)
       .single()
 
     if (freebieError || !freebie) {
-      return NextResponse.json({ error: "Freebie not found" }, { status: 404 })
+      return NextResponse.json({ error: "Freebie not found or inactive" }, { status: 404 })
     }
 
-    // Check tier access
-    const tierLevels = { grassroot: 0, pioneer: 1, elder: 2, blood: 3 }
-    const userTierLevel = tierLevels[profile.tier]
-    const requiredTierLevel = tierLevels[freebie.required_tier]
+    // Check if user has already claimed this freebie
+    const { data: existingClaim, error: claimCheckError } = await supabase
+      .from("freebie_claims")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("freebie_id", freebie_id)
+      .single()
 
-    if (userTierLevel < requiredTierLevel) {
-      return NextResponse.json(
-        {
-          error: `This freebie requires ${freebie.required_tier} tier or higher`,
-        },
-        { status: 403 },
-      )
+    if (existingClaim) {
+      return NextResponse.json({ error: "You have already claimed this freebie" }, { status: 400 })
     }
 
     // Check stock availability
@@ -57,43 +49,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "This freebie is out of stock" }, { status: 400 })
     }
 
-    // Check if user has already claimed this freebie
-    const { data: existingClaim } = await supabase
-      .from("freebie_claims")
-      .select("*")
-      .eq("user_id", profile.id)
-      .eq("freebie_id", freebieId)
+    // Get user profile to check tier eligibility
+    const { data: userProfile, error: profileError } = await supabase
+      .from("user_profiles")
+      .select("tier")
+      .eq("auth_user_id", user.id)
       .single()
 
-    if (existingClaim) {
-      return NextResponse.json({ error: "You have already claimed this freebie" }, { status: 400 })
+    if (profileError || !userProfile) {
+      return NextResponse.json({ error: "User profile not found" }, { status: 404 })
     }
 
-    // Check user's total claims for this freebie
-    const { data: userClaims } = await supabase
-      .from("freebie_claims")
-      .select("id")
-      .eq("user_id", profile.id)
-      .eq("freebie_id", freebieId)
+    // Check tier eligibility
+    const tierOrder = { grassroot: 1, pioneer: 2, elder: 3, blood: 4 }
+    const userTierLevel = tierOrder[userProfile.tier as keyof typeof tierOrder] || 1
+    const requiredTierLevel = tierOrder[freebie.required_tier as keyof typeof tierOrder] || 1
 
-    if (userClaims && userClaims.length >= freebie.max_per_user) {
+    if (userTierLevel < requiredTierLevel) {
       return NextResponse.json(
-        {
-          error: `You can only claim this freebie ${freebie.max_per_user} time(s)`,
-        },
-        { status: 400 },
+        { error: `This freebie requires ${freebie.required_tier} tier or higher` },
+        { status: 403 },
       )
     }
 
-    // Create claim request
+    // Create the claim
     const { data: claim, error: claimError } = await supabase
       .from("freebie_claims")
       .insert({
-        user_id: profile.id,
-        freebie_id: freebieId,
+        user_id: user.id,
+        freebie_id,
+        shipping_address,
+        notes,
         status: "pending",
-        shipping_address: shippingAddress,
-        claimed_at: new Date().toISOString(),
       })
       .select()
       .single()
@@ -103,19 +90,68 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to create claim" }, { status: 500 })
     }
 
-    // Update freebie stock and claim count
+    // Update freebie claim count and stock
     await supabase
       .from("freebies")
       .update({
-        stock_quantity: freebie.stock_quantity - 1,
         claim_count: freebie.claim_count + 1,
         total_claims: freebie.total_claims + 1,
+        stock_quantity: freebie.stock_quantity - 1,
       })
-      .eq("id", freebieId)
+      .eq("id", freebie_id)
 
-    return NextResponse.json({ claim, success: true })
+    return NextResponse.json({
+      message: "Freebie claimed successfully",
+      claim,
+    })
   } catch (error) {
-    console.error("API error:", error)
+    console.error("Unexpected error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = createClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const status = searchParams.get("status")
+    const limit = Number.parseInt(searchParams.get("limit") || "20")
+    const offset = Number.parseInt(searchParams.get("offset") || "0")
+
+    let query = supabase
+      .from("freebie_claims")
+      .select(`
+        *,
+        freebie:freebies(*)
+      `)
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+
+    if (status) {
+      query = query.eq("status", status)
+    }
+
+    query = query.range(offset, offset + limit - 1)
+
+    const { data: claims, error } = await query
+
+    if (error) {
+      console.error("Error fetching claims:", error)
+      return NextResponse.json({ error: "Failed to fetch claims" }, { status: 500 })
+    }
+
+    return NextResponse.json({ claims })
+  } catch (error) {
+    console.error("Unexpected error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

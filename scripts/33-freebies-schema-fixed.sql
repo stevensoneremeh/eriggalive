@@ -1,3 +1,6 @@
+-- Fixed Freebies Schema Script
+-- This script handles the user_tier enum and foreign key constraints properly
+
 -- First, create the user_tier enum if it doesn't exist
 DO $$ BEGIN
     CREATE TYPE user_tier AS ENUM ('grassroot', 'pioneer', 'elder', 'blood');
@@ -34,10 +37,10 @@ CREATE TABLE IF NOT EXISTS public.freebies (
     updated_at timestamp with time zone default now()
 );
 
--- Create freebie claims table
+-- Create freebie claims table with proper user reference
 CREATE TABLE IF NOT EXISTS public.freebie_claims (
     id bigint primary key generated always as identity,
-    user_id bigint not null,
+    user_id uuid not null, -- Changed to uuid to match auth.users
     freebie_id bigint references public.freebies(id) on delete cascade,
     status text default 'pending' check (status in ('pending', 'approved', 'shipped', 'delivered', 'rejected')),
     shipping_address jsonb not null,
@@ -52,23 +55,10 @@ CREATE TABLE IF NOT EXISTS public.freebie_claims (
     unique(user_id, freebie_id)
 );
 
--- Add foreign key constraint for user_id (flexible to work with different user table structures)
-DO $$ 
-BEGIN
-    -- Try to add foreign key to user_profiles first
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'user_profiles') THEN
-        ALTER TABLE public.freebie_claims 
-        ADD CONSTRAINT fk_freebie_claims_user_profiles 
-        FOREIGN KEY (user_id) REFERENCES public.user_profiles(id) ON DELETE CASCADE;
-    -- Fallback to users table if user_profiles doesn't exist
-    ELSIF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users') THEN
-        ALTER TABLE public.freebie_claims 
-        ADD CONSTRAINT fk_freebie_claims_users 
-        FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-    END IF;
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+-- Add foreign key constraint to auth.users directly
+ALTER TABLE public.freebie_claims 
+ADD CONSTRAINT fk_freebie_claims_auth_users 
+FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_freebies_category ON public.freebies(category);
@@ -91,16 +81,11 @@ ALTER TABLE public.freebie_claims ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Freebies are viewable by everyone" ON public.freebies
     FOR SELECT USING (is_active = true);
 
--- Admin policy for freebies (flexible to work with different user table structures)
+-- Admin policy for freebies
 CREATE POLICY "Admins can manage freebies" ON public.freebies
     FOR ALL USING (
         EXISTS (
             SELECT 1 FROM public.user_profiles
-            WHERE auth_user_id = auth.uid()
-            AND role IN ('admin', 'super_admin')
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.users
             WHERE auth_user_id = auth.uid()
             AND role IN ('admin', 'super_admin')
         )
@@ -109,53 +94,23 @@ CREATE POLICY "Admins can manage freebies" ON public.freebies
 -- Freebie claims policies
 CREATE POLICY "Users can view their own claims" ON public.freebie_claims
     FOR SELECT USING (
-        EXISTS (
-            SELECT 1 FROM public.user_profiles up
-            WHERE up.id = freebie_claims.user_id
-            AND up.auth_user_id = auth.uid()
-        )
+        user_id = auth.uid()
         OR EXISTS (
-            SELECT 1 FROM public.users u
-            WHERE u.id = freebie_claims.user_id
-            AND u.auth_user_id = auth.uid()
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.user_profiles up
-            WHERE up.auth_user_id = auth.uid()
-            AND up.role IN ('admin', 'super_admin')
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.users u
-            WHERE u.auth_user_id = auth.uid()
-            AND u.role IN ('admin', 'super_admin')
+            SELECT 1 FROM public.user_profiles
+            WHERE auth_user_id = auth.uid()
+            AND role IN ('admin', 'super_admin')
         )
     );
 
 CREATE POLICY "Users can create their own claims" ON public.freebie_claims
-    FOR INSERT WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM public.user_profiles up
-            WHERE up.id = freebie_claims.user_id
-            AND up.auth_user_id = auth.uid()
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.users u
-            WHERE u.id = freebie_claims.user_id
-            AND u.auth_user_id = auth.uid()
-        )
-    );
+    FOR INSERT WITH CHECK (user_id = auth.uid());
 
 CREATE POLICY "Admins can update claims" ON public.freebie_claims
     FOR UPDATE USING (
         EXISTS (
-            SELECT 1 FROM public.user_profiles up
-            WHERE up.auth_user_id = auth.uid()
-            AND up.role IN ('admin', 'super_admin')
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.users u
-            WHERE u.auth_user_id = auth.uid()
-            AND u.role IN ('admin', 'super_admin')
+            SELECT 1 FROM public.user_profiles
+            WHERE auth_user_id = auth.uid()
+            AND role IN ('admin', 'super_admin')
         )
     );
 
@@ -178,52 +133,6 @@ DROP TRIGGER IF EXISTS update_freebie_claims_updated_at ON public.freebie_claims
 CREATE TRIGGER update_freebie_claims_updated_at 
     BEFORE UPDATE ON public.freebie_claims
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
--- Create helper functions for vote and comment counting
-CREATE OR REPLACE FUNCTION increment_post_votes(post_id bigint)
-RETURNS void AS $$
-BEGIN
-    UPDATE public.community_posts 
-    SET vote_count = vote_count + 1 
-    WHERE id = post_id;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION decrement_post_votes(post_id bigint)
-RETURNS void AS $$
-BEGIN
-    UPDATE public.community_posts 
-    SET vote_count = GREATEST(vote_count - 1, 0) 
-    WHERE id = post_id;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION increment_post_comments(post_id bigint)
-RETURNS void AS $$
-BEGIN
-    UPDATE public.community_posts 
-    SET comment_count = comment_count + 1 
-    WHERE id = post_id;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION increment_comment_likes(comment_id bigint)
-RETURNS void AS $$
-BEGIN
-    UPDATE public.community_comments 
-    SET like_count = like_count + 1 
-    WHERE id = comment_id;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION decrement_comment_likes(comment_id bigint)
-RETURNS void AS $$
-BEGIN
-    UPDATE public.community_comments 
-    SET like_count = GREATEST(like_count - 1, 0) 
-    WHERE id = comment_id;
-END;
-$$ LANGUAGE plpgsql;
 
 -- Insert sample freebies data
 INSERT INTO public.freebies (name, slug, description, category, required_tier, stock_quantity, max_per_user, is_active, is_featured, images) VALUES
