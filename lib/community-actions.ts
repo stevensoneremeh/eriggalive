@@ -14,74 +14,72 @@ export interface CreatePostPayload {
 }
 
 export async function createCommunityPostAction(formData: FormData) {
-  try {
-    const supabase = await createClient()
+  const supabase = await createClient()
 
+  try {
+    // Get current user
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      redirect("/login")
+      throw new Error("Authentication required")
     }
 
-    // Get user profile
-    const { data: profile, error: profileError } = await supabase
+    // Get user's internal ID
+    const { data: userData, error: userError } = await supabase
       .from("users")
       .select("id")
       .eq("auth_user_id", user.id)
       .single()
 
-    if (profileError || !profile) {
-      return { success: false, error: "User profile not found" }
+    if (userError || !userData) {
+      throw new Error("User profile not found")
     }
 
     const content = formData.get("content") as string
-    const categoryId = Number.parseInt(formData.get("categoryId") as string)
+    const categoryId = formData.get("categoryId") as string
 
-    if (!content?.trim() || !categoryId) {
-      return { success: false, error: "Content and category are required" }
+    if (!content || !categoryId) {
+      throw new Error("Content and category are required")
     }
 
-    const { data: post, error } = await supabase
+    // Extract hashtags from content
+    const hashtagMatches = content.match(/#\w+/g)
+    const hashtags = hashtagMatches ? hashtagMatches.map((tag) => tag.slice(1)) : []
+
+    // Create post
+    const { data: post, error: postError } = await supabase
       .from("community_posts")
       .insert({
-        user_id: profile.id,
-        category_id: categoryId,
-        content: content.trim(),
-        is_published: true,
-        is_deleted: false,
-        vote_count: 0,
-        comment_count: 0,
+        user_id: userData.id,
+        category_id: Number.parseInt(categoryId),
+        content,
+        hashtags,
       })
-      .select(`
-        *,
-        users!inner (
-          id,
-          username,
-          full_name,
-          avatar_url,
-          tier
-        ),
-        community_categories!inner (
-          name,
-          slug,
-          color
-        )
-      `)
+      .select()
       .single()
 
-    if (error) {
-      console.error("Error creating post:", error)
-      return { success: false, error: "Failed to create post" }
+    if (postError) {
+      console.error("Post creation error:", postError)
+      throw new Error("Failed to create post")
     }
 
+    // Update user post count
+    await supabase
+      .from("users")
+      .update({
+        posts_count: supabase.raw("COALESCE(posts_count, 0) + 1"),
+        total_posts: supabase.raw("COALESCE(total_posts, 0) + 1"),
+      })
+      .eq("id", userData.id)
+
     revalidatePath("/community")
-    return { success: true, data: post }
+    return { success: true, post }
   } catch (error) {
-    console.error("Server action error:", error)
-    return { success: false, error: "Internal server error" }
+    console.error("Error creating post:", error)
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
 }
 
@@ -431,9 +429,9 @@ export async function toggleLikeCommentAction(commentId: number) {
 }
 
 export async function fetchCommentsForPost(postId: number) {
-  try {
-    const supabase = await createClient()
+  const supabase = await createClient()
 
+  try {
     const { data: comments, error } = await supabase
       .from("post_comments")
       .select(`
@@ -451,14 +449,13 @@ export async function fetchCommentsForPost(postId: number) {
       .order("created_at", { ascending: true })
 
     if (error) {
-      console.error("Error fetching comments:", error)
-      return { success: false, error: "Failed to fetch comments" }
+      throw new Error("Failed to fetch comments")
     }
 
-    return { success: true, data: comments || [] }
+    return { success: true, comments }
   } catch (error) {
-    console.error("Fetch comments error:", error)
-    return { success: false, error: "Internal server error" }
+    console.error("Error fetching comments:", error)
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
 }
 

@@ -1,67 +1,39 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
-import { Heart } from "lucide-react"
-import { voteOnPostAction } from "@/lib/community-actions"
-import { useToast } from "@/components/ui/use-toast"
+import { Heart, HeartOff } from "lucide-react"
+import { voteOnPost } from "@/lib/community-actions"
+import { toast } from "sonner"
 
 interface VoteButtonProps {
   postId: number
-  voteCount: number
-  hasVoted?: boolean
+  initialVoted: boolean
+  initialVoteCount: number
 }
 
-export function VoteButton({ postId, voteCount, hasVoted = false }: VoteButtonProps) {
-  const [isVoting, setIsVoting] = useState(false)
-  const [voted, setVoted] = useState(hasVoted)
-  const [count, setCount] = useState(voteCount)
-  const { toast } = useToast()
+export function VoteButton({ postId, initialVoted, initialVoteCount }: VoteButtonProps) {
+  const [voted, setVoted] = useState(initialVoted)
+  const [voteCount, setVoteCount] = useState(initialVoteCount)
+  const [isPending, startTransition] = useTransition()
 
-  async function handleVote() {
-    setIsVoting(true)
-
-    try {
-      const result = await voteOnPostAction(postId)
+  const handleVote = () => {
+    startTransition(async () => {
+      const result = await voteOnPost(postId)
 
       if (result.success) {
-        if (result.action === "added") {
-          setVoted(true)
-          setCount((prev) => prev + 1)
-        } else {
-          setVoted(false)
-          setCount((prev) => prev - 1)
-        }
+        setVoted(result.voted)
+        setVoteCount((prev) => (result.voted ? prev + 1 : prev - 1))
       } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to vote",
-          variant: "destructive",
-        })
+        toast.error(result.error || "Failed to vote")
       }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive",
-      })
-    } finally {
-      setIsVoting(false)
-    }
+    })
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={handleVote}
-      disabled={isVoting}
-      className={`flex items-center gap-2 transition-colors ${
-        voted ? "text-red-500 hover:text-red-600 bg-red-50" : "hover:text-red-500 hover:bg-red-50"
-      }`}
-    >
-      <Heart className={`h-4 w-4 ${voted ? "fill-current" : ""}`} />
-      <span className="font-medium">{count}</span>
+    <Button variant="ghost" size="sm" onClick={handleVote} disabled={isPending} className="flex items-center gap-2">
+      {voted ? <Heart className="h-4 w-4 fill-red-500 text-red-500" /> : <HeartOff className="h-4 w-4" />}
+      <span>{voteCount}</span>
     </Button>
   )
 }

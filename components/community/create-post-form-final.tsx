@@ -1,136 +1,77 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useToast } from "@/components/ui/use-toast"
-import { createCommunityPostAction } from "@/lib/community-actions"
-import { Loader2, Plus } from "lucide-react"
-
-interface Category {
-  id: number
-  name: string
-  slug: string
-  color?: string
-  icon?: string
-}
+import { createPost } from "@/lib/community-actions"
+import { toast } from "sonner"
 
 interface CreatePostFormProps {
-  categories: Category[]
-  profile?: any
+  categories: Array<{ id: number; name: string }>
 }
 
-export function CreatePostFormFinal({ categories, profile }: CreatePostFormProps) {
+export function CreatePostForm({ categories }: CreatePostFormProps) {
   const [content, setContent] = useState("")
   const [categoryId, setCategoryId] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const { toast } = useToast()
-  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-
-    if (!content.trim() || !categoryId) {
-      toast({
-        title: "Missing information",
-        description: "Please provide content and select a category.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsSubmitting(true)
-
-    const formData = new FormData()
-    formData.append("content", content.trim())
-    formData.append("categoryId", categoryId)
-
-    try {
-      const result = await createCommunityPostAction(formData)
+  const handleSubmit = async (formData: FormData) => {
+    startTransition(async () => {
+      const result = await createPost(formData)
 
       if (result.success) {
-        toast({
-          title: "Post created successfully!",
-          description: "Your post has been shared with the community.",
-        })
         setContent("")
         setCategoryId("")
-        router.refresh()
+        toast.success("Post created successfully!")
       } else {
-        toast({
-          title: "Failed to create post",
-          description: result.error || "Something went wrong.",
-          variant: "destructive",
-        })
+        toast.error(result.error || "Failed to create post")
       }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
+    })
   }
 
   return (
-    <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2 text-xl">
-          <Plus className="h-5 w-5 text-blue-600" />
-          Share Your Thoughts
-        </CardTitle>
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle>Create a Post</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <Textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="What's on your mind? Share your thoughts about Erigga's music, use #hashtags, and connect with the community..."
-            className="min-h-[120px] border-gray-200 focus:border-blue-500 focus:ring-blue-500 resize-none"
-            required
-          />
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <Select value={categoryId} onValueChange={setCategoryId} required>
-              <SelectTrigger className="w-full sm:w-64 border-gray-200 focus:border-blue-500">
+        <form action={handleSubmit} className="space-y-4">
+          <div>
+            <Select name="categoryId" value={categoryId} onValueChange={setCategoryId} required>
+              <SelectTrigger>
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
                 {categories.map((category) => (
                   <SelectItem key={category.id} value={category.id.toString()}>
-                    <span className="flex items-center gap-2">
-                      {category.icon} {category.name}
-                    </span>
+                    {category.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Button
-              type="submit"
-              disabled={isSubmitting || !content.trim() || !categoryId}
-              className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium px-8"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Posting...
-                </>
-              ) : (
-                "Share Post"
-              )}
-            </Button>
           </div>
+
+          <div>
+            <Textarea
+              name="content"
+              placeholder="What's on your mind? Use #hashtags to categorize your post..."
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="min-h-[120px]"
+              required
+            />
+          </div>
+
+          <Button type="submit" disabled={isPending || !content.trim() || !categoryId}>
+            {isPending ? "Posting..." : "Post"}
+          </Button>
         </form>
       </CardContent>
     </Card>
   )
 }
 
-// Export as CreatePostForm for backward compatibility
-export const CreatePostForm = CreatePostFormFinal
+// Default export for compatibility
+export default CreatePostForm
