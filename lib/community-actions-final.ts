@@ -2,7 +2,7 @@
 
 // Re-export all functions from the main community actions file
 export {
-  createPost,
+  createPost, // alias of createCommunityPostAction
   voteOnPost,
   bookmarkPost,
   createCommentAction,
@@ -12,4 +12,4 @@ export {
   deleteCommentAction,
   editCommentAction,
   searchUsersForMention,
-} from "./community-actions"
+} from "@/lib/community-actions"

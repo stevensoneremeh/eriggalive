@@ -1,16 +1,19 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { PostCard } from "./post-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, Search, RefreshCw } from "lucide-react"
 import { useDebounce } from "@/hooks/use-debounce"
 import { fetchCommunityPosts } from "@/lib/community-actions"
+import { VoteButton } from "./vote-button"
+import { BookmarkButton } from "./bookmark-button"
+import { Card, CardContent } from "@/components/ui/card"
+import type { CommunityPost } from "@/types/database"
 
 interface PostFeedProps {
-  initialPosts: any[]
+  initialPosts: CommunityPost[]
   userId?: string
   onVoteUpdate?: (postId: number, newVoteCount: number, hasVoted: boolean) => void
   categories: any[]
@@ -18,13 +21,13 @@ interface PostFeedProps {
   sortOrder?: string
 }
 
-export function PostFeed({ 
-  initialPosts, 
-  userId, 
+export function PostFeed({
+  initialPosts,
+  userId,
   onVoteUpdate,
   categories,
   categoryFilter,
-  sortOrder = "newest" 
+  sortOrder = "newest",
 }: PostFeedProps) {
   const [posts, setPosts] = useState(initialPosts)
   const [loading, setLoading] = useState(false)
@@ -36,39 +39,42 @@ export function PostFeed({
 
   const debouncedSearchQuery = useDebounce(searchQuery, 500)
 
-  const loadPosts = useCallback(async (isRefresh = false) => {
-    setLoading(true)
-    
-    try {
-      const currentPage = isRefresh ? 1 : page
-      const result = await fetchCommunityPosts(userId, {
-        categoryFilter: selectedCategory,
-        sortOrder: selectedSort,
-        page: currentPage,
-        limit: 10,
-        searchQuery: debouncedSearchQuery,
-      })
+  const loadPosts = useCallback(
+    async (isRefresh = false) => {
+      setLoading(true)
 
-      if (result.error) {
-        console.error("Error loading posts:", result.error)
-        return
+      try {
+        const currentPage = isRefresh ? 1 : page
+        const result = await fetchCommunityPosts(userId, {
+          categoryFilter: selectedCategory,
+          sortOrder: selectedSort,
+          page: currentPage,
+          limit: 10,
+          searchQuery: debouncedSearchQuery,
+        })
+
+        if (result.error) {
+          console.error("Error loading posts:", result.error)
+          return
+        }
+
+        if (isRefresh) {
+          setPosts(result.posts)
+          setPage(2)
+        } else {
+          setPosts((prev) => [...prev, ...result.posts])
+          setPage((prev) => prev + 1)
+        }
+
+        setHasMore(result.posts.length === 10)
+      } catch (error) {
+        console.error("Error loading posts:", error)
+      } finally {
+        setLoading(false)
       }
-
-      if (isRefresh) {
-        setPosts(result.posts)
-        setPage(2)
-      } else {
-        setPosts(prev => [...prev, ...result.posts])
-        setPage(prev => prev + 1)
-      }
-
-      setHasMore(result.posts.length === 10)
-    } catch (error) {
-      console.error("Error loading posts:", error)
-    } finally {
-      setLoading(false)
-    }
-  }, [userId, selectedCategory, selectedSort, debouncedSearchQuery, page])
+    },
+    [userId, selectedCategory, selectedSort, debouncedSearchQuery, page],
+  )
 
   useEffect(() => {
     setPosts(initialPosts)
@@ -91,11 +97,9 @@ export function PostFeed({
   }
 
   const handleVoteUpdate = (postId: number, newVoteCount: number, hasVoted: boolean) => {
-    setPosts(prev => prev.map(post => 
-      post.id === postId 
-        ? { ...post, vote_count: newVoteCount, has_voted: hasVoted }
-        : post
-    ))
+    setPosts((prev) =>
+      prev.map((post) => (post.id === postId ? { ...post, vote_count: newVoteCount, has_voted: hasVoted } : post)),
+    )
     onVoteUpdate?.(postId, newVoteCount, hasVoted)
   }
 
@@ -115,12 +119,15 @@ export function PostFeed({
         </div>
 
         <div className="flex items-center gap-2">
-          <Select value={selectedCategory?.toString() || ""} onValueChange={(value) => setSelectedCategory(value ? Number(value) : undefined)}>
+          <Select
+            value={selectedCategory?.toString() || "all"}
+            onValueChange={(value) => setSelectedCategory(value ? Number(value) : undefined)}
+          >
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Categories</SelectItem>
+              <SelectItem value="all">All Categories</SelectItem>
               {categories.map((category) => (
                 <SelectItem key={category.id} value={category.id.toString()}>
                   {category.name}
@@ -156,12 +163,21 @@ export function PostFeed({
       {/* Posts */}
       <div className="space-y-6">
         {posts.map((post) => (
-          <PostCard 
-            key={post.id} 
-            post={post} 
-            currentUserId={userId}
-            onVoteUpdate={handleVoteUpdate}
-          />
+          <Card key={post.id} className="bg-white/90 backdrop-blur-sm shadow">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="font-semibold">@{post.user?.username}</div>
+                <div className="text-xs text-gray-500">{new Date(post.created_at).toLocaleDateString()}</div>
+              </div>
+
+              <p className="whitespace-pre-wrap">{post.content}</p>
+
+              <div className="flex items-center gap-4">
+                <VoteButton postId={post.id} voteCount={post.vote_count} />
+                <BookmarkButton postId={post.id} />
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 

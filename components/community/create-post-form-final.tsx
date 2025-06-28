@@ -1,77 +1,51 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useTransition, type FormEvent } from "react"
+import { createPost } from "@/lib/community-actions"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { createPost } from "@/lib/community-actions"
-import { toast } from "sonner"
+import type { CommunityCategory } from "@/types/database"
 
-interface CreatePostFormProps {
-  categories: Array<{ id: number; name: string }>
+interface Props {
+  categories: CommunityCategory[]
 }
-
-export function CreatePostForm({ categories }: CreatePostFormProps) {
-  const [content, setContent] = useState("")
-  const [categoryId, setCategoryId] = useState("")
+export function CreatePostForm({ categories }: Props) {
   const [isPending, startTransition] = useTransition()
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  const handleSubmit = async (formData: FormData) => {
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
     startTransition(async () => {
-      const result = await createPost(formData)
-
-      if (result.success) {
-        setContent("")
-        setCategoryId("")
-        toast.success("Post created successfully!")
-      } else {
-        toast.error(result.error || "Failed to create post")
+      const res = await createPost(formData)
+      if (!res?.success) setErrorMsg(res.error ?? "Something went wrong")
+      else {
+        setErrorMsg(null)
+        e.currentTarget.reset()
       }
     })
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Create a Post</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form action={handleSubmit} className="space-y-4">
-          <div>
-            <Select name="categoryId" value={categoryId} onValueChange={setCategoryId} required>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((category) => (
-                  <SelectItem key={category.id} value={category.id.toString()}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Textarea
-              name="content"
-              placeholder="What's on your mind? Use #hashtags to categorize your post..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="min-h-[120px]"
-              required
-            />
-          </div>
-
-          <Button type="submit" disabled={isPending || !content.trim() || !categoryId}>
-            {isPending ? "Posting..." : "Post"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <form onSubmit={submit} className="space-y-4 rounded-lg border p-4 shadow-sm bg-white/80 backdrop-blur">
+      <Textarea name="content" placeholder="Share something…" rows={4} required />
+      <Select name="categoryId" required>
+        <SelectTrigger>
+          <SelectValue placeholder="Choose category" />
+        </SelectTrigger>
+        <SelectContent>
+          {categories.map((c) => (
+            <SelectItem key={c.id} value={String(c.id)}>
+              {c.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {errorMsg && <p className="text-sm text-red-600">{errorMsg}</p>}
+      <Button type="submit" disabled={isPending} className="w-full">
+        {isPending ? "Posting…" : "Post"}
+      </Button>
+    </form>
   )
 }
-
-// Default export for compatibility
-export default CreatePostForm

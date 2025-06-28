@@ -24,7 +24,7 @@ async function getCommunityData() {
     .from("community_posts")
     .select(`
       *,
-      user:users(id, username, display_name, avatar_url, tier),
+      user:users(id, username, full_name, avatar_url, tier),
       category:community_categories(id, name, color)
     `)
     .order("created_at", { ascending: false })
@@ -79,7 +79,7 @@ export default async function CommunityPage() {
         </Suspense>
 
         <Suspense fallback={<SimpleLoading />}>
-          <PostFeed initialPosts={posts} />
+          <PostFeed initialPosts={posts || []} />
         </Suspense>
       </div>
     </CommunityLayout>

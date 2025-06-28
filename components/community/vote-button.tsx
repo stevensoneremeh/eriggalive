@@ -1,39 +1,26 @@
 "use client"
 
-import { useState, useTransition } from "react"
-import { Button } from "@/components/ui/button"
-import { Heart, HeartOff } from "lucide-react"
+import { useTransition } from "react"
 import { voteOnPost } from "@/lib/community-actions"
-import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { ThumbsUp } from "lucide-react"
 
-interface VoteButtonProps {
+interface Props {
   postId: number
-  initialVoted: boolean
-  initialVoteCount: number
+  voteCount: number
 }
-
-export function VoteButton({ postId, initialVoted, initialVoteCount }: VoteButtonProps) {
-  const [voted, setVoted] = useState(initialVoted)
-  const [voteCount, setVoteCount] = useState(initialVoteCount)
-  const [isPending, startTransition] = useTransition()
-
-  const handleVote = () => {
-    startTransition(async () => {
-      const result = await voteOnPost(postId)
-
-      if (result.success) {
-        setVoted(result.voted)
-        setVoteCount((prev) => (result.voted ? prev + 1 : prev - 1))
-      } else {
-        toast.error(result.error || "Failed to vote")
-      }
-    })
-  }
-
+export function VoteButton({ postId, voteCount }: Props) {
+  const [isPending, start] = useTransition()
   return (
-    <Button variant="ghost" size="sm" onClick={handleVote} disabled={isPending} className="flex items-center gap-2">
-      {voted ? <Heart className="h-4 w-4 fill-red-500 text-red-500" /> : <HeartOff className="h-4 w-4" />}
-      <span>{voteCount}</span>
+    <Button
+      size="sm"
+      variant="ghost"
+      disabled={isPending}
+      onClick={() => start(() => voteOnPost(postId))}
+      className="flex items-center gap-1 hover:text-blue-600"
+    >
+      <ThumbsUp className="h-4 w-4" />
+      <span className="font-medium tabular-nums">{voteCount}</span>
     </Button>
   )
 }

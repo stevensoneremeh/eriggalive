@@ -1,36 +1,24 @@
 "use client"
 
-import { useState, useTransition } from "react"
-import { Button } from "@/components/ui/button"
-import { Bookmark, BookmarkCheck } from "lucide-react"
+import { useTransition } from "react"
 import { bookmarkPost } from "@/lib/community-actions"
-import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { Bookmark } from "lucide-react"
 
-interface BookmarkButtonProps {
+interface Props {
   postId: number
-  initialBookmarked: boolean
 }
-
-export function BookmarkButton({ postId, initialBookmarked }: BookmarkButtonProps) {
-  const [bookmarked, setBookmarked] = useState(initialBookmarked)
-  const [isPending, startTransition] = useTransition()
-
-  const handleBookmark = () => {
-    startTransition(async () => {
-      const result = await bookmarkPost(postId)
-
-      if (result.success) {
-        setBookmarked(result.bookmarked)
-        toast.success(result.bookmarked ? "Post bookmarked" : "Bookmark removed")
-      } else {
-        toast.error(result.error || "Failed to bookmark")
-      }
-    })
-  }
-
+export function BookmarkButton({ postId }: Props) {
+  const [isPending, start] = useTransition()
   return (
-    <Button variant="ghost" size="sm" onClick={handleBookmark} disabled={isPending}>
-      {bookmarked ? <BookmarkCheck className="h-4 w-4 text-blue-500" /> : <Bookmark className="h-4 w-4" />}
+    <Button
+      size="sm"
+      variant="ghost"
+      disabled={isPending}
+      onClick={() => start(() => bookmarkPost(postId))}
+      className="hover:text-purple-600"
+    >
+      <Bookmark className="h-4 w-4" />
     </Button>
   )
 }
