@@ -22,7 +22,5 @@ export {
   fetchCommunityPosts,
   voteOnPostAction,
   /* convenience wrappers used elsewhere */
-  createPost,
-  voteOnPost,
   bookmarkPost,
 } from "./community-actions"
