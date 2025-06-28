@@ -36,3 +36,6 @@ const UnifiedNavigation = () => {
 }
 
 export default UnifiedNavigation
+
+// Provide a named export in addition to the default export
+export { UnifiedNavigation }
