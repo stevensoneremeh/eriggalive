@@ -50,7 +50,7 @@ interface NavigationItem {
 const navigationItems: NavigationItem[] = [
   {
     name: "Home",
-    href: "/",
+    href: "/", // Always goes to home page, not dashboard
     icon: Home,
     showInMobile: true,
     requiresAuth: false,
@@ -399,7 +399,7 @@ export function UnifiedNavigation() {
                       <UserTierBadge tier={profile.tier} />
                     </div>
                     <Link href="/dashboard">
-                      <Button variant="outline" size="sm" className="hidden md:flex">
+                      <Button variant="outline" size="sm" className="hidden md:flex bg-transparent">
                         <User className="h-4 w-4 mr-2" />
                         Dashboard
                       </Button>
@@ -417,7 +417,7 @@ export function UnifiedNavigation() {
                 ) : (
                   <>
                     <Link href="/login">
-                      <Button variant="outline" size="sm" className="hidden md:flex">
+                      <Button variant="outline" size="sm" className="hidden md:flex bg-transparent">
                         <LogIn className="h-4 w-4 mr-2" />
                         Login
                       </Button>
@@ -544,11 +544,19 @@ export function UnifiedNavigation() {
           {/* Auth Actions */}
           {isAuthenticated ? (
             <div className="space-y-2">
-              <Button variant="outline" className="w-full justify-start" onClick={() => handleNavigation("/coins")}>
+              <Button
+                variant="outline"
+                className="w-full justify-start bg-transparent"
+                onClick={() => handleNavigation("/coins")}
+              >
                 <CreditCard className="h-4 w-4 mr-2" />
                 Manage Coins
               </Button>
-              <Button variant="outline" className="w-full justify-start" onClick={() => handleNavigation("/settings")}>
+              <Button
+                variant="outline"
+                className="w-full justify-start bg-transparent"
+                onClick={() => handleNavigation("/settings")}
+              >
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
               </Button>
@@ -563,7 +571,11 @@ export function UnifiedNavigation() {
             </div>
           ) : (
             <div className="space-y-2">
-              <Button variant="outline" className="w-full justify-start" onClick={() => handleNavigation("/login")}>
+              <Button
+                variant="outline"
+                className="w-full justify-start bg-transparent"
+                onClick={() => handleNavigation("/login")}
+              >
                 <LogIn className="h-4 w-4 mr-2" />
                 Login
               </Button>

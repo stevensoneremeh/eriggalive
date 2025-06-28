@@ -1,173 +1,136 @@
 "use client"
 
-import { useRef, useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
-import { createCommunityPostAction } from "@/lib/community-actions" // Updated import
+import type React from "react"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
-import { useRouter } from "next/navigation"
-import { Loader2 } from "lucide-react"
-import type { CommunityCategory } from "@/types/database"
+import { createCommunityPostAction } from "@/lib/community-actions"
+import { Loader2, Plus } from "lucide-react"
 
-const formSchema = z
-  .object({
-    content: z.string().min(1, { message: "Content cannot be empty unless media is provided." }).max(5000).optional(),
-    categoryId: z.string().min(1, { message: "Please select a category." }),
-    mediaFile: z.custom<FileList>((val) => val instanceof FileList, "Please upload a file.").optional(),
-  })
-  .refine((data) => data.content || data.mediaFile?.[0], {
-    message: "Either content or a media file must be provided.",
-    path: ["content"], // Show error on content field or a general form error
-  })
-
-interface CreatePostFormProps {
-  categories: CommunityCategory[]
-  onPostCreated?: (newPost: any) => void // Callback after successful post creation
+interface Category {
+  id: number
+  name: string
+  slug: string
+  color?: string
+  icon?: string
 }
 
-export function CreatePostFormFinal({ categories, onPostCreated }: CreatePostFormProps) {
+interface CreatePostFormProps {
+  categories: Category[]
+  profile?: any
+}
+
+export function CreatePostFormFinal({ categories, profile }: CreatePostFormProps) {
+  const [content, setContent] = useState("")
+  const [categoryId, setCategoryId] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      content: "",
-      categoryId: "",
-      mediaFile: undefined,
-    },
-  })
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsSubmitting(true)
-
-    const formData = new FormData()
-    if (values.content) formData.append("content", values.content)
-    formData.append("categoryId", values.categoryId)
-    if (values.mediaFile && values.mediaFile[0]) {
-      formData.append("mediaFile", values.mediaFile[0])
-    }
-
-    if (!values.content && (!values.mediaFile || !values.mediaFile[0])) {
+    if (!content.trim() || !categoryId) {
       toast({
-        title: "Cannot create empty post",
-        description: "Please provide some content or upload a media file.",
+        title: "Missing information",
+        description: "Please provide content and select a category.",
         variant: "destructive",
       })
-      setIsSubmitting(false)
       return
     }
 
-    const result = await createCommunityPostAction(formData)
-    setIsSubmitting(false)
+    setIsSubmitting(true)
 
-    if (result.success) {
-      toast({
-        title: "Post created successfully!",
-      })
-      form.reset()
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "" // Clear file input
-      }
-      if (onPostCreated && result.post) {
-        onPostCreated(result.post)
+    const formData = new FormData()
+    formData.append("content", content.trim())
+    formData.append("categoryId", categoryId)
+
+    try {
+      const result = await createCommunityPostAction(formData)
+
+      if (result.success) {
+        toast({
+          title: "Post created successfully!",
+          description: "Your post has been shared with the community.",
+        })
+        setContent("")
+        setCategoryId("")
+        router.refresh()
       } else {
-        // Fallback to router.refresh() if no callback, or if you want to ensure full page data refresh
-        router.refresh() // Or revalidatePath can be called from server action
+        toast({
+          title: "Failed to create post",
+          description: result.error || "Something went wrong.",
+          variant: "destructive",
+        })
       }
-    } else {
+    } catch (error) {
       toast({
-        title: "Something went wrong!",
-        description: result.error || "Failed to create post.",
+        title: "Error",
+        description: "An unexpected error occurred.",
         variant: "destructive",
       })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 p-4 border rounded-lg bg-card">
-        <FormField
-          control={form.control}
-          name="content"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>What's on your mind?</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Share your thoughts, bars, or stories..."
-                  className="resize-none min-h-[100px]"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="categoryId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Category</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id.toString()}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
+    <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 text-xl">
+          <Plus className="h-5 w-5 text-blue-600" />
+          Share Your Thoughts
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <Textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="What's on your mind? Share your thoughts about Erigga's music, use #hashtags, and connect with the community..."
+            className="min-h-[120px] border-gray-200 focus:border-blue-500 focus:ring-blue-500 resize-none"
+            required
           />
-
-          <FormField
-            control={form.control}
-            name="mediaFile"
-            render={({ field: { onChange, value, ...restField } }) => (
-              <FormItem>
-                <FormLabel>Upload Media (Optional)</FormLabel>
-                <FormControl>
-                  <Input
-                    type="file"
-                    accept="image/*,audio/*,video/*"
-                    onChange={(event) => {
-                      onChange(event.target.files)
-                    }}
-                    ref={fileInputRef}
-                    className="pt-[5px]" // Minor style adjustment for file input
-                    {...restField}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
-          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {isSubmitting ? "Posting..." : "Create Post"}
-        </Button>
-      </form>
-    </Form>
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <Select value={categoryId} onValueChange={setCategoryId} required>
+              <SelectTrigger className="w-full sm:w-64 border-gray-200 focus:border-blue-500">
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id.toString()}>
+                    <span className="flex items-center gap-2">
+                      {category.icon} {category.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="submit"
+              disabled={isSubmitting || !content.trim() || !categoryId}
+              className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium px-8"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Posting...
+                </>
+              ) : (
+                "Share Post"
+              )}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   )
 }
+
+// Export as CreatePostForm for backward compatibility
+export const CreatePostForm = CreatePostFormFinal
