@@ -7,13 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Menu, Home, Users, Coins, Trophy, Music, Crown, LogOut, User } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { useTheme } from "next-themes"
 import { DynamicLogo } from "@/components/dynamic-logo"
 
 function NavigationContent() {
   const { user, logout } = useAuth()
   const pathname = usePathname()
-  const { theme } = useTheme()
 
   const navigationItems = [
     { href: "/", label: "Home", icon: Home },
@@ -34,7 +32,7 @@ function NavigationContent() {
 
   return (
     <>
-      {/* Logo - Always links to / */}
+      {/* Logo */}
       <Link href="/" className="flex items-center space-x-2">
         <DynamicLogo className="h-8 w-8" />
         <span className="font-bold text-xl">Erigga Live</span>
@@ -175,5 +173,4 @@ export default function UnifiedNavigation() {
   )
 }
 
-// Named export for compatibility
 export { UnifiedNavigation }
