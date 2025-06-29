@@ -3,326 +3,280 @@
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
-export interface ActionResult {
-  success: boolean
-  message?: string
-  data?: any
-  error?: string
-}
+export async function createPost(formData: FormData) {
+  const supabase = await createClient()
 
-async function getAuthenticatedUser() {
-  const supabase = createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new Error("Authentication required")
-  }
-
-  return user
-}
-
-async function getInternalUserId(authUserId: string) {
-  const supabase = createClient()
-
-  let { data: userData, error } = await supabase.from("users").select("id").eq("auth_user_id", authUserId).single()
-
-  if (error || !userData) {
-    const { data: fallbackData, error: fallbackError } = await supabase
-      .from("users")
-      .select("id")
-      .eq("id", authUserId)
-      .single()
-
-    if (fallbackError || !fallbackData) {
-      throw new Error("User not found in database")
+  try {
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (authError || !user) {
+      throw new Error("Authentication required")
     }
 
-    userData = fallbackData
-  }
+    // Get user's internal ID - check both possible table structures
+    let userData
+    try {
+      // First try the standard users table
+      const { data: standardUser, error: standardError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .single()
 
-  return userData.id
-}
+      if (standardUser) {
+        userData = standardUser
+      } else {
+        // Fallback: try direct match with user ID
+        const { data: directUser, error: directError } = await supabase
+          .from("users")
+          .select("id")
+          .eq("id", user.id)
+          .single()
 
-export async function createPost(formData: FormData): Promise<ActionResult> {
-  try {
-    const user = await getAuthenticatedUser()
-    const internalUserId = await getInternalUserId(user.id)
+        if (directUser) {
+          userData = directUser
+        } else {
+          throw new Error("User profile not found")
+        }
+      }
+    } catch (error) {
+      throw new Error("User profile not found")
+    }
 
     const content = formData.get("content") as string
-    const category = (formData.get("category") as string) || "general"
+    const categoryId = formData.get("categoryId") as string
 
-    if (!content || content.trim().length === 0) {
-      return { success: false, error: "Content is required" }
+    if (!content || !categoryId) {
+      throw new Error("Content and category are required")
     }
 
-    const supabase = createClient()
+    // Extract hashtags from content
+    const hashtagMatches = content.match(/#\w+/g)
+    const hashtags = hashtagMatches ? hashtagMatches.map((tag) => tag.slice(1)) : []
 
-    const hashtagRegex = /#(\w+)/g
-    const hashtags = []
-    let match
-    while ((match = hashtagRegex.exec(content)) !== null) {
-      hashtags.push(match[1].toLowerCase())
-    }
-
-    const { data: postData, error: postError } = await supabase
+    // Create post
+    const { data: post, error: postError } = await supabase
       .from("community_posts")
       .insert({
-        content: content.trim(),
-        user_id: internalUserId,
-        category,
+        user_id: userData.id,
+        category_id: Number.parseInt(categoryId),
+        content,
         hashtags,
-        vote_count: 0,
-        comment_count: 0,
-        created_at: new Date().toISOString(),
       })
       .select()
       .single()
 
     if (postError) {
       console.error("Post creation error:", postError)
-      return { success: false, error: "Failed to create post" }
+      throw new Error("Failed to create post")
     }
 
-    await supabase.rpc("increment_category_post_count", {
-      category_name: category,
-    })
+    // Update user post count
+    await supabase
+      .from("users")
+      .update({
+        posts_count: supabase.raw("COALESCE(posts_count, 0) + 1"),
+        total_posts: supabase.raw("COALESCE(total_posts, 0) + 1"),
+      })
+      .eq("id", userData.id)
 
-    await supabase.rpc("increment_user_post_count", {
-      user_id: internalUserId,
-    })
+    // Update category post count
+    await supabase
+      .from("community_categories")
+      .update({
+        post_count: supabase.raw("COALESCE(post_count, 0) + 1"),
+      })
+      .eq("id", Number.parseInt(categoryId))
 
     revalidatePath("/community")
-    return {
-      success: true,
-      message: "Post created successfully!",
-      data: postData,
-    }
+    return { success: true, post }
   } catch (error) {
-    console.error("Create post error:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to create post",
-    }
+    console.error("Error creating post:", error)
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
 }
 
-export async function voteOnPost(postId: number): Promise<ActionResult> {
-  try {
-    const user = await getAuthenticatedUser()
-    const internalUserId = await getInternalUserId(user.id)
+export async function voteOnPost(postId: number) {
+  const supabase = await createClient()
 
-    if (!postId || isNaN(postId)) {
-      return { success: false, error: "Invalid post ID" }
+  try {
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (authError || !user) {
+      throw new Error("Authentication required")
     }
 
-    const supabase = createClient()
+    // Get user's internal ID
+    let userData
+    try {
+      const { data: standardUser } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
 
+      if (standardUser) {
+        userData = standardUser
+      } else {
+        const { data: directUser } = await supabase.from("users").select("id").eq("id", user.id).single()
+
+        if (directUser) {
+          userData = directUser
+        } else {
+          throw new Error("User profile not found")
+        }
+      }
+    } catch (error) {
+      throw new Error("User profile not found")
+    }
+
+    // Use the safe vote function
     const { data, error } = await supabase.rpc("handle_post_vote_safe", {
       p_post_id: postId,
-      p_user_id: internalUserId,
-      p_vote_cost: 100,
+      p_voter_id: userData.id,
+      p_coin_amount: 100,
     })
 
     if (error) {
       console.error("Vote error:", error)
-      return { success: false, error: error.message || "Failed to process vote" }
+      throw new Error(error.message)
+    }
+
+    if (!data.success) {
+      throw new Error(data.error || "Vote failed")
     }
 
     revalidatePath("/community")
-    return {
-      success: true,
-      message: data?.message || "Vote processed successfully!",
-      data: {
-        voted: data?.voted || false,
-        vote_count: data?.vote_count || 0,
-      },
-    }
+    return { success: true, voted: data.voted, action: data.action }
   } catch (error) {
-    console.error("Vote on post error:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to vote on post",
-    }
+    console.error("Error voting on post:", error)
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
 }
 
-export async function bookmarkPost(postId: number): Promise<ActionResult> {
-  try {
-    const user = await getAuthenticatedUser()
-    const internalUserId = await getInternalUserId(user.id)
+export async function bookmarkPost(postId: number) {
+  const supabase = await createClient()
 
-    if (!postId || isNaN(postId)) {
-      return { success: false, error: "Invalid post ID" }
+  try {
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (authError || !user) {
+      throw new Error("Authentication required")
     }
 
-    const supabase = createClient()
+    // Get user's internal ID
+    let userData
+    try {
+      const { data: standardUser } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
 
-    const { data: existingBookmark, error: checkError } = await supabase
+      if (standardUser) {
+        userData = standardUser
+      } else {
+        const { data: directUser } = await supabase.from("users").select("id").eq("id", user.id).single()
+
+        if (directUser) {
+          userData = directUser
+        } else {
+          throw new Error("User profile not found")
+        }
+      }
+    } catch (error) {
+      throw new Error("User profile not found")
+    }
+
+    // Check if already bookmarked
+    const { data: existingBookmark } = await supabase
       .from("user_bookmarks")
       .select("id")
-      .eq("user_id", internalUserId)
+      .eq("user_id", userData.id)
       .eq("post_id", postId)
       .single()
 
-    let isBookmarked = false
-
     if (existingBookmark) {
-      const { error: deleteError } = await supabase
-        .from("user_bookmarks")
-        .delete()
-        .eq("user_id", internalUserId)
-        .eq("post_id", postId)
+      // Remove bookmark
+      await supabase.from("user_bookmarks").delete().eq("user_id", userData.id).eq("post_id", postId)
 
-      if (deleteError) {
-        console.error("Remove bookmark error:", deleteError)
-        return { success: false, error: "Failed to remove bookmark" }
-      }
-
-      isBookmarked = false
+      return { success: true, bookmarked: false }
     } else {
-      const { error: insertError } = await supabase.from("user_bookmarks").insert({
-        user_id: internalUserId,
+      // Add bookmark
+      await supabase.from("user_bookmarks").insert({
+        user_id: userData.id,
         post_id: postId,
-        created_at: new Date().toISOString(),
       })
 
-      if (insertError) {
-        console.error("Add bookmark error:", insertError)
-        return { success: false, error: "Failed to add bookmark" }
-      }
-
-      isBookmarked = true
-    }
-
-    revalidatePath("/community")
-    return {
-      success: true,
-      message: isBookmarked ? "Post bookmarked!" : "Bookmark removed!",
-      data: { bookmarked: isBookmarked },
+      return { success: true, bookmarked: true }
     }
   } catch (error) {
-    console.error("Bookmark post error:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to bookmark post",
-    }
+    console.error("Error bookmarking post:", error)
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
 }
 
-export async function addComment(postId: number, content: string, parentCommentId?: number): Promise<ActionResult> {
+export async function addComment(postId: number, content: string, parentCommentId?: number) {
+  const supabase = await createClient()
+
   try {
-    const user = await getAuthenticatedUser()
-    const internalUserId = await getInternalUserId(user.id)
-
-    if (!postId || isNaN(postId)) {
-      return { success: false, error: "Invalid post ID" }
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (authError || !user) {
+      throw new Error("Authentication required")
     }
 
-    if (!content || content.trim().length === 0) {
-      return { success: false, error: "Comment content is required" }
+    // Get user's internal ID
+    let userData
+    try {
+      const { data: standardUser } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
+
+      if (standardUser) {
+        userData = standardUser
+      } else {
+        const { data: directUser } = await supabase.from("users").select("id").eq("id", user.id).single()
+
+        if (directUser) {
+          userData = directUser
+        } else {
+          throw new Error("User profile not found")
+        }
+      }
+    } catch (error) {
+      throw new Error("User profile not found")
     }
 
-    const supabase = createClient()
-
-    const { data: commentData, error: commentError } = await supabase
+    // Create comment
+    const { data: comment, error: commentError } = await supabase
       .from("community_comments")
       .insert({
         post_id: postId,
-        user_id: internalUserId,
-        content: content.trim(),
-        parent_comment_id: parentCommentId || null,
-        created_at: new Date().toISOString(),
+        user_id: userData.id,
+        parent_comment_id: parentCommentId,
+        content,
       })
       .select()
       .single()
 
     if (commentError) {
       console.error("Comment creation error:", commentError)
-      return { success: false, error: "Failed to add comment" }
+      throw new Error("Failed to create comment")
     }
 
-    await supabase.rpc("increment_post_comment_count", {
-      p_post_id: postId,
-    })
+    // Update post comment count
+    await supabase
+      .from("community_posts")
+      .update({ comment_count: supabase.raw("COALESCE(comment_count, 0) + 1") })
+      .eq("id", postId)
 
     revalidatePath("/community")
-    return {
-      success: true,
-      message: "Comment added successfully!",
-      data: commentData,
-    }
+    return { success: true, comment }
   } catch (error) {
-    console.error("Add comment error:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to add comment",
-    }
-  }
-}
-
-export async function fetchCommunityPosts(
-  userId?: string,
-  options: {
-    category?: string
-    sortBy?: "newest" | "popular" | "trending"
-    limit?: number
-    offset?: number
-  } = {},
-): Promise<ActionResult> {
-  try {
-    const supabase = createClient()
-    const { category, sortBy = "newest", limit = 20, offset = 0 } = options
-
-    let query = supabase.from("community_posts").select(`
-        *,
-        users!community_posts_user_id_fkey(
-          id,
-          username,
-          display_name,
-          avatar_url,
-          tier
-        ),
-        community_comments(count),
-        community_votes(vote_type),
-        user_bookmarks(id)
-      `)
-
-    if (category && category !== "all") {
-      query = query.eq("category", category)
-    }
-
-    switch (sortBy) {
-      case "popular":
-        query = query.order("vote_count", { ascending: false })
-        break
-      case "trending":
-        query = query.order("created_at", { ascending: false })
-        break
-      default:
-        query = query.order("created_at", { ascending: false })
-    }
-
-    query = query.range(offset, offset + limit - 1)
-
-    const { data: posts, error } = await query
-
-    if (error) {
-      console.error("Fetch posts error:", error)
-      return { success: false, error: "Failed to fetch posts" }
-    }
-
-    return {
-      success: true,
-      data: posts || [],
-    }
-  } catch (error) {
-    console.error("Fetch community posts error:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to fetch posts",
-    }
+    console.error("Error adding comment:", error)
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
 }

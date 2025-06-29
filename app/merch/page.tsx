@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ShoppingCart, Heart, Star, Coins, CreditCard, Gift, Package } from "lucide-react"
+import { ShoppingCart, Heart, Star, Coins, CreditCard } from "lucide-react"
 import { CoinBalance } from "@/components/coin-balance"
 import {
   Dialog,
@@ -19,10 +19,6 @@ import {
 } from "@/components/ui/dialog"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { toast } from "sonner"
-import type { FreebieItem } from "@/types/freebies"
 
 // Mock product data - in a real app, this would come from the API
 const products = [
@@ -146,7 +142,7 @@ function ProductCard({ product, onAddToCart }: ProductCardProps) {
 
   const handlePurchase = () => {
     if (paymentMethod === "coins" && profile && profile.coins < product.coin_price) {
-      toast.error("Insufficient coins. Please purchase more coins or pay with cash.")
+      alert("Insufficient coins. Please purchase more coins or pay with cash.")
       return
     }
 
@@ -292,7 +288,7 @@ function ProductCard({ product, onAddToCart }: ProductCardProps) {
                     Add to Cart
                   </Button>
 
-                  <Button variant="outline" className="flex-1 bg-transparent" onClick={() => setIsDialogOpen(false)}>
+                  <Button variant="outline" className="flex-1" onClick={() => setIsDialogOpen(false)}>
                     Cancel
                   </Button>
                 </div>
@@ -309,117 +305,9 @@ function ProductCard({ product, onAddToCart }: ProductCardProps) {
   )
 }
 
-interface FreebieCardProps {
-  freebie: FreebieItem
-  onClaim: (freebie: FreebieItem) => void
-}
-
-function FreebieCard({ freebie, onClaim }: FreebieCardProps) {
-  const { profile } = useAuth()
-
-  const canClaim = () => {
-    if (!profile) return false
-
-    const tierLevels = {
-      grassroot: 0,
-      pioneer: 1,
-      elder: 2,
-      blood: 3,
-    }
-
-    const userLevel = tierLevels[profile.tier]
-    const requiredLevel = tierLevels[freebie.required_tier]
-
-    return userLevel >= requiredLevel && freebie.stock_quantity > 0
-  }
-
-  const isExpired = freebie.expires_at && new Date(freebie.expires_at) < new Date()
-
-  return (
-    <Card className="group hover:shadow-lg transition-all duration-300 bg-card/50 border-green-500/20">
-      <div className="relative overflow-hidden">
-        <img
-          src={freebie.images[0] || "/placeholder.svg"}
-          alt={freebie.name}
-          className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
-        />
-        <Badge className="absolute top-2 left-2 bg-green-500 text-white">
-          <Gift className="h-3 w-3 mr-1" />
-          FREE
-        </Badge>
-        {freebie.is_featured && <Badge className="absolute top-2 right-2 bg-orange-500 text-white">Featured</Badge>}
-        {isExpired && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <Badge variant="destructive">Expired</Badge>
-          </div>
-        )}
-      </div>
-
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-2">
-          <h3 className="font-semibold text-lg group-hover:text-green-500 transition-colors">{freebie.name}</h3>
-          <Badge variant="outline" className="text-xs">
-            {freebie.required_tier.toUpperCase()}+
-          </Badge>
-        </div>
-
-        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{freebie.description}</p>
-
-        <div className="flex items-center justify-between mb-4">
-          <div className="space-y-1">
-            <div className="font-bold text-lg text-green-600">FREE</div>
-            <div className="text-xs text-muted-foreground">Max {freebie.max_per_user} per user</div>
-          </div>
-          <div className="text-right">
-            <Badge variant="outline" className="text-xs mb-1">
-              {freebie.stock_quantity} left
-            </Badge>
-            <div className="text-xs text-muted-foreground">{freebie.total_claims} claimed</div>
-          </div>
-        </div>
-
-        {canClaim() && !isExpired ? (
-          <Button className="w-full bg-green-500 hover:bg-green-600 text-white" onClick={() => onClaim(freebie)}>
-            <Gift className="h-4 w-4 mr-2" />
-            Claim Free Item
-          </Button>
-        ) : (
-          <Button disabled className="w-full">
-            {isExpired
-              ? "Expired"
-              : freebie.stock_quantity <= 0
-                ? "Out of Stock"
-                : !profile
-                  ? "Login Required"
-                  : `${freebie.required_tier.toUpperCase()}+ Only`}
-          </Button>
-        )}
-
-        {freebie.expires_at && !isExpired && (
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            Expires: {new Date(freebie.expires_at).toLocaleDateString()}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
 export default function MerchPage() {
   const { profile } = useAuth()
   const [selectedCategory, setSelectedCategory] = useState("all")
-  const [freebies, setFreebies] = useState<FreebieItem[]>([])
-  const [loadingFreebies, setLoadingFreebies] = useState(true)
-  const [claimDialogOpen, setClaimDialogOpen] = useState(false)
-  const [selectedFreebie, setSelectedFreebie] = useState<FreebieItem | null>(null)
-  const [shippingAddress, setShippingAddress] = useState({
-    fullName: "",
-    address: "",
-    city: "",
-    state: "",
-    postalCode: "",
-    phone: "",
-  })
   const [cart, setCart] = useState<
     Array<{
       product: (typeof products)[0]
@@ -436,34 +324,8 @@ export default function MerchPage() {
     { value: "collectibles", label: "Collectibles" },
   ]
 
-  useEffect(() => {
-    fetchFreebies()
-  }, [profile])
-
-  const fetchFreebies = async () => {
-    try {
-      setLoadingFreebies(true)
-      const response = await fetch(`/api/freebies?tier=${profile?.tier || "grassroot"}`)
-      const data = await response.json()
-
-      if (data.success) {
-        setFreebies(data.freebies)
-      } else {
-        toast.error("Failed to load freebies")
-      }
-    } catch (error) {
-      console.error("Error fetching freebies:", error)
-      toast.error("Failed to load freebies")
-    } finally {
-      setLoadingFreebies(false)
-    }
-  }
-
   const filteredProducts =
     selectedCategory === "all" ? products : products.filter((product) => product.category === selectedCategory)
-
-  const filteredFreebies =
-    selectedCategory === "all" ? freebies : freebies.filter((freebie) => freebie.category === selectedCategory)
 
   const handleAddToCart = (product: (typeof products)[0], size: string, paymentMethod: "cash" | "coins") => {
     setCart((prev) => {
@@ -478,51 +340,8 @@ export default function MerchPage() {
       }
     })
 
-    toast.success(`${product.name} (${size}) added to cart!`)
-  }
-
-  const handleClaimFreebie = (freebie: FreebieItem) => {
-    setSelectedFreebie(freebie)
-    setClaimDialogOpen(true)
-  }
-
-  const submitClaim = async () => {
-    if (!selectedFreebie || !profile) return
-
-    try {
-      const response = await fetch("/api/freebies/claim", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          freebieId: selectedFreebie.id,
-          shippingAddress,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success("Freebie claimed successfully! We'll process your request soon.")
-        setClaimDialogOpen(false)
-        setSelectedFreebie(null)
-        setShippingAddress({
-          fullName: "",
-          address: "",
-          city: "",
-          state: "",
-          postalCode: "",
-          phone: "",
-        })
-        fetchFreebies() // Refresh freebies list
-      } else {
-        toast.error(data.error || "Failed to claim freebie")
-      }
-    } catch (error) {
-      console.error("Error claiming freebie:", error)
-      toast.error("Failed to claim freebie")
-    }
+    // Show success message
+    alert(`${product.name} (${size}) added to cart!`)
   }
 
   return (
@@ -532,12 +351,12 @@ export default function MerchPage() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
           <div>
             <h1 className="font-street text-4xl md:text-6xl text-gradient mb-2">MERCH STORE</h1>
-            <p className="text-muted-foreground">Official Erigga merchandise and exclusive freebies</p>
+            <p className="text-muted-foreground">Official Erigga merchandise and collectibles</p>
           </div>
 
           <div className="flex items-center gap-4">
             {profile && <CoinBalance size="md" />}
-            <Button variant="outline" className="relative bg-transparent">
+            <Button variant="outline" className="relative">
               <ShoppingCart className="h-4 w-4 mr-2" />
               Cart ({cart.reduce((sum, item) => sum + item.quantity, 0)})
             </Button>
@@ -557,156 +376,12 @@ export default function MerchPage() {
           </Tabs>
         </div>
 
-        {/* Main Content Tabs */}
-        <Tabs defaultValue="merchandise" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-card/50 border border-orange-500/20 mb-8">
-            <TabsTrigger
-              value="merchandise"
-              className="data-[state=active]:bg-orange-500 data-[state=active]:text-black"
-            >
-              <Package className="h-4 w-4 mr-2" />
-              Merchandise
-            </TabsTrigger>
-            <TabsTrigger value="freebies" className="data-[state=active]:bg-green-500 data-[state=active]:text-black">
-              <Gift className="h-4 w-4 mr-2" />
-              Freebies
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Merchandise Tab */}
-          <TabsContent value="merchandise">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
-              ))}
-            </div>
-          </TabsContent>
-
-          {/* Freebies Tab */}
-          <TabsContent value="freebies">
-            {loadingFreebies ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                {[...Array(6)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <div className="h-64 bg-muted"></div>
-                    <CardContent className="p-4">
-                      <div className="h-4 bg-muted rounded mb-2"></div>
-                      <div className="h-3 bg-muted rounded mb-4"></div>
-                      <div className="h-10 bg-muted rounded"></div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                {filteredFreebies.map((freebie) => (
-                  <FreebieCard key={freebie.id} freebie={freebie} onClaim={handleClaimFreebie} />
-                ))}
-              </div>
-            )}
-
-            {!loadingFreebies && filteredFreebies.length === 0 && (
-              <div className="text-center py-12">
-                <Gift className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No freebies available</h3>
-                <p className="text-muted-foreground">Check back later for new free items!</p>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-
-        {/* Claim Freebie Dialog */}
-        <Dialog open={claimDialogOpen} onOpenChange={setClaimDialogOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Claim Free Item</DialogTitle>
-              <DialogDescription>
-                Please provide your shipping address to claim {selectedFreebie?.name}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  id="fullName"
-                  value={shippingAddress.fullName}
-                  onChange={(e) => setShippingAddress((prev) => ({ ...prev, fullName: e.target.value }))}
-                  placeholder="Enter your full name"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Textarea
-                  id="address"
-                  value={shippingAddress.address}
-                  onChange={(e) => setShippingAddress((prev) => ({ ...prev, address: e.target.value }))}
-                  placeholder="Enter your full address"
-                  rows={3}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="city">City</Label>
-                  <Input
-                    id="city"
-                    value={shippingAddress.city}
-                    onChange={(e) => setShippingAddress((prev) => ({ ...prev, city: e.target.value }))}
-                    placeholder="City"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="state">State</Label>
-                  <Input
-                    id="state"
-                    value={shippingAddress.state}
-                    onChange={(e) => setShippingAddress((prev) => ({ ...prev, state: e.target.value }))}
-                    placeholder="State"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="postalCode">Postal Code</Label>
-                  <Input
-                    id="postalCode"
-                    value={shippingAddress.postalCode}
-                    onChange={(e) => setShippingAddress((prev) => ({ ...prev, postalCode: e.target.value }))}
-                    placeholder="Postal code"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    value={shippingAddress.phone}
-                    onChange={(e) => setShippingAddress((prev) => ({ ...prev, phone: e.target.value }))}
-                    placeholder="Phone number"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-4 pt-4">
-                <Button
-                  className="flex-1 bg-green-500 hover:bg-green-600 text-white"
-                  onClick={submitClaim}
-                  disabled={!shippingAddress.fullName || !shippingAddress.address || !shippingAddress.city}
-                >
-                  Claim Item
-                </Button>
-
-                <Button variant="outline" className="flex-1 bg-transparent" onClick={() => setClaimDialogOpen(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* Products Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {filteredProducts.map((product) => (
+            <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
+          ))}
+        </div>
 
         {/* Info Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -725,21 +400,6 @@ export default function MerchPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-card/50 border-green-500/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Gift className="h-5 w-5 text-green-500" />
-                Free Items
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Claim exclusive freebies based on your membership tier. Higher tiers get access to more premium free
-                items.
-              </p>
-            </CardContent>
-          </Card>
-
           <Card className="bg-card/50 border-orange-500/20">
             <CardHeader>
               <CardTitle>Free Shipping</CardTitle>
@@ -748,6 +408,18 @@ export default function MerchPage() {
               <p className="text-sm text-muted-foreground">
                 Free shipping on orders over ₦10,000 within Nigeria. International shipping available for premium
                 members.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/50 border-orange-500/20">
+            <CardHeader>
+              <CardTitle>Exclusive Items</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Some items are exclusive to higher-tier members. Upgrade your membership to access limited edition
+                collectibles.
               </p>
             </CardContent>
           </Card>

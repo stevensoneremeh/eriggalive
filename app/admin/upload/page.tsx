@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Upload, Music, Video, Camera, Plus, X } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
+import { toast } from "sonner"
 
 export default function AdminUploadPage() {
   const [albumForm, setAlbumForm] = useState({
@@ -92,30 +93,120 @@ export default function AdminUploadPage() {
 
   const handleAlbumSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle album upload
-    console.log("Album upload:", albumForm, streamingLinks)
-    alert("Album uploaded successfully!")
+    try {
+      const response = await fetch("/api/admin/albums", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...albumForm, streaming_links: streamingLinks }),
+      })
+
+      if (response.ok) {
+        toast.success("Album uploaded successfully!")
+        setAlbumForm({
+          title: "",
+          description: "",
+          type: "album",
+          release_date: "",
+          cover_url: "",
+          is_premium: false,
+          required_tier: "street_rep",
+        })
+        setStreamingLinks([{ platform: "", url: "" }])
+      } else {
+        toast.error("Failed to upload album")
+      }
+    } catch (error) {
+      toast.error("Error uploading album")
+    }
   }
 
   const handleTrackSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle track upload
-    console.log("Track upload:", trackForm, streamingLinks)
-    alert("Track uploaded successfully!")
+    try {
+      const response = await fetch("/api/admin/tracks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...trackForm, streaming_links: streamingLinks }),
+      })
+
+      if (response.ok) {
+        toast.success("Track uploaded successfully!")
+        setTrackForm({
+          title: "",
+          artist: "Erigga",
+          featuring: "",
+          duration: "",
+          album_id: "",
+          track_number: 1,
+          lyrics: "",
+          cover_url: "",
+          audio_url: "",
+          is_premium: false,
+          required_tier: "street_rep",
+          release_date: "",
+        })
+      } else {
+        toast.error("Failed to upload track")
+      }
+    } catch (error) {
+      toast.error("Error uploading track")
+    }
   }
 
   const handleVideoSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle video upload
-    console.log("Video upload:", videoForm)
-    alert("Video uploaded successfully!")
+    try {
+      const response = await fetch("/api/admin/videos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(videoForm),
+      })
+
+      if (response.ok) {
+        toast.success("Video uploaded successfully!")
+        setVideoForm({
+          title: "",
+          description: "",
+          video_url: "",
+          thumbnail_url: "",
+          duration: "",
+          is_premium: false,
+          required_tier: "street_rep",
+          release_date: "",
+        })
+      } else {
+        toast.error("Failed to upload video")
+      }
+    } catch (error) {
+      toast.error("Error uploading video")
+    }
   }
 
   const handleGallerySubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle gallery upload
-    console.log("Gallery upload:", galleryForm)
-    alert("Gallery item uploaded successfully!")
+    try {
+      const response = await fetch("/api/admin/gallery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(galleryForm),
+      })
+
+      if (response.ok) {
+        toast.success("Gallery item uploaded successfully!")
+        setGalleryForm({
+          title: "",
+          description: "",
+          image_url: "",
+          category: "",
+          is_premium: false,
+          required_tier: "street_rep",
+        })
+      } else {
+        toast.error("Failed to upload gallery item")
+      }
+    } catch (error) {
+      toast.error("Error uploading gallery item")
+    }
   }
 
   return (

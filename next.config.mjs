@@ -13,17 +13,11 @@ const nextConfig = {
       'eriggalive.com',
       'www.eriggalive.com',
       'eriggalive.vercel.app',
-      'vercel.app',
     ],
     remotePatterns: [
       {
         protocol: 'https',
         hostname: '**.supabase.co',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '**',
       },
     ],
     unoptimized: true,
@@ -65,8 +59,13 @@ const nextConfig = {
       },
     ];
   },
-  // Move serverComponentsExternalPackages to serverExternalPackages
-  serverExternalPackages: ['sharp'],
+  experimental: {
+    // Disable the missing suspense with CSR bailout check
+    missingSuspenseWithCSRBailout: false,
+    // Additional experimental flags to help with SSR issues
+    serverComponentsExternalPackages: [],
+    optimizePackageImports: ['lucide-react'],
+  },
   // Force static generation for specific pages
   output: 'standalone',
 };
