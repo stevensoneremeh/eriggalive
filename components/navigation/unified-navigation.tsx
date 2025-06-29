@@ -32,13 +32,11 @@ function NavigationContent() {
 
   return (
     <>
-      {/* Logo */}
       <Link href="/" className="flex items-center space-x-2">
         <DynamicLogo className="h-8 w-8" />
         <span className="font-bold text-xl">Erigga Live</span>
       </Link>
 
-      {/* Desktop Navigation */}
       <nav className="hidden md:flex items-center space-x-6">
         {navigationItems.map((item) => (
           <Link
@@ -56,7 +54,6 @@ function NavigationContent() {
         ))}
       </nav>
 
-      {/* User Menu */}
       <div className="flex items-center space-x-4">
         {user ? (
           <div className="flex items-center space-x-2">
@@ -86,7 +83,6 @@ function NavigationContent() {
         )}
       </div>
 
-      {/* Mobile Navigation */}
       <Sheet>
         <SheetTrigger asChild className="md:hidden">
           <Button variant="ghost" size="sm">

@@ -10,7 +10,6 @@ export interface ActionResult {
   error?: string
 }
 
-// Helper function to get authenticated user
 async function getAuthenticatedUser() {
   const supabase = createClient()
   const {
@@ -25,14 +24,11 @@ async function getAuthenticatedUser() {
   return user
 }
 
-// Helper function to get internal user ID
 async function getInternalUserId(authUserId: string) {
   const supabase = createClient()
 
-  // Try to find user by auth_user_id first
   let { data: userData, error } = await supabase.from("users").select("id").eq("auth_user_id", authUserId).single()
 
-  // If not found, try by id field (fallback)
   if (error || !userData) {
     const { data: fallbackData, error: fallbackError } = await supabase
       .from("users")
@@ -50,26 +46,20 @@ async function getInternalUserId(authUserId: string) {
   return userData.id
 }
 
-/**
- * Create a new community post
- */
 export async function createPost(formData: FormData): Promise<ActionResult> {
   try {
     const user = await getAuthenticatedUser()
     const internalUserId = await getInternalUserId(user.id)
 
-    const title = formData.get("title") as string
     const content = formData.get("content") as string
     const category = (formData.get("category") as string) || "general"
-    const mediaFile = formData.get("media") as File | null
 
-    if (!title || !content) {
-      return { success: false, error: "Title and content are required" }
+    if (!content || content.trim().length === 0) {
+      return { success: false, error: "Content is required" }
     }
 
     const supabase = createClient()
 
-    // Extract hashtags from content
     const hashtagRegex = /#(\w+)/g
     const hashtags = []
     let match
@@ -77,44 +67,16 @@ export async function createPost(formData: FormData): Promise<ActionResult> {
       hashtags.push(match[1].toLowerCase())
     }
 
-    // Handle media upload if present
-    let mediaUrl = null
-    let mediaType = null
-
-    if (mediaFile && mediaFile.size > 0) {
-      const fileExt = mediaFile.name.split(".").pop()
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
-      const filePath = `community-media/${fileName}`
-
-      const { data: uploadData, error: uploadError } = await supabase.storage.from("media").upload(filePath, mediaFile)
-
-      if (uploadError) {
-        console.error("Upload error:", uploadError)
-        return { success: false, error: "Failed to upload media" }
-      }
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("media").getPublicUrl(filePath)
-
-      mediaUrl = publicUrl
-      mediaType = mediaFile.type.startsWith("image/") ? "image" : mediaFile.type.startsWith("video/") ? "video" : "file"
-    }
-
-    // Insert the post
     const { data: postData, error: postError } = await supabase
       .from("community_posts")
       .insert({
-        title,
-        content,
-        author_id: internalUserId,
+        content: content.trim(),
+        user_id: internalUserId,
         category,
         hashtags,
-        media_url: mediaUrl,
-        media_type: mediaType,
-        upvotes: 0,
-        downvotes: 0,
+        vote_count: 0,
         comment_count: 0,
+        created_at: new Date().toISOString(),
       })
       .select()
       .single()
@@ -124,12 +86,10 @@ export async function createPost(formData: FormData): Promise<ActionResult> {
       return { success: false, error: "Failed to create post" }
     }
 
-    // Update category post count
     await supabase.rpc("increment_category_post_count", {
       category_name: category,
     })
 
-    // Update user post count
     await supabase.rpc("increment_user_post_count", {
       user_id: internalUserId,
     })
@@ -149,9 +109,6 @@ export async function createPost(formData: FormData): Promise<ActionResult> {
   }
 }
 
-/**
- * Vote on a post
- */
 export async function voteOnPost(postId: number): Promise<ActionResult> {
   try {
     const user = await getAuthenticatedUser()
@@ -163,7 +120,6 @@ export async function voteOnPost(postId: number): Promise<ActionResult> {
 
     const supabase = createClient()
 
-    // Call the RPC function to handle voting
     const { data, error } = await supabase.rpc("handle_post_vote_safe", {
       p_post_id: postId,
       p_user_id: internalUserId,
@@ -181,8 +137,7 @@ export async function voteOnPost(postId: number): Promise<ActionResult> {
       message: data?.message || "Vote processed successfully!",
       data: {
         voted: data?.voted || false,
-        upvotes: data?.upvotes || 0,
-        downvotes: data?.downvotes || 0,
+        vote_count: data?.vote_count || 0,
       },
     }
   } catch (error) {
@@ -194,9 +149,6 @@ export async function voteOnPost(postId: number): Promise<ActionResult> {
   }
 }
 
-/**
- * Toggle bookmark status for a post
- */
 export async function bookmarkPost(postId: number): Promise<ActionResult> {
   try {
     const user = await getAuthenticatedUser()
@@ -208,7 +160,6 @@ export async function bookmarkPost(postId: number): Promise<ActionResult> {
 
     const supabase = createClient()
 
-    // Check if bookmark exists
     const { data: existingBookmark, error: checkError } = await supabase
       .from("user_bookmarks")
       .select("id")
@@ -219,7 +170,6 @@ export async function bookmarkPost(postId: number): Promise<ActionResult> {
     let isBookmarked = false
 
     if (existingBookmark) {
-      // Remove bookmark
       const { error: deleteError } = await supabase
         .from("user_bookmarks")
         .delete()
@@ -233,10 +183,10 @@ export async function bookmarkPost(postId: number): Promise<ActionResult> {
 
       isBookmarked = false
     } else {
-      // Add bookmark
       const { error: insertError } = await supabase.from("user_bookmarks").insert({
         user_id: internalUserId,
         post_id: postId,
+        created_at: new Date().toISOString(),
       })
 
       if (insertError) {
@@ -262,9 +212,6 @@ export async function bookmarkPost(postId: number): Promise<ActionResult> {
   }
 }
 
-/**
- * Add a comment to a post
- */
 export async function addComment(postId: number, content: string, parentCommentId?: number): Promise<ActionResult> {
   try {
     const user = await getAuthenticatedUser()
@@ -280,14 +227,14 @@ export async function addComment(postId: number, content: string, parentCommentI
 
     const supabase = createClient()
 
-    // Insert the comment
     const { data: commentData, error: commentError } = await supabase
-      .from("post_comments")
+      .from("community_comments")
       .insert({
         post_id: postId,
-        author_id: internalUserId,
+        user_id: internalUserId,
         content: content.trim(),
         parent_comment_id: parentCommentId || null,
+        created_at: new Date().toISOString(),
       })
       .select()
       .single()
@@ -297,7 +244,6 @@ export async function addComment(postId: number, content: string, parentCommentI
       return { success: false, error: "Failed to add comment" }
     }
 
-    // Update post comment count
     await supabase.rpc("increment_post_comment_count", {
       p_post_id: postId,
     })
@@ -317,9 +263,6 @@ export async function addComment(postId: number, content: string, parentCommentI
   }
 }
 
-/**
- * Fetch community posts with filters and pagination
- */
 export async function fetchCommunityPosts(
   userId?: string,
   options: {
@@ -335,27 +278,25 @@ export async function fetchCommunityPosts(
 
     let query = supabase.from("community_posts").select(`
         *,
-        author:users!community_posts_author_id_fkey(
+        users!community_posts_user_id_fkey(
           id,
-          display_name,
           username,
+          display_name,
           avatar_url,
           tier
         ),
-        comments:post_comments(count),
-        user_votes:post_votes(vote_type),
-        user_bookmarks:user_bookmarks(id)
+        community_comments(count),
+        community_votes(vote_type),
+        user_bookmarks(id)
       `)
 
-    // Apply category filter
     if (category && category !== "all") {
       query = query.eq("category", category)
     }
 
-    // Apply sorting
     switch (sortBy) {
       case "popular":
-        query = query.order("upvotes", { ascending: false })
+        query = query.order("vote_count", { ascending: false })
         break
       case "trending":
         query = query.order("created_at", { ascending: false })
@@ -364,7 +305,6 @@ export async function fetchCommunityPosts(
         query = query.order("created_at", { ascending: false })
     }
 
-    // Apply pagination
     query = query.range(offset, offset + limit - 1)
 
     const { data: posts, error } = await query
