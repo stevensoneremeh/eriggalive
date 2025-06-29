@@ -65,17 +65,10 @@ const nextConfig = {
       },
     ];
   },
-  experimental: {
-    // Disable the missing suspense with CSR bailout check
-    missingSuspenseWithCSRBailout: false,
-    // Additional experimental flags to help with SSR issues
-    serverComponentsExternalPackages: [],
-    optimizePackageImports: ['lucide-react'],
-  },
-  // Force static generation for specific pages
-  output: 'standalone',
   // Move serverComponentsExternalPackages to serverExternalPackages
   serverExternalPackages: ['sharp'],
+  // Force static generation for specific pages
+  output: 'standalone',
 };
 
 export default nextConfig;

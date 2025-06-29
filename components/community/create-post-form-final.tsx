@@ -1,51 +1,107 @@
 "use client"
 
-import { useState, useTransition, type FormEvent } from "react"
-import { createPost } from "@/lib/community-actions"
+import type React from "react"
+
+import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import type { CommunityCategory } from "@/types/database"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Loader2, Send } from "lucide-react"
+import { createPost } from "@/lib/community-actions-final"
+import { toast } from "sonner"
 
-interface Props {
-  categories: CommunityCategory[]
+interface Category {
+  id: number
+  name: string
+  color?: string
 }
-export function CreatePostForm({ categories }: Props) {
-  const [isPending, startTransition] = useTransition()
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  const submit = (e: FormEvent<HTMLFormElement>) => {
+interface CreatePostFormProps {
+  categories: Category[]
+}
+
+export function CreatePostForm({ categories = [] }: CreatePostFormProps) {
+  const [content, setContent] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState<string>("none")
+  const [isPending, startTransition] = useTransition()
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const formData = new FormData(e.currentTarget)
+
+    if (!content.trim()) {
+      toast.error("Please enter some content for your post")
+      return
+    }
+
     startTransition(async () => {
-      const res = await createPost(formData)
-      if (!res?.success) setErrorMsg(res.error ?? "Something went wrong")
-      else {
-        setErrorMsg(null)
-        e.currentTarget.reset()
+      try {
+        const result = await createPost(content, selectedCategory !== "none" ? Number(selectedCategory) : undefined)
+
+        if (result.success) {
+          setContent("")
+          setSelectedCategory("none")
+          toast.success("Post created successfully!")
+        } else {
+          toast.error(result.error || "Failed to create post")
+        }
+      } catch (error) {
+        console.error("Error creating post:", error)
+        toast.error("An unexpected error occurred")
       }
     })
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4 rounded-lg border p-4 shadow-sm bg-white/80 backdrop-blur">
-      <Textarea name="content" placeholder="Share something…" rows={4} required />
-      <Select name="categoryId" required>
-        <SelectTrigger>
-          <SelectValue placeholder="Choose category" />
-        </SelectTrigger>
-        <SelectContent>
-          {categories.map((c) => (
-            <SelectItem key={c.id} value={String(c.id)}>
-              {c.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {errorMsg && <p className="text-sm text-red-600">{errorMsg}</p>}
-      <Button type="submit" disabled={isPending} className="w-full">
-        {isPending ? "Posting…" : "Post"}
-      </Button>
-    </form>
+    <Card>
+      <CardHeader>
+        <CardTitle>Create a Post</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Textarea
+            placeholder="What's on your mind?"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            className="min-h-[100px] resize-none"
+            disabled={isPending}
+          />
+
+          {categories.length > 0 && (
+            <Select value={selectedCategory} onValueChange={setSelectedCategory} disabled={isPending}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a category (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No category</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id.toString()}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          <div className="flex justify-end">
+            <Button type="submit" disabled={isPending || !content.trim()}>
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Posting...
+                </>
+              ) : (
+                <>
+                  <Send className="mr-2 h-4 w-4" />
+                  Post
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   )
 }
+
+// Named export for compatibility
