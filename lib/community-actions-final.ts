@@ -118,13 +118,3 @@ export async function bookmarkPost(postId: number) {
     return { success: false, error: "Failed to bookmark post" }
   }
 }
-
-export {
-  createCommentAction,
-  fetchCommentsForPost,
-  createReportAction,
-  toggleLikeCommentAction,
-  deleteCommentAction,
-  editCommentAction,
-  searchUsersForMention,
-} from "@/lib/community-actions"

@@ -1,431 +1,171 @@
 "use server"
 
-/**
- * Centralised Community server-actions.
- *
- * NOTE:  - These functions are intentionally lightweight; they just perform basic
- *         DB work and return a JSON serialisable payload so the build succeeds.
- *       - Replace the `TODO:` sections with your own business logic later.
- */
-
-import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { supabase } from "./supabase/server-client"
 
-/* -------------------------------------------------------------------------- */
-/*                               Helper types                                 */
-/* -------------------------------------------------------------------------- */
+/* ---------- POST CRUD & VOTING ---------- */
 
-export interface ActionResult<T = unknown> {
-  success: boolean
-  data?: T
-  error?: string
-}
-
-/* -------------------------------------------------------------------------- */
-/*                              Post - level APIs                             */
-/* -------------------------------------------------------------------------- */
-
-export async function createCommunityPostAction(formData: FormData): Promise<ActionResult> {
-  /**
-   * Incoming FormData keys (expected):
-   *   - content       : string
-   *   - categoryId    : string | number
-   *   - mediaFile (optional File) : File
-   */
-  const supabase = await createClient()
-
-  // ---------------------------------- auth --------------------------------- //
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return { success: false, error: "Authentication required" }
-  }
-
-  // -------------------------------- payload -------------------------------- //
-  const content = (formData.get("content") as string | null)?.trim() || ""
-  const categoryId = formData.get("categoryId")
-
-  if (!content && !formData.get("mediaFile")) {
-    return { success: false, error: "Post must contain text or media." }
-  }
-  if (!categoryId) {
-    return { success: false, error: "Category is required." }
-  }
-
-  // TODO: upload media to Supabase Storage if present.
-  // For now, we’ll only store the text content.
-
-  const { data: insert, error } = await supabase
+export async function createCommunityPostAction({
+  userId,
+  content,
+  mediaUrl,
+}: {
+  userId: string
+  content: string
+  mediaUrl?: string
+}) {
+  const { error, data } = await supabase
     .from("community_posts")
-    .insert({
-      user_id: user.id,
-      category_id: Number(categoryId),
-      content,
-    })
+    .insert({ user_id: userId, content, media_url: mediaUrl })
     .select()
     .single()
 
-  if (error) {
-    console.error("createCommunityPostAction insert error:", error)
-    return { success: false, error: error.message }
-  }
-
+  if (error) throw error
   revalidatePath("/community")
-  return { success: true, data: insert }
+  return data
 }
 
-export async function voteOnPostAction(postId: number): Promise<ActionResult<{ action: "added" | "removed" }>> {
-  const supabase = await createClient()
+export async function voteOnPostAction({
+  userId,
+  postId,
+  value,
+}: {
+  userId: string
+  postId: string
+  value: 1 | -1
+}) {
+  const { error, data } = await supabase
+    .from("community_post_votes")
+    .upsert({ user_id: userId, post_id: postId, value })
+    .select()
+    .single()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { success: false, error: "Authentication required" }
-  }
-
-  // check if vote exists
-  const { data: existing } = await supabase
-    .from("post_votes")
-    .select("id")
-    .eq("post_id", postId)
-    .eq("user_id", user.id)
-    .maybeSingle()
-
-  if (existing) {
-    // remove vote
-    await supabase.from("post_votes").delete().eq("id", existing.id)
-    await supabase
-      .from("community_posts")
-      .update({ vote_count: supabase.literal("vote_count - 1") })
-      .eq("id", postId)
-
-    revalidatePath("/community")
-    return { success: true, data: { action: "removed" } }
-  }
-
-  // add vote
-  await supabase.from("post_votes").insert({ post_id: postId, user_id: user.id })
-  await supabase
-    .from("community_posts")
-    .update({ vote_count: supabase.literal("vote_count + 1") })
-    .eq("id", postId)
-
+  if (error) throw error
   revalidatePath("/community")
-  return { success: true, data: { action: "added" } }
+  return data
 }
 
-/**
- * A friendly alias so older imports (`voteOnPost`) keep working.
- *    import { voteOnPost } from "@/lib/community-actions"
- */
+/* Alias expected by older code */
 export const voteOnPost = voteOnPostAction
 
-export async function bookmarkPost(postId: number): Promise<ActionResult<{ bookmarked: boolean }>> {
-  const supabase = await createClient()
+export async function bookmarkPost({ userId, postId }: { userId: string; postId: string }) {
+  const { error, data } = await supabase
+    .from("community_bookmarks")
+    .upsert({ user_id: userId, post_id: postId })
+    .select()
+    .single()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { success: false, error: "Authentication required" }
-  }
-
-  const { data: existing } = await supabase
-    .from("post_bookmarks")
-    .select("id")
-    .eq("post_id", postId)
-    .eq("user_id", user.id)
-    .maybeSingle()
-
-  if (existing) {
-    await supabase.from("post_bookmarks").delete().eq("id", existing.id)
-    revalidatePath("/community")
-    return { success: true, data: { bookmarked: false } }
-  }
-
-  await supabase.from("post_bookmarks").insert({ post_id: postId, user_id: user.id })
+  if (error) throw error
   revalidatePath("/community")
-  return { success: true, data: { bookmarked: true } }
+  return data
 }
 
-/* -------------------------------------------------------------------------- */
-/*               Re-export legacy names so existing code compiles             */
-/* -------------------------------------------------------------------------- */
+/* ---------- COMMENT HELPERS ---------- */
 
-// legacy names used in several components/pages
-export { bookmarkPost as bookmarkPostAction }
-export { createCommunityPostAction as createPost }
-/* voteOnPost alias already declared above */
+export async function fetchCommentsForPost(postId: string) {
+  const { data, error } = await supabase
+    .from("community_comments_with_users") // view incl. user display fields
+    .select("*")
+    .eq("post_id", postId)
+    .order("created_at", { ascending: true })
 
-/* -------------------------------------------------------------------------- */
-/*        Add NO-OP stubs for comment helpers if other pages still            */
-/*        import them.  (Remove when real implementations exist.)            */
-/* -------------------------------------------------------------------------- */
-
-export async function fetchCommentsForPost(postId: number) {
-  try {
-    const supabase = await createClient()
-    const { data: comments, error } = await supabase
-      .from("community_comments")
-      .select(`
-        *,
-        user:users(id, username, full_name, avatar_url, tier)
-      `)
-      .eq("post_id", postId)
-      .order("created_at", { ascending: true })
-
-    if (error) {
-      console.error("Error fetching comments:", error)
-      return { success: false, error: error.message }
-    }
-
-    return { success: true, comments: comments || [] }
-  } catch (error) {
-    console.error("Error in fetchCommentsForPost:", error)
-    return { success: false, error: "Failed to fetch comments" }
-  }
+  if (error) throw error
+  return data ?? []
 }
 
-export async function createCommentAction(postId: number, content: string) {
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return { success: false, error: "Authentication required" }
-    }
-
-    const { data: comment, error } = await supabase
-      .from("community_comments")
-      .insert({
-        post_id: postId,
-        user_id: user.id,
-        content: content.trim(),
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error("Error creating comment:", error)
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath("/community")
-    return { success: true, data: comment }
-  } catch (error) {
-    console.error("Error in createCommentAction:", error)
-    return { success: false, error: "Failed to create comment" }
-  }
+export async function createCommentAction({
+  userId,
+  postId,
+  content,
+}: {
+  userId: string
+  postId: string
+  content: string
+}) {
+  const { error, data } = await supabase
+    .from("community_comments")
+    .insert({ user_id: userId, post_id: postId, content })
+    .select()
+    .single()
+  if (error) throw error
+  revalidatePath(`/community/post/${postId}`)
+  return data
 }
 
-export async function editCommentAction(commentId: number, content: string) {
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return { success: false, error: "Authentication required" }
-    }
-
-    const { error } = await supabase
-      .from("community_comments")
-      .update({ content: content.trim() })
-      .eq("id", commentId)
-      .eq("user_id", user.id)
-
-    if (error) {
-      console.error("Error editing comment:", error)
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath("/community")
-    return { success: true }
-  } catch (error) {
-    console.error("Error in editCommentAction:", error)
-    return { success: false, error: "Failed to edit comment" }
-  }
+export async function editCommentAction({
+  commentId,
+  content,
+}: {
+  commentId: string
+  content: string
+}) {
+  const { error, data } = await supabase
+    .from("community_comments")
+    .update({ content })
+    .eq("id", commentId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
 }
 
-export async function deleteCommentAction(commentId: number) {
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return { success: false, error: "Authentication required" }
-    }
-
-    const { error } = await supabase.from("community_comments").delete().eq("id", commentId).eq("user_id", user.id)
-
-    if (error) {
-      console.error("Error deleting comment:", error)
-      return { success: false, error: error.message }
-    }
-
-    revalidatePath("/community")
-    return { success: true }
-  } catch (error) {
-    console.error("Error in deleteCommentAction:", error)
-    return { success: false, error: "Failed to delete comment" }
-  }
+export async function deleteCommentAction(commentId: string) {
+  const { error } = await supabase.from("community_comments").delete().eq("id", commentId)
+  if (error) throw error
+  return { success: true }
 }
 
-export async function toggleLikeCommentAction(commentId: number) {
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+export async function toggleLikeCommentAction({
+  userId,
+  commentId,
+}: {
+  userId: string
+  commentId: string
+}) {
+  // Supabase upsert toggle: if exists delete else insert
+  const { count } = await supabase
+    .from("community_comment_likes")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("comment_id", commentId)
 
-    if (!user) {
-      return { success: false, error: "Authentication required" }
-    }
-
-    // Check if already liked
-    const { data: existingLike } = await supabase
-      .from("comment_likes")
-      .select("id")
-      .eq("comment_id", commentId)
-      .eq("user_id", user.id)
-      .single()
-
-    if (existingLike) {
-      // Unlike
-      await supabase.from("comment_likes").delete().eq("comment_id", commentId).eq("user_id", user.id)
-    } else {
-      // Like
-      await supabase.from("comment_likes").insert({
-        comment_id: commentId,
-        user_id: user.id,
-      })
-    }
-
-    revalidatePath("/community")
-    return { success: true, data: { liked: !existingLike } }
-  } catch (error) {
-    console.error("Error in toggleLikeCommentAction:", error)
-    return { success: false, error: "Failed to toggle like" }
+  if ((count ?? 0) > 0) {
+    await supabase.from("community_comment_likes").delete().eq("user_id", userId).eq("comment_id", commentId)
+    return { liked: false }
   }
+  await supabase.from("community_comment_likes").insert({ user_id: userId, comment_id: commentId })
+  return { liked: true }
 }
 
-export async function createReportAction(postId: number, reason: string) {
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+/* ---------- REPORT & MENTION HELPERS ---------- */
 
-    if (!user) {
-      return { success: false, error: "Authentication required" }
-    }
-
-    const { error } = await supabase.from("post_reports").insert({
-      post_id: postId,
-      user_id: user.id,
-      reason: reason.trim(),
-    })
-
-    if (error) {
-      console.error("Error creating report:", error)
-      return { success: false, error: error.message }
-    }
-
-    return { success: true }
-  } catch (error) {
-    console.error("Error in createReportAction:", error)
-    return { success: false, error: "Failed to create report" }
-  }
+export async function createReportAction({
+  userId,
+  targetId,
+  reason,
+}: {
+  userId: string
+  targetId: string
+  reason: string
+}) {
+  const { error } = await supabase.from("community_reports").insert({
+    reporter_id: userId,
+    target_id: targetId,
+    reason,
+  })
+  if (error) throw error
+  return { success: true }
 }
 
 export async function searchUsersForMention(query: string) {
-  try {
-    const supabase = await createClient()
-    const { data: users, error } = await supabase
-      .from("users")
-      .select("id, username, full_name, avatar_url")
-      .ilike("username", `%${query}%`)
-      .limit(10)
-
-    if (error) {
-      console.error("Error searching users:", error)
-      return { success: false, error: error.message }
-    }
-
-    return { success: true, users: users || [] }
-  } catch (error) {
-    console.error("Error in searchUsersForMention:", error)
-    return { success: false, error: "Failed to search users" }
-  }
+  const { data, error } = await supabase
+    .from("users_public_profile") // view exposing public fields only
+    .select("id, username, avatar_url")
+    .ilike("username", `%${query}%`)
+    .limit(8)
+  if (error) throw error
+  return data ?? []
 }
 
-export async function fetchCommunityPosts(
-  userId?: string,
-  options: {
-    categoryFilter?: number
-    sortOrder?: string
-    page?: number
-    limit?: number
-    searchQuery?: string
-  } = {},
-): Promise<ActionResult> {
-  try {
-    const supabase = await createClient()
-    const { categoryFilter, sortOrder = "newest", page = 1, limit = 10, searchQuery } = options
-
-    let query = supabase.from("community_posts").select(`
-        *,
-        user:users(id, username, full_name, avatar_url, tier),
-        category:community_categories(id, name, color)
-      `)
-
-    // Apply filters
-    if (categoryFilter) {
-      query = query.eq("category_id", categoryFilter)
-    }
-
-    if (searchQuery) {
-      query = query.ilike("content", `%${searchQuery}%`)
-    }
-
-    // Apply sorting
-    switch (sortOrder) {
-      case "oldest":
-        query = query.order("created_at", { ascending: true })
-        break
-      case "top":
-        query = query.order("vote_count", { ascending: false })
-        break
-      default:
-        query = query.order("created_at", { ascending: false })
-    }
-
-    // Apply pagination
-    const from = (page - 1) * limit
-    const to = from + limit - 1
-    query = query.range(from, to)
-
-    const { data: posts, error } = await query
-
-    if (error) {
-      console.error("Error fetching posts:", error)
-      return { success: false, error: error.message }
-    }
-
-    return { success: true, data: posts || [] }
-  } catch (error) {
-    console.error("Error in fetchCommunityPosts:", error)
-    return { success: false, error: "Failed to fetch posts" }
-  }
-}
+/* Back-compat named export expected by some pages */
+export const createPost = createCommunityPostAction
