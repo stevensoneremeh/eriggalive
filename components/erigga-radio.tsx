@@ -135,7 +135,7 @@ export default function EriggaRadio() {
       <audio
         ref={audioRef}
         loop
-        preload="metadata"
+        preload="none"
         onLoadStart={() => setIsLoading(true)}
         onCanPlay={() => setIsLoading(false)}
         onPlay={() => setIsPlaying(true)}
@@ -145,7 +145,10 @@ export default function EriggaRadio() {
           setIsPlaying(false)
         }}
       >
-        <source src="/audio/erigga-radio-stream.mp3" type="audio/mpeg" />
+        <source
+          src="https://yor5bfsajnljnrjg.public.blob.vercel-storage.com/erigga-radio-stream-qGVtALspqbLlH9VQJgg93RVa3Qs7Kb.mp3"
+          type="audio/mpeg"
+        />
         Your browser does not support the audio element.
       </audio>
 
