@@ -13,12 +13,17 @@ const nextConfig = {
       'eriggalive.com',
       'www.eriggalive.com',
       'eriggalive.vercel.app',
+      'vercel.app',
     ],
     remotePatterns: [
       {
         protocol: 'https',
         hostname: '**.supabase.co',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '**',
       },
     ],
     unoptimized: true,
@@ -69,6 +74,8 @@ const nextConfig = {
   },
   // Force static generation for specific pages
   output: 'standalone',
+  // Move serverComponentsExternalPackages to serverExternalPackages
+  serverExternalPackages: ['sharp'],
 };
 
 export default nextConfig;

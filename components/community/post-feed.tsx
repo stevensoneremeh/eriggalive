@@ -10,22 +10,21 @@ import { fetchCommunityPosts } from "@/lib/community-actions"
 import { VoteButton } from "./vote-button"
 import { BookmarkButton } from "./bookmark-button"
 import { Card, CardContent } from "@/components/ui/card"
-import type { CommunityPost } from "@/types/database"
 
 interface PostFeedProps {
-  initialPosts: CommunityPost[]
+  initialPosts: any[]
   userId?: string
   onVoteUpdate?: (postId: number, newVoteCount: number, hasVoted: boolean) => void
-  categories: any[]
+  categories?: any[]
   categoryFilter?: number
   sortOrder?: string
 }
 
 export function PostFeed({
-  initialPosts,
+  initialPosts = [],
   userId,
   onVoteUpdate,
-  categories,
+  categories = [],
   categoryFilter,
   sortOrder = "newest",
 }: PostFeedProps) {
@@ -59,14 +58,14 @@ export function PostFeed({
         }
 
         if (isRefresh) {
-          setPosts(result.posts)
+          setPosts(result.posts || [])
           setPage(2)
         } else {
-          setPosts((prev) => [...prev, ...result.posts])
+          setPosts((prev) => [...prev, ...(result.posts || [])])
           setPage((prev) => prev + 1)
         }
 
-        setHasMore(result.posts.length === 10)
+        setHasMore((result.posts || []).length === 10)
       } catch (error) {
         console.error("Error loading posts:", error)
       } finally {
@@ -77,7 +76,7 @@ export function PostFeed({
   )
 
   useEffect(() => {
-    setPosts(initialPosts)
+    setPosts(initialPosts || [])
   }, [initialPosts])
 
   useEffect(() => {
@@ -121,14 +120,14 @@ export function PostFeed({
         <div className="flex items-center gap-2">
           <Select
             value={selectedCategory?.toString() || "all"}
-            onValueChange={(value) => setSelectedCategory(value ? Number(value) : undefined)}
+            onValueChange={(value) => setSelectedCategory(value === "all" ? undefined : Number(value))}
           >
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((category) => (
+              {(categories || []).map((category) => (
                 <SelectItem key={category.id} value={category.id.toString()}>
                   {category.name}
                 </SelectItem>
@@ -162,18 +161,18 @@ export function PostFeed({
 
       {/* Posts */}
       <div className="space-y-6">
-        {posts.map((post) => (
+        {(posts || []).map((post) => (
           <Card key={post.id} className="bg-white/90 backdrop-blur-sm shadow">
             <CardContent className="p-4 space-y-4">
               <div className="flex items-center justify-between">
-                <div className="font-semibold">@{post.user?.username}</div>
+                <div className="font-semibold">@{post.user?.username || "Anonymous"}</div>
                 <div className="text-xs text-gray-500">{new Date(post.created_at).toLocaleDateString()}</div>
               </div>
 
               <p className="whitespace-pre-wrap">{post.content}</p>
 
               <div className="flex items-center gap-4">
-                <VoteButton postId={post.id} voteCount={post.vote_count} />
+                <VoteButton postId={post.id} voteCount={post.vote_count || 0} />
                 <BookmarkButton postId={post.id} />
               </div>
             </CardContent>
