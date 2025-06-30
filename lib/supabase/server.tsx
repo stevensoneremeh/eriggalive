@@ -1,4 +1,5 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+```typescriptreact file="middleware.ts"
+[v0-no-op-code-block-prefix]import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 import { NextResponse, type NextRequest } from "next/server"
 

@@ -1,4 +1,4 @@
-import { createClient as supabaseCreateClient } from "@supabase/supabase-js"
+import { createBrowserClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 
 // Check if we're in a browser environment
@@ -211,14 +211,6 @@ const createMockClient = () => {
     rpc: (functionName: string, params: any) => Promise.resolve({ data: true, error: null }),
     raw: (sql: string) => sql,
   } as any
-}
-
-// --- tiny wrapper so other modules can still call createBrowserClient ----
-function createBrowserClient<DB>(url: string, key: string) {
-  // Same options we used before
-  return supabaseCreateClient<DB>(url, key, {
-    auth: { persistSession: true },
-  })
 }
 
 // Create a Supabase client for browser usage
