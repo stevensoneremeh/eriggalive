@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Heart, MessageCircle, Share2 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Heart, MessageCircle, Share2, Users, TrendingUp } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 interface Post {
@@ -25,6 +26,7 @@ interface Post {
     avatar_url?: string
   }
   category: {
+    id: number
     name: string
     slug: string
   }
@@ -35,8 +37,8 @@ interface Category {
   id: number
   name: string
   slug: string
-  icon: string
-  color: string
+  description?: string
+  is_active: boolean
 }
 
 const TIER_COLORS = {
@@ -54,6 +56,7 @@ export default function CommunityPage() {
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [posting, setPosting] = useState(false)
+  const [sortOrder, setSortOrder] = useState("newest")
 
   // Use your existing auth context
   const { user, profile } = useAuth()
@@ -62,17 +65,36 @@ export default function CommunityPage() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [sortOrder])
 
-  const loadData = async () => {
+  const loadData = async (options = {}) => {
     try {
-      // Load categories
-      const { data: categoriesData } = await supabase.from("community_categories").select("*").order("display_order")
+      setLoading(true)
 
-      setCategories(categoriesData || [])
+      // Safe destructuring with defaults
+      const {
+        categoryFilter = null,
+        sortOrder: sort = sortOrder || "newest",
+        page = 1,
+        limit = 20,
+        searchQuery = null,
+      } = options
 
-      // Load posts with user data
-      const { data: postsData } = await supabase
+      // Load categories first
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from("community_categories")
+        .select("*")
+        .eq("is_active", true)
+        .order("display_order", { ascending: true })
+
+      if (categoriesError) {
+        console.error("Categories error:", categoriesError)
+      } else {
+        setCategories(categoriesData || [])
+      }
+
+      // Build posts query with safe chaining
+      let postsQuery = supabase
         .from("community_posts")
         .select(`
           *,
@@ -80,21 +102,58 @@ export default function CommunityPage() {
             id, username, full_name, tier, avatar_url
           ),
           category:community_categories!community_posts_category_id_fkey (
-            name, slug
+            id, name, slug
           )
         `)
         .eq("is_published", true)
         .eq("is_deleted", false)
-        .order("created_at", { ascending: false })
-        .limit(20)
+
+      // Apply filters safely
+      if (categoryFilter) {
+        postsQuery = postsQuery.eq("category_id", categoryFilter)
+      }
+
+      if (searchQuery) {
+        postsQuery = postsQuery.ilike("content", `%${searchQuery}%`)
+      }
+
+      // Apply sorting with safe defaults
+      switch (sort) {
+        case "oldest":
+          postsQuery = postsQuery.order("created_at", { ascending: true })
+          break
+        case "top":
+          postsQuery = postsQuery.order("vote_count", { ascending: false }).order("created_at", { ascending: false })
+          break
+        case "newest":
+        default:
+          postsQuery = postsQuery.order("created_at", { ascending: false })
+          break
+      }
+
+      // Apply pagination
+      const offset = (page - 1) * limit
+      postsQuery = postsQuery.range(offset, offset + limit - 1)
+
+      const { data: postsData, error: postsError } = await postsQuery
+
+      if (postsError) {
+        console.error("Posts error:", postsError)
+        throw postsError
+      }
 
       if (postsData) {
         // Check which posts current user has voted on
         let userVotes: number[] = []
-        if (profile) {
-          const { data: votesData } = await supabase.from("community_votes").select("post_id").eq("user_id", profile.id)
+        if (profile?.id) {
+          const { data: votesData, error: votesError } = await supabase
+            .from("community_post_votes")
+            .select("post_id")
+            .eq("user_id", profile.id)
 
-          userVotes = votesData?.map((v) => v.post_id) || []
+          if (!votesError && votesData) {
+            userVotes = votesData.map((v) => v.post_id)
+          }
         }
 
         const formattedPosts = postsData.map((post) => ({
@@ -108,7 +167,7 @@ export default function CommunityPage() {
       console.error("Error loading data:", error)
       toast({
         title: "Error",
-        description: "Failed to load community data",
+        description: "Failed to load community data. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -117,7 +176,14 @@ export default function CommunityPage() {
   }
 
   const createPost = async () => {
-    if (!newPost.trim() || !profile) return
+    if (!newPost.trim() || !profile || !selectedCategory) {
+      toast({
+        title: "Missing Information",
+        description: "Please select a category and write your post content.",
+        variant: "destructive",
+      })
+      return
+    }
 
     setPosting(true)
     try {
@@ -127,6 +193,8 @@ export default function CommunityPage() {
           user_id: profile.id,
           category_id: selectedCategory,
           content: newPost.trim(),
+          is_published: true,
+          is_deleted: false,
         })
         .select()
         .single()
@@ -135,17 +203,17 @@ export default function CommunityPage() {
 
       toast({
         title: "Success!",
-        description: "Your post has been created",
+        description: "Your post has been created successfully.",
       })
 
       setNewPost("")
       setSelectedCategory(null)
-      loadData() // Reload posts
+      await loadData() // Reload posts
     } catch (error) {
       console.error("Error creating post:", error)
       toast({
         title: "Error",
-        description: "Failed to create post",
+        description: "Failed to create post. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -154,40 +222,79 @@ export default function CommunityPage() {
   }
 
   const voteOnPost = async (postId: number) => {
-    if (!profile) return
+    if (!profile?.id) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to vote on posts.",
+        variant: "destructive",
+      })
+      return
+    }
 
     try {
       // Check if already voted
-      const { data: existingVote } = await supabase
-        .from("community_votes")
+      const { data: existingVote, error: voteCheckError } = await supabase
+        .from("community_post_votes")
         .select("id")
         .eq("post_id", postId)
         .eq("user_id", profile.id)
-        .single()
+        .maybeSingle()
+
+      if (voteCheckError && voteCheckError.code !== "PGRST116") {
+        throw voteCheckError
+      }
 
       if (existingVote) {
         // Remove vote
-        await supabase.from("community_votes").delete().eq("post_id", postId).eq("user_id", profile.id)
+        const { error: deleteError } = await supabase
+          .from("community_post_votes")
+          .delete()
+          .eq("post_id", postId)
+          .eq("user_id", profile.id)
+
+        if (deleteError) throw deleteError
 
         // Update post vote count
-        await supabase.rpc("decrement_post_votes", { post_id: postId })
+        const { error: updateError } = await supabase
+          .from("community_posts")
+          .update({ vote_count: supabase.raw("vote_count - 1") })
+          .eq("id", postId)
+
+        if (updateError) throw updateError
+
+        toast({
+          title: "Vote Removed",
+          description: "Your vote has been removed.",
+        })
       } else {
         // Add vote
-        await supabase.from("community_votes").insert({
+        const { error: insertError } = await supabase.from("community_post_votes").insert({
           post_id: postId,
           user_id: profile.id,
         })
 
+        if (insertError) throw insertError
+
         // Update post vote count
-        await supabase.rpc("increment_post_votes", { post_id: postId })
+        const { error: updateError } = await supabase
+          .from("community_posts")
+          .update({ vote_count: supabase.raw("vote_count + 1") })
+          .eq("id", postId)
+
+        if (updateError) throw updateError
+
+        toast({
+          title: "Vote Added",
+          description: "Thanks for voting!",
+        })
       }
 
-      loadData() // Reload to update counts
+      await loadData() // Reload to update counts
     } catch (error) {
       console.error("Error voting:", error)
       toast({
         title: "Error",
-        description: "Failed to vote on post",
+        description: "Failed to vote on post. Please try again.",
         variant: "destructive",
       })
     }
@@ -239,9 +346,45 @@ export default function CommunityPage() {
                       </Badge>
                     </div>
                   </div>
+                  <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+                    <div>
+                      <p className="text-2xl font-bold text-purple-600">{profile.coins || 0}</p>
+                      <p className="text-xs text-gray-500">Coins</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-blue-600">{profile.level || 1}</p>
+                      <p className="text-xs text-gray-500">Level</p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             )}
+
+            {/* Community Stats */}
+            <Card className="mb-6 border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg">
+                  <TrendingUp className="w-5 h-5 mr-2" />
+                  Community Stats
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <Users className="h-4 w-4 text-blue-600 mx-auto mb-1" />
+                      <div className="text-2xl font-bold text-blue-600">12,450</div>
+                      <div className="text-xs text-blue-600">Members</div>
+                    </div>
+                    <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <MessageCircle className="h-4 w-4 text-green-600 mx-auto mb-1" />
+                      <div className="text-2xl font-bold text-green-600">{posts.length}</div>
+                      <div className="text-xs text-green-600">Posts</div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Categories */}
             <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
@@ -255,14 +398,13 @@ export default function CommunityPage() {
                       key={category.id}
                       className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
                         selectedCategory === category.id
-                          ? "bg-blue-100 dark:bg-blue-900"
+                          ? "bg-blue-100 dark:bg-blue-900/50"
                           : "hover:bg-gray-100 dark:hover:bg-gray-700"
                       }`}
                       onClick={() => setSelectedCategory(category.id)}
                     >
                       <div className="flex items-center space-x-2">
-                        <span>{category.icon}</span>
-                        <span className="text-sm">{category.name}</span>
+                        <span className="text-sm font-medium">{category.name}</span>
                       </div>
                     </div>
                   ))}
@@ -273,6 +415,25 @@ export default function CommunityPage() {
 
           {/* Main Content */}
           <div className="lg:col-span-3">
+            {/* Sort Controls */}
+            <Card className="mb-6 border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">Community Feed</h2>
+                  <Select value={sortOrder} onValueChange={setSortOrder}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="newest">Newest</SelectItem>
+                      <SelectItem value="oldest">Oldest</SelectItem>
+                      <SelectItem value="top">Top Voted</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Create Post */}
             {profile && (
               <Card className="mb-6 border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
@@ -292,13 +453,18 @@ export default function CommunityPage() {
                       <Badge variant="outline">{categories.find((c) => c.id === selectedCategory)?.name}</Badge>
                     </div>
                   )}
-                  <Button
-                    onClick={createPost}
-                    disabled={!newPost.trim() || posting || !selectedCategory}
-                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                  >
-                    {posting ? "Posting..." : "Post"}
-                  </Button>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-gray-500">
+                      {selectedCategory ? "Ready to post!" : "Select a category first"}
+                    </p>
+                    <Button
+                      onClick={createPost}
+                      disabled={!newPost.trim() || posting || !selectedCategory}
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                    >
+                      {posting ? "Posting..." : "Post"}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -331,9 +497,20 @@ export default function CommunityPage() {
                       <div className="text-sm text-gray-500">{new Date(post.created_at).toLocaleDateString()}</div>
                     </div>
 
+                    {/* Category Badge */}
+                    {post.category && (
+                      <div className="mb-3">
+                        <Badge variant="secondary" className="text-xs">
+                          {post.category.name}
+                        </Badge>
+                      </div>
+                    )}
+
                     {/* Post Content */}
                     <div className="mb-4">
-                      <p className="text-gray-800 dark:text-gray-200 leading-relaxed">{post.content}</p>
+                      <p className="text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
+                        {post.content}
+                      </p>
                     </div>
 
                     {/* Post Actions */}
@@ -348,7 +525,7 @@ export default function CommunityPage() {
                         disabled={!profile}
                       >
                         <Heart className={`h-4 w-4 ${post.user_has_voted ? "fill-current" : ""}`} />
-                        <span>{post.vote_count}</span>
+                        <span>{post.vote_count || 0}</span>
                       </Button>
 
                       <Button
@@ -357,7 +534,7 @@ export default function CommunityPage() {
                         className="flex items-center space-x-2 text-gray-500 hover:text-blue-500"
                       >
                         <MessageCircle className="h-4 w-4" />
-                        <span>{post.comment_count}</span>
+                        <span>{post.comment_count || 0}</span>
                       </Button>
 
                       <Button
@@ -376,7 +553,11 @@ export default function CommunityPage() {
               {posts.length === 0 && (
                 <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
                   <CardContent className="p-12 text-center">
-                    <p className="text-gray-500 dark:text-gray-400">No posts yet. Be the first to share something!</p>
+                    <MessageCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-600 dark:text-gray-400 mb-2">No posts yet</h3>
+                    <p className="text-gray-500 dark:text-gray-400">
+                      Be the first to share something with the community!
+                    </p>
                   </CardContent>
                 </Card>
               )}

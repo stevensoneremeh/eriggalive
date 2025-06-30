@@ -1,4 +1,5 @@
-import { createClient as supabaseCreateClient } from "@supabase/supabase-js"
+import { createBrowserClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/database"
 
 // Check if we're in a browser environment
 const isBrowser = typeof window !== "undefined"
@@ -73,7 +74,7 @@ const createMockClient = () => {
 }
 
 // Create a Supabase client for browser usage
-export const createClient = () => {
+export function createClient() {
   if (isPreviewMode) {
     return createMockClient()
   }
@@ -86,11 +87,15 @@ export const createClient = () => {
     return createMockClient()
   }
 
-  return supabaseCreateClient(supabaseUrl, supabaseAnonKey)
+  return createBrowserClient<Database>(supabaseUrl!, supabaseAnonKey!)
 }
 
-// Create a singleton instance
-const supabaseClientInstance = createClient()
+// Export a singleton instance for consistent usage
+let supabaseClient: ReturnType<typeof createClient> | null = null
 
-// Export the singleton instance as default
-export default supabaseClientInstance
+export function getSupabaseClient() {
+  if (!supabaseClient) {
+    supabaseClient = createClient()
+  }
+  return supabaseClient
+}
