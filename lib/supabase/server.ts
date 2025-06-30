@@ -1,4 +1,4 @@
-import { createClient as createSupabaseClient, createServerClient, type SupabaseClient } from "@supabase/supabase-js"
+import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 import { cookies } from "next/headers"
 
@@ -74,7 +74,7 @@ export function createMockServerClient(): SupabaseClient<Database> {
 export function createServerSupabaseClient() {
   const cookieStore = cookies()
 
-  return createServerClient<Database>(
+  return createSupabaseClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
