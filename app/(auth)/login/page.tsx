@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
@@ -9,11 +10,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/contexts/auth-context"
-import { Loader2, AlertCircle, CheckCircle } from "lucide-react"
+import { Loader2, AlertCircle, CheckCircle, Eye, EyeOff } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { getRedirectPath, ROUTES } from "@/lib/navigation-utils"
 
-// Loading skeleton for the login page
 function LoginPageSkeleton() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
@@ -29,39 +28,27 @@ function LoginPageSkeleton() {
   )
 }
 
-// Component that uses useSearchParams - wrapped in its own Suspense
 function LoginFormWithSearchParams() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
-  const [redirectPath, setRedirectPath] = useState(ROUTES.DASHBOARD)
+  const [redirectPath, setRedirectPath] = useState("/dashboard")
 
   const router = useRouter()
   const { signIn, isAuthenticated, isLoading, isInitialized } = useAuth()
 
-  // Use a safer approach for search params
-  const [searchParamsReady, setSearchParamsReady] = useState(false)
-  let searchParams: URLSearchParams | null = null
-  
-  try {
-    searchParams = useSearchParams()
-    if (!searchParamsReady) {
-      setSearchParamsReady(true)
-    }
-  } catch (error) {
-    console.warn("SearchParams not available during SSR, will use default redirect")
-  }
+  const searchParams = useSearchParams()
 
-  // Set redirect path after component mounts and search params are ready
   useEffect(() => {
-    if (searchParamsReady && searchParams) {
-      setRedirectPath(getRedirectPath(searchParams))
+    const redirect = searchParams?.get("redirect")
+    if (redirect && redirect.startsWith("/")) {
+      setRedirectPath(redirect)
     }
-  }, [searchParams, searchParamsReady])
+  }, [searchParams])
 
-  // Handle already authenticated users
   useEffect(() => {
     if (isInitialized && isAuthenticated) {
       setShowSuccess(true)
@@ -72,12 +59,10 @@ function LoginFormWithSearchParams() {
     }
   }, [isAuthenticated, isInitialized, router, redirectPath])
 
-  // Show loading state during initialization
   if (!isInitialized || isLoading) {
     return <LoginPageSkeleton />
   }
 
-  // Show success state for already authenticated users
   if (showSuccess) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
@@ -115,7 +100,7 @@ function LoginFormWithSearchParams() {
       if (result.success) {
         setShowSuccess(true)
       } else {
-        setError(result.error || "Failed to sign in. Please check your credentials.")
+        setError(result.error?.message || "Failed to sign in. Please check your credentials.")
       }
     } catch (err: any) {
       console.error("Login error:", err)
@@ -131,7 +116,7 @@ function LoginFormWithSearchParams() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Welcome Back</CardTitle>
           <CardDescription className="text-center">Sign in to access your Erigga fan account</CardDescription>
-          {redirectPath !== ROUTES.DASHBOARD && (
+          {redirectPath !== "/dashboard" && (
             <div className="text-xs text-center text-muted-foreground bg-muted/50 rounded-md p-2">
               You'll be redirected to your requested page after signing in
             </div>
@@ -166,17 +151,33 @@ function LoginFormWithSearchParams() {
                   Forgot password?
                 </Link>
               </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={isSubmitting}
-                className="border-lime-500/20 focus:border-lime-500"
-                autoComplete="current-password"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isSubmitting}
+                  className="border-lime-500/20 focus:border-lime-500 pr-10"
+                  autoComplete="current-password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
             </div>
 
             {error && (
@@ -230,7 +231,6 @@ function LoginFormWithSearchParams() {
   )
 }
 
-// Main login page component with enhanced error boundary
 export default function LoginPage() {
   return (
     <Suspense fallback={<LoginPageSkeleton />}>

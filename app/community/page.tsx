@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { useAuth } from "@/contexts/auth-context" // Keep your existing auth
+import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Heart, MessageCircle, Share2, Users, TrendingUp } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Heart, MessageCircle, Share2, Users, TrendingUp, Search, Plus, Filter } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 interface Post {
@@ -57,28 +58,20 @@ export default function CommunityPage() {
   const [loading, setLoading] = useState(true)
   const [posting, setPosting] = useState(false)
   const [sortOrder, setSortOrder] = useState("newest")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState<number | null>(null)
 
-  // Use your existing auth context
   const { user, profile } = useAuth()
   const { toast } = useToast()
   const supabase = createClient()
 
   useEffect(() => {
     loadData()
-  }, [sortOrder])
+  }, [sortOrder, categoryFilter, searchQuery])
 
-  const loadData = async (options = {}) => {
+  const loadData = async () => {
     try {
       setLoading(true)
-
-      // Safe destructuring with defaults
-      const {
-        categoryFilter = null,
-        sortOrder: sort = sortOrder || "newest",
-        page = 1,
-        limit = 20,
-        searchQuery = null,
-      } = options
 
       // Load categories first
       const { data: categoriesData, error: categoriesError } = await supabase
@@ -93,7 +86,7 @@ export default function CommunityPage() {
         setCategories(categoriesData || [])
       }
 
-      // Build posts query with safe chaining
+      // Build posts query
       let postsQuery = supabase
         .from("community_posts")
         .select(`
@@ -108,7 +101,7 @@ export default function CommunityPage() {
         .eq("is_published", true)
         .eq("is_deleted", false)
 
-      // Apply filters safely
+      // Apply filters
       if (categoryFilter) {
         postsQuery = postsQuery.eq("category_id", categoryFilter)
       }
@@ -117,8 +110,8 @@ export default function CommunityPage() {
         postsQuery = postsQuery.ilike("content", `%${searchQuery}%`)
       }
 
-      // Apply sorting with safe defaults
-      switch (sort) {
+      // Apply sorting
+      switch (sortOrder) {
         case "oldest":
           postsQuery = postsQuery.order("created_at", { ascending: true })
           break
@@ -131,9 +124,7 @@ export default function CommunityPage() {
           break
       }
 
-      // Apply pagination
-      const offset = (page - 1) * limit
-      postsQuery = postsQuery.range(offset, offset + limit - 1)
+      postsQuery = postsQuery.limit(20)
 
       const { data: postsData, error: postsError } = await postsQuery
 
@@ -208,7 +199,7 @@ export default function CommunityPage() {
 
       setNewPost("")
       setSelectedCategory(null)
-      await loadData() // Reload posts
+      await loadData()
     } catch (error) {
       console.error("Error creating post:", error)
       toast({
@@ -255,12 +246,15 @@ export default function CommunityPage() {
         if (deleteError) throw deleteError
 
         // Update post vote count
-        const { error: updateError } = await supabase
-          .from("community_posts")
-          .update({ vote_count: supabase.raw("vote_count - 1") })
-          .eq("id", postId)
+        const { error: updateError } = await supabase.rpc("decrement_post_votes", { post_id: postId })
 
-        if (updateError) throw updateError
+        if (updateError) {
+          // Fallback to manual update if RPC doesn't exist
+          await supabase
+            .from("community_posts")
+            .update({ vote_count: supabase.raw("GREATEST(vote_count - 1, 0)") })
+            .eq("id", postId)
+        }
 
         toast({
           title: "Vote Removed",
@@ -276,12 +270,15 @@ export default function CommunityPage() {
         if (insertError) throw insertError
 
         // Update post vote count
-        const { error: updateError } = await supabase
-          .from("community_posts")
-          .update({ vote_count: supabase.raw("vote_count + 1") })
-          .eq("id", postId)
+        const { error: updateError } = await supabase.rpc("increment_post_votes", { post_id: postId })
 
-        if (updateError) throw updateError
+        if (updateError) {
+          // Fallback to manual update if RPC doesn't exist
+          await supabase
+            .from("community_posts")
+            .update({ vote_count: supabase.raw("vote_count + 1") })
+            .eq("id", postId)
+        }
 
         toast({
           title: "Vote Added",
@@ -289,7 +286,7 @@ export default function CommunityPage() {
         })
       }
 
-      await loadData() // Reload to update counts
+      await loadData()
     } catch (error) {
       console.error("Error voting:", error)
       toast({
@@ -393,19 +390,27 @@ export default function CommunityPage() {
               </CardHeader>
               <CardContent className="p-4 pt-0">
                 <div className="space-y-2">
+                  <div
+                    className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
+                      categoryFilter === null
+                        ? "bg-blue-100 dark:bg-blue-900/50"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }`}
+                    onClick={() => setCategoryFilter(null)}
+                  >
+                    <span className="text-sm font-medium">All Categories</span>
+                  </div>
                   {categories.map((category) => (
                     <div
                       key={category.id}
                       className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
-                        selectedCategory === category.id
+                        categoryFilter === category.id
                           ? "bg-blue-100 dark:bg-blue-900/50"
                           : "hover:bg-gray-100 dark:hover:bg-gray-700"
                       }`}
-                      onClick={() => setSelectedCategory(category.id)}
+                      onClick={() => setCategoryFilter(category.id)}
                     >
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium">{category.name}</span>
-                      </div>
+                      <span className="text-sm font-medium">{category.name}</span>
                     </div>
                   ))}
                 </div>
@@ -415,21 +420,32 @@ export default function CommunityPage() {
 
           {/* Main Content */}
           <div className="lg:col-span-3">
-            {/* Sort Controls */}
+            {/* Search and Filter Controls */}
             <Card className="mb-6 border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
               <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold">Community Feed</h2>
-                  <Select value={sortOrder} onValueChange={setSortOrder}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="newest">Newest</SelectItem>
-                      <SelectItem value="oldest">Oldest</SelectItem>
-                      <SelectItem value="top">Top Voted</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                  <div className="flex items-center space-x-2 flex-1">
+                    <Search className="h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search posts..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="border-0 bg-gray-50 dark:bg-gray-700"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Filter className="h-4 w-4 text-gray-400" />
+                    <Select value={sortOrder} onValueChange={setSortOrder}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="newest">Newest</SelectItem>
+                        <SelectItem value="oldest">Oldest</SelectItem>
+                        <SelectItem value="top">Top Voted</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -438,7 +454,10 @@ export default function CommunityPage() {
             {profile && (
               <Card className="mb-6 border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
                 <CardHeader>
-                  <CardTitle className="text-lg">Share your thoughts</CardTitle>
+                  <CardTitle className="flex items-center text-lg">
+                    <Plus className="w-5 h-5 mr-2" />
+                    Share your thoughts
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Textarea
@@ -448,15 +467,22 @@ export default function CommunityPage() {
                     className="mb-4 border-0 bg-gray-50 dark:bg-gray-700"
                     rows={3}
                   />
-                  {selectedCategory && (
-                    <div className="mb-4">
-                      <Badge variant="outline">{categories.find((c) => c.id === selectedCategory)?.name}</Badge>
-                    </div>
-                  )}
                   <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-500">
-                      {selectedCategory ? "Ready to post!" : "Select a category first"}
-                    </p>
+                    <Select
+                      value={selectedCategory?.toString() || ""}
+                      onValueChange={(value) => setSelectedCategory(Number(value))}
+                    >
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category.id} value={category.id.toString()}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Button
                       onClick={createPost}
                       disabled={!newPost.trim() || posting || !selectedCategory}
