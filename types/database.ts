@@ -1,4 +1,6 @@
-export type UserTier = "grassroot" | "pioneer" | "elder" | "blood" | "admin"
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+
+export type UserTier = "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
 export type UserRole = "user" | "moderator" | "admin" | "super_admin"
 export type SubscriptionStatus = "active" | "canceled" | "past_due" | "incomplete" | "trialing"
 export type PaymentStatus = "pending" | "processing" | "completed" | "failed" | "refunded" | "canceled"
@@ -16,17 +18,16 @@ export interface User {
   id: number
   auth_user_id: string
   username: string
-  full_name: string
+  full_name: string | null
   email: string
-  avatar_url?: string
-  cover_image_url?: string
+  avatar_url: string | null
   tier: UserTier
   role: UserRole
   level: number
   points: number
   coins: number
   erigga_id?: string
-  bio?: string
+  bio: string | null
   location?: string
   wallet_address?: string
   phone_number?: string
@@ -56,7 +57,7 @@ export interface CommunityCategory {
   id: number
   name: string
   slug: string
-  description?: string
+  description: string | null
   icon?: string
   color?: string
   display_order: number
@@ -69,12 +70,14 @@ export interface CommunityPost {
   id: number
   user_id: number
   category_id: number
+  title: string | null
   content: string
-  media_url?: string
-  media_type?: "image" | "audio" | "video"
-  media_metadata?: Record<string, any>
+  media_url: string | null
+  media_type: string | null
   vote_count: number
   comment_count: number
+  is_pinned: boolean
+  is_locked: boolean
   tags?: string[]
   mentions?: { user_id: string; username: string; position: number }[]
   is_published: boolean
@@ -100,8 +103,9 @@ export interface CommunityComment {
   id: number
   post_id: number
   user_id: number
-  parent_comment_id?: number | null
+  parent_id: number | null
   content: string
+  vote_count: number
   like_count: number
   reply_count: number
   is_edited: boolean
@@ -139,102 +143,298 @@ export interface Database {
     Tables: {
       users: {
         Row: User
-        Insert: Partial<User>
-        Update: Partial<User>
+        Insert: {
+          id?: number
+          auth_user_id: string
+          username: string
+          full_name?: string | null
+          email: string
+          tier?: UserTier
+          coins?: number
+          level?: number
+          points?: number
+          avatar_url?: string | null
+          bio?: string | null
+          is_verified?: boolean
+          is_active?: boolean
+          is_banned?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          auth_user_id?: string
+          username?: string
+          full_name?: string | null
+          email?: string
+          tier?: UserTier
+          coins?: number
+          level?: number
+          points?: number
+          avatar_url?: string | null
+          bio?: string | null
+          is_verified?: boolean
+          is_active?: boolean
+          is_banned?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       community_categories: {
         Row: CommunityCategory
-        Insert: Omit<CommunityCategory, "id" | "created_at" | "updated_at">
-        Update: Partial<Omit<CommunityCategory, "id" | "created_at" | "updated_at">>
+        Insert: {
+          id?: number
+          name: string
+          slug: string
+          description?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          name?: string
+          slug?: string
+          description?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       community_posts: {
         Row: CommunityPost
-        Insert: Omit<
-          CommunityPost,
-          | "id"
-          | "vote_count"
-          | "comment_count"
-          | "created_at"
-          | "updated_at"
-          | "is_published"
-          | "is_deleted"
-          | "is_edited"
-          | "user"
-          | "category"
-          | "has_voted"
-          | "comments"
-        > & { user_id: number }
-        Update: Partial<
-          Omit<
-            CommunityPost,
-            "id" | "user_id" | "created_at" | "updated_at" | "user" | "category" | "has_voted" | "comments"
-          >
-        >
-      }
-      community_post_votes: {
-        Row: CommunityPostVote
-        Insert: CommunityPostVote & { user_id: number }
-        Update: never
+        Insert: {
+          id?: number
+          user_id: number
+          category_id: number
+          title?: string | null
+          content: string
+          media_url?: string | null
+          media_type?: string | null
+          vote_count?: number
+          comment_count?: number
+          is_pinned?: boolean
+          is_locked?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          user_id?: number
+          category_id?: number
+          title?: string | null
+          content?: string
+          media_url?: string | null
+          media_type?: string | null
+          vote_count?: number
+          comment_count?: number
+          is_pinned?: boolean
+          is_locked?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_posts_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "community_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_posts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       community_comments: {
         Row: CommunityComment
-        Insert: Omit<
-          CommunityComment,
-          | "id"
-          | "like_count"
-          | "reply_count"
-          | "created_at"
-          | "updated_at"
-          | "is_deleted"
-          | "is_edited"
-          | "user"
-          | "replies"
-          | "has_liked"
-        > & { user_id: number }
-        Update: Partial<
-          Omit<
-            CommunityComment,
-            "id" | "user_id" | "post_id" | "created_at" | "updated_at" | "user" | "replies" | "has_liked"
-          >
-        >
-      }
-      community_comment_likes: {
-        Row: CommunityCommentLike
-        Insert: CommunityCommentLike & { user_id: number }
-        Update: never
-      }
-      community_reports: {
-        Row: CommunityReport
-        Insert: Omit<CommunityReport, "id" | "created_at" | "is_resolved" | "resolved_by" | "resolved_at"> & {
-          reporter_user_id: number
+        Insert: {
+          id?: number
+          post_id: number
+          user_id: number
+          parent_id?: number | null
+          content: string
+          vote_count?: number
+          like_count?: number
+          reply_count?: number
+          created_at?: string
+          updated_at?: string
         }
-        Update: Partial<Pick<CommunityReport, "is_resolved" | "resolved_by" | "resolved_at">>
+        Update: {
+          id?: number
+          post_id?: number
+          user_id?: number
+          parent_id?: number | null
+          content?: string
+          vote_count?: number
+          like_count?: number
+          reply_count?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "community_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_comments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
+      community_votes: {
+        Row: {
+          id: number
+          user_id: number
+          post_id: number | null
+          comment_id: number | null
+          vote_type: "up" | "down"
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          user_id: number
+          post_id?: number | null
+          comment_id?: number | null
+          vote_type: "up" | "down"
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          user_id?: number
+          post_id?: number | null
+          comment_id?: number | null
+          vote_type?: "up" | "down"
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_votes_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "community_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_votes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_votes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
     }
     Functions: {
-      increment_post_votes: {
-        Args: { post_id: number }
-        Returns: void
-      }
-      decrement_post_votes: {
-        Args: { post_id: number }
-        Returns: void
-      }
-      handle_post_vote: {
-        Args: {
-          p_post_id: number
-          p_voter_auth_id: string
-          p_post_creator_auth_id: string
-          p_coin_amount: number
-        }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
-      report_reason: ReportReason
-      report_target_type: ReportTargetType
-      user_tier: UserTier
-      user_role: UserRole
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
     }
   }
 }
+
+export type Tables<
+  PublicTableNameOrOptions extends
+    | keyof (Database["public"]["Tables"] & Database["public"]["Views"])
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+        Database[PublicTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : PublicTableNameOrOptions extends keyof (Database["public"]["Tables"] & Database["public"]["Views"])
+    ? (Database["public"]["Tables"] & Database["public"]["Views"])[PublicTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  PublicTableNameOrOptions extends keyof Database["public"]["Tables"] | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : PublicTableNameOrOptions extends keyof Database["public"]["Tables"]
+    ? Database["public"]["Tables"][PublicTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  PublicTableNameOrOptions extends keyof Database["public"]["Tables"] | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : PublicTableNameOrOptions extends keyof Database["public"]["Tables"]
+    ? Database["public"]["Tables"][PublicTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  PublicEnumNameOrOptions extends keyof Database["public"]["Enums"] | { schema: keyof Database },
+  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = PublicEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : PublicEnumNameOrOptions extends keyof Database["public"]["Enums"]
+    ? Database["public"]["Enums"][PublicEnumNameOrOptions]
+    : never
