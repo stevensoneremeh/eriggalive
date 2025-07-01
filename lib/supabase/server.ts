@@ -1,6 +1,6 @@
-import { createClient as createSupabaseClient, createServerClient, type SupabaseClient } from "@supabase/supabase-js"
+import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
-import { cookies, headers } from "next/headers"
+import { cookies } from "next/headers"
 
 /* -------------------------------------------------------------------------- */
 /*                              ENV & UTIL HELPERS                            */
@@ -69,46 +69,33 @@ export function createMockServerClient(): SupabaseClient<Database> {
 
 /**
  * Standard server-side client built with the ANON key.
- * No `req/res` objects are required, so it is safe during Next.js prerender.
+ * Uses cookies for auth state management.
  */
 export function createServerSupabaseClient() {
-  const cookieStore = cookies()
+  if (isPreviewMode()) return createMockServerClient()
 
-  return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
-        },
-        set(name: string, value: string, options: any) {
-          try {
-            cookieStore.set({ name, value, ...options })
-          } catch (error) {
-            // The `set` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
-        remove(name: string, options: any) {
-          try {
-            cookieStore.set({ name, value: "", ...options })
-          } catch (error) {
-            // The `delete` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
+  const cookieStore = cookies()
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+  return createSupabaseClient<Database>(supabaseUrl, supabaseKey, {
+    auth: {
+      persistSession: false,
+    },
+    global: {
+      headers: {
+        Cookie: cookieStore.toString(),
       },
     },
-  )
+  })
 }
 
 /**
  * Server-side client that can access cookies for auth state
  */
 export function createServerSupabaseClientWithAuth(): SupabaseClient<Database> {
+  if (isPreviewMode()) return createMockServerClient()
+
   const cookieStore = cookies()
   const supabaseUrl = process.env.SUPABASE_URL as string
   const supabaseKey = process.env.SUPABASE_ANON_KEY as string
@@ -154,40 +141,3 @@ export const createClient = createServerSupabaseClient
  * Older code imported `getServerClient`.  Provide the same implementation.
  */
 export const getServerClient = createServerSupabaseClient
-
-/**
- * A **tiny** server-side factory that passes auth cookies/headers along.
- * If the necessary env vars are not present (e.g. v0 preview) we reuse the
- * browser-side fallback so calls do not explode during SSR.
- */
-function buildMock() {
-  return {
-    auth: {
-      getSession: () =>
-        Promise.resolve({
-          data: { session: null },
-          error: null,
-        }),
-    },
-    from: () => ({
-      select: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
-    }),
-  } as any
-}
-
-export function createServerSupabaseClientLegacy() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) return buildMock()
-
-  return createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
-    global: {
-      /* forward cookies + auth headers to keep SSR in-sync                    */
-      headers: {
-        Authorization: headers().get("Authorization") ?? "",
-        Cookie: cookies().toString(),
-      },
-    },
-  })
-}
