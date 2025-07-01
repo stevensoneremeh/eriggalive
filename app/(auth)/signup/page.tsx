@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -63,12 +64,9 @@ export default function SignUpPage() {
     }
 
     try {
-      const { error } = await signUp(email, password, {
-        username: username.trim(),
-        full_name: fullName.trim(),
-      })
+      const { success, error } = await signUp(email, password, username, fullName)
 
-      if (error) {
+      if (!success) {
         setError(error?.message || "Failed to create account")
       } else {
         setSuccess(true)

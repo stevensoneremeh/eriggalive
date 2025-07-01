@@ -1,8 +1,9 @@
 "use client"
 
 import type React from "react"
+
 import { useState, useEffect, Suspense } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,7 +13,6 @@ import { useAuth } from "@/contexts/auth-context"
 import { Loader2, AlertCircle, CheckCircle, Eye, EyeOff } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
-// Loading skeleton for the login page
 function LoginPageSkeleton() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
@@ -28,7 +28,6 @@ function LoginPageSkeleton() {
   )
 }
 
-// Component that uses useSearchParams - wrapped in its own Suspense
 function LoginFormWithSearchParams() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -39,32 +38,31 @@ function LoginFormWithSearchParams() {
   const [redirectPath, setRedirectPath] = useState("/dashboard")
 
   const router = useRouter()
-  const { signIn, user, loading } = useAuth()
-  const [searchParamsReady, setSearchParamsReady] = useState(false)
+  const { signIn, isAuthenticated, isLoading, isInitialized } = useAuth()
+
+  const searchParams = useSearchParams()
 
   useEffect(() => {
-    if (!searchParamsReady) {
-      setSearchParamsReady(true)
+    const redirect = searchParams?.get("redirect")
+    if (redirect && redirect.startsWith("/")) {
+      setRedirectPath(redirect)
     }
-  }, [searchParamsReady])
+  }, [searchParams])
 
-  // Set redirect path after component mounts and search params are ready
   useEffect(() => {
-    if (searchParamsReady && user) {
+    if (isInitialized && isAuthenticated) {
       setShowSuccess(true)
       const timer = setTimeout(() => {
         router.replace(redirectPath)
       }, 1000)
       return () => clearTimeout(timer)
     }
-  }, [user, searchParamsReady, router, redirectPath])
+  }, [isAuthenticated, isInitialized, router, redirectPath])
 
-  // Show loading state during initialization
-  if (loading) {
+  if (!isInitialized || isLoading) {
     return <LoginPageSkeleton />
   }
 
-  // Show success state for already authenticated users
   if (showSuccess) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
@@ -99,10 +97,10 @@ function LoginFormWithSearchParams() {
 
       const result = await signIn(email.trim(), password)
 
-      if (result.error) {
-        setError(result.error?.message || "Failed to sign in. Please check your credentials.")
-      } else {
+      if (result.success) {
         setShowSuccess(true)
+      } else {
+        setError(result.error?.message || "Failed to sign in. Please check your credentials.")
       }
     } catch (err: any) {
       console.error("Login error:", err)
@@ -233,7 +231,6 @@ function LoginFormWithSearchParams() {
   )
 }
 
-// Main login page component with enhanced error boundary
 export default function LoginPage() {
   return (
     <Suspense fallback={<LoginPageSkeleton />}>

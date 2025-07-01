@@ -1,44 +1,63 @@
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/database"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
-  const response = NextResponse.next({
+  let response = NextResponse.next({
     request: {
       headers: request.headers,
     },
   })
 
-  // Add performance and health monitoring headers
-  response.headers.set("Server-Timing", `middleware;dur=${Date.now()}`)
+  const supabase = createSupabaseClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  )
 
-  // Add security headers
-  response.headers.set("X-Frame-Options", "DENY")
-  response.headers.set("X-Content-Type-Options", "nosniff")
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+  // Refresh session if expired - required for Server Components
+  await supabase.auth.getSession()
 
-  // Handle health check endpoints
-  if (pathname.startsWith("/api/health")) {
-    response.headers.set("Cache-Control", "no-cache, no-store, must-revalidate")
-    response.headers.set("Pragma", "no-cache")
-    response.headers.set("Expires", "0")
-    return response
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // Define protected routes
+  const protectedRoutes = ["/dashboard", "/community", "/chat", "/premium", "/coins", "/vault"]
+  const authRoutes = ["/login", "/signup", "/forgot-password"]
+
+  const isProtectedRoute = protectedRoutes.some((route) => request.nextUrl.pathname.startsWith(route))
+  const isAuthRoute = authRoutes.some((route) => request.nextUrl.pathname.startsWith(route))
+
+  // Redirect authenticated users away from auth pages
+  if (user && isAuthRoute) {
+    const redirectTo = request.nextUrl.searchParams.get("redirect") || "/dashboard"
+    return NextResponse.redirect(new URL(redirectTo, request.url))
   }
 
-  // For all other cases, proceed normally
+  // Redirect unauthenticated users from protected routes
+  if (!user && isProtectedRoute) {
+    const redirectUrl = new URL("/login", request.url)
+    redirectUrl.searchParams.set("redirect", request.nextUrl.pathname)
+    return NextResponse.redirect(redirectUrl)
+  }
+
+  // Redirect root to dashboard if authenticated
+  if (user && request.nextUrl.pathname === "/") {
+    return NextResponse.redirect(new URL("/dashboard", request.url))
+  }
+
   return response
 }
 
-// Configure matcher to handle all routes except static files and API routes
 export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public files (images, etc.)
+     * - images, videos, audio (media files)
      */
-    "/((?!api/|_next/static|_next/image|favicon.ico|images/|videos/|fonts/|placeholder).*)",
+    "/((?!_next/static|_next/image|favicon.ico|images|videos|audio|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 }
