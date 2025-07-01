@@ -1,33 +1,193 @@
-import { createClient } from "@supabase/supabase-js"
-import { cookies } from "next/headers"
+import { createClient as createSupabaseClient, createServerClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
+import { cookies, headers } from "next/headers"
 
-export function createServerClient() {
+/* -------------------------------------------------------------------------- */
+/*                              ENV & UTIL HELPERS                            */
+/* -------------------------------------------------------------------------- */
+
+export const isProduction = () => process.env.NODE_ENV === "production"
+export const isDevelopment = () => process.env.NODE_ENV === "development"
+
+/**
+ * Return TRUE when we are building locally / in preview and do **not** have a
+ * real Supabase URL or key.  In this mode we serve mock data so the build
+ * never contacts Supabase (useful for Vercel previews & storybook).
+ */
+export const isPreviewMode = () =>
+  !process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_VERCEL_ENV === "preview"
+
+/* -------------------------------------------------------------------------- */
+/*                                    MOCK                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A **very** small mock client – only the methods currently used at
+ * build-time: `.from().select()` and `.from().insert()`.
+ * Extend as needed; it purposefully returns empty data so UI can still render.
+ */
+export function createMockServerClient(): SupabaseClient<Database> {
+  // @ts-expect-error – we are faking the minimal API surface
+  return {
+    from: () => ({
+      select: () => Promise.resolve({ data: [], error: null }),
+      insert: () => Promise.resolve({ data: [], error: null }),
+      upsert: () => Promise.resolve({ data: [], error: null }),
+      update: () => Promise.resolve({ data: [], error: null }),
+      delete: () => Promise.resolve({ data: [], error: null }),
+      eq: function () {
+        return this
+      },
+      single: () => Promise.resolve({ data: null, error: null }),
+      order: function () {
+        return this
+      },
+      limit: function () {
+        return this
+      },
+      range: function () {
+        return this
+      },
+    }),
+    auth: {
+      getUser: async () => ({ data: { user: null }, error: null }),
+      getSession: async () => ({ data: { session: null }, error: null }),
+    },
+    rpc: () => Promise.resolve({ data: null, error: null }),
+    storage: {
+      from: () => ({
+        upload: () => Promise.resolve({ data: null, error: null }),
+        getPublicUrl: () => ({ data: { publicUrl: "" } }),
+      }),
+    },
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                             REAL SUPABASE CLIENTS                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Standard server-side client built with the ANON key.
+ * No `req/res` objects are required, so it is safe during Next.js prerender.
+ */
+export function createServerSupabaseClient() {
   const cookieStore = cookies()
 
-  return createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+  return createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+        set(name: string, value: string, options: any) {
+          try {
+            cookieStore.set({ name, value, ...options })
+          } catch (error) {
+            // The `set` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
+        remove(name: string, options: any) {
+          try {
+            cookieStore.set({ name, value: "", ...options })
+          } catch (error) {
+            // The `delete` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
+      },
+    },
+  )
+}
+
+/**
+ * Server-side client that can access cookies for auth state
+ */
+export function createServerSupabaseClientWithAuth(): SupabaseClient<Database> {
+  const cookieStore = cookies()
+  const supabaseUrl = process.env.SUPABASE_URL as string
+  const supabaseKey = process.env.SUPABASE_ANON_KEY as string
+
+  return createSupabaseClient<Database>(supabaseUrl, supabaseKey, {
     auth: {
-      storage: {
-        getItem: (key: string) => {
-          return cookieStore.get(key)?.value
-        },
-        setItem: (key: string, value: string) => {
-          cookieStore.set({ name: key, value })
-        },
-        removeItem: (key: string) => {
-          cookieStore.set({ name: key, value: "", expires: new Date(0) })
-        },
+      persistSession: false,
+    },
+    global: {
+      headers: {
+        Cookie: cookieStore.toString(),
       },
     },
   })
 }
 
-// For server actions and API routes
-export function createServiceRoleClient() {
-  return createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+/**
+ * Elevated-privilege client that uses the SERVICE_ROLE key.
+ * NEVER expose this to the browser!
+ */
+export function createAdminSupabaseClient(): SupabaseClient<Database> {
+  if (isPreviewMode()) return createMockServerClient()
+
+  const supabaseUrl = process.env.SUPABASE_URL as string
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string
+
+  return createSupabaseClient<Database>(supabaseUrl, serviceKey, {
+    auth: { persistSession: false },
+  })
+}
+
+/* -------------------------------------------------------------------------- */
+/*                         BACKWARDS-COMPATIBILITY EXPORTS                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Some modules import `createClient` instead of `createServerSupabaseClient`.
+ * Exporting an alias keeps them working without edits.
+ */
+export const createClient = createServerSupabaseClient
+
+/**
+ * Older code imported `getServerClient`.  Provide the same implementation.
+ */
+export const getServerClient = createServerSupabaseClient
+
+/**
+ * A **tiny** server-side factory that passes auth cookies/headers along.
+ * If the necessary env vars are not present (e.g. v0 preview) we reuse the
+ * browser-side fallback so calls do not explode during SSR.
+ */
+function buildMock() {
+  return {
     auth: {
-      autoRefreshToken: false,
-      persistSession: false,
+      getSession: () =>
+        Promise.resolve({
+          data: { session: null },
+          error: null,
+        }),
+    },
+    from: () => ({
+      select: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+    }),
+  } as any
+}
+
+export function createServerSupabaseClientLegacy() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) return buildMock()
+
+  return createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
+    global: {
+      /* forward cookies + auth headers to keep SSR in-sync                    */
+      headers: {
+        Authorization: headers().get("Authorization") ?? "",
+        Cookie: cookies().toString(),
+      },
     },
   })
 }
