@@ -1,415 +1,177 @@
 -- Enable necessary extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Create custom types
-DO $$ BEGIN
-    CREATE TYPE user_tier AS ENUM ('grassroot', 'pioneer', 'elder', 'blood');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+CREATE TYPE user_tier AS ENUM ('grassroot', 'pioneer', 'elder', 'blood', 'admin');
+CREATE TYPE user_role AS ENUM ('user', 'moderator', 'admin', 'super_admin');
+CREATE TYPE report_reason AS ENUM ('spam', 'harassment', 'hate_speech', 'misinformation', 'inappropriate_content', 'other');
+CREATE TYPE report_target_type AS ENUM ('post', 'comment');
 
-DO $$ BEGIN
-    CREATE TYPE subscription_status AS ENUM ('active', 'canceled', 'past_due', 'incomplete');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE ticket_status AS ENUM ('confirmed', 'pending', 'canceled');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE content_type AS ENUM ('video', 'audio', 'image');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE post_type AS ENUM ('bars', 'story', 'event', 'general');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE album_type AS ENUM ('album', 'ep', 'mixtape', 'single');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE transaction_type AS ENUM ('purchase', 'withdrawal', 'reward', 'content_access');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE payment_method AS ENUM ('paystack', 'crypto', 'coins');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
--- Create users table
-CREATE TABLE IF NOT EXISTS public.users (
-    id bigint primary key generated always as identity,
-    auth_user_id text unique not null,
-    username text unique not null,
-    full_name text not null,
-    avatar_url text,
-    tier user_tier default 'grassroot',
-    level integer default 1,
-    points integer default 0,
-    coins integer default 0,
-    erigga_id text unique,
-    bio text,
-    location text,
-    wallet_address text,
-    created_at timestamp with time zone default now(),
-    updated_at timestamp with time zone default now()
+-- Users table
+CREATE TABLE IF NOT EXISTS users (
+  id BIGSERIAL PRIMARY KEY,
+  auth_user_id UUID UNIQUE NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  username VARCHAR(50) UNIQUE NOT NULL,
+  full_name VARCHAR(100) NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  avatar_url TEXT,
+  cover_image_url TEXT,
+  tier user_tier DEFAULT 'grassroot',
+  role user_role DEFAULT 'user',
+  level INTEGER DEFAULT 1,
+  points INTEGER DEFAULT 0,
+  coins INTEGER DEFAULT 100,
+  erigga_id VARCHAR(20) UNIQUE,
+  bio TEXT,
+  location VARCHAR(100),
+  wallet_address VARCHAR(100),
+  phone_number VARCHAR(20),
+  date_of_birth DATE,
+  gender VARCHAR(20),
+  is_verified BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
+  is_banned BOOLEAN DEFAULT false,
+  ban_reason TEXT,
+  banned_until TIMESTAMP WITH TIME ZONE,
+  last_login TIMESTAMP WITH TIME ZONE,
+  login_count INTEGER DEFAULT 0,
+  referral_code VARCHAR(20) UNIQUE,
+  referred_by BIGINT REFERENCES users(id),
+  subscription_expires_at TIMESTAMP WITH TIME ZONE,
+  email_verified BOOLEAN DEFAULT false,
+  phone_verified BOOLEAN DEFAULT false,
+  two_factor_enabled BOOLEAN DEFAULT false,
+  two_factor_secret TEXT,
+  preferences JSONB DEFAULT '{}',
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create function to generate erigga_id
-CREATE OR REPLACE FUNCTION generate_erigga_id()
-RETURNS TRIGGER AS $$
+-- Community Categories
+CREATE TABLE IF NOT EXISTS community_categories (
+  id BIGSERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  slug VARCHAR(100) UNIQUE NOT NULL,
+  description TEXT,
+  icon VARCHAR(50),
+  color VARCHAR(20),
+  display_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Community Posts
+CREATE TABLE IF NOT EXISTS community_posts (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  category_id BIGINT REFERENCES community_categories(id) ON DELETE SET NULL,
+  content TEXT NOT NULL,
+  media_url TEXT,
+  media_type VARCHAR(20),
+  media_metadata JSONB,
+  vote_count INTEGER DEFAULT 0,
+  comment_count INTEGER DEFAULT 0,
+  tags TEXT[],
+  mentions JSONB,
+  is_published BOOLEAN DEFAULT true,
+  is_edited BOOLEAN DEFAULT false,
+  is_deleted BOOLEAN DEFAULT false,
+  deleted_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Community Post Votes
+CREATE TABLE IF NOT EXISTS community_post_votes (
+  post_id BIGINT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY (post_id, user_id)
+);
+
+-- Community Comments
+CREATE TABLE IF NOT EXISTS community_comments (
+  id BIGSERIAL PRIMARY KEY,
+  post_id BIGINT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  parent_comment_id BIGINT REFERENCES community_comments(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  like_count INTEGER DEFAULT 0,
+  reply_count INTEGER DEFAULT 0,
+  is_edited BOOLEAN DEFAULT false,
+  is_deleted BOOLEAN DEFAULT false,
+  deleted_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Community Comment Likes
+CREATE TABLE IF NOT EXISTS community_comment_likes (
+  comment_id BIGINT NOT NULL REFERENCES community_comments(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY (comment_id, user_id)
+);
+
+-- Community Reports
+CREATE TABLE IF NOT EXISTS community_reports (
+  id BIGSERIAL PRIMARY KEY,
+  reporter_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  target_id BIGINT NOT NULL,
+  target_type report_target_type NOT NULL,
+  reason report_reason NOT NULL,
+  additional_notes TEXT,
+  is_resolved BOOLEAN DEFAULT false,
+  resolved_by UUID REFERENCES auth.users(id),
+  resolved_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Insert default categories
+INSERT INTO community_categories (name, slug, description, icon, color, display_order) VALUES
+('General Discussion', 'general', 'Open discussion for all topics', '💬', '#3B82F6', 1),
+('Music & Bars', 'music-bars', 'Share your bars and discuss music', '🎵', '#10B981', 2),
+('Events & Shows', 'events', 'Upcoming events and show discussions', '🎤', '#F59E0B', 3),
+('Fan Art & Media', 'fan-art', 'Share your creative works', '🎨', '#8B5CF6', 4),
+('Questions & Help', 'questions', 'Ask questions and get help', '❓', '#EF4444', 5)
+ON CONFLICT (slug) DO NOTHING;
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_users_auth_user_id ON users(auth_user_id);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_community_posts_user_id ON community_posts(user_id);
+CREATE INDEX IF NOT EXISTS idx_community_posts_category_id ON community_posts(category_id);
+CREATE INDEX IF NOT EXISTS idx_community_posts_created_at ON community_posts(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_community_posts_vote_count ON community_posts(vote_count DESC);
+CREATE INDEX IF NOT EXISTS idx_community_post_votes_user_id ON community_post_votes(user_id);
+CREATE INDEX IF NOT EXISTS idx_community_comments_post_id ON community_comments(post_id);
+CREATE INDEX IF NOT EXISTS idx_community_comments_user_id ON community_comments(user_id);
+CREATE INDEX IF NOT EXISTS idx_community_comment_likes_user_id ON community_comment_likes(user_id);
+
+-- Functions for vote counting
+CREATE OR REPLACE FUNCTION increment_post_votes(post_id BIGINT)
+RETURNS VOID AS $$
 BEGIN
-    NEW.erigga_id := 'EG' || LPAD(NEW.id::text, 6, '0');
-    RETURN NEW;
+  UPDATE community_posts 
+  SET vote_count = vote_count + 1 
+  WHERE id = post_id;
 END;
 $$ LANGUAGE plpgsql;
 
--- Create trigger for erigga_id generation
-DROP TRIGGER IF EXISTS generate_erigga_id_trigger ON public.users;
-CREATE TRIGGER generate_erigga_id_trigger
-    BEFORE INSERT ON public.users
-    FOR EACH ROW EXECUTE FUNCTION generate_erigga_id();
+CREATE OR REPLACE FUNCTION decrement_post_votes(post_id BIGINT)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE community_posts 
+  SET vote_count = GREATEST(vote_count - 1, 0) 
+  WHERE id = post_id;
+END;
+$$ LANGUAGE plpgsql;
 
--- Create albums table
-CREATE TABLE IF NOT EXISTS public.albums (
-    id bigint primary key generated always as identity,
-    title text NOT NULL,
-    description text,
-    cover_url text NOT NULL,
-    type album_type DEFAULT 'album',
-    release_date date NOT NULL,
-    total_tracks integer DEFAULT 0,
-    duration text,
-    is_premium boolean DEFAULT false,
-    required_tier user_tier DEFAULT 'grassroot',
-    coin_price integer DEFAULT 0,
-    play_count integer DEFAULT 0,
-    like_count integer DEFAULT 0,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
--- Create tracks table
-CREATE TABLE IF NOT EXISTS public.tracks (
-    id bigint primary key generated always as identity,
-    album_id bigint,
-    title text NOT NULL,
-    artist text NOT NULL DEFAULT 'Erigga',
-    featuring text,
-    duration text NOT NULL,
-    track_number integer,
-    lyrics text,
-    cover_url text,
-    audio_url text,
-    is_premium boolean DEFAULT false,
-    required_tier user_tier DEFAULT 'grassroot',
-    coin_price integer DEFAULT 0,
-    play_count integer DEFAULT 0,
-    like_count integer DEFAULT 0,
-    release_date date NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    FOREIGN KEY (album_id) REFERENCES public.albums (id) ON DELETE SET NULL
-);
-
--- Create streaming_links table
-CREATE TABLE IF NOT EXISTS public.streaming_links (
-    id bigint primary key generated always as identity,
-    track_id bigint,
-    album_id bigint,
-    platform text NOT NULL,
-    url text NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    FOREIGN KEY (track_id) REFERENCES public.tracks (id) ON DELETE CASCADE,
-    FOREIGN KEY (album_id) REFERENCES public.albums (id) ON DELETE CASCADE,
-    CHECK ((track_id IS NOT NULL) OR (album_id IS NOT NULL))
-);
-
--- Create music_videos table
-CREATE TABLE IF NOT EXISTS public.music_videos (
-    id bigint primary key generated always as identity,
-    track_id bigint,
-    title text NOT NULL,
-    description text,
-    video_url text NOT NULL,
-    thumbnail_url text NOT NULL,
-    duration text NOT NULL,
-    views integer DEFAULT 0,
-    is_premium boolean DEFAULT false,
-    required_tier user_tier DEFAULT 'grassroot',
-    coin_price integer DEFAULT 0,
-    release_date date NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    FOREIGN KEY (track_id) REFERENCES public.tracks (id) ON DELETE SET NULL
-);
-
--- Create gallery_items table
-CREATE TABLE IF NOT EXISTS public.gallery_items (
-    id bigint primary key generated always as identity,
-    title text NOT NULL,
-    description text,
-    image_url text NOT NULL,
-    category text NOT NULL,
-    is_premium boolean DEFAULT false,
-    required_tier user_tier DEFAULT 'grassroot',
-    coin_price integer DEFAULT 0,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
--- Create coin_transactions table
-CREATE TABLE IF NOT EXISTS public.coin_transactions (
-    id bigint primary key generated always as identity,
-    user_id bigint NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    amount integer NOT NULL,
-    transaction_type transaction_type NOT NULL,
-    payment_method payment_method,
-    reference_id text,
-    status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed')),
-    metadata jsonb DEFAULT '{}',
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
--- Create content_access table
-CREATE TABLE IF NOT EXISTS public.content_access (
-    id bigint primary key generated always as identity,
-    user_id bigint NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    content_type text NOT NULL,
-    content_id bigint NOT NULL,
-    coins_spent integer NOT NULL,
-    expires_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT now()
-);
-
--- Create posts table
-CREATE TABLE IF NOT EXISTS public.posts (
-    id bigint primary key generated always as identity,
-    user_id bigint NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    content text NOT NULL,
-    type post_type DEFAULT 'general',
-    media_url text,
-    like_count integer DEFAULT 0,
-    comment_count integer DEFAULT 0,
-    is_featured boolean DEFAULT false,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
--- Create comments table
-CREATE TABLE IF NOT EXISTS public.comments (
-    id bigint primary key generated always as identity,
-    post_id bigint NOT NULL REFERENCES public.posts(id) ON DELETE CASCADE,
-    user_id bigint NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    content text NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
--- Create post_likes table
-CREATE TABLE IF NOT EXISTS public.post_likes (
-    id bigint primary key generated always as identity,
-    post_id bigint NOT NULL REFERENCES public.posts(id) ON DELETE CASCADE,
-    user_id bigint NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    created_at timestamp with time zone DEFAULT now(),
-    UNIQUE(post_id, user_id)
-);
-
--- Create events table
-CREATE TABLE IF NOT EXISTS public.events (
-    id bigint primary key generated always as identity,
-    title text NOT NULL,
-    description text,
-    venue text NOT NULL,
-    location text NOT NULL,
-    date timestamp with time zone NOT NULL,
-    ticket_price decimal(10,2) NOT NULL,
-    max_tickets integer NOT NULL,
-    tickets_sold integer DEFAULT 0,
-    image_url text,
-    is_active boolean DEFAULT true,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
--- Create tickets table
-CREATE TABLE IF NOT EXISTS public.tickets (
-    id bigint primary key generated always as identity,
-    user_id bigint NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    event_id bigint NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
-    ticket_number text UNIQUE NOT NULL,
-    qr_code text NOT NULL,
-    status ticket_status DEFAULT 'pending',
-    payment_reference text NOT NULL,
-    amount_paid decimal(10,2) NOT NULL,
-    purchased_at timestamp with time zone DEFAULT now(),
-    used_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT now()
-);
-
--- Create products table
-CREATE TABLE IF NOT EXISTS public.products (
-    id bigint primary key generated always as identity,
-    name text NOT NULL,
-    description text,
-    price decimal(10,2) NOT NULL,
-    images text[] DEFAULT '{}',
-    sizes text[] DEFAULT '{}',
-    category text,
-    is_premium_only boolean DEFAULT false,
-    coin_price integer DEFAULT 0,
-    stock_quantity integer DEFAULT 0,
-    is_active boolean DEFAULT true,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
--- Create media_content table
-CREATE TABLE IF NOT EXISTS public.media_content (
-    id bigint primary key generated always as identity,
-    title text NOT NULL,
-    description text,
-    type content_type NOT NULL,
-    file_url text NOT NULL,
-    thumbnail_url text,
-    duration integer,
-    is_premium boolean DEFAULT false,
-    required_tier user_tier DEFAULT 'grassroot',
-    coin_price integer DEFAULT 0,
-    view_count integer DEFAULT 0,
-    like_count integer DEFAULT 0,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
-);
-
--- Create indexes for performance
-CREATE INDEX IF NOT EXISTS idx_users_auth_user_id ON public.users (auth_user_id);
-CREATE INDEX IF NOT EXISTS idx_users_username ON public.users (username);
-CREATE INDEX IF NOT EXISTS idx_users_tier ON public.users (tier);
-CREATE INDEX IF NOT EXISTS idx_albums_release_date ON public.albums (release_date DESC);
-CREATE INDEX IF NOT EXISTS idx_albums_type ON public.albums (type);
-CREATE INDEX IF NOT EXISTS idx_tracks_album_id ON public.tracks (album_id);
-CREATE INDEX IF NOT EXISTS idx_tracks_release_date ON public.tracks (release_date DESC);
-CREATE INDEX IF NOT EXISTS idx_streaming_links_track_id ON public.streaming_links (track_id);
-CREATE INDEX IF NOT EXISTS idx_streaming_links_album_id ON public.streaming_links (album_id);
-CREATE INDEX IF NOT EXISTS idx_music_videos_track_id ON public.music_videos (track_id);
-CREATE INDEX IF NOT EXISTS idx_gallery_items_category ON public.gallery_items (category);
-CREATE INDEX IF NOT EXISTS idx_coin_transactions_user_id ON public.coin_transactions (user_id);
-CREATE INDEX IF NOT EXISTS idx_coin_transactions_status ON public.coin_transactions (status);
-CREATE INDEX IF NOT EXISTS idx_content_access_user_id ON public.content_access (user_id);
-CREATE INDEX IF NOT EXISTS idx_posts_user_id ON public.posts (user_id);
-CREATE INDEX IF NOT EXISTS idx_posts_created_at ON public.posts (created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_comments_post_id ON public.comments (post_id);
-CREATE INDEX IF NOT EXISTS idx_post_likes_post_id ON public.post_likes (post_id);
-CREATE INDEX IF NOT EXISTS idx_events_date ON public.events (date);
-CREATE INDEX IF NOT EXISTS idx_tickets_user_id ON public.tickets (user_id);
-
--- Enable RLS on all tables
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.albums ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tracks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.streaming_links ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.music_videos ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.gallery_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.coin_transactions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.content_access ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.post_likes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tickets ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.media_content ENABLE ROW LEVEL SECURITY;
-
--- Create RLS policies
--- Users can view and update their own profile
-CREATE POLICY "Users can view their own profile" ON public.users
-    FOR SELECT USING (auth.uid()::text = auth_user_id);
-
-CREATE POLICY "Users can update their own profile" ON public.users
-    FOR UPDATE USING (auth.uid()::text = auth_user_id);
-
--- Public content policies
-CREATE POLICY "Albums are viewable by everyone" ON public.albums
-    FOR SELECT USING (true);
-
-CREATE POLICY "Tracks are viewable by everyone" ON public.tracks
-    FOR SELECT USING (true);
-
-CREATE POLICY "Streaming links are viewable by everyone" ON public.streaming_links
-    FOR SELECT USING (true);
-
-CREATE POLICY "Music videos are viewable by everyone" ON public.music_videos
-    FOR SELECT USING (true);
-
-CREATE POLICY "Gallery items are viewable by everyone" ON public.gallery_items
-    FOR SELECT USING (true);
-
-CREATE POLICY "Events are viewable by everyone" ON public.events
-    FOR SELECT USING (true);
-
-CREATE POLICY "Products are viewable by everyone" ON public.products
-    FOR SELECT USING (true);
-
-CREATE POLICY "Media content is viewable by everyone" ON public.media_content
-    FOR SELECT USING (true);
-
--- User-specific policies
-CREATE POLICY "Users can view their own transactions" ON public.coin_transactions
-    FOR SELECT USING (auth.uid()::text = (SELECT auth_user_id FROM public.users WHERE id = user_id));
-
-CREATE POLICY "Users can insert their own transactions" ON public.coin_transactions
-    FOR INSERT WITH CHECK (auth.uid()::text = (SELECT auth_user_id FROM public.users WHERE id = user_id));
-
-CREATE POLICY "Users can view their own content access" ON public.content_access
-    FOR SELECT USING (auth.uid()::text = (SELECT auth_user_id FROM public.users WHERE id = user_id));
-
-CREATE POLICY "Users can insert their own content access" ON public.content_access
-    FOR INSERT WITH CHECK (auth.uid()::text = (SELECT auth_user_id FROM public.users WHERE id = user_id));
-
-CREATE POLICY "Posts are viewable by everyone" ON public.posts
-    FOR SELECT USING (true);
-
-CREATE POLICY "Users can create posts" ON public.posts
-    FOR INSERT WITH CHECK (auth.uid()::text = (SELECT auth_user_id FROM public.users WHERE id = user_id));
-
-CREATE POLICY "Users can update their own posts" ON public.posts
-    FOR UPDATE USING (auth.uid()::text = (SELECT auth_user_id FROM public.users WHERE id = user_id));
-
-CREATE POLICY "Comments are viewable by everyone" ON public.comments
-    FOR SELECT USING (true);
-
-CREATE POLICY "Users can create comments" ON public.comments
-    FOR INSERT WITH CHECK (auth.uid()::text = (SELECT auth_user_id FROM public.users WHERE id = user_id));
-
-CREATE POLICY "Post likes are viewable by everyone" ON public.post_likes
-    FOR SELECT USING (true);
-
-CREATE POLICY "Users can like posts" ON public.post_likes
-    FOR INSERT WITH CHECK (auth.uid()::text = (SELECT auth_user_id FROM public.users WHERE id = user_id));
-
-CREATE POLICY "Users can view their own tickets" ON public.tickets
-    FOR SELECT USING (auth.uid()::text = (SELECT auth_user_id FROM public.users WHERE id = user_id));
-
-CREATE POLICY "Users can purchase tickets" ON public.tickets
-    FOR INSERT WITH CHECK (auth.uid()::text = (SELECT auth_user_id FROM public.users WHERE id = user_id));
-
--- Create function to update updated_at timestamp
+-- Update triggers for updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -418,15 +180,53 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Create triggers for updated_at
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_albums_updated_at BEFORE UPDATE ON public.albums FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_tracks_updated_at BEFORE UPDATE ON public.tracks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_music_videos_updated_at BEFORE UPDATE ON public.music_videos FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_gallery_items_updated_at BEFORE UPDATE ON public.gallery_items FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_coin_transactions_updated_at BEFORE UPDATE ON public.coin_transactions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_posts_updated_at BEFORE UPDATE ON public.posts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_comments_updated_at BEFORE UPDATE ON public.comments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON public.events FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON public.products FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_media_content_updated_at BEFORE UPDATE ON public.media_content FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_community_categories_updated_at BEFORE UPDATE ON community_categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_community_posts_updated_at BEFORE UPDATE ON community_posts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_community_comments_updated_at BEFORE UPDATE ON community_comments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Row Level Security (RLS) policies
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE community_posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE community_post_votes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE community_comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE community_comment_likes ENABLE ROW LEVEL SECURITY;
+
+-- Users can read all public user data
+CREATE POLICY "Users can view public user data" ON users FOR SELECT USING (true);
+
+-- Users can update their own profile
+CREATE POLICY "Users can update own profile" ON users FOR UPDATE USING (auth.uid() = auth_user_id);
+
+-- Anyone can read published posts
+CREATE POLICY "Anyone can view published posts" ON community_posts FOR SELECT USING (is_published = true AND is_deleted = false);
+
+-- Authenticated users can create posts
+CREATE POLICY "Authenticated users can create posts" ON community_posts FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+-- Users can update their own posts
+CREATE POLICY "Users can update own posts" ON community_posts FOR UPDATE USING (
+  EXISTS (SELECT 1 FROM users WHERE users.auth_user_id = auth.uid() AND users.id = community_posts.user_id)
+);
+
+-- Users can delete their own posts
+CREATE POLICY "Users can delete own posts" ON community_posts FOR DELETE USING (
+  EXISTS (SELECT 1 FROM users WHERE users.auth_user_id = auth.uid() AND users.id = community_posts.user_id)
+);
+
+-- Authenticated users can vote
+CREATE POLICY "Authenticated users can vote" ON community_post_votes FOR ALL USING (auth.role() = 'authenticated');
+
+-- Anyone can read comments
+CREATE POLICY "Anyone can view comments" ON community_comments FOR SELECT USING (is_deleted = false);
+
+-- Authenticated users can create comments
+CREATE POLICY "Authenticated users can create comments" ON community_comments FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+-- Users can update their own comments
+CREATE POLICY "Users can update own comments" ON community_comments FOR UPDATE USING (
+  EXISTS (SELECT 1 FROM users WHERE users.auth_user_id = auth.uid() AND users.id = community_comments.user_id)
+);
+
+-- Authenticated users can like comments
+CREATE POLICY "Authenticated users can like comments" ON community_comment_likes FOR ALL USING (auth.role() = 'authenticated');

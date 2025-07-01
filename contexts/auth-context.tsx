@@ -1,370 +1,318 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { useRouter, usePathname } from "next/navigation"
-import { clientAuth } from "@/lib/auth-utils"
-import { NavigationManager, ROUTES } from "@/lib/navigation-utils"
+import type React from "react"
+import { createContext, useContext, useEffect, useState, useCallback } from "react"
+import { createClient } from "@/lib/supabase/client"
+import type { User, Session } from "@supabase/supabase-js"
+import type { Database } from "@/types/database"
 
-// Define types
-type UserTier = "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
-
-interface User {
-  id: string
-  email: string
-  username: string
-}
-
-interface UserProfile extends User {
-  tier: UserTier
-  coins: number
-  level: number
-  points: number
-  avatar_url?: string
-  full_name?: string
-  bio?: string
-  created_at: string
-}
+type UserProfile = Database["public"]["Tables"]["users"]["Row"]
 
 interface AuthContextType {
   user: User | null
+  session: Session | null
   profile: UserProfile | null
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: any }>
+  loading: boolean
+  signIn: (email: string, password: string) => Promise<{ error: any }>
   signUp: (
     email: string,
     password: string,
-    username: string,
-    fullName: string,
-  ) => Promise<{ success: boolean; error?: any }>
+    userData: { username: string; full_name: string },
+  ) => Promise<{ error: any }>
   signOut: () => Promise<void>
-  isLoading: boolean
-  isAuthenticated: boolean
-  isInitialized: boolean
-  purchaseCoins: (amount: number, method: string) => Promise<{ success: boolean; data?: any; error?: any }>
-  refreshSession: () => Promise<void>
-  navigationManager: NavigationManager | null
+  refreshProfile: () => Promise<void>
 }
 
-// Create context
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Provider component
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isInitialized, setIsInitialized] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [initialized, setInitialized] = useState(false)
 
-  const router = useRouter()
-  const pathname = usePathname()
+  const supabase = createClient()
 
-  // Create navigation manager
-  const navigationManager = new NavigationManager(router, pathname)
+  const fetchProfile = useCallback(
+    async (userId: string): Promise<UserProfile | null> => {
+      try {
+        const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
 
-  // Initialize authentication state
+        if (error) {
+          console.error("Error fetching profile:", error)
+
+          // If profile doesn't exist, create it
+          if (error.code === "PGRST116") {
+            const {
+              data: { user: authUser },
+            } = await supabase.auth.getUser()
+            if (authUser) {
+              const newProfile = {
+                auth_user_id: authUser.id,
+                email: authUser.email || "",
+                username: authUser.user_metadata?.username || authUser.email?.split("@")[0] || "user",
+                full_name: authUser.user_metadata?.full_name || authUser.email || "",
+                tier: "grassroot" as const,
+                role: "user" as const,
+                coins: 100,
+                level: 1,
+                points: 0,
+                is_verified: false,
+                is_active: true,
+                is_banned: false,
+                login_count: 0,
+                email_verified: authUser.email_confirmed_at ? true : false,
+                phone_verified: false,
+                two_factor_enabled: false,
+                preferences: {},
+                metadata: {},
+              }
+
+              const { data: createdProfile, error: createError } = await supabase
+                .from("users")
+                .insert(newProfile)
+                .select()
+                .single()
+
+              if (createError) {
+                console.error("Error creating profile:", createError)
+                return null
+              }
+
+              return createdProfile
+            }
+          }
+          return null
+        }
+
+        return data
+      } catch (error) {
+        console.error("Error in fetchProfile:", error)
+        return null
+      }
+    },
+    [supabase],
+  )
+
+  const refreshProfile = useCallback(async () => {
+    if (user) {
+      const profileData = await fetchProfile(user.id)
+      setProfile(profileData)
+    }
+  }, [user, fetchProfile])
+
+  const updateLoginCount = useCallback(
+    async (userId: string) => {
+      try {
+        await supabase
+          .from("users")
+          .update({
+            login_count: supabase.raw("login_count + 1"),
+            last_login: new Date().toISOString(),
+          })
+          .eq("auth_user_id", userId)
+      } catch (error) {
+        console.error("Error updating login count:", error)
+      }
+    },
+    [supabase],
+  )
+
   useEffect(() => {
+    let mounted = true
+
     const initializeAuth = async () => {
       try {
-        setIsLoading(true)
+        // Get initial session
+        const {
+          data: { session: initialSession },
+          error,
+        } = await supabase.auth.getSession()
 
-        // Get session from our utility
-        const session = clientAuth.getSession()
+        if (error) {
+          console.error("Error getting session:", error)
+        }
 
-        if (session?.user && session?.profile) {
-          setUser(session.user)
-          setProfile(session.profile)
-          setIsAuthenticated(true)
+        if (mounted) {
+          setSession(initialSession)
+          setUser(initialSession?.user ?? null)
 
-          // Refresh the session to extend expiry
-          clientAuth.refreshSession()
-
-          // Handle post-initialization navigation for authenticated users
-          if (navigationManager.isAuthRoute(pathname)) {
-            // User is authenticated but on auth page, redirect to dashboard
-            navigationManager.handlePostLoginNavigation()
+          if (initialSession?.user) {
+            const profileData = await fetchProfile(initialSession.user.id)
+            if (mounted) {
+              setProfile(profileData)
+            }
           }
-        } else {
-          setIsAuthenticated(false)
 
-          // Handle unauthenticated users on protected routes
-          if (navigationManager.isProtectedRoute(pathname)) {
-            navigationManager.handleAuthRequiredNavigation(pathname)
-          }
+          setLoading(false)
+          setInitialized(true)
         }
       } catch (error) {
-        console.error("Auth initialization error:", error)
-        setIsAuthenticated(false)
-
-        // Handle initialization error on protected routes
-        if (navigationManager.isProtectedRoute(pathname)) {
-          navigationManager.handleAuthRequiredNavigation(pathname)
+        console.error("Error initializing auth:", error)
+        if (mounted) {
+          setLoading(false)
+          setInitialized(true)
         }
-      } finally {
-        setIsLoading(false)
-        setIsInitialized(true)
       }
     }
 
     initializeAuth()
-  }, []) // Only run once on mount
 
-  // Handle route changes for authenticated users
-  useEffect(() => {
-    if (isInitialized && isAuthenticated) {
-      // Refresh session on route changes
-      clientAuth.refreshSession()
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return
 
-      // Redirect away from auth routes if authenticated
-      if (navigationManager.isAuthRoute(pathname)) {
-        navigationManager.handlePostLoginNavigation()
-      }
-    }
-  }, [pathname, isAuthenticated, isInitialized])
+      console.log("Auth state changed:", event, session?.user?.id)
 
-  // Set up periodic session refresh
-  useEffect(() => {
-    if (!isAuthenticated) return
+      setSession(session)
+      setUser(session?.user ?? null)
 
-    const refreshInterval = setInterval(
-      () => {
-        try {
-          clientAuth.refreshSession()
-        } catch (error) {
-          console.error("Session refresh error:", error)
-          // If refresh fails, sign out the user
-          signOut()
+      if (session?.user) {
+        const profileData = await fetchProfile(session.user.id)
+        if (mounted) {
+          setProfile(profileData)
         }
-      },
-      5 * 60 * 1000, // Every 5 minutes
-    )
 
-    return () => clearInterval(refreshInterval)
-  }, [isAuthenticated])
-
-  // Enhanced sign in function
-  const signIn = async (email: string, password: string) => {
-    try {
-      setIsLoading(true)
-
-      // Validate inputs
-      if (!email || !password) {
-        return { success: false, error: "Email and password are required" }
+        // Update login count on sign in
+        if (event === "SIGNED_IN") {
+          await updateLoginCount(session.user.id)
+        }
+      } else {
+        if (mounted) {
+          setProfile(null)
+        }
       }
 
-      // Simulate API delay for realistic UX
-      await new Promise((resolve) => setTimeout(resolve, 800))
-
-      // Generate a unique ID based on the email
-      const userId = `user-${btoa(email).replace(/[=+/]/g, "").substring(0, 16)}`
-
-      // Create a username from the email
-      const username = email.split("@")[0]
-
-      // Create a mock user
-      const mockUser = {
-        id: userId,
-        email,
-        username,
+      if (mounted && !loading) {
+        setLoading(false)
       }
+    })
 
-      // Create a mock profile with 500 coins
-      const mockProfile = {
-        ...mockUser,
-        tier: "pioneer" as UserTier,
-        coins: 500,
-        level: 1,
-        points: 100,
-        created_at: new Date().toISOString(),
-        bio: `${username}'s profile`,
-      }
-
-      // Persist the session using our utility
-      clientAuth.saveSession(mockUser, mockProfile)
-
-      setUser(mockUser)
-      setProfile(mockProfile)
-      setIsAuthenticated(true)
-
-      // Handle post-login navigation
-      setTimeout(() => {
-        navigationManager.handlePostLoginNavigation()
-      }, 100)
-
-      return { success: true }
-    } catch (error: any) {
-      console.error("Sign in error:", error)
-      return {
-        success: false,
-        error: error.message || "An unexpected error occurred during sign in",
-      }
-    } finally {
-      setIsLoading(false)
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
     }
-  }
+  }, [supabase, fetchProfile, updateLoginCount, loading])
 
-  // Enhanced sign up function
-  const signUp = async (email: string, password: string, username: string, fullName: string) => {
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      try {
+        setLoading(true)
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        })
+        return { error }
+      } catch (error) {
+        console.error("Sign in error:", error)
+        return { error }
+      } finally {
+        setLoading(false)
+      }
+    },
+    [supabase],
+  )
+
+  const signUp = useCallback(
+    async (email: string, password: string, userData: { username: string; full_name: string }) => {
+      try {
+        setLoading(true)
+
+        // Check if username is already taken
+        const { data: existingUser } = await supabase
+          .from("users")
+          .select("username")
+          .eq("username", userData.username.trim())
+          .single()
+
+        if (existingUser) {
+          return { error: { message: "Username is already taken" } }
+        }
+
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            data: {
+              username: userData.username.trim(),
+              full_name: userData.full_name.trim(),
+            },
+          },
+        })
+
+        if (error) return { error }
+
+        // Create user profile
+        if (data.user) {
+          const profileData = {
+            auth_user_id: data.user.id,
+            email: email.trim(),
+            username: userData.username.trim(),
+            full_name: userData.full_name.trim(),
+            tier: "grassroot" as const,
+            role: "user" as const,
+            coins: 100, // Starting coins
+            level: 1,
+            points: 0,
+            is_active: true,
+            is_verified: false,
+            is_banned: false,
+            login_count: 0,
+            email_verified: data.user.email_confirmed_at ? true : false,
+            phone_verified: false,
+            two_factor_enabled: false,
+            preferences: {},
+            metadata: {},
+          }
+
+          const { error: profileError } = await supabase.from("users").insert(profileData)
+
+          if (profileError) {
+            console.error("Error creating profile:", profileError)
+            // Don't return error here as auth user was created successfully
+          }
+        }
+
+        return { error: null }
+      } catch (error) {
+        console.error("Sign up error:", error)
+        return { error }
+      } finally {
+        setLoading(false)
+      }
+    },
+    [supabase],
+  )
+
+  const signOut = useCallback(async () => {
     try {
-      setIsLoading(true)
-
-      // Validate inputs
-      if (!email || !password || !username || !fullName) {
-        return { success: false, error: { message: "All fields are required" } }
-      }
-
-      if (password.length < 6) {
-        return { success: false, error: { message: "Password must be at least 6 characters" } }
-      }
-
-      // Check if username is already taken (simple check)
-      if (username.length < 3) {
-        return { success: false, error: { message: "Username must be at least 3 characters" } }
-      }
-
-      // Simulate API delay for realistic UX
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      // Generate a unique ID based on the email
-      const userId = `user-${btoa(email).replace(/[=+/]/g, "").substring(0, 16)}`
-
-      // Create a mock user
-      const mockUser = {
-        id: userId,
-        email,
-        username,
-      }
-
-      // Create a mock profile with welcome bonus coins
-      const mockProfile = {
-        ...mockUser,
-        tier: "grassroot" as UserTier,
-        coins: 100, // Welcome bonus
-        level: 1,
-        points: 0,
-        full_name: fullName,
-        created_at: new Date().toISOString(),
-        bio: `Welcome to the movement, ${username}!`,
-      }
-
-      // Persist the session using our utility
-      clientAuth.saveSession(mockUser, mockProfile)
-
-      setUser(mockUser)
-      setProfile(mockProfile)
-      setIsAuthenticated(true)
-
-      return { success: true }
-    } catch (error: any) {
-      console.error("Sign up error:", error)
-      return {
-        success: false,
-        error: { message: error.message || "An unexpected error occurred during sign up" },
-      }
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Enhanced sign out function
-  const signOut = async () => {
-    try {
-      setIsLoading(true)
-
-      // Clear session using our utility
-      clientAuth.clearSession()
-
-      setUser(null)
-      setProfile(null)
-      setIsAuthenticated(false)
-
-      // Navigate to login page
-      navigationManager.navigateTo(ROUTES.LOGIN, { replace: true })
+      setLoading(true)
+      await supabase.auth.signOut()
     } catch (error) {
       console.error("Sign out error:", error)
-
-      // Force navigation even if there's an error
-      try {
-        router.push(ROUTES.LOGIN)
-      } catch (navError) {
-        console.error("Emergency navigation failed:", navError)
-        // Last resort: reload the page
-        if (typeof window !== "undefined") {
-          window.location.href = ROUTES.LOGIN
-        }
-      }
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
+  }, [supabase])
+
+  const value = {
+    user,
+    session,
+    profile,
+    loading: loading || !initialized,
+    signIn,
+    signUp,
+    signOut,
+    refreshProfile,
   }
 
-  // Function to refresh the current session
-  const refreshSession = async () => {
-    if (user && profile) {
-      try {
-        clientAuth.saveSession(user, profile)
-      } catch (error) {
-        console.error("Session refresh error:", error)
-      }
-    }
-  }
-
-  // Enhanced purchase coins function
-  const purchaseCoins = async (amount: number, method: string) => {
-    try {
-      // Validate inputs
-      if (!amount || amount <= 0) {
-        return { success: false, error: { message: "Invalid coin amount" } }
-      }
-
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 800))
-
-      // Update the profile with new coins
-      if (profile) {
-        const updatedProfile = {
-          ...profile,
-          coins: profile.coins + amount,
-        }
-
-        // Update session with new profile data
-        clientAuth.saveSession(user!, updatedProfile)
-
-        setProfile(updatedProfile)
-      }
-
-      return { success: true, data: { id: `transaction-${Date.now()}` } }
-    } catch (error: any) {
-      console.error("Purchase coins error:", error)
-      return {
-        success: false,
-        error: { message: error.message || "Failed to purchase coins" },
-      }
-    }
-  }
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        profile,
-        signIn,
-        signUp,
-        signOut,
-        isLoading,
-        isAuthenticated,
-        isInitialized,
-        purchaseCoins,
-        refreshSession,
-        navigationManager,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-// Custom hook to use the auth context
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext)
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider")

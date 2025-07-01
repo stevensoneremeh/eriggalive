@@ -1,127 +1,177 @@
-import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js"
-import type { Database } from "@/types/database"
+import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
+import type { Database } from "@/types/database"
 
-/* -------------------------------------------------------------------------- */
-/*                              ENV & UTIL HELPERS                            */
-/* -------------------------------------------------------------------------- */
+// Check if we're in preview mode
+const isPreviewMode = process.env.NEXT_PUBLIC_VERCEL_ENV === "preview" || process.env.VERCEL_ENV === "preview"
 
-export const isProduction = () => process.env.NODE_ENV === "production"
-export const isDevelopment = () => process.env.NODE_ENV === "development"
+// Mock server client for preview mode
+const createMockServerClient = () => {
+  const mockUser = {
+    id: "mock-user-id",
+    email: "mock@example.com",
+    user_metadata: { username: "mockuser", full_name: "Mock User" },
+    email_confirmed_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
 
-/**
- * Return TRUE when we are building locally / in preview and do **not** have a
- * real Supabase URL or key.  In this mode we serve mock data so the build
- * never contacts Supabase (useful for Vercel previews & storybook).
- */
-export const isPreviewMode = () =>
-  !process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_VERCEL_ENV === "preview"
+  const mockSession = {
+    access_token: "mock-token",
+    refresh_token: "mock-refresh-token",
+    expires_in: 3600,
+    token_type: "bearer",
+    user: mockUser,
+  }
 
-/* -------------------------------------------------------------------------- */
-/*                                    MOCK                                    */
-/* -------------------------------------------------------------------------- */
-
-/**
- * A **very** small mock client – only the methods currently used at
- * build-time: `.from().select()` and `.from().insert()`.
- * Extend as needed; it purposefully returns empty data so UI can still render.
- */
-export function createMockServerClient(): SupabaseClient<Database> {
-  // @ts-expect-error – we are faking the minimal API surface
   return {
-    from: () => ({
-      select: () => Promise.resolve({ data: [], error: null }),
-      insert: () => Promise.resolve({ data: [], error: null }),
-      upsert: () => Promise.resolve({ data: [], error: null }),
-      update: () => Promise.resolve({ data: [], error: null }),
-      delete: () => Promise.resolve({ data: [], error: null }),
-      eq: function() { return this },
-      single: () => Promise.resolve({ data: null, error: null }),
-      order: function() { return this },
-      limit: function() { return this },
-      range: function() { return this },
-    }),
     auth: {
-      getUser: async () => ({ data: { user: null }, error: null }),
-      getSession: async () => ({ data: { session: null }, error: null }),
+      getUser: () =>
+        Promise.resolve({
+          data: { user: mockUser },
+          error: null,
+        }),
+      getSession: () =>
+        Promise.resolve({
+          data: { session: mockSession },
+          error: null,
+        }),
     },
-    rpc: () => Promise.resolve({ data: null, error: null }),
+    from: (table: string) => ({
+      select: (columns?: string) => ({
+        eq: (column: string, value: any) => ({
+          single: () => {
+            if (table === "users" && column === "auth_user_id") {
+              return Promise.resolve({
+                data: {
+                  id: 1,
+                  auth_user_id: value,
+                  username: "mockuser",
+                  full_name: "Mock User",
+                  email: "mock@example.com",
+                  tier: "grassroot",
+                  role: "user",
+                  coins: 500,
+                  level: 1,
+                  points: 0,
+                  avatar_url: null,
+                  is_verified: false,
+                  is_active: true,
+                  is_banned: false,
+                  login_count: 1,
+                  email_verified: true,
+                  phone_verified: false,
+                  two_factor_enabled: false,
+                  preferences: {},
+                  metadata: {},
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                },
+                error: null,
+              })
+            }
+            return Promise.resolve({ data: null, error: null })
+          },
+          maybeSingle: () => Promise.resolve({ data: null, error: null }),
+        }),
+        order: (column: string, options?: { ascending: boolean }) => ({
+          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
+          range: (start: number, end: number) => Promise.resolve({ data: [], error: null }),
+        }),
+        is: (column: string, value: any) => ({
+          order: (column: string, options?: { ascending: boolean }) => ({
+            limit: (limit: number) => Promise.resolve({ data: [], error: null }),
+          }),
+        }),
+        ilike: (column: string, value: string) => ({
+          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
+        }),
+      }),
+      insert: (data: any) => ({
+        select: (columns?: string) => ({
+          single: () =>
+            Promise.resolve({
+              data: {
+                ...data,
+                id: Math.floor(Math.random() * 1000),
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              },
+              error: null,
+            }),
+        }),
+      }),
+      update: (data: any) => ({
+        eq: (column: string, value: any) => ({
+          select: (columns?: string) => ({
+            single: () => Promise.resolve({ data: { ...data }, error: null }),
+          }),
+        }),
+      }),
+      delete: () => ({
+        eq: (column: string, value: any) => Promise.resolve({ error: null }),
+      }),
+    }),
     storage: {
-      from: () => ({
-        upload: () => Promise.resolve({ data: null, error: null }),
-        getPublicUrl: () => ({ data: { publicUrl: "" } }),
+      from: (bucket: string) => ({
+        upload: (path: string, file: File) =>
+          Promise.resolve({
+            data: { path: `mock/${path}` },
+            error: null,
+          }),
+        getPublicUrl: (path: string) => ({
+          data: { publicUrl: `/placeholder.svg` },
+        }),
       }),
     },
+    rpc: (functionName: string, params: any) => {
+      if (functionName === "handle_post_vote") {
+        return Promise.resolve({ data: true, error: null })
+      }
+      return Promise.resolve({ data: true, error: null })
+    },
+    raw: (sql: string) => sql,
+  } as any
+}
+
+export async function createClient() {
+  if (isPreviewMode) {
+    console.log("Using mock Supabase server client for preview mode")
+    return createMockServerClient()
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn("Missing Supabase environment variables, using mock server client")
+    return createMockServerClient()
+  }
+
+  try {
+    const cookieStore = await cookies()
+
+    return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+          } catch {
+            // The `setAll` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
+      },
+    })
+  } catch (error) {
+    console.error("Error creating Supabase server client:", error)
+    return createMockServerClient()
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/*                             REAL SUPABASE CLIENTS                          */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Standard server-side client built with the ANON key.
- * No `req/res` objects are required, so it is safe during Next.js prerender.
- */
-export function createServerSupabaseClient(): SupabaseClient<Database> {
-  if (isPreviewMode()) return createMockServerClient()
-
-  const supabaseUrl = process.env.SUPABASE_URL as string
-  const supabaseKey = process.env.SUPABASE_ANON_KEY as string
-
-  return createSupabaseClient<Database>(supabaseUrl, supabaseKey, {
-    auth: { persistSession: false },
-  })
-}
-
-/**
- * Server-side client that can access cookies for auth state
- */
-export function createServerSupabaseClientWithAuth(): SupabaseClient<Database> {
-  if (isPreviewMode()) return createMockServerClient()
-
-  const cookieStore = cookies()
-  const supabaseUrl = process.env.SUPABASE_URL as string
-  const supabaseKey = process.env.SUPABASE_ANON_KEY as string
-
-  return createSupabaseClient<Database>(supabaseUrl, supabaseKey, {
-    auth: {
-      persistSession: false,
-    },
-    global: {
-      headers: {
-        Cookie: cookieStore.toString(),
-      },
-    },
-  })
-}
-
-/**
- * Elevated-privilege client that uses the SERVICE_ROLE key.
- * NEVER expose this to the browser!
- */
-export function createAdminSupabaseClient(): SupabaseClient<Database> {
-  if (isPreviewMode()) return createMockServerClient()
-
-  const supabaseUrl = process.env.SUPABASE_URL as string
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string
-
-  return createSupabaseClient<Database>(supabaseUrl, serviceKey, {
-    auth: { persistSession: false },
-  })
-}
-
-/* -------------------------------------------------------------------------- */
-/*                         BACKWARDS-COMPATIBILITY EXPORTS                    */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Some modules import `createClient` instead of `createServerSupabaseClient`.
- * Exporting an alias keeps them working without edits.
- */
-export const createClient = createServerSupabaseClient
-
-/**
- * Older code imported `getServerClient`.  Provide the same implementation.
- */
-export const getServerClient = createServerSupabaseClient
+// Export a function to get a fresh client instance
+export { createClient as default }
