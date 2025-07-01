@@ -1,5 +1,4 @@
 import { createClient as supabaseCreateClient } from "@supabase/supabase-js"
-import type { Database } from "@/types/database"
 
 // Check if we're in a browser environment
 const isBrowser = typeof window !== "undefined"
@@ -8,81 +7,20 @@ const isBrowser = typeof window !== "undefined"
 const isPreviewMode =
   isBrowser && (window.location.hostname.includes("vusercontent.net") || window.location.hostname.includes("v0.dev"))
 
-// Define the mock client function for preview mode
+// Define the mock client function BEFORE it's used
 const createMockClient = () => {
   return {
     auth: {
-      getSession: () =>
-        Promise.resolve({
-          data: {
-            session: {
-              user: {
-                id: "mock-user-id",
-                email: "mock@example.com",
-                user_metadata: { username: "mockuser", full_name: "Mock User" },
-              },
-            },
-          },
-          error: null,
-        }),
-      getUser: () =>
-        Promise.resolve({
-          data: {
-            user: {
-              id: "mock-user-id",
-              email: "mock@example.com",
-              user_metadata: { username: "mockuser", full_name: "Mock User" },
-            },
-          },
-          error: null,
-        }),
+      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+      getUser: () => Promise.resolve({ data: { user: null }, error: null }),
       signInWithPassword: () =>
         Promise.resolve({
-          data: {
-            user: {
-              id: "mock-user-id",
-              email: "mock@example.com",
-              user_metadata: { username: "mockuser", full_name: "Mock User" },
-            },
-            session: {
-              access_token: "mock-token",
-              user: {
-                id: "mock-user-id",
-                email: "mock@example.com",
-              },
-            },
-          },
-          error: null,
-        }),
-      signUp: () =>
-        Promise.resolve({
-          data: {
-            user: {
-              id: "mock-user-id",
-              email: "mock@example.com",
-              user_metadata: { username: "mockuser", full_name: "Mock User" },
-            },
-            session: {
-              access_token: "mock-token",
-              user: {
-                id: "mock-user-id",
-                email: "mock@example.com",
-              },
-            },
-          },
+          data: { user: { id: "mock-user-id", email: "mock@example.com" }, session: { access_token: "mock-token" } },
           error: null,
         }),
       signOut: () => Promise.resolve({ error: null }),
       onAuthStateChange: (callback: any) => {
-        callback("SIGNED_IN", {
-          session: {
-            user: {
-              id: "mock-user-id",
-              email: "mock@example.com",
-              user_metadata: { username: "mockuser", full_name: "Mock User" },
-            },
-          },
-        })
+        callback("SIGNED_IN", { session: { user: { id: "mock-user-id", email: "mock@example.com" } } })
         return { data: { subscription: { unsubscribe: () => {} } } }
       },
     },
@@ -90,131 +28,52 @@ const createMockClient = () => {
       select: (columns?: string) => ({
         eq: (column: string, value: any) => ({
           single: () => {
-            if (table === "users" && column === "auth_user_id") {
+            if (table === "user_profiles" && column === "user_id") {
               return Promise.resolve({
                 data: {
                   id: 1,
-                  auth_user_id: value,
+                  user_id: value,
                   username: "mockuser",
-                  full_name: "Mock User",
-                  email: "mock@example.com",
                   tier: "grassroot",
                   coins: 500,
-                  level: 1,
-                  points: 0,
-                  avatar_url: null,
-                  is_verified: false,
-                  is_active: true,
-                  is_banned: false,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
                 },
                 error: null,
               })
             }
             return Promise.resolve({ data: null, error: null })
           },
-          maybeSingle: () => Promise.resolve({ data: null, error: null }),
         }),
-        order: (column: string, options?: { ascending: boolean }) => ({
+        order: (column: string, { ascending }: { ascending: boolean }) => ({
           limit: (limit: number) => {
-            if (table === "community_posts") {
+            if (table === "media_items") {
               return Promise.resolve({
-                data: Array(Math.min(limit, 3))
+                data: Array(limit)
                   .fill(0)
                   .map((_, i) => ({
                     id: i + 1,
-                    content: `Mock post content ${i + 1}`,
-                    vote_count: Math.floor(Math.random() * 50),
-                    comment_count: Math.floor(Math.random() * 10),
+                    title: `Mock Media ${i + 1}`,
+                    description: "Mock description",
+                    url: "/placeholder.jpg",
+                    thumbnail_url: "/placeholder.jpg",
+                    media_type: "image",
                     created_at: new Date().toISOString(),
-                    user: {
-                      id: 1,
-                      username: "mockuser",
-                      full_name: "Mock User",
-                      tier: "grassroot",
-                      avatar_url: null,
-                    },
-                    category: {
-                      id: 1,
-                      name: "General",
-                      slug: "general",
-                    },
-                    user_has_voted: false,
+                    tier_access: "grassroot",
                   })),
-                error: null,
-              })
-            }
-            if (table === "community_categories") {
-              return Promise.resolve({
-                data: [
-                  { id: 1, name: "General", slug: "general", is_active: true },
-                  { id: 2, name: "Music", slug: "music", is_active: true },
-                  { id: 3, name: "Events", slug: "events", is_active: true },
-                ],
                 error: null,
               })
             }
             return Promise.resolve({ data: [], error: null })
           },
-          range: (start: number, end: number) => Promise.resolve({ data: [], error: null }),
-        }),
-        is: (column: string, value: any) => ({
-          order: (column: string, options?: { ascending: boolean }) => ({
-            limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-          }),
-        }),
-        ilike: (column: string, value: string) => ({
-          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-        }),
-        or: (conditions: string) => ({
-          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
         }),
       }),
-      insert: (data: any) => ({
-        select: (columns?: string) => ({
-          single: () =>
-            Promise.resolve({
-              data: {
-                ...data,
-                id: Math.floor(Math.random() * 1000),
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              },
-              error: null,
-            }),
-        }),
-      }),
-      update: (data: any) => ({
-        eq: (column: string, value: any) => ({
-          select: (columns?: string) => ({
-            single: () => Promise.resolve({ data: { ...data }, error: null }),
-          }),
-        }),
-      }),
-      delete: () => ({
-        eq: (column: string, value: any) => Promise.resolve({ error: null }),
-      }),
+      insert: (data: any) => Promise.resolve({ data: { ...data, id: Math.floor(Math.random() * 1000) }, error: null }),
+      update: (data: any) => Promise.resolve({ data, error: null }),
     }),
-    storage: {
-      from: (bucket: string) => ({
-        upload: (path: string, file: File) =>
-          Promise.resolve({
-            data: { path: `mock/${path}` },
-            error: null,
-          }),
-        getPublicUrl: (path: string) => ({
-          data: { publicUrl: `/placeholder.svg` },
-        }),
-      }),
-    },
-    rpc: (functionName: string, params: any) => Promise.resolve({ data: true, error: null }),
-    raw: (sql: string) => sql,
   } as any
 }
 
 // Create a Supabase client for browser usage
-export function createClient() {
+export const createClient = () => {
   if (isPreviewMode) {
     return createMockClient()
   }
@@ -227,15 +86,11 @@ export function createClient() {
     return createMockClient()
   }
 
-  return supabaseCreateClient<Database>(supabaseUrl, supabaseAnonKey)
+  return supabaseCreateClient(supabaseUrl, supabaseAnonKey)
 }
 
-// Export a singleton instance for consistent usage
-let supabaseClient: ReturnType<typeof createClient> | null = null
+// Create a singleton instance
+const supabaseClientInstance = createClient()
 
-export function getSupabaseClient() {
-  if (!supabaseClient) {
-    supabaseClient = createClient()
-  }
-  return supabaseClient
-}
+// Export the singleton instance as default
+export default supabaseClientInstance

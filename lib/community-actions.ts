@@ -1,14 +1,14 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
-import DOMPurify from "isomorphic-dompurify"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import type { User as PublicUser, CommunityComment, ReportReason, ReportTargetType } from "@/types/database"
+import DOMPurify from "isomorphic-dompurify"
 
 const VOTE_COIN_AMOUNT = 100
 
 async function getCurrentPublicUserProfile(
-  supabaseClient: ReturnType<typeof createClient>,
+  supabaseClient: ReturnType<typeof createServerSupabaseClient>,
 ): Promise<PublicUser | null> {
   try {
     const {
@@ -36,9 +36,9 @@ async function getCurrentPublicUserProfile(
         .from("users")
         .insert({
           auth_user_id: authUser.id,
-          username: authUser.user_metadata?.username || authUser.email?.split("@")[0] || "user",
-          full_name: authUser.user_metadata?.full_name || authUser.email || "",
-          email: authUser.email || "",
+          username: authUser.user_metadata?.username || authUser.email?.split('@')[0] || 'user',
+          full_name: authUser.user_metadata?.full_name || authUser.email || '',
+          email: authUser.email || '',
           avatar_url: authUser.user_metadata?.avatar_url,
         })
         .select()
@@ -60,36 +60,20 @@ async function getCurrentPublicUserProfile(
 }
 
 // --- Post Actions ---
-export async function createCommunityPost(formData: FormData) {
+export async function createCommunityPostAction(formData: FormData) {
   try {
-    const supabase = await createClient()
+    const supabase = createServerSupabaseClient()
+    const userProfile = await getCurrentPublicUserProfile(supabase)
 
-    // Get current user safely
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: "Authentication required" }
+    if (!userProfile) {
+      return { success: false, error: "User not authenticated or profile not found." }
     }
 
-    // Get user profile safely
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("id")
-      .eq("auth_user_id", user.id)
-      .single()
-
-    if (profileError || !userProfile) {
-      return { success: false, error: "User profile not found" }
-    }
-
-    const content = formData.get("content") as string
+    const rawContent = formData.get("content") as string
     const categoryId = formData.get("categoryId") as string
     const mediaFile = formData.get("mediaFile") as File | null
 
-    if (!content?.trim() && !mediaFile) {
+    if (!rawContent?.trim() && !mediaFile) {
       return { success: false, error: "Please provide content or upload media." }
     }
 
@@ -97,7 +81,7 @@ export async function createCommunityPost(formData: FormData) {
       return { success: false, error: "Please select a category." }
     }
 
-    const sanitizedContent = DOMPurify.sanitize(content)
+    const sanitizedContent = rawContent ? DOMPurify.sanitize(rawContent) : ""
 
     let media_url: string | undefined = undefined
     let media_type: string | undefined = undefined
@@ -138,10 +122,6 @@ export async function createCommunityPost(formData: FormData) {
       media_url,
       media_type,
       media_metadata,
-      is_published: true,
-      is_deleted: false,
-      vote_count: 0,
-      comment_count: 0,
     }
 
     const { data: newPost, error } = await supabase
@@ -169,7 +149,7 @@ export async function createCommunityPost(formData: FormData) {
 
 export async function editPostAction(postId: number, formData: FormData) {
   try {
-    const supabase = await createClient()
+    const supabase = createServerSupabaseClient()
     const userProfile = await getCurrentPublicUserProfile(supabase)
 
     if (!userProfile) {
@@ -229,7 +209,7 @@ export async function editPostAction(postId: number, formData: FormData) {
 
 export async function deletePostAction(postId: number) {
   try {
-    const supabase = await createClient()
+    const supabase = createServerSupabaseClient()
     const userProfile = await getCurrentPublicUserProfile(supabase)
 
     if (!userProfile) {
@@ -260,7 +240,7 @@ export async function deletePostAction(postId: number) {
 
 export async function voteOnPostAction(postId: number, postCreatorAuthId: string) {
   try {
-    const supabase = await createClient()
+    const supabase = createServerSupabaseClient()
     const voterProfile = await getCurrentPublicUserProfile(supabase)
 
     if (!voterProfile) {
@@ -346,7 +326,7 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId: string
 // --- Comment Actions ---
 export async function createCommentAction(postId: number, content: string, parentCommentId?: number | null) {
   try {
-    const supabase = await createClient()
+    const supabase = createServerSupabaseClient()
     const userProfile = await getCurrentPublicUserProfile(supabase)
 
     if (!userProfile) {
@@ -388,7 +368,7 @@ export async function createCommentAction(postId: number, content: string, paren
 
 export async function editCommentAction(commentId: number, content: string) {
   try {
-    const supabase = await createClient()
+    const supabase = createServerSupabaseClient()
     const userProfile = await getCurrentPublicUserProfile(supabase)
 
     if (!userProfile) {
@@ -431,7 +411,7 @@ export async function editCommentAction(commentId: number, content: string) {
 
 export async function deleteCommentAction(commentId: number) {
   try {
-    const supabase = await createClient()
+    const supabase = createServerSupabaseClient()
     const userProfile = await getCurrentPublicUserProfile(supabase)
 
     if (!userProfile) {
@@ -463,7 +443,7 @@ export async function deleteCommentAction(commentId: number) {
 
 export async function toggleLikeCommentAction(commentId: number) {
   try {
-    const supabase = await createClient()
+    const supabase = createServerSupabaseClient()
     const userProfile = await getCurrentPublicUserProfile(supabase)
 
     if (!userProfile) {
@@ -525,7 +505,7 @@ export async function createReportAction(
   additionalNotes = "",
 ) {
   try {
-    const supabase = await createClient()
+    const supabase = createServerSupabaseClient()
     const userProfile = await getCurrentPublicUserProfile(supabase)
 
     if (!userProfile) {
@@ -570,7 +550,7 @@ export async function fetchCommunityPosts(
 ) {
   try {
     const { categoryFilter, sortOrder = "newest", page = 1, limit = 10, searchQuery } = options
-    const supabase = await createClient()
+    const supabase = createServerSupabaseClient()
     const offset = (page - 1) * limit
 
     // Get logged in user's internal ID if provided
@@ -635,7 +615,7 @@ export async function fetchCommunityPosts(
 
 export async function fetchCommentsForPost(postId: number, loggedInUserId?: string) {
   try {
-    const supabase = await createClient()
+    const supabase = createServerSupabaseClient()
 
     // Get logged in user's internal ID if provided
     let loggedInUserInternalId: number | undefined
@@ -705,7 +685,7 @@ export async function searchUsersForMention(query: string) {
   try {
     if (!query || query.length < 2) return []
 
-    const supabase = await createClient()
+    const supabase = createServerSupabaseClient()
     const { data, error } = await supabase
       .from("users")
       .select("id, username, full_name, avatar_url")
@@ -729,6 +709,7 @@ export async function searchUsersForMention(query: string) {
   }
 }
 
+// Dummy data for fallback
 export async function getDummyPosts() {
   return [
     {
@@ -768,8 +749,7 @@ export async function getDummyPosts() {
       id: 2,
       user_id: 2,
       category_id: 2,
-      content:
-        "Just dropped some fire bars 🔥\n\n*They say I'm the king of my city*\n*But I tell them I'm just getting started*\n*Paper boy flow, now I'm paper rich*\n*From the streets to the studio, never departed*",
+      content: "Just dropped some fire bars 🔥\n\n*They say I'm the king of my city*\n*But I tell them I'm just getting started*\n*Paper boy flow, now I'm paper rich*\n*From the streets to the studio, never departed*",
       media_url: null,
       media_type: null,
       media_metadata: null,
@@ -799,26 +779,4 @@ export async function getDummyPosts() {
       has_voted: false,
     },
   ]
-}
-
-export async function fetchCommunityCategories() {
-  try {
-    const supabase = await createClient()
-
-    const { data: categories, error } = await supabase
-      .from("community_categories")
-      .select("*")
-      .eq("is_active", true)
-      .order("display_order", { ascending: true })
-
-    if (error) {
-      console.error("Error fetching categories:", error)
-      return []
-    }
-
-    return categories || []
-  } catch (error) {
-    console.error("Error in fetchCommunityCategories:", error)
-    return []
-  }
 }

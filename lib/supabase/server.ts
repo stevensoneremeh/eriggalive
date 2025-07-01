@@ -35,19 +35,11 @@ export function createMockServerClient(): SupabaseClient<Database> {
       upsert: () => Promise.resolve({ data: [], error: null }),
       update: () => Promise.resolve({ data: [], error: null }),
       delete: () => Promise.resolve({ data: [], error: null }),
-      eq: function () {
-        return this
-      },
+      eq: function() { return this },
       single: () => Promise.resolve({ data: null, error: null }),
-      order: function () {
-        return this
-      },
-      limit: function () {
-        return this
-      },
-      range: function () {
-        return this
-      },
+      order: function() { return this },
+      limit: function() { return this },
+      range: function() { return this },
     }),
     auth: {
       getUser: async () => ({ data: { user: null }, error: null }),
@@ -69,24 +61,16 @@ export function createMockServerClient(): SupabaseClient<Database> {
 
 /**
  * Standard server-side client built with the ANON key.
- * Uses cookies for auth state management.
+ * No `req/res` objects are required, so it is safe during Next.js prerender.
  */
-export function createServerSupabaseClient() {
+export function createServerSupabaseClient(): SupabaseClient<Database> {
   if (isPreviewMode()) return createMockServerClient()
 
-  const cookieStore = cookies()
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const supabaseUrl = process.env.SUPABASE_URL as string
+  const supabaseKey = process.env.SUPABASE_ANON_KEY as string
 
   return createSupabaseClient<Database>(supabaseUrl, supabaseKey, {
-    auth: {
-      persistSession: false,
-    },
-    global: {
-      headers: {
-        Cookie: cookieStore.toString(),
-      },
-    },
+    auth: { persistSession: false },
   })
 }
 
