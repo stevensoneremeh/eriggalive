@@ -13,16 +13,13 @@ import {
   LogIn,
   CreditCard,
   Music,
-  Ticket,
   ShoppingBag,
-  Home,
-  BookOpen,
-  Users,
   Crown,
-  LayoutDashboard,
   Sun,
   Moon,
   Monitor,
+  Calendar,
+  Archive,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useTheme } from "@/contexts/theme-context"
@@ -30,6 +27,7 @@ import { DynamicLogo } from "@/components/dynamic-logo"
 import { CoinBalance } from "@/components/coin-balance"
 import { UserTierBadge } from "@/components/user-tier-badge"
 import { cn } from "@/lib/utils"
+import { Coins } from "lucide-react" // Import Coins icon
 
 // Navigation skeleton component
 function NavigationSkeleton() {
@@ -59,6 +57,16 @@ function NavigationContent() {
   const { user, profile, signOut, isAuthenticated, isLoading } = useAuth()
   const { theme, setTheme, resolvedTheme, isLoading: themeLoading } = useTheme()
 
+  const navigation = [
+    { name: "Home", href: "/", icon: Music },
+    { name: "Chronicles", href: "/chronicles", icon: Archive },
+    { name: "Vault", href: "/vault", icon: Crown },
+    { name: "Tickets", href: "/tickets", icon: Calendar },
+    { name: "Merch", href: "/merch", icon: ShoppingBag },
+    { name: "Coins", href: "/coins", icon: Coins },
+    { name: "Premium", href: "/premium", icon: Crown },
+  ]
+
   // Handle mounting
   useEffect(() => {
     setMounted(true)
@@ -77,17 +85,6 @@ function NavigationContent() {
   useEffect(() => {
     setIsMobileMenuOpen(false)
   }, [pathname])
-
-  const navItems = [
-    { name: "Home", href: "/", icon: <Home className="h-5 w-5" /> },
-    { name: "Community", href: "/community", icon: <Users className="h-5 w-5" /> },
-    { name: "Chronicles", href: "/chronicles", icon: <BookOpen className="h-5 w-5" /> },
-    { name: "Media Vault", href: "/vault", icon: <Music className="h-5 w-5" /> },
-    { name: "Dashboard", href: "/dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
-    { name: "Tickets", href: "/tickets", icon: <Ticket className="h-5 w-5" /> },
-    { name: "Premium", href: "/premium", icon: <Crown className="h-5 w-5" /> },
-    { name: "Merch", href: "/merch", icon: <ShoppingBag className="h-5 w-5" /> },
-  ]
 
   const isActive = (path: string) => {
     if (path === "/") {
@@ -120,20 +117,24 @@ function NavigationContent() {
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  "px-3 py-2 text-sm font-medium rounded-md transition-all duration-200",
-                  isActive(item.href)
-                    ? "text-primary bg-primary/10 shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent",
-                )}
-              >
-                {item.name}
-              </Link>
-            ))}
+            {navigation.map((item) => {
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    "px-3 py-2 text-sm font-medium rounded-md transition-all duration-200",
+                    isActive(item.href)
+                      ? "text-primary bg-primary/10 shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent",
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                  {item.name}
+                </Link>
+              )
+            })}
           </nav>
 
           {/* User Actions */}
@@ -188,7 +189,7 @@ function NavigationContent() {
                       <UserTierBadge tier={profile.tier} />
                     </div>
                     <Link href="/dashboard">
-                      <Button variant="outline" size="sm" className="hidden md:flex">
+                      <Button variant="outline" size="sm" className="hidden md:flex bg-transparent">
                         <User className="h-4 w-4 mr-2" />
                         Dashboard
                       </Button>
@@ -206,7 +207,7 @@ function NavigationContent() {
                 ) : (
                   <>
                     <Link href="/login">
-                      <Button variant="outline" size="sm" className="hidden md:flex">
+                      <Button variant="outline" size="sm" className="hidden md:flex bg-transparent">
                         <LogIn className="h-4 w-4 mr-2" />
                         Login
                       </Button>
@@ -261,23 +262,26 @@ function NavigationContent() {
                   {/* Mobile Navigation */}
                   <nav className="flex-1 p-4">
                     <ul className="space-y-2">
-                      {navItems.map((item) => (
-                        <li key={item.name}>
-                          <Link
-                            href={item.href}
-                            className={cn(
-                              "flex items-center px-3 py-3 rounded-md transition-all duration-200",
-                              isActive(item.href)
-                                ? "bg-primary/10 text-primary"
-                                : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                            )}
-                            onClick={() => setIsMobileMenuOpen(false)}
-                          >
-                            <span className="mr-3">{item.icon}</span>
-                            {item.name}
-                          </Link>
-                        </li>
-                      ))}
+                      {navigation.map((item) => {
+                        const Icon = item.icon
+                        return (
+                          <li key={item.name}>
+                            <Link
+                              href={item.href}
+                              className={cn(
+                                "flex items-center px-3 py-3 rounded-md transition-all duration-200",
+                                isActive(item.href)
+                                  ? "bg-primary/10 text-primary"
+                                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                              )}
+                              onClick={() => setIsMobileMenuOpen(false)}
+                            >
+                              <span className="mr-3">{Icon}</span>
+                              {item.name}
+                            </Link>
+                          </li>
+                        )
+                      })}
                     </ul>
                   </nav>
 
@@ -320,13 +324,13 @@ function NavigationContent() {
                     {isAuthenticated ? (
                       <div className="space-y-2">
                         <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
-                          <Button variant="outline" className="w-full justify-start">
+                          <Button variant="outline" className="w-full justify-start bg-transparent">
                             <User className="h-4 w-4 mr-2" />
                             Dashboard
                           </Button>
                         </Link>
                         <Link href="/coins" onClick={() => setIsMobileMenuOpen(false)}>
-                          <Button variant="outline" className="w-full justify-start">
+                          <Button variant="outline" className="w-full justify-start bg-transparent">
                             <CreditCard className="h-4 w-4 mr-2" />
                             Manage Coins
                           </Button>
@@ -346,7 +350,7 @@ function NavigationContent() {
                     ) : (
                       <div className="space-y-2">
                         <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                          <Button variant="outline" className="w-full justify-start">
+                          <Button variant="outline" className="w-full justify-start bg-transparent">
                             <LogIn className="h-4 w-4 mr-2" />
                             Login
                           </Button>
@@ -368,7 +372,7 @@ function NavigationContent() {
 }
 
 // Main Navigation component with Suspense boundary
-export function Navigation() {
+export function NavigationComponent() {
   return (
     <Suspense fallback={<NavigationSkeleton />}>
       <NavigationContent />

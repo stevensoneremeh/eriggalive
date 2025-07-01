@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, Suspense } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -40,7 +40,6 @@ function LoginFormWithSearchParams() {
 
   const router = useRouter()
   const { signIn, user, loading } = useAuth()
-  const searchParams = useSearchParams()
   const [searchParamsReady, setSearchParamsReady] = useState(false)
 
   useEffect(() => {
@@ -51,24 +50,14 @@ function LoginFormWithSearchParams() {
 
   // Set redirect path after component mounts and search params are ready
   useEffect(() => {
-    if (searchParamsReady && searchParams) {
-      const redirect = searchParams.get("redirect")
-      if (redirect && redirect.startsWith("/")) {
-        setRedirectPath(redirect)
-      }
-    }
-  }, [searchParams, searchParamsReady])
-
-  // Handle already authenticated users
-  useEffect(() => {
-    if (user && !loading) {
+    if (searchParamsReady && user) {
       setShowSuccess(true)
       const timer = setTimeout(() => {
         router.replace(redirectPath)
       }, 1000)
       return () => clearTimeout(timer)
     }
-  }, [user, loading, router, redirectPath])
+  }, [user, searchParamsReady, router, redirectPath])
 
   // Show loading state during initialization
   if (loading) {
