@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import supabase from "@/lib/supabase/client"
 import { Navigation } from "@/components/navigation"
 import { ProfileView } from "@/components/profile/profile-view"
 import { notFound } from "next/navigation"
@@ -10,7 +10,7 @@ interface ProfilePageProps {
 }
 
 export default async function ProfilePage({ params }: ProfilePageProps) {
-  const supabase = await createClient()
+  // const supabase = await createClient() // Removed this line
 
   // Get current user
   const {

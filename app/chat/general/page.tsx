@@ -1,11 +1,11 @@
 import { GeneralChat } from "@/components/chat/general-chat"
 import { ChatSidebar } from "@/components/chat/chat-sidebar"
 import { Navigation } from "@/components/navigation"
-import { createClient } from "@/lib/supabase/server"
+import supabase from "@/lib/supabase/client"
 import { redirect } from "next/navigation"
 
 export default async function GeneralChatPage() {
-  const supabase = await createClient()
+  // const supabase = await createClient() // Removed this line
 
   // Get current user
   const {

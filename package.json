@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@auth/core": "latest",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "latest",
@@ -59,7 +60,9 @@
     "isomorphic-dompurify": "latest",
     "lucide-react": "^0.454.0",
     "next": "15.2.4",
+    "next-auth": "latest",
     "next-themes": "latest",
+    "nodemailer": "latest",
     "react": "^19",
     "react-day-picker": "latest",
     "react-dom": "^19",

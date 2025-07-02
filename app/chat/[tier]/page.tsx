@@ -1,7 +1,7 @@
 import { TierChat } from "@/components/tier-chat"
 import { ChatSidebar } from "@/components/chat/chat-sidebar"
 import { Navigation } from "@/components/navigation"
-import { createClient } from "@/lib/supabase/server"
+import supabase from "@/lib/supabase/client"
 import { redirect, notFound } from "next/navigation"
 
 interface TierChatPageProps {
@@ -13,8 +13,6 @@ interface TierChatPageProps {
 const validTiers = ["grassroot", "pioneer", "elder", "blood"]
 
 export default async function TierChatPage({ params }: TierChatPageProps) {
-  const supabase = await createClient()
-
   if (!validTiers.includes(params.tier.toLowerCase())) {
     notFound()
   }

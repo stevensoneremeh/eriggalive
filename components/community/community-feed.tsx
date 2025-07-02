@@ -1,86 +1,43 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { PostCard } from "./post-card"
-import { createClient } from "@/lib/supabase/client"
-import { Loader2 } from "lucide-react"
+import { useState, useEffect } from "react"
+import type { Post } from "@/types"
+import PostCard from "@/components/post/post-card"
+import { useSession } from "next-auth/react"
+import supabase from "@/lib/supabase/client"
 
-interface Post {
-  id: string
-  title: string
-  content: string
-  author_id: string
-  category_id: string
-  image_url?: string
-  upvotes: number
-  downvotes: number
-  comment_count: number
-  view_count: number
-  created_at: string
-  profiles: {
-    username: string
-    display_name?: string
-    avatar_url?: string
-  }
-  categories: {
-    name: string
-    color: string
-    icon?: string
-  }
-}
-
-export function CommunityFeed() {
+const CommunityFeed = () => {
   const [posts, setPosts] = useState<Post[]>([])
-  const [loading, setLoading] = useState(true)
-  const supabase = createClient()
+  const { data: session } = useSession()
+  const userId = session?.user?.id
 
   useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const { data, error } = await supabase.from("posts").select("*").order("created_at", { ascending: false })
+
+        if (error) {
+          console.error("Error fetching posts:", error)
+        }
+
+        if (data) {
+          setPosts(data)
+        }
+      } catch (error) {
+        console.error("Error during fetch:", error)
+      }
+    }
+
     fetchPosts()
   }, [])
 
-  const fetchPosts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("posts")
-        .select(`
-          *,
-          profiles:author_id (username, display_name, avatar_url),
-          categories:category_id (name, color, icon)
-        `)
-        .order("created_at", { ascending: false })
-        .limit(20)
-
-      if (error) throw error
-      setPosts(data || [])
-    } catch (error) {
-      console.error("Error fetching posts:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    )
-  }
-
-  if (posts.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <h3 className="text-lg font-semibold mb-2">No posts yet</h3>
-        <p className="text-muted-foreground">Be the first to start a conversation!</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
+        <PostCard key={post.id} post={post} userId={userId} />
       ))}
     </div>
   )
 }
+
+export default CommunityFeed

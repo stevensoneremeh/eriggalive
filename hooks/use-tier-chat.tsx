@@ -1,6 +1,6 @@
 "use client"
 
-import { createClient } from "@/lib/supabase/client"
+import supabase from "@/lib/supabase/client"
 import { useCallback, useEffect, useState } from "react"
 
 interface UseTierChatProps {
@@ -22,7 +22,6 @@ export interface TierChatMessage {
 const EVENT_MESSAGE_TYPE = "tier_message"
 
 export function useTierChat({ userTier, username }: UseTierChatProps) {
-  const supabase = createClient()
   const [messages, setMessages] = useState<TierChatMessage[]>([])
   const [channel, setChannel] = useState<ReturnType<typeof supabase.channel> | null>(null)
   const [isConnected, setIsConnected] = useState(false)

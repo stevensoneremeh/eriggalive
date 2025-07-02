@@ -3,10 +3,10 @@ import { CommunityFeed } from "@/components/community/community-feed"
 import { CommunityHeader } from "@/components/community/community-header"
 import { CommunityStats } from "@/components/community/community-stats"
 import { Navigation } from "@/components/navigation"
-import { createClient } from "@/lib/supabase/server"
+import supabase from "@/lib/supabase/client"
 
 export default async function CommunityPage() {
-  const supabase = await createClient()
+  // const supabase = await createClient()
 
   // Get current user
   const {
