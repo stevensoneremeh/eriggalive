@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const supabase = createClient()
 
-    // First, get posts
+    // First, get posts with all required fields
     const { data: posts, error: postsError } = await supabase
       .from("community_posts")
       .select(`
@@ -58,19 +58,28 @@ export async function GET() {
     const {
       data: { user },
     } = await supabase.auth.getUser()
+
     let userVotes = []
+    let currentUserInternalId = null
 
     if (user) {
-      const { data: votes } = await supabase
-        .from("community_post_votes")
-        .select("post_id")
-        .eq("user_id", user.id)
-        .in(
-          "post_id",
-          posts.map((p) => p.id),
-        )
+      // Get user's internal ID
+      const { data: userData } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
 
-      userVotes = votes?.map((v) => v.post_id) || []
+      currentUserInternalId = userData?.id
+
+      if (currentUserInternalId) {
+        const { data: votes } = await supabase
+          .from("community_post_votes")
+          .select("post_id")
+          .eq("user_id", currentUserInternalId)
+          .in(
+            "post_id",
+            posts.map((p) => p.id),
+          )
+
+        userVotes = votes?.map((v) => v.post_id) || []
+      }
     }
 
     // Combine the data
@@ -154,7 +163,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ post })
+    return NextResponse.json({ success: true, post })
   } catch (error) {
     console.error("API Error:", error)
     return NextResponse.json({ error: "Failed to create post" }, { status: 500 })
