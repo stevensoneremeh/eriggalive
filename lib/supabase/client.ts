@@ -24,3 +24,7 @@ export function createServerSupabase() {
 export default function createSupabaseClient() {
   return createClientComponentClient<Database>()
 }
+
+// Alias for compatibility with older imports
+//      import { createClientSupabase } from "@/lib/supabase/client"
+export const createClientSupabaseAlias = createClientSupabase

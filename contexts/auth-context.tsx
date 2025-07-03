@@ -13,11 +13,13 @@ interface AuthContextType {
   session: Session | null
   profile: UserProfile | null
   loading: boolean
+  isAuthenticated: boolean
+  isLoading: boolean
   signIn: (email: string, password: string) => Promise<{ error: any }>
   signUp: (
     email: string,
     password: string,
-    userData: { username: string; full_name: string },
+    userData: { username: string; full_name: string; tier?: string },
   ) => Promise<{ error: any }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
@@ -101,7 +103,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const signUp = async (email: string, password: string, userData: { username: string; full_name: string }) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    userData: { username: string; full_name: string; tier?: string },
+  ) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -115,13 +121,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Create user profile
       if (data.user) {
+        const tier = userData.tier || "grassroot"
+        const coins = tier === "grassroot" ? 100 : tier === "pioneer" ? 500 : 1000
+
         const { error: profileError } = await supabase.from("users").insert({
           auth_user_id: data.user.id,
           email: email,
           username: userData.username,
           full_name: userData.full_name,
-          tier: "grassroot",
-          coins: 100, // Starting coins
+          tier: tier as any,
+          coins: coins,
           level: 1,
           points: 0,
           is_active: true,
@@ -149,6 +158,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     profile,
     loading,
+    isAuthenticated: !!user,
+    isLoading: loading,
     signIn,
     signUp,
     signOut,
