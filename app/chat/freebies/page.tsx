@@ -1,11 +1,11 @@
 import { FreebiesFeed } from "@/components/freebies/freebies-feed"
 import { ChatSidebar } from "@/components/chat/chat-sidebar"
 import { Navigation } from "@/components/navigation"
-import supabase from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 
 export default async function FreebiesPage() {
-  // const supabase = await createClient()
+  const supabase = await createClient()
 
   // Get current user
   const {

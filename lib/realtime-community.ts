@@ -1,6 +1,6 @@
 "use client"
 
-import supabase from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import { useEffect, useState, useCallback } from "react"
 import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js"
 
@@ -76,14 +76,14 @@ export interface UserPresence {
 export function useRealtimePosts(initialPosts: CommunityPost[] = []) {
   const [posts, setPosts] = useState<CommunityPost[]>(initialPosts)
   const [loading, setLoading] = useState(false)
-  const supabaseClient = supabase
+  const supabase = createClient()
 
   useEffect(() => {
     let channel: RealtimeChannel
 
     const setupRealtimeSubscription = async () => {
       // Subscribe to posts changes
-      channel = supabaseClient
+      channel = supabase
         .channel("community_posts_changes")
         .on(
           "postgres_changes",
@@ -97,7 +97,7 @@ export function useRealtimePosts(initialPosts: CommunityPost[] = []) {
 
             if (payload.eventType === "INSERT") {
               // Fetch the new post with user data
-              const { data: newPost } = await supabaseClient
+              const { data: newPost } = await supabase
                 .from("community_posts")
                 .select(`
                   *,
@@ -130,7 +130,7 @@ export function useRealtimePosts(initialPosts: CommunityPost[] = []) {
           },
           async (payload: RealtimePostgresChangesPayload<any>) => {
             // Update vote counts in real-time
-            const { data: updatedPost } = await supabaseClient
+            const { data: updatedPost } = await supabase
               .from("community_posts")
               .select("id, vote_count")
               .eq("id", payload.new.post_id)
@@ -152,15 +152,15 @@ export function useRealtimePosts(initialPosts: CommunityPost[] = []) {
 
     return () => {
       if (channel) {
-        supabaseClient.removeChannel(channel)
+        supabase.removeChannel(channel)
       }
     }
-  }, [supabaseClient])
+  }, [supabase])
 
   const refreshPosts = useCallback(async () => {
     setLoading(true)
     try {
-      const { data } = await supabaseClient
+      const { data } = await supabase
         .from("community_posts")
         .select(`
           *,
@@ -184,7 +184,7 @@ export function useRealtimePosts(initialPosts: CommunityPost[] = []) {
     } finally {
       setLoading(false)
     }
-  }, [supabaseClient])
+  }, [supabase])
 
   return { posts, loading, refreshPosts }
 }
@@ -193,7 +193,7 @@ export function useRealtimePosts(initialPosts: CommunityPost[] = []) {
 export function useRealtimeNotifications(userId?: string) {
   const [notifications, setNotifications] = useState<UserNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
-  const supabaseClient = supabase
+  const supabase = createClient()
 
   useEffect(() => {
     if (!userId) return
@@ -202,7 +202,7 @@ export function useRealtimeNotifications(userId?: string) {
 
     const setupNotifications = async () => {
       // Fetch initial notifications
-      const { data } = await supabaseClient
+      const { data } = await supabase
         .from("notifications")
         .select("*")
         .eq("user_id", userId)
@@ -215,7 +215,7 @@ export function useRealtimeNotifications(userId?: string) {
       }
 
       // Subscribe to new notifications
-      channel = supabaseClient
+      channel = supabase
         .channel(`notifications_${userId}`)
         .on(
           "postgres_changes",
@@ -252,25 +252,25 @@ export function useRealtimeNotifications(userId?: string) {
 
     return () => {
       if (channel) {
-        supabaseClient.removeChannel(channel)
+        supabase.removeChannel(channel)
       }
     }
-  }, [userId, supabaseClient])
+  }, [userId, supabase])
 
   const markAsRead = useCallback(
     async (notificationId: number) => {
-      await supabaseClient.from("notifications").update({ is_read: true }).eq("id", notificationId)
+      await supabase.from("notifications").update({ is_read: true }).eq("id", notificationId)
     },
-    [supabaseClient],
+    [supabase],
   )
 
   const markAllAsRead = useCallback(async () => {
     if (!userId) return
 
-    await supabaseClient.from("notifications").update({ is_read: true }).eq("user_id", userId).eq("is_read", false)
+    await supabase.from("notifications").update({ is_read: true }).eq("user_id", userId).eq("is_read", false)
 
     setUnreadCount(0)
-  }, [userId, supabaseClient])
+  }, [userId, supabase])
 
   return { notifications, unreadCount, markAsRead, markAllAsRead }
 }
@@ -278,7 +278,7 @@ export function useRealtimeNotifications(userId?: string) {
 // Real-time presence hook
 export function useRealtimePresence(currentUserId?: string) {
   const [onlineUsers, setOnlineUsers] = useState<UserPresence[]>([])
-  const supabaseClient = supabase
+  const supabase = createClient()
 
   useEffect(() => {
     if (!currentUserId) return
@@ -289,7 +289,7 @@ export function useRealtimePresence(currentUserId?: string) {
     const setupPresence = async () => {
       // Update user presence
       const updatePresence = async (status = "online") => {
-        await supabaseClient.from("user_presence").upsert({
+        await supabase.from("user_presence").upsert({
           user_id: currentUserId,
           status,
           last_seen: new Date().toISOString(),
@@ -307,7 +307,7 @@ export function useRealtimePresence(currentUserId?: string) {
       }, 30000) // Update every 30 seconds
 
       // Subscribe to presence changes
-      channel = supabaseClient
+      channel = supabase
         .channel("user_presence_changes")
         .on(
           "postgres_changes",
@@ -318,7 +318,7 @@ export function useRealtimePresence(currentUserId?: string) {
           },
           async () => {
             // Fetch updated online users
-            const { data } = await supabaseClient
+            const { data } = await supabase
               .from("user_presence")
               .select("*")
               .eq("status", "online")
@@ -358,19 +358,19 @@ export function useRealtimePresence(currentUserId?: string) {
 
     return () => {
       if (channel) {
-        supabaseClient.removeChannel(channel)
+        supabase.removeChannel(channel)
       }
       if (presenceInterval) {
         clearInterval(presenceInterval)
       }
       // Set user offline when component unmounts
-      supabaseClient.from("user_presence").upsert({
+      supabase.from("user_presence").upsert({
         user_id: currentUserId,
         status: "offline",
         last_seen: new Date().toISOString(),
       })
     }
-  }, [currentUserId, supabaseClient])
+  }, [currentUserId, supabase])
 
   return { onlineUsers }
 }
@@ -378,14 +378,14 @@ export function useRealtimePresence(currentUserId?: string) {
 // Real-time comments hook
 export function useRealtimeComments(postId: number) {
   const [comments, setComments] = useState<CommunityComment[]>([])
-  const supabaseClient = supabase
+  const supabase = createClient()
 
   useEffect(() => {
     let channel: RealtimeChannel
 
     const setupCommentsSubscription = async () => {
       // Fetch initial comments
-      const { data } = await supabaseClient
+      const { data } = await supabase
         .from("community_comments")
         .select(`
           *,
@@ -402,7 +402,7 @@ export function useRealtimeComments(postId: number) {
       }
 
       // Subscribe to comment changes
-      channel = supabaseClient
+      channel = supabase
         .channel(`comments_${postId}`)
         .on(
           "postgres_changes",
@@ -414,7 +414,7 @@ export function useRealtimeComments(postId: number) {
           },
           async (payload: RealtimePostgresChangesPayload<any>) => {
             // Fetch the new comment with user data
-            const { data: newComment } = await supabaseClient
+            const { data: newComment } = await supabase
               .from("community_comments")
               .select(`
                 *,
@@ -463,10 +463,10 @@ export function useRealtimeComments(postId: number) {
 
     return () => {
       if (channel) {
-        supabaseClient.removeChannel(channel)
+        supabase.removeChannel(channel)
       }
     }
-  }, [postId, supabaseClient])
+  }, [postId, supabase])
 
   return { comments }
 }
