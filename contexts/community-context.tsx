@@ -202,79 +202,138 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
           userInternalId = userData?.id
         }
 
-        // --- inside loadPosts (replace everything from `let query = supabase...` down to
-        // the end of the try { ... } block) ---
+        // First, check if community_posts table exists
+        let postsData: any[] = []
+        try {
+          // Build the base query for posts only
+          let query = supabase.from("community_posts").select("*").eq("is_published", true).eq("is_deleted", false)
 
-        // 1️⃣ build the base query (posts + author + category)
-        let query = supabase
-          .from("community_posts")
-          .select(
-            `
-      *,
-      user:users(id, auth_user_id, username, full_name, avatar_url, tier),
-      category:community_categories(id, name, slug)
-    `,
-          )
-          .eq("is_published", true)
-          .eq("is_deleted", false)
+          // Apply filters
+          if (state.filters.category) {
+            query = query.eq("category_id", state.filters.category)
+          }
+          if (state.filters.search) {
+            query = query.ilike("content", `%${state.filters.search}%`)
+          }
 
-        // 2️⃣ filters
-        if (state.filters.category) {
-          query = query.eq("category_id", state.filters.category)
-        }
-        if (state.filters.search) {
-          query = query.ilike("content", `%${state.filters.search}%`)
-        }
+          // Apply sorting
+          switch (state.filters.sort) {
+            case "newest":
+              query = query.order("created_at", { ascending: false })
+              break
+            case "oldest":
+              query = query.order("created_at", { ascending: true })
+              break
+            case "top":
+              query = query.order("vote_count", { ascending: false }).order("created_at", { ascending: false })
+              break
+          }
 
-        // 3️⃣ sorting
-        switch (state.filters.sort) {
-          case "newest":
-            query = query.order("created_at", { ascending: false })
-            break
-          case "oldest":
-            query = query.order("created_at", { ascending: true })
-            break
-          case "top":
-            query = query.order("vote_count", { ascending: false }).order("created_at", { ascending: false })
-            break
-        }
+          // Apply pagination
+          query = query.range(offset, offset + limit - 1)
 
-        // 4️⃣ pagination
-        query = query.range(offset, offset + limit - 1)
-
-        // --- run the query ---
-        const { data: postsData, error } = await query
-        if (error) throw error
-
-        // 5️⃣ If the viewer is logged-in, fetch the set of post_ids they’ve already voted on
-        let votedPostIds: number[] = []
-        if (userInternalId && postsData && postsData.length) {
-          const { data: voteRows } = await supabase
-            .from("community_post_votes")
-            .select("post_id")
-            .eq("user_id", userInternalId)
-            .in(
-              "post_id",
-              postsData.map((p: any) => p.id),
-            )
-
-          votedPostIds = voteRows?.map((v) => v.post_id) ?? []
+          const { data, error } = await query
+          if (error) {
+            if (error.code === "42P01") {
+              // Table doesn't exist, return empty array
+              console.warn("community_posts table is missing")
+              postsData = []
+            } else {
+              throw error
+            }
+          } else {
+            postsData = data || []
+          }
+        } catch (error: any) {
+          console.error("Error fetching posts:", error)
+          postsData = []
         }
 
-        // 6️⃣ decorate posts
-        const postsWithVoteStatus = (postsData || []).map((post: any) => ({
-          ...post,
-          has_voted: votedPostIds.includes(post.id),
-        }))
+        // If we have posts, fetch related data separately
+        let enrichedPosts: any[] = []
+        if (postsData.length > 0) {
+          // Get unique user IDs and category IDs
+          const userIds = [...new Set(postsData.map((post) => post.user_id).filter(Boolean))]
+          const categoryIds = [...new Set(postsData.map((post) => post.category_id).filter(Boolean))]
 
-        // 7️⃣ push to state
+          // Fetch users data
+          let usersData: any[] = []
+          if (userIds.length > 0) {
+            try {
+              const { data: users } = await supabase
+                .from("users")
+                .select("id, auth_user_id, username, full_name, avatar_url, tier")
+                .in("id", userIds)
+              usersData = users || []
+            } catch (error) {
+              console.warn("Could not fetch users data:", error)
+            }
+          }
+
+          // Fetch categories data
+          let categoriesData: any[] = []
+          if (categoryIds.length > 0) {
+            try {
+              const { data: categories } = await supabase
+                .from("community_categories")
+                .select("id, name, slug")
+                .in("id", categoryIds)
+              categoriesData = categories || []
+            } catch (error) {
+              console.warn("Could not fetch categories data:", error)
+            }
+          }
+
+          // Get vote status for current user
+          let votedPostIds: number[] = []
+          if (userInternalId && postsData.length > 0) {
+            try {
+              const { data: voteRows } = await supabase
+                .from("community_post_votes")
+                .select("post_id")
+                .eq("user_id", userInternalId)
+                .in(
+                  "post_id",
+                  postsData.map((p) => p.id),
+                )
+              votedPostIds = voteRows?.map((v) => v.post_id) ?? []
+            } catch (error) {
+              console.warn("Could not fetch vote data:", error)
+            }
+          }
+
+          // Manually join the data
+          enrichedPosts = postsData.map((post) => {
+            const postUser = usersData.find((u) => u.id === post.user_id)
+            const postCategory = categoriesData.find((c) => c.id === post.category_id)
+
+            return {
+              ...post,
+              user: postUser || {
+                id: post.user_id,
+                username: "Unknown User",
+                full_name: "Unknown User",
+                avatar_url: null,
+                tier: "grassroot",
+              },
+              category: postCategory || {
+                id: post.category_id,
+                name: "General",
+                slug: "general",
+              },
+              has_voted: votedPostIds.includes(post.id),
+            }
+          })
+        }
+
+        // Update state
         if (reset) {
-          dispatch({ type: "SET_POSTS", payload: postsWithVoteStatus })
+          dispatch({ type: "SET_POSTS", payload: enrichedPosts })
         } else {
-          dispatch({ type: "ADD_POSTS", payload: postsWithVoteStatus })
+          dispatch({ type: "ADD_POSTS", payload: enrichedPosts })
         }
 
-        dispatch({ type: "SET_HAS_MORE", payload: postsWithVoteStatus.length === limit })
+        dispatch({ type: "SET_HAS_MORE", payload: enrichedPosts.length === limit })
         dispatch({ type: "SET_PAGE", payload: page + 1 })
       } catch (error: any) {
         console.error("Error loading posts:", error)
@@ -397,21 +456,47 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         (payload) => {
           // Only add if it's not from the current user (to avoid duplicates)
           if (payload.new.user_id !== profile?.id) {
-            // Fetch the full post data with relations
-            supabase
-              .from("community_posts")
-              .select(`
-                *,
-                user:users(id, auth_user_id, username, full_name, avatar_url, tier),
-                category:community_categories(id, name, slug)
-              `)
-              .eq("id", payload.new.id)
-              .single()
-              .then(({ data }) => {
-                if (data) {
-                  dispatch({ type: "ADD_POST", payload: { ...data, has_voted: false } })
+            // For real-time updates, we'll need to fetch the user and category data separately too
+            const fetchPostData = async () => {
+              try {
+                // Get user data
+                const { data: userData } = await supabase
+                  .from("users")
+                  .select("id, auth_user_id, username, full_name, avatar_url, tier")
+                  .eq("id", payload.new.user_id)
+                  .single()
+
+                // Get category data
+                const { data: categoryData } = await supabase
+                  .from("community_categories")
+                  .select("id, name, slug")
+                  .eq("id", payload.new.category_id)
+                  .single()
+
+                const enrichedPost = {
+                  ...payload.new,
+                  user: userData || {
+                    id: payload.new.user_id,
+                    username: "Unknown User",
+                    full_name: "Unknown User",
+                    avatar_url: null,
+                    tier: "grassroot",
+                  },
+                  category: categoryData || {
+                    id: payload.new.category_id,
+                    name: "General",
+                    slug: "general",
+                  },
+                  has_voted: false,
                 }
-              })
+
+                dispatch({ type: "ADD_POST", payload: enrichedPost })
+              } catch (error) {
+                console.error("Error fetching real-time post data:", error)
+              }
+            }
+
+            fetchPostData()
           }
         },
       )
