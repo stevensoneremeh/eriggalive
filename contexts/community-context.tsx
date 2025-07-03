@@ -149,27 +149,31 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
           userInternalId = userData?.id
         }
 
+        // --- inside loadPosts (replace everything from `let query = supabase...` down to
+        // the end of the try { ... } block) ---
+
+        // 1️⃣ build the base query (posts + author + category)
         let query = supabase
           .from("community_posts")
-          .select(`
-            *,
-            user:users!community_posts_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
-            category:community_categories!community_posts_category_id_fkey(id, name, slug),
-            votes:community_post_votes(user_id)
-          `)
+          .select(
+            `
+      *,
+      user:users(id, auth_user_id, username, full_name, avatar_url, tier),
+      category:community_categories(id, name, slug)
+    `,
+          )
           .eq("is_published", true)
           .eq("is_deleted", false)
 
-        // Apply filters
+        // 2️⃣ filters
         if (state.filters.category) {
           query = query.eq("category_id", state.filters.category)
         }
-
         if (state.filters.search) {
           query = query.ilike("content", `%${state.filters.search}%`)
         }
 
-        // Apply sorting
+        // 3️⃣ sorting
         switch (state.filters.sort) {
           case "newest":
             query = query.order("created_at", { ascending: false })
@@ -182,17 +186,35 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
             break
         }
 
+        // 4️⃣ pagination
         query = query.range(offset, offset + limit - 1)
 
-        const { data, error } = await query
-
+        // --- run the query ---
+        const { data: postsData, error } = await query
         if (error) throw error
 
-        const postsWithVoteStatus = (data || []).map((post: any) => ({
+        // 5️⃣ If the viewer is logged-in, fetch the set of post_ids they’ve already voted on
+        let votedPostIds: number[] = []
+        if (userInternalId && postsData && postsData.length) {
+          const { data: voteRows } = await supabase
+            .from("community_post_votes")
+            .select("post_id")
+            .eq("user_id", userInternalId)
+            .in(
+              "post_id",
+              postsData.map((p: any) => p.id),
+            )
+
+          votedPostIds = voteRows?.map((v) => v.post_id) ?? []
+        }
+
+        // 6️⃣ decorate posts
+        const postsWithVoteStatus = (postsData || []).map((post: any) => ({
           ...post,
-          has_voted: userInternalId ? post.votes.some((vote: any) => vote.user_id === userInternalId) : false,
+          has_voted: votedPostIds.includes(post.id),
         }))
 
+        // 7️⃣ push to state
         if (reset) {
           dispatch({ type: "SET_POSTS", payload: postsWithVoteStatus })
         } else {
