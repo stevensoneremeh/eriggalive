@@ -1,9 +1,9 @@
-import { createClient } from "@/lib/supabase/server"
+import { createAdminSupabaseClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    const supabase = createClient()
+    const supabase = createAdminSupabaseClient()
 
     // First, get posts with all required fields
     const { data: posts, error: postsError } = await supabase
@@ -54,32 +54,32 @@ export async function GET() {
       .select("id, name, slug, icon, color")
       .in("id", categoryIds)
 
-    // Get current user for vote status
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // Get current user for vote status (if authenticated)
+    let userVotes: number[] = []
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-    let userVotes = []
-    let currentUserInternalId = null
+      if (user) {
+        // Get user's internal ID
+        const { data: userData } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
 
-    if (user) {
-      // Get user's internal ID
-      const { data: userData } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
+        if (userData) {
+          const { data: votes } = await supabase
+            .from("community_post_votes")
+            .select("post_id")
+            .eq("user_id", userData.id)
+            .in(
+              "post_id",
+              posts.map((p) => p.id),
+            )
 
-      currentUserInternalId = userData?.id
-
-      if (currentUserInternalId) {
-        const { data: votes } = await supabase
-          .from("community_post_votes")
-          .select("post_id")
-          .eq("user_id", currentUserInternalId)
-          .in(
-            "post_id",
-            posts.map((p) => p.id),
-          )
-
-        userVotes = votes?.map((v) => v.post_id) || []
+          userVotes = votes?.map((v) => v.post_id) || []
+        }
       }
+    } catch (error) {
+      console.warn("Could not fetch user vote status:", error)
     }
 
     // Combine the data
@@ -122,7 +122,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const supabase = createClient()
+    const supabase = createAdminSupabaseClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -154,6 +154,11 @@ export async function POST(request: Request) {
         media_url,
         media_type,
         hashtags: hashtags || [],
+        vote_count: 0,
+        comment_count: 0,
+        view_count: 0,
+        is_published: true,
+        is_deleted: false,
       })
       .select()
       .single()
