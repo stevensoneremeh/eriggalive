@@ -55,6 +55,7 @@
     "date-fns": "latest",
     "dompurify": "latest",
     "embla-carousel-react": "latest",
+    "fs": "latest",
     "input-otp": "latest",
     "isomorphic-dompurify": "latest",
     "lucide-react": "^0.454.0",
