@@ -113,6 +113,46 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClientComponentClient<Database>()
 
   const loadCategories = useCallback(async () => {
+    // Default fallback if the table isn't available yet
+    const fallbackCategories: CommunityCategory[] = [
+      {
+        id: 1,
+        name: "General",
+        slug: "general",
+        description: null,
+        icon: null,
+        color: "#3B82F6",
+        display_order: 1,
+        is_active: true,
+        created_at: null,
+        updated_at: null,
+      },
+      {
+        id: 2,
+        name: "Music & Bars",
+        slug: "music-bars",
+        description: null,
+        icon: null,
+        color: "#10B981",
+        display_order: 2,
+        is_active: true,
+        created_at: null,
+        updated_at: null,
+      },
+      {
+        id: 3,
+        name: "Events & Shows",
+        slug: "events",
+        description: null,
+        icon: null,
+        color: "#F59E0B",
+        display_order: 3,
+        is_active: true,
+        created_at: null,
+        updated_at: null,
+      },
+    ]
+
     try {
       const { data, error } = await supabase
         .from("community_categories")
@@ -120,11 +160,24 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         .eq("is_active", true)
         .order("display_order", { ascending: true })
 
+      // If the table does not exist in the connected DB yet, fall back silently
+      if (error?.code === "42P01") {
+        console.warn("community_categories table is missing – using fallback list")
+        dispatch({ type: "SET_CATEGORIES", payload: fallbackCategories })
+        return
+      }
+
       if (error) throw error
-      dispatch({ type: "SET_CATEGORIES", payload: data || [] })
+
+      dispatch({
+        type: "SET_CATEGORIES",
+        payload: (data && data.length > 0 ? data : fallbackCategories) as CommunityCategory[],
+      })
     } catch (error: any) {
       console.error("Error loading categories:", error)
       dispatch({ type: "SET_ERROR", payload: error.message })
+      // Still give the UI something sensible to show
+      dispatch({ type: "SET_CATEGORIES", payload: fallbackCategories })
     }
   }, [supabase])
 
@@ -349,8 +402,8 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
               .from("community_posts")
               .select(`
                 *,
-                user:users!community_posts_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
-                category:community_categories!community_posts_category_id_fkey(id, name, slug)
+                user:users(id, auth_user_id, username, full_name, avatar_url, tier),
+                category:community_categories(id, name, slug)
               `)
               .eq("id", payload.new.id)
               .single()
