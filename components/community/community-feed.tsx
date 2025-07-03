@@ -1,35 +1,36 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import type { Post } from "@/types"
-import PostCard from "@/components/post/post-card"
-import { useSession } from "next-auth/react"
-import supabase from "@/lib/supabase/client"
+import React, { useState, useEffect } from 'react';
+import { Post } from '@/types';
+import PostCard from '@/components/post/post-card';
+import { useSession } from 'next-auth/react';
+import supabase from "@/lib/supabase/client";
 
 const CommunityFeed = () => {
-  const [posts, setPosts] = useState<Post[]>([])
-  const { data: session } = useSession()
-  const userId = session?.user?.id
+  const [posts, setPosts] = useState<Post[]>([]);
+  const { data: session } = useSession();
+  const userId = session?.user?.id;
 
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const { data, error } = await supabase.from("posts").select("*").order("created_at", { ascending: false })
+        const { data, error } = await supabase
+          .from('posts')
+          .select('*')
+          .order('created_at', { ascending: false });
 
         if (error) {
-          console.error("Error fetching posts:", error)
+          console.error('Error fetching posts:', error);
         }
 
         if (data) {
-          setPosts(data)
+          setPosts(data);
         }
       } catch (error) {
-        console.error("Error during fetch:", error)
+        console.error('Error during fetch:', error);
       }
-    }
+    };
 
-    fetchPosts()
-  }, [])
+    fetchPosts();
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -37,7 +38,7 @@ const CommunityFeed = () => {
         <PostCard key={post.id} post={post} userId={userId} />
       ))}
     </div>
-  )
-}
+  );
+};
 
-export default CommunityFeed
+export default CommunityFeed;

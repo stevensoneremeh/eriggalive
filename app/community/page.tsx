@@ -29,16 +29,3 @@ export default async function CommunityPage() {
             <CommunityHeader />
             <Suspense fallback={<div className="animate-pulse bg-muted h-96 rounded-lg" />}>
               <CommunityFeed />
-            </Suspense>
-          </div>
-
-          <div className="lg:col-span-1">
-            <Suspense fallback={<div className="animate-pulse bg-muted h-48 rounded-lg" />}>
-              <CommunityStats />
-            </Suspense>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}

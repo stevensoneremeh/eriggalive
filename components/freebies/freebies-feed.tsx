@@ -1,44 +1,40 @@
-"use client"
-
-import type React from "react"
-
-import type { Freebie } from "@/types"
-import FreebieCard from "./freebie-card"
-import { useEffect, useState } from "react"
-import supabase from "@/lib/supabase/client"
+import { Freebie } from "@/types";
+import FreebieCard from "./freebie-card";
+import { useEffect, useState } from "react";
+import supabase from "@/lib/supabase/client";
 
 interface FreebiesFeedProps {
-  category?: string
+  category?: string;
 }
 
 const FreebiesFeed: React.FC<FreebiesFeedProps> = ({ category }) => {
-  const [freebies, setFreebies] = useState<Freebie[]>([])
-  const [loading, setLoading] = useState(true)
+  const [freebies, setFreebies] = useState<Freebie[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchFreebies = async () => {
-      setLoading(true)
-      let query = supabase.from("freebies").select("*").order("created_at", { ascending: false })
+      setLoading(true);
+      let query = supabase.from("freebies").select("*").order("created_at", { ascending: false });
 
       if (category) {
-        query = query.eq("category", category)
+        query = query.eq("category", category);
       }
 
-      const { data, error } = await query
+      const { data, error } = await query;
 
       if (error) {
-        console.error("Error fetching freebies:", error)
+        console.error("Error fetching freebies:", error);
       } else {
-        setFreebies(data || [])
+        setFreebies(data || []);
       }
-      setLoading(false)
-    }
+      setLoading(false);
+    };
 
-    fetchFreebies()
-  }, [category])
+    fetchFreebies();
+  }, [category]);
 
   if (loading) {
-    return <div>Loading freebies...</div>
+    return <div>Loading freebies...</div>;
   }
 
   return (
@@ -47,7 +43,7 @@ const FreebiesFeed: React.FC<FreebiesFeedProps> = ({ category }) => {
         <FreebieCard key={freebie.id} freebie={freebie} />
       ))}
     </div>
-  )
-}
+  );
+};
 
-export default FreebiesFeed
+export default FreebiesFeed;
