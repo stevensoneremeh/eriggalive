@@ -1,82 +1,162 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { createAdminSupabaseClient } from "@/lib/supabase-utils"
+import { createClient } from "@/lib/supabase/server"
+import { NextResponse } from "next/server"
 
-/**
- * GET /api/community/posts
- * Query params:
- *   - limit    : number   (default 20)
- *   - before   : ISO date (cursor pagination)
- *   - category : id | slug (optional filter)
- *
- * This endpoint DOES NOT rely on PostgREST join syntax ― it enriches posts
- * manually so it works even if FK relationships are missing in the DB.
- */
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-
-  const limit = Number(searchParams.get("limit") ?? 20)
-  const before = searchParams.get("before") // ISO string
-  const categoryParam = searchParams.get("category") // id or slug
-
+export async function GET() {
   try {
-    const supabase = createAdminSupabaseClient()
+    const supabase = createClient()
 
-    /* ---------- base post query ---------- */
-    let postQuery = supabase.from("community_posts").select("*").order("created_at", { ascending: false }).limit(limit)
+    // First, get posts
+    const { data: posts, error: postsError } = await supabase
+      .from("community_posts")
+      .select(`
+        id,
+        content,
+        hashtags,
+        media_url,
+        media_type,
+        vote_count,
+        comment_count,
+        view_count,
+        is_pinned,
+        is_featured,
+        created_at,
+        updated_at,
+        user_id,
+        category_id
+      `)
+      .eq("is_published", true)
+      .eq("is_deleted", false)
+      .order("created_at", { ascending: false })
+      .limit(20)
 
-    if (before) {
-      postQuery = postQuery.lt("created_at", before)
+    if (postsError) {
+      console.error("Error fetching posts:", postsError)
+      return NextResponse.json({ posts: [], error: postsError.message }, { status: 500 })
     }
 
-    /* ---------- optional category filter ---------- */
-    if (categoryParam) {
-      let categoryId: number | null = null
-
-      if (/^\d+$/.test(categoryParam)) {
-        // param is a numeric id
-        categoryId = Number(categoryParam)
-      } else {
-        // param is a slug → look up id
-        const { data: cat } = await supabase
-          .from("community_categories")
-          .select("id")
-          .eq("slug", categoryParam)
-          .maybeSingle()
-
-        if (cat) categoryId = cat.id
-      }
-
-      if (categoryId) {
-        postQuery = postQuery.eq("category_id", categoryId)
-      }
+    if (!posts || posts.length === 0) {
+      return NextResponse.json({ posts: [] })
     }
 
-    const { data: posts, error: postErr } = await postQuery
-    if (postErr) throw postErr
+    // Get unique user IDs and category IDs
+    const userIds = [...new Set(posts.map((post) => post.user_id))]
+    const categoryIds = [...new Set(posts.map((post) => post.category_id))]
 
-    if (!posts?.length) return NextResponse.json([], { status: 200 })
+    // Fetch users
+    const { data: users } = await supabase
+      .from("users")
+      .select("id, username, full_name, avatar_url, tier")
+      .in("id", userIds)
 
-    /* ---------- enrich with user + category ---------- */
-    const userIds = [...new Set(posts.map((p) => p.user_id))].filter(Boolean)
-    const categoryIds = [...new Set(posts.map((p) => p.category_id))].filter(Boolean)
+    // Fetch categories
+    const { data: categories } = await supabase
+      .from("community_categories")
+      .select("id, name, slug, icon, color")
+      .in("id", categoryIds)
 
-    const [{ data: users }, { data: categories }] = await Promise.all([
-      supabase.from("users").select("id, username, avatar_url, tier").in("id", userIds),
-      supabase.from("community_categories").select("id, name, slug").in("id", categoryIds),
-    ])
+    // Get current user for vote status
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    let userVotes = []
 
-    const usersMap = new Map((users ?? []).map((u) => [u.id, u]))
-    const categoriesMap = new Map((categories ?? []).map((c) => [c.id, c]))
+    if (user) {
+      const { data: votes } = await supabase
+        .from("community_post_votes")
+        .select("post_id")
+        .eq("user_id", user.id)
+        .in(
+          "post_id",
+          posts.map((p) => p.id),
+        )
 
-    const enriched = posts.map((p) => ({
-      ...p,
-      user: usersMap.get(p.user_id) ?? null,
-      category: categoriesMap.get(p.category_id) ?? null,
-    }))
+      userVotes = votes?.map((v) => v.post_id) || []
+    }
 
-    return NextResponse.json(enriched, { status: 200 })
-  } catch (err: any) {
-    console.error("GET /api/community/posts ->", err)
-    return NextResponse.json({ error: err.message ?? "Unknown error" }, { status: 500 })
+    // Combine the data
+    const enrichedPosts = posts.map((post) => {
+      const postUser = users?.find((u) => u.id === post.user_id)
+      const postCategory = categories?.find((c) => c.id === post.category_id)
+
+      return {
+        ...post,
+        user: postUser || {
+          id: post.user_id,
+          username: "Unknown User",
+          full_name: "Unknown User",
+          avatar_url: "/placeholder-user.jpg",
+          tier: "grassroot",
+        },
+        category: postCategory || {
+          id: post.category_id,
+          name: "General",
+          slug: "general",
+          icon: "💬",
+          color: "#3B82F6",
+        },
+        has_voted: userVotes.includes(post.id),
+      }
+    })
+
+    return NextResponse.json({ posts: enrichedPosts })
+  } catch (error) {
+    console.error("API Error:", error)
+    return NextResponse.json(
+      {
+        posts: [],
+        error: "Failed to fetch posts",
+      },
+      { status: 500 },
+    )
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { content, category_id, media_url, media_type, hashtags } = body
+
+    if (!content || !category_id) {
+      return NextResponse.json({ error: "Content and category are required" }, { status: 400 })
+    }
+
+    // Get user's internal ID
+    const { data: userData } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
+
+    if (!userData) {
+      return NextResponse.json({ error: "User profile not found" }, { status: 404 })
+    }
+
+    const { data: post, error } = await supabase
+      .from("community_posts")
+      .insert({
+        user_id: userData.id,
+        category_id,
+        content,
+        media_url,
+        media_type,
+        hashtags: hashtags || [],
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Error creating post:", error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ post })
+  } catch (error) {
+    console.error("API Error:", error)
+    return NextResponse.json({ error: "Failed to create post" }, { status: 500 })
   }
 }
