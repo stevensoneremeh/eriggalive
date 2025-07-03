@@ -63,7 +63,7 @@ const nextConfig = {
     // Disable the missing suspense with CSR bailout check
     missingSuspenseWithCSRBailout: false,
     // Additional experimental flags to help with SSR issues
-    serverExternalPackages: [],
+    serverExternalComponentsPackages: [],
     optimizePackageImports: ['lucide-react'],
   },
   // Force static generation for specific pages
