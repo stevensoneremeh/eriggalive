@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useReducer, useCallback, useEffect } from "react"
+import { createContext, useContext, useReducer, useCallback, useEffect, useState } from "react"
 import type { CommunityPost, CommunityCategory } from "@/types/database"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Database } from "@/types/database"
@@ -111,99 +111,28 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(communityReducer, initialState)
   const { user, profile } = useAuth()
   const supabase = createClientComponentClient<Database>()
+  const [loading, setLoading] = useState(true)
+  const [categories, setCategories] = useState<CommunityCategory[]>([])
+  const [posts, setPosts] = useState<CommunityPost[]>([])
 
   const loadCategories = useCallback(async () => {
-    // Default fallback if the table isn't available yet
-    const fallbackCategories: CommunityCategory[] = [
-      {
-        id: 1,
-        name: "General",
-        slug: "general",
-        description: null,
-        icon: null,
-        color: "#3B82F6",
-        display_order: 1,
-        is_active: true,
-        created_at: null,
-        updated_at: null,
-      },
-      {
-        id: 2,
-        name: "Music & Bars",
-        slug: "music-bars",
-        description: null,
-        icon: null,
-        color: "#10B981",
-        display_order: 2,
-        is_active: true,
-        created_at: null,
-        updated_at: null,
-      },
-      {
-        id: 3,
-        name: "Events & Shows",
-        slug: "events",
-        description: null,
-        icon: null,
-        color: "#F59E0B",
-        display_order: 3,
-        is_active: true,
-        created_at: null,
-        updated_at: null,
-      },
-    ]
-
     try {
-      // Try to fetch categories with minimal columns first
-      const { data, error } = await supabase
-        .from("community_categories")
-        .select("id, name, slug")
-        .order("id", { ascending: true })
-
-      // If the table does not exist in the connected DB yet, fall back silently
-      if (error?.code === "42P01") {
-        console.warn("community_categories table is missing – using fallback list")
-        dispatch({ type: "SET_CATEGORIES", payload: fallbackCategories })
-        return
-      }
-
-      // If column doesn't exist, still fall back
-      if (error?.code === "42703") {
-        console.warn("community_categories table has different schema – using fallback list")
-        dispatch({ type: "SET_CATEGORIES", payload: fallbackCategories })
-        return
-      }
-
-      if (error) {
-        console.warn("Error fetching categories, using fallback:", error.message)
-        dispatch({ type: "SET_CATEGORIES", payload: fallbackCategories })
-        return
-      }
-
-      // Transform the data to match our expected format
-      const transformedCategories = (data || []).map((cat: any) => ({
-        id: cat.id,
-        name: cat.name || "Unknown",
-        slug: cat.slug || `category-${cat.id}`,
-        description: null,
-        icon: null,
-        color: "#3B82F6",
-        display_order: cat.id,
-        is_active: true,
-        created_at: null,
-        updated_at: null,
-      }))
-
-      dispatch({
-        type: "SET_CATEGORIES",
-        payload: transformedCategories.length > 0 ? transformedCategories : fallbackCategories,
-      })
-    } catch (error: any) {
-      console.error("Error loading categories:", error)
-      // Always provide fallback categories so the UI doesn't break
+      const res = await fetch("/api/community/categories")
+      if (!res.ok) throw new Error(await res.text())
+      const data: CommunityCategory[] = await res.json()
+      setCategories(data)
+      dispatch({ type: "SET_CATEGORIES", payload: data })
+    } catch (err) {
+      console.error("Error loading categories:", err)
+      // fallback to a simple default to keep UI alive
+      const fallbackCategories = [
+        { id: 1, name: "General", slug: "general" },
+        { id: 2, name: "Announcements", slug: "announcements" },
+      ]
+      setCategories(fallbackCategories)
       dispatch({ type: "SET_CATEGORIES", payload: fallbackCategories })
     }
-  }, [supabase])
+  }, [])
 
   const loadPosts = useCallback(
     async (reset = false) => {
@@ -482,6 +411,11 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const setFilters = useCallback((filters: Partial<CommunityState["filters"]>) => {
     dispatch({ type: "SET_FILTERS", payload: filters })
   }, [])
+
+  const refresh = useCallback(() => {
+    setLoading(true)
+    Promise.all([loadCategories(), loadPosts()]).finally(() => setLoading(false))
+  }, [loadCategories, loadPosts])
 
   // Load categories on mount
   useEffect(() => {

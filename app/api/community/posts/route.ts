@@ -1,68 +1,82 @@
-import { createClient } from "@/utils/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
+import { createAdminSupabaseClient } from "@/lib/supabase-utils"
 
-export async function POST(request: NextRequest) {
+/**
+ * GET /api/community/posts
+ * Query params:
+ *   - limit    : number   (default 20)
+ *   - before   : ISO date (cursor pagination)
+ *   - category : id | slug (optional filter)
+ *
+ * This endpoint DOES NOT rely on PostgREST join syntax ― it enriches posts
+ * manually so it works even if FK relationships are missing in the DB.
+ */
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+
+  const limit = Number(searchParams.get("limit") ?? 20)
+  const before = searchParams.get("before") // ISO string
+  const categoryParam = searchParams.get("category") // id or slug
+
   try {
-    const supabase = await createClient()
+    const supabase = createAdminSupabaseClient()
 
-    // Get current user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    /* ---------- base post query ---------- */
+    let postQuery = supabase.from("community_posts").select("*").order("created_at", { ascending: false }).limit(limit)
 
-    if (!user) {
-      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
+    if (before) {
+      postQuery = postQuery.lt("created_at", before)
     }
 
-    // Get user profile
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("id")
-      .eq("auth_user_id", user.id)
-      .single()
+    /* ---------- optional category filter ---------- */
+    if (categoryParam) {
+      let categoryId: number | null = null
 
-    if (profileError || !userProfile) {
-      return NextResponse.json({ success: false, error: "User profile not found" }, { status: 404 })
+      if (/^\d+$/.test(categoryParam)) {
+        // param is a numeric id
+        categoryId = Number(categoryParam)
+      } else {
+        // param is a slug → look up id
+        const { data: cat } = await supabase
+          .from("community_categories")
+          .select("id")
+          .eq("slug", categoryParam)
+          .maybeSingle()
+
+        if (cat) categoryId = cat.id
+      }
+
+      if (categoryId) {
+        postQuery = postQuery.eq("category_id", categoryId)
+      }
     }
 
-    const body = await request.json()
-    const { content, categoryId } = body
+    const { data: posts, error: postErr } = await postQuery
+    if (postErr) throw postErr
 
-    if (!content?.trim()) {
-      return NextResponse.json({ success: false, error: "Post content is required" }, { status: 400 })
-    }
+    if (!posts?.length) return NextResponse.json([], { status: 200 })
 
-    if (!categoryId) {
-      return NextResponse.json({ success: false, error: "Category is required" }, { status: 400 })
-    }
+    /* ---------- enrich with user + category ---------- */
+    const userIds = [...new Set(posts.map((p) => p.user_id))].filter(Boolean)
+    const categoryIds = [...new Set(posts.map((p) => p.category_id))].filter(Boolean)
 
-    // Create post
-    const { data: newPost, error: postError } = await supabase
-      .from("community_posts")
-      .insert({
-        user_id: userProfile.id,
-        category_id: Number.parseInt(categoryId),
-        content: content.trim(),
-        is_published: true,
-        is_deleted: false,
-        vote_count: 0,
-        comment_count: 0,
-      })
-      .select(`
-        *,
-        user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
-        category:community_categories!community_posts_category_id_fkey(id, name, slug)
-      `)
-      .single()
+    const [{ data: users }, { data: categories }] = await Promise.all([
+      supabase.from("users").select("id, username, avatar_url, tier").in("id", userIds),
+      supabase.from("community_categories").select("id, name, slug").in("id", categoryIds),
+    ])
 
-    if (postError) {
-      console.error("Error creating post:", postError)
-      return NextResponse.json({ success: false, error: postError.message }, { status: 500 })
-    }
+    const usersMap = new Map((users ?? []).map((u) => [u.id, u]))
+    const categoriesMap = new Map((categories ?? []).map((c) => [c.id, c]))
 
-    return NextResponse.json({ success: true, post: newPost })
-  } catch (error: any) {
-    console.error("Error in create post API:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
+    const enriched = posts.map((p) => ({
+      ...p,
+      user: usersMap.get(p.user_id) ?? null,
+      category: categoriesMap.get(p.category_id) ?? null,
+    }))
+
+    return NextResponse.json(enriched, { status: 200 })
+  } catch (err: any) {
+    console.error("GET /api/community/posts ->", err)
+    return NextResponse.json({ error: err.message ?? "Unknown error" }, { status: 500 })
   }
 }
