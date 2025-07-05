@@ -1,23 +1,25 @@
-import { createBrowserClient } from "@supabase/ssr"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/database"
 
-let client: ReturnType<typeof createBrowserClient> | null = null
+/**
+ * Browser-side Supabase client (singleton).
+ *
+ * Exposes three identical entry-points so **all existing code keeps working**:
+ *   1.  import { createClient } from "@/lib/supabase/client"
+ *   2.  import { createClientSupabase } from "@/lib/supabase/client"
+ *   3.  import createClientSupabase from "@/lib/supabase/client"
+ */
+let _client: SupabaseClient<Database> | null = null
 
-export function createClient() {
-  if (client) return client
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing Supabase environment variables")
-  }
-
-  client = createBrowserClient(supabaseUrl, supabaseAnonKey)
-  return client
+function initClient() {
+  if (_client) return _client
+  // `createClientComponentClient` automatically reads
+  // NEXT_PUBLIC_SUPABASE_URL & NEXT_PUBLIC_SUPABASE_ANON_KEY.
+  _client = createClientComponentClient<Database>()
+  return _client
 }
 
-// Legacy alias for backward compatibility
-export const createClientSupabase = createClient
-
-// Default export
-export default createClient
+export const createClient = initClient
+export const createClientSupabase = initClient // legacy alias
+export default initClient

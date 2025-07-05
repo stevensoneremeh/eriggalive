@@ -1,57 +1,40 @@
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
+import { createClient } from "@supabase/supabase-js"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/database"
 
-export async function createClient() {
-  const cookieStore = await cookies()
+/**
+ * Server-side Supabase client (singleton).
+ * Works in Route Handlers, Server Actions, and Server Components.
+ *
+ * All legacy imports below are supported:
+ *   import { createClientSupabase } from "@/lib/supabase/server"
+ *   import createServerSupabase     from "@/lib/supabase/server"
+ */
+let _serverClient: SupabaseClient<Database> | null = null
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+function initServerClient() {
+  if (_serverClient) return _serverClient
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing Supabase environment variables")
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !key) {
+    throw new Error(
+      "Supabase environment variables are missing on the server. " +
+        "Add `NEXT_PUBLIC_SUPABASE_URL` and " +
+        "`SUPABASE_SERVICE_ROLE_KEY` (or anon key) in Vercel.",
+    )
   }
 
-  return createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-        } catch {
-          // The `setAll` method was called from a Server Component.
-          // This can be ignored if you have middleware refreshing
-          // user sessions.
-        }
-      },
+  _serverClient = createClient<Database>(url, key, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
   })
+  return _serverClient
 }
 
-export async function createServerSupabaseClient() {
-  return createClient()
-}
-
-export async function createAdminSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase admin environment variables")
-  }
-
-  return createServerClient(supabaseUrl, supabaseServiceKey, {
-    cookies: {
-      getAll() {
-        return []
-      },
-      setAll() {
-        // Admin client doesn't need cookies
-      },
-    },
-  })
-}
-
-// Legacy aliases
-export const createServerSupabaseClientAlias = createServerSupabaseClient
+export const createClientSupabase = initServerClient // legacy alias
+export const createServerSupabase = initServerClient // alt alias
+export default initServerClient
