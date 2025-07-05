@@ -822,3 +822,6 @@ export async function fetchCommunityCategories() {
     return []
   }
 }
+
+// Alias so legacy `import { createCommunityPostAction }` continues to work:
+export { createCommunityPost as createCommunityPostAction } from "./community-actions"

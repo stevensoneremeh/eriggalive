@@ -1,59 +1,46 @@
-import { createClient } from "@supabase/supabase-js"
+import { cookies } from "next/headers"
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createClient as createBrowserlessClient } from "@supabase/supabase-js"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 
-/**
- * Server-side Supabase client (singleton).
- * Works in Route Handlers, Server Actions, and Server Components.
- *
- * All legacy imports below are supported:
- *   import { createClientSupabase } from "@/lib/supabase/server"
- *   import createServerSupabase     from "@/lib/supabase/server"
- */
+/* ------------------------------------------------------------------
+   🌐  ONE-TIME (singleton) SERVER COMPONENT / ACTION CLIENT
+   ------------------------------------------------------------------ */
 let _serverClient: SupabaseClient<Database> | null = null
 
-function initServerClient() {
+function initServerClient(): SupabaseClient<Database> {
   if (_serverClient) return _serverClient
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  // The helper automatically reads NEXT_PUBLIC_SUPABASE_URL + ANON KEY
+  const cookieStore = cookies()
+  _serverClient = createServerComponentClient<Database>({ cookies: () => cookieStore })
 
-  if (!url || !key) {
-    throw new Error(
-      "Supabase environment variables are missing on the server. " +
-        "Add `NEXT_PUBLIC_SUPABASE_URL` and " +
-        "`SUPABASE_SERVICE_ROLE_KEY` (or anon key) in Vercel.",
-    )
-  }
-
-  _serverClient = createClient<Database>(url, key, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
   return _serverClient
 }
 
-/* ------------------------------------------------------------------ */
-/*  ✨  PUBLIC EXPORTS – keep every legacy import working              */
-/* ------------------------------------------------------------------ */
-
-// Generic helper (most pages)
-export const createServerClient = initServerClient
-
-// Full-access (service-role) helper
-export function createAdminSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+/* ------------------------------------------------------------------
+   🛠️  ADMIN-LEVEL CLIENT  (uses SERVICE_ROLE_KEY)
+   ------------------------------------------------------------------ */
+export function createAdminSupabaseClient(): SupabaseClient<Database> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL // fallback for older env var names
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!url || !serviceKey) {
-    throw new Error("Supabase admin env vars missing — add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
+    throw new Error("Missing SUPABASE env vars — add NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
   }
 
-  return createClient<Database>(url, serviceKey, {
+  return createBrowserlessClient<Database>(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 }
+
+/* ------------------------------------------------------------------
+   ✨  PUBLIC EXPORTS  ── aliases to keep every historic import working
+   ------------------------------------------------------------------ */
+export const createClient = initServerClient // many files `import { createClient }`
+export const createServerClient = initServerClient // alternative name
+export const createServerSupabaseClient = initServerClient // legacy name
+export const createClientSupabase = initServerClient // another legacy name
 
 export default initServerClient

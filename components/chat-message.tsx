@@ -1,47 +1,45 @@
-import { cn } from "@/lib/utils"
-import type { ChatMessage } from "@/hooks/use-realtime-chat"
+/**
+ * Unified ChatMessage component – now exported both as default **and** named
+ * so imports like `import ChatMessage from "@/components/chat-message"`
+ * and   `import { ChatMessage } from "@/components/chat-message"`
+ * are both valid.
+ */
+"use client"
 
-interface ChatMessageItemProps {
-  message: ChatMessage
-  isOwnMessage: boolean
-  showHeader: boolean
+import { cn } from "@/lib/utils"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+
+export interface ChatMessageProps {
+  id?: string
+  author: { name: string; avatarUrl?: string }
+  content: string
+  timestamp?: string
+  className?: string
 }
 
-export const ChatMessageItem = ({ message, isOwnMessage, showHeader }: ChatMessageItemProps) => {
+export function ChatMessage({ author, content, timestamp, className }: ChatMessageProps) {
   return (
-    <div className={`flex mt-2 ${isOwnMessage ? "justify-end" : "justify-start"}`}>
-      <div
-        className={cn("max-w-[75%] w-fit flex flex-col gap-1", {
-          "items-end": isOwnMessage,
-        })}
-      >
-        {showHeader && (
-          <div
-            className={cn("flex items-center gap-2 text-xs px-3", {
-              "justify-end flex-row-reverse": isOwnMessage,
-            })}
-          >
-            <span className={"font-medium"}>{message.user.name}</span>
-            <span className="text-foreground/50 text-xs">
-              {new Date(message.createdAt).toLocaleTimeString("en-US", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: true,
-              })}
-            </span>
-          </div>
-        )}
-        <div
-          className={cn(
-            "py-2 px-3 rounded-xl text-sm w-fit",
-            isOwnMessage ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
-          )}
-        >
-          {message.content}
-        </div>
+    <div className={cn("flex items-start gap-3 rounded-lg px-4 py-3 hover:bg-muted/50 transition-colors", className)}>
+      <Avatar className="h-9 w-9">
+        <AvatarImage src={author.avatarUrl ?? "/placeholder-user.jpg"} alt={author.name} />
+        <AvatarFallback>
+          {author.name
+            .split(" ")
+            .map((n) => n[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium">
+          {author.name} {timestamp && <span className="ml-1 text-xs text-muted-foreground">{timestamp}</span>}
+        </p>
+        <p className="text-sm whitespace-pre-wrap break-words">{content}</p>
       </div>
     </div>
   )
 }
 
-export default ChatMessageItem
+export default ChatMessage
