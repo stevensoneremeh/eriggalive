@@ -1,46 +1,52 @@
-import { cookies } from "next/headers"
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
-import { createClient as createBrowserlessClient } from "@supabase/supabase-js"
-import type { SupabaseClient } from "@supabase/supabase-js"
-import type { Database } from "@/types/database"
+import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js"
 
-/* ------------------------------------------------------------------
-   🌐  ONE-TIME (singleton) SERVER COMPONENT / ACTION CLIENT
-   ------------------------------------------------------------------ */
-let _serverClient: SupabaseClient<Database> | null = null
+// ---------------------------------------------------------------------------
+// Environment checks
+// ---------------------------------------------------------------------------
+const url = process.env.SUPABASE_URL
+const anon = process.env.SUPABASE_ANON_KEY
+const service = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-function initServerClient(): SupabaseClient<Database> {
-  if (_serverClient) return _serverClient
-
-  // The helper automatically reads NEXT_PUBLIC_SUPABASE_URL + ANON KEY
-  const cookieStore = cookies()
-  _serverClient = createServerComponentClient<Database>({ cookies: () => cookieStore })
-
-  return _serverClient
+if (!url || !anon) {
+  throw new Error("Missing SUPABASE_URL or SUPABASE_ANON_KEY environment variables")
 }
 
-/* ------------------------------------------------------------------
-   🛠️  ADMIN-LEVEL CLIENT  (uses SERVICE_ROLE_KEY)
-   ------------------------------------------------------------------ */
-export function createAdminSupabaseClient(): SupabaseClient<Database> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL // fallback for older env var names
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+// ---------------------------------------------------------------------------
+// Singleton helpers (server-only)
+// ---------------------------------------------------------------------------
+let _anonClient: SupabaseClient | undefined
+let _serviceClient: SupabaseClient | undefined
 
-  if (!url || !serviceKey) {
-    throw new Error("Missing SUPABASE env vars — add NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
+/**
+ * Standard server-side client that uses the **anon** key.
+ * Most of the application should call this.
+ */
+export function createClient(): SupabaseClient {
+  if (!_anonClient) {
+    _anonClient = createSupabaseClient(url, anon, {
+      auth: { persistSession: false },
+    })
   }
-
-  return createBrowserlessClient<Database>(url, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
+  return _anonClient
 }
 
-/* ------------------------------------------------------------------
-   ✨  PUBLIC EXPORTS  ── aliases to keep every historic import working
-   ------------------------------------------------------------------ */
-export const createClient = initServerClient // many files `import { createClient }`
-export const createServerClient = initServerClient // alternative name
-export const createServerSupabaseClient = initServerClient // legacy name
-export const createClientSupabase = initServerClient // another legacy name
+/**
+ * Alias kept for backward compatibility.
+ */
+export const createServerSupabaseClient = createClient
 
-export default initServerClient
+/**
+ * Elevated client that uses the **service-role** key.
+ * NEVER expose this on the client!
+ */
+export function createAdminSupabaseClient(): SupabaseClient {
+  if (!service) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set – cannot create admin client")
+  }
+  if (!_serviceClient) {
+    _serviceClient = createSupabaseClient(url, service, {
+      auth: { persistSession: false },
+    })
+  }
+  return _serviceClient
+}
