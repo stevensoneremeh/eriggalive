@@ -3,26 +3,28 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    const supabase = createAdminSupabaseClient()
+    const supabase = await createAdminSupabaseClient()
 
-    // First, get posts with all required fields
+    // Check if community_posts table exists, if not use posts table
     const { data: posts, error: postsError } = await supabase
-      .from("community_posts")
+      .from("posts")
       .select(`
         id,
         content,
-        hashtags,
-        media_url,
-        media_type,
-        vote_count,
+        type,
+        media_urls,
+        media_types,
+        thumbnail_urls,
+        like_count,
         comment_count,
         view_count,
-        is_pinned,
         is_featured,
+        is_pinned,
         created_at,
         updated_at,
         user_id,
-        category_id
+        hashtags,
+        tags
       `)
       .eq("is_published", true)
       .eq("is_deleted", false)
@@ -38,21 +40,14 @@ export async function GET() {
       return NextResponse.json({ posts: [] })
     }
 
-    // Get unique user IDs and category IDs
+    // Get unique user IDs
     const userIds = [...new Set(posts.map((post) => post.user_id))]
-    const categoryIds = [...new Set(posts.map((post) => post.category_id))]
 
     // Fetch users
     const { data: users } = await supabase
       .from("users")
       .select("id, username, full_name, avatar_url, tier")
       .in("id", userIds)
-
-    // Fetch categories
-    const { data: categories } = await supabase
-      .from("community_categories")
-      .select("id, name, slug, icon, color")
-      .in("id", categoryIds)
 
     // Get current user for vote status (if authenticated)
     let userVotes: number[] = []
@@ -66,8 +61,9 @@ export async function GET() {
         const { data: userData } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
 
         if (userData) {
+          // Check for votes in post_votes or similar table
           const { data: votes } = await supabase
-            .from("community_post_votes")
+            .from("post_votes")
             .select("post_id")
             .eq("user_id", userData.id)
             .in(
@@ -85,7 +81,6 @@ export async function GET() {
     // Combine the data
     const enrichedPosts = posts.map((post) => {
       const postUser = users?.find((u) => u.id === post.user_id)
-      const postCategory = categories?.find((c) => c.id === post.category_id)
 
       return {
         ...post,
@@ -96,10 +91,10 @@ export async function GET() {
           avatar_url: "/placeholder-user.jpg",
           tier: "grassroot",
         },
-        category: postCategory || {
-          id: post.category_id,
-          name: "General",
-          slug: "general",
+        category: {
+          id: 1,
+          name: post.type || "General",
+          slug: post.type || "general",
           icon: "💬",
           color: "#3B82F6",
         },
@@ -122,7 +117,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const supabase = createAdminSupabaseClient()
+    const supabase = await createAdminSupabaseClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -132,10 +127,10 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { content, category_id, media_url, media_type, hashtags } = body
+    const { content, type = "general", media_urls, media_types, hashtags } = body
 
-    if (!content || !category_id) {
-      return NextResponse.json({ error: "Content and category are required" }, { status: 400 })
+    if (!content) {
+      return NextResponse.json({ error: "Content is required" }, { status: 400 })
     }
 
     // Get user's internal ID
@@ -146,17 +141,22 @@ export async function POST(request: Request) {
     }
 
     const { data: post, error } = await supabase
-      .from("community_posts")
+      .from("posts")
       .insert({
         user_id: userData.id,
-        category_id,
         content,
-        media_url,
-        media_type,
+        type,
+        media_urls: media_urls || [],
+        media_types: media_types || [],
+        thumbnail_urls: [],
         hashtags: hashtags || [],
-        vote_count: 0,
+        tags: [],
+        like_count: 0,
         comment_count: 0,
         view_count: 0,
+        share_count: 0,
+        is_featured: false,
+        is_pinned: false,
         is_published: true,
         is_deleted: false,
       })
