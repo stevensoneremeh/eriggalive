@@ -14,9 +14,26 @@ let _client: SupabaseClient<Database> | null = null
 
 function initClient() {
   if (_client) return _client
-  // `createClientComponentClient` automatically reads
-  // NEXT_PUBLIC_SUPABASE_URL & NEXT_PUBLIC_SUPABASE_ANON_KEY.
-  _client = createClientComponentClient<Database>()
+
+  // Read the public env vars injected at build-time.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  // Pass them explicitly (they’re required on the client).
+  if (supabaseUrl && supabaseKey) {
+    _client = createClientComponentClient<Database>({
+      supabaseUrl,
+      supabaseKey,
+    })
+  } else {
+    // Fall back to the default behaviour and warn the developer.
+    console.warn(
+      "Supabase env vars missing – falling back to createClientComponentClient() without explicit keys. " +
+        "Double-check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+    )
+    _client = createClientComponentClient<Database>()
+  }
+
   return _client
 }
 

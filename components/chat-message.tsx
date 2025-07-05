@@ -29,5 +29,7 @@ export function ChatMessage({ author, message, avatarUrl, timestamp }: ChatMessa
   )
 }
 
+export const ChatMessageItem = ChatMessage
+
 /* Default export so `import ChatMessage from '@/components/chat-message'` works */
 export default ChatMessage
