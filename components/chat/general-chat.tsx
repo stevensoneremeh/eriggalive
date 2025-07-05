@@ -1,55 +1,41 @@
 "use client"
 
-import { useState } from "react"
-import { SendHorizonal } from "lucide-react"
+import { useState, type FormEvent } from "react"
+import { useGeneralChat } from "@/hooks/use-general-chat"
+import { ChatMessage } from "@/components/chat-message"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-
-interface Message {
-  id: number
-  author: string
-  body: string
-}
+import { Card, CardContent } from "@/components/ui/card"
 
 /**
- * Ultra-lightweight “general chat” placeholder.
- * Replace with your real realtime chat implementation later.
+ * Minimal GeneralChat implementation so existing pages build.
+ * Replace this with your fully-featured chat when ready.
  */
-export default function GeneralChat() {
-  const [messages, setMessages] = useState<Message[]>([{ id: 1, author: "System", body: "Welcome to General chat 🎉" }])
-  const [draft, setDraft] = useState("")
+export function GeneralChat() {
+  const { messages, sendMessage, isLoading } = useGeneralChat()
+  const [text, setText] = useState("")
 
-  const send = () => {
-    const text = draft.trim()
-    if (!text) return
-    setMessages((prev) => [...prev, { id: Date.now(), author: "You", body: text }])
-    setDraft("")
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!text.trim()) return
+    sendMessage(text)
+    setText("")
   }
 
   return (
-    <section className="flex flex-col h-full">
-      <ScrollArea className="flex-1 p-4 space-y-2">
-        {messages.map((m) => (
-          <p key={m.id}>
-            <span className="font-semibold">{m.author}: </span>
-            {m.body}
-          </p>
-        ))}
-      </ScrollArea>
+    <Card className="w-full">
+      <CardContent className="p-4 space-y-4">
+        <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+          {isLoading ? "Loading…" : messages.map((m) => <ChatMessage key={m.id} message={m} />)}
+        </div>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          send()
-        }}
-        className="border-t p-4 flex gap-2"
-      >
-        <Input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Type a message…" />
-        <Button type="submit" size="icon" aria-label="Send">
-          <SendHorizonal className="size-4" />
-        </Button>
-      </form>
-    </section>
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <Input placeholder="Type a message…" value={text} onChange={(e) => setText(e.target.value)} />
+          <Button type="submit">Send</Button>
+        </form>
+      </CardContent>
+    </Card>
   )
 }
+
+export default GeneralChat

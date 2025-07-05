@@ -1,21 +1,32 @@
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
-import { createClient } from "@supabase/supabase-js"
-import { cookies } from "next/headers"
-import type { Database } from "@/types/database"
+/**
+ * Server-side Supabase client (singleton).
+ * Exposes:
+ *  • createClient                   ─ named  ✅
+ *  • createServerSupabaseClient     ─ named  ✅ (alias, matches previous code)
+ *  • default                        ─ same   ✅
+ */
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
-export function createServerSupabaseClient() {
-  const cookieStore = cookies()
-  return createServerComponentClient<Database>({ cookies: () => cookieStore })
+const supabaseUrl = process.env.SUPABASE_URL!
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+if (!supabaseUrl || !serviceRoleKey) {
+  throw new Error("Supabase env vars are not set (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).")
 }
 
-export function createAdminSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+let _serverClient: ReturnType<typeof createSupabaseClient> | undefined
 
-  return createClient<Database>(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
+export function createClient() {
+  if (!_serverClient) {
+    _serverClient = createSupabaseClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  }
+  return _serverClient
 }
+
+export const createServerSupabaseClient = createClient
+export default createClient
