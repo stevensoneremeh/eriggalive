@@ -28,62 +28,9 @@ const mockCommunityPosts = [
   { id: 2, author: "WarriToTheWorld", content: "That new freestyle is 🔥🔥🔥", likes: 18 },
 ]
 
-// Coins icon component
-function Coins(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="8" cy="8" r="6" />
-      <path d="M18.09 10.37A6 6 0 1 1 10.34 18" />
-      <path d="M7 6h1v4" />
-      <path d="m16.71 13.88.7.71-2.82 2.82" />
-    </svg>
-  )
-}
-
-// Helper function to format large numbers
-function formatNumber(num: number): string {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + "M"
-  }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + "K"
-  }
-  return num.toString()
-}
-
-// Helper function to get tier descriptions
-function getTierDescription(tier: string): string {
-  switch (tier.toLowerCase()) {
-    case "grassroot":
-      return "Basic access to content"
-    case "pioneer":
-      return "Early access to new releases"
-    case "elder":
-      return "Exclusive content and event discounts"
-    case "blood": // Corrected from "blood_brotherhood"
-      return "VIP access to all content and events"
-    default:
-      return "Fan membership tier"
-  }
-}
-
 export default function DashboardPage() {
   const { profile } = useAuth()
   const [activeTab, setActiveTab] = useState("overview")
-
-  // The DashboardLayout handles loading and error states, so we can assume profile exists here.
-  // The `if (!profile)` check is removed.
 
   return (
     <DashboardLayout>
@@ -283,5 +230,55 @@ export default function DashboardPage() {
         </Tabs>
       </div>
     </DashboardLayout>
+  )
+}
+
+// Helper function to format large numbers
+function formatNumber(num: number): string {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + "M"
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1) + "K"
+  }
+  return num.toString()
+}
+
+// Helper function to get tier descriptions
+function getTierDescription(tier: string): string {
+  switch (tier.toLowerCase()) {
+    case "grassroot":
+      return "Basic access to content"
+    case "pioneer":
+      return "Early access to new releases"
+    case "elder":
+      return "Exclusive content and event discounts"
+    case "blood":
+      return "VIP access to all content and events"
+    default:
+      return "Fan membership tier"
+  }
+}
+
+// Coins icon component
+function Coins(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="8" cy="8" r="6" />
+      <path d="M18.09 10.37A6 6 0 1 1 10.34 18" />
+      <path d="M7 6h1v4" />
+      <path d="m16.71 13.88.7.71-2.82 2.82" />
+    </svg>
   )
 }

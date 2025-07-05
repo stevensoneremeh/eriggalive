@@ -32,17 +32,24 @@ export default function LoginPage() {
     setError("")
 
     try {
+      console.log("Attempting to sign in with:", email)
       const { error } = await signIn(email, password)
 
       if (error) {
+        console.error("Login error:", error)
         setError(error?.message || "Failed to sign in")
+        setLoading(false)
       } else {
-        // Successful login - redirect to dashboard or intended page
-        router.push(redirectTo)
+        console.log("Login successful, redirecting to:", redirectTo)
+        // Add a small delay to ensure auth state is updated
+        setTimeout(() => {
+          router.push(redirectTo)
+          router.refresh()
+        }, 1000)
       }
     } catch (err) {
+      console.error("Login exception:", err)
       setError("An unexpected error occurred")
-    } finally {
       setLoading(false)
     }
   }
@@ -78,6 +85,7 @@ export default function LoginPage() {
                   placeholder="Enter your email"
                   required
                   className="bg-background/50"
+                  disabled={loading}
                 />
               </div>
 
@@ -92,6 +100,7 @@ export default function LoginPage() {
                     placeholder="Enter your password"
                     required
                     className="bg-background/50 pr-10"
+                    disabled={loading}
                   />
                   <Button
                     type="button"
@@ -99,6 +108,7 @@ export default function LoginPage() {
                     size="icon"
                     className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading}
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4 text-muted-foreground" />
