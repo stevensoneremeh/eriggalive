@@ -35,6 +35,25 @@ function initServerClient() {
   return _serverClient
 }
 
-export const createClientSupabase = initServerClient // legacy alias
-export const createServerSupabase = initServerClient // alt alias
+/* ------------------------------------------------------------------ */
+/*  ✨  PUBLIC EXPORTS – keep every legacy import working              */
+/* ------------------------------------------------------------------ */
+
+// Generic helper (most pages)
+export const createServerClient = initServerClient
+
+// Full-access (service-role) helper
+export function createAdminSupabaseClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!url || !serviceKey) {
+    throw new Error("Supabase admin env vars missing — add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
+  }
+
+  return createClient<Database>(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+}
+
 export default initServerClient
