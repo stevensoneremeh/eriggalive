@@ -167,9 +167,8 @@ export function MainNavigation() {
   const pathname = usePathname()
   const router = useRouter()
   const { user, profile, signOut, isAuthenticated, loading } = useAuth()
-  const { theme, setTheme, toggleTheme } = useTheme()
+  const { theme, setTheme } = useTheme()
 
-  // Screen size detection
   const updateScreenSize = useCallback(() => {
     if (typeof window === "undefined") return
     const width = window.innerWidth
@@ -204,7 +203,6 @@ export function MainNavigation() {
     }
   }, [updateScreenSize])
 
-  // Close mobile menu on route change
   useEffect(() => {
     setIsMobileMenuOpen(false)
   }, [pathname])
@@ -255,7 +253,6 @@ export function MainNavigation() {
   if (screenSize === "mobile") {
     return (
       <>
-        {/* Top Header for Mobile */}
         <header
           className={cn(
             "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
@@ -294,7 +291,6 @@ export function MainNavigation() {
           </div>
         </header>
 
-        {/* Bottom Navigation */}
         <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-t border-border/50">
           <div className="flex items-center justify-around py-2 px-2">
             {getMobileItems()
@@ -353,14 +349,12 @@ export function MainNavigation() {
     >
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 w-full">
-          {/* Logo */}
           <div className="flex items-center shrink-0">
             <Link href="/" className="flex items-center space-x-2">
               <DynamicLogo width={120} height={32} />
             </Link>
           </div>
 
-          {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-1 flex-1 justify-center max-w-4xl">
             {getAllNavigationItems().map((item) => {
               const active = isActive(item.href)
@@ -393,9 +387,7 @@ export function MainNavigation() {
             })}
           </nav>
 
-          {/* Right Actions */}
           <div className="flex items-center space-x-2 shrink-0">
-            {/* Theme Toggle */}
             <div className="hidden md:flex items-center space-x-1 mr-2">
               <Button
                 variant="ghost"
@@ -432,7 +424,6 @@ export function MainNavigation() {
               </Button>
             </div>
 
-            {/* User Actions */}
             {!loading && (
               <>
                 {isAuthenticated && profile ? (
@@ -502,7 +493,6 @@ export function MainNavigation() {
               </>
             )}
 
-            {/* Tablet Hamburger Menu */}
             {screenSize === "tablet" && (
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
@@ -521,11 +511,9 @@ export function MainNavigation() {
     </header>
   )
 
-  // Mobile Menu Content Component
   function MobileMenuContent() {
     return (
       <div className="flex flex-col h-full bg-background">
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
             <DynamicLogo width={100} height={28} />
@@ -535,7 +523,6 @@ export function MainNavigation() {
           </Button>
         </div>
 
-        {/* User Info */}
         {isAuthenticated && profile && (
           <div className="p-4 border-b bg-accent/20">
             <div className="flex items-center space-x-3 mb-3">
@@ -557,7 +544,6 @@ export function MainNavigation() {
           </div>
         )}
 
-        {/* Navigation Items */}
         <div className="flex-1 overflow-y-auto p-4">
           <div className="space-y-1">
             {getAllNavigationItems().map((item) => {
@@ -590,7 +576,6 @@ export function MainNavigation() {
           </div>
         </div>
 
-        {/* Theme Toggle */}
         <div className="p-4 border-t">
           <div className="mb-4">
             <p className="text-sm font-medium mb-3">Appearance</p>
@@ -614,7 +599,6 @@ export function MainNavigation() {
             </div>
           </div>
 
-          {/* Auth Actions */}
           {isAuthenticated ? (
             <div className="space-y-2">
               <Button
@@ -666,7 +650,6 @@ export function MainNavigation() {
   }
 }
 
-// Navigation Skeleton
 function NavigationSkeleton() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur shadow-md">

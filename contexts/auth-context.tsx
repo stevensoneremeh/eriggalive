@@ -16,6 +16,7 @@ interface Profile {
   tier: string
   coins: number
   points: number
+  level: number
   created_at: string
   updated_at: string
 }
@@ -28,7 +29,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   isInitialized: boolean
   signIn: (email: string, password: string) => Promise<{ error?: string }>
-  signUp: (email: string, password: string, username: string) => Promise<{ error?: string }>
+  signUp: (email: string, password: string, userData: any) => Promise<{ error?: string }>
   signOut: () => Promise<void>
   updateProfile: (updates: Partial<Profile>) => Promise<void>
   refreshProfile: () => Promise<void>
@@ -44,52 +45,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false)
   const router = useRouter()
 
-  /** Fetch the user profile stored in our `users` table. */
   const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
+    if (!supabase) return null
+
     try {
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("auth_user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).maybeSingle()
 
       if (error && error.code !== "PGRST116") {
-        // Not found error codes are ignored – we treat them as “no profile yet”
         console.error("Error fetching profile:", error)
-        toast.error("Unable to fetch your profile data.")
         return null
       }
 
       return data as Profile | null
-    } catch (err) {
-      console.error("Error fetching profile:", err)
-      toast.error("Network error fetching profile.")
+    } catch (error) {
+      console.error("Error in fetchProfile:", error)
       return null
     }
   }, [])
 
-  /** Refresh the profile when needed (pull-to-refresh behaviour). */
   const refreshProfile = useCallback(async () => {
     if (!user?.id) return
-    setLoading(true)
     const profileData = await fetchProfile(user.id)
     setProfile(profileData)
-    setLoading(false)
   }, [user?.id, fetchProfile])
 
   const updateProfile = useCallback(
     async (updates: Partial<Profile>) => {
-      if (!user?.id) return
+      if (!user?.id || !supabase) return
+
       try {
         const { error } = await supabase.from("users").update(updates).eq("auth_user_id", user.id)
+
         if (error) throw error
+
         setProfile((prev) => (prev ? { ...prev, ...updates } : null))
-        toast.success("Profile updated")
-      } catch (err) {
-        console.error("Error updating profile:", err)
-        toast.error("Unable to update profile")
+        toast.success("Profile updated successfully")
+      } catch (error) {
+        console.error("Error updating profile:", error)
+        toast.error("Failed to update profile")
       }
     },
     [user?.id],
@@ -97,85 +90,135 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = useCallback(
     async (email: string, password: string) => {
+      if (!supabase) return { error: "Supabase not initialized" }
+
       try {
         setLoading(true)
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) return { error: error.message }
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+
+        if (error) {
+          return { error: error.message }
+        }
 
         if (data.user) {
           const profileData = await fetchProfile(data.user.id)
           setProfile(profileData)
-          router.replace("/dashboard")
-          toast.success("Signed in")
+          toast.success("Signed in successfully!")
         }
+
         return {}
-      } catch (err) {
-        console.error("Sign-in error:", err)
-        return { error: "Network or server error" }
+      } catch (error) {
+        console.error("Sign in error:", error)
+        return { error: "An unexpected error occurred" }
       } finally {
         setLoading(false)
       }
     },
-    [fetchProfile, router],
+    [fetchProfile],
   )
 
-  const signUp = useCallback(async (email: string, password: string, username: string) => {
+  const signUp = useCallback(async (email: string, password: string, userData: any) => {
+    if (!supabase) return { error: "Supabase not initialized" }
+
     try {
       setLoading(true)
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { username } },
+        options: {
+          data: userData,
+        },
       })
-      if (error) return { error: error.message }
-      toast.success("Account created – check your email to verify!")
+
+      if (error) {
+        return { error: error.message }
+      }
+
+      // Create user profile if signup was successful
+      if (data.user && !data.user.identities?.length) {
+        return { error: "User already exists" }
+      }
+
+      if (data.user) {
+        const tier = userData.tier || "grassroot"
+        const coins = tier === "grassroot" ? 100 : tier === "pioneer" ? 500 : 1000
+
+        const { error: profileError } = await supabase.from("users").insert({
+          auth_user_id: data.user.id,
+          email: email,
+          username: userData.username,
+          full_name: userData.full_name,
+          tier: tier as any,
+          coins: coins,
+          level: 1,
+          points: 0,
+        })
+
+        if (profileError) {
+          console.error("Error creating profile:", profileError)
+        }
+      }
+
+      toast.success("Account created successfully!")
       return {}
-    } catch (err) {
-      console.error("Sign-up error:", err)
-      return { error: "Network or server error" }
+    } catch (error) {
+      console.error("Sign up error:", error)
+      return { error: "An unexpected error occurred" }
     } finally {
       setLoading(false)
     }
   }, [])
 
   const signOut = useCallback(async () => {
-    setLoading(true)
+    if (!supabase) return
+
     try {
+      setLoading(true)
       await supabase.auth.signOut()
       setUser(null)
       setProfile(null)
       setSession(null)
-      router.replace("/")
-      toast.success("Signed out")
-    } catch (err) {
-      console.error("Sign-out error:", err)
-      toast.error("Unable to sign out")
+      toast.success("Signed out successfully")
+      router.push("/")
+    } catch (error) {
+      console.error("Sign out error:", error)
+      toast.error("Error signing out")
     } finally {
       setLoading(false)
     }
   }, [router])
 
-  /* ---------- INITIALISE AUTH STATE ---------- */
   useEffect(() => {
+    if (!supabase) {
+      setLoading(false)
+      setIsInitialized(true)
+      return
+    }
+
     let mounted = true
 
-    const init = async () => {
+    const initializeAuth = async () => {
       try {
         const {
           data: { session: initialSession },
         } = await supabase.auth.getSession()
 
-        if (!mounted) return
+        if (mounted) {
+          setSession(initialSession)
+          setUser(initialSession?.user ?? null)
 
-        setSession(initialSession)
-        setUser(initialSession?.user ?? null)
-
-        if (initialSession?.user) {
-          const profileData = await fetchProfile(initialSession.user.id)
-          if (mounted) setProfile(profileData)
+          if (initialSession?.user) {
+            const profileData = await fetchProfile(initialSession.user.id)
+            if (mounted) {
+              setProfile(profileData)
+            }
+          }
         }
-      } catch (err) {
-        console.error("Auth initialise error:", err)
+      } catch (error) {
+        console.error("Error initializing auth:", error)
       } finally {
         if (mounted) {
           setLoading(false)
@@ -184,21 +227,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    init()
+    initializeAuth()
 
-    // Listen for auth state changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_, newSession) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
-      setSession(newSession)
-      setUser(newSession?.user ?? null)
 
-      if (newSession?.user) {
-        const profileData = await fetchProfile(newSession.user.id)
-        if (mounted) setProfile(profileData)
+      setSession(session)
+      setUser(session?.user ?? null)
+
+      if (session?.user) {
+        const profileData = await fetchProfile(session.user.id)
+        if (mounted) {
+          setProfile(profileData)
+        }
       } else {
         setProfile(null)
+      }
+
+      if (mounted) {
+        setLoading(false)
       }
     })
 
@@ -208,7 +257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchProfile])
 
-  const ctx: AuthContextType = {
+  const value: AuthContextType = {
     user,
     profile,
     session,
@@ -222,11 +271,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshProfile,
   }
 
-  return <AuthContext.Provider value={ctx}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error("useAuth must be used within an AuthProvider")
-  return ctx
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider")
+  }
+  return context
 }
