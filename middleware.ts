@@ -36,14 +36,23 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Protected routes that require authentication
-  const protectedRoutes = ["/dashboard", "/chat", "/coins", "/settings", "/profile", "/rooms/freebies"]
+  const protectedRoutes = ["/dashboard", "/chat", "/coins", "/settings", "/profile", "/rooms", "/community", "/vault"]
 
   // Auth routes that should redirect if already logged in
   const authRoutes = ["/login", "/signup"]
 
+  // Public routes that don't require authentication
+  const publicRoutes = ["/", "/about", "/contact"]
+
   // Check if current path is protected
   const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
   const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
+  const isPublicRoute = publicRoutes.some((route) => pathname === route)
+
+  // Allow public routes
+  if (isPublicRoute) {
+    return supabaseResponse
+  }
 
   // Redirect unauthenticated users from protected routes to login
   if (isProtectedRoute && !user) {

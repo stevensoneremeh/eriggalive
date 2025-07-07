@@ -1,42 +1,36 @@
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import type { SupabaseClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 
-/**
- * Browser-side Supabase client (singleton).
- *
- * Exposes three identical entry-points so **all existing code keeps working**:
- *   1.  import { createClient } from "@/lib/supabase/client"
- *   2.  import { createClientSupabase } from "@/lib/supabase/client"
- *   3.  import createClientSupabase from "@/lib/supabase/client"
- */
-let _client: SupabaseClient<Database> | null = null
+// Singleton pattern for Supabase client
+let supabaseClient: SupabaseClient<Database> | null = null
 
-function initClient() {
-  if (_client) return _client
-
-  // Read the public env vars injected at build-time.
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  // Pass them explicitly (they’re required on the client).
-  if (supabaseUrl && supabaseKey) {
-    _client = createClientComponentClient<Database>({
-      supabaseUrl,
-      supabaseKey,
-    })
-  } else {
-    // Fall back to the default behaviour and warn the developer.
-    console.warn(
-      "Supabase env vars missing – falling back to createClientComponentClient() without explicit keys. " +
-        "Double-check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-    )
-    _client = createClientComponentClient<Database>()
+export function createSupabaseClient(): SupabaseClient<Database> {
+  if (supabaseClient) {
+    return supabaseClient
   }
 
-  return _client
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Missing Supabase environment variables")
+  }
+
+  supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  })
+
+  return supabaseClient
 }
 
-export const createClient = initClient
-export const createClientSupabase = initClient // legacy alias
-export default initClient
+// Export the singleton instance
+export const supabase = createSupabaseClient()
+
+// For backward compatibility
+export { supabase as createClient }
+export const createClientSupabase = createSupabaseClient // legacy alias
+export default supabase

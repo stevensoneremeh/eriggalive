@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
@@ -22,16 +21,16 @@ export default function LoginPage() {
 
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { signIn, isAuthenticated, loading: authLoading } = useAuth()
+  const { signIn, isAuthenticated, loading: authLoading, isInitialized } = useAuth()
 
   const redirectTo = searchParams.get("redirect") || "/dashboard"
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated && !authLoading) {
+    if (isInitialized && isAuthenticated && !authLoading) {
       router.push(redirectTo)
     }
-  }, [isAuthenticated, authLoading, router, redirectTo])
+  }, [isAuthenticated, authLoading, isInitialized, router, redirectTo])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,24 +42,38 @@ export default function LoginPage() {
 
       if (error) {
         setError(error.message || "Failed to sign in")
-        setIsLoading(false)
       } else {
-        // Success - the auth context will handle the redirect
-        console.log("Login successful, redirecting to:", redirectTo)
-        router.push(redirectTo)
+        // Success - redirect will happen via useEffect when auth state updates
+        console.log("Login successful")
       }
     } catch (err) {
       console.error("Login error:", err)
       setError("An unexpected error occurred")
+    } finally {
       setIsLoading(false)
     }
   }
 
   // Show loading if auth is still initializing
-  if (authLoading) {
+  if (!isInitialized || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p>Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Don't render login form if already authenticated
+  if (isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p>Redirecting to dashboard...</p>
+        </div>
       </div>
     )
   }
