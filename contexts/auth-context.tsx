@@ -44,16 +44,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false)
   const router = useRouter()
 
-  const fetchProfile = useCallback(async (userId: string) => {
+  const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     try {
-      const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
+      const { data, error } = await supabase
+        .from("users") // ← back to the correct table
+        .select("*")
+        .eq("auth_user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle() // ← don’t error if 0 or >1 rows
 
-      if (error) {
+      if (error && error.code !== "PGRST116") {
         console.error("Error fetching profile:", error)
         return null
       }
 
-      return data as Profile
+      return data as Profile | null
     } catch (error) {
       console.error("Error in fetchProfile:", error)
       return null
@@ -72,7 +78,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!user?.id) return
 
       try {
-        const { error } = await supabase.from("profiles").update(updates).eq("id", user.id)
+        const { error } = await supabase
+          .from("users") // ← consistent table
+          .update(updates)
+          .eq("auth_user_id", user.id)
 
         if (error) throw error
 

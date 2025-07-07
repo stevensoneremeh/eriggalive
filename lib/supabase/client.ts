@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js"
+import { createClient as supabaseCreateClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -8,12 +8,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing Supabase environment variables")
 }
 
-// Singleton pattern - create only one instance
-let supabaseInstance: ReturnType<typeof createClient<Database>> | null = null
+// Singleton pattern
+let supabaseInstance: ReturnType<typeof supabaseCreateClient<Database>> | null = null
 
-export function createClientSupabase() {
+export function createSupabaseClient() {
   if (!supabaseInstance) {
-    supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    supabaseInstance = supabaseCreateClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -21,15 +21,15 @@ export function createClientSupabase() {
         flowType: "pkce",
       },
       global: {
-        headers: {
-          "X-Client-Info": "erigga-live-web",
-        },
+        headers: { "X-Client-Info": "erigga-live-web" },
       },
     })
   }
   return supabaseInstance
 }
 
-// Default export for convenience
-export const supabase = createClientSupabase()
+// ---- Back-compat aliases ----
+export const createClient = createSupabaseClient // <- legacy import support
+export const createClientSupabase = createSupabaseClient // <- additional legacy alias
+export const supabase = createSupabaseClient() // singleton instance
 export default supabase

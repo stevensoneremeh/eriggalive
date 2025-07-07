@@ -1,11 +1,11 @@
-import { createServerClient, type CookieOptions } from "@supabase/ssr"
+import { createServerClient as supabaseCreateServerClient, type CookieOptions } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import type { Database } from "@/types/database"
 
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies()
 
-  return createServerClient<Database>(
+  return supabaseCreateServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -37,13 +37,20 @@ export async function createServerSupabaseClient() {
 }
 
 export async function createAdminSupabaseClient() {
-  return createServerClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    cookies: {
-      get() {
-        return undefined
+  return supabaseCreateServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      cookies: {
+        get() {
+          return undefined
+        },
+        set() {},
+        remove() {},
       },
-      set() {},
-      remove() {},
     },
-  })
+  )
 }
+
+// ---- Back-compat alias ----
+export const createClient = createServerSupabaseClient

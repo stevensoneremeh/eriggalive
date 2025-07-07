@@ -1,133 +1,111 @@
-"use client"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
+import type { Database } from "@/types/database"
 
-// Define types first
-type UserTier = "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
+type UserProfile = Database["public"]["Tables"]["users"]["Row"]
 
-interface User {
-  id: string
-  email: string
-  username: string
-}
+export async function getCurrentUser(): Promise<{
+  user: any | null
+  profile: UserProfile | null
+  error: string | null
+}> {
+  try {
+    const supabase = await createServerSupabaseClient()
 
-interface UserProfile extends User {
-  tier: UserTier
-  coins: number
-  level: number
-  points: number
-  avatar_url?: string
-  full_name?: string
-  bio?: string
-  created_at: string
-}
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
-interface Session {
-  user: User
-  profile: UserProfile
-  timestamp: number
-}
+    if (authError) {
+      return { user: null, profile: null, error: authError.message }
+    }
 
-// Session expiration time (30 days in seconds)
-const SESSION_EXPIRY = 30 * 24 * 60 * 60
+    if (!user) {
+      return { user: null, profile: null, error: null }
+    }
 
-// Helper to get a cookie value
-const getCookie = (name: string): string | null => {
-  if (typeof document === "undefined") return null
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("auth_user_id", user.id)
+      .maybeSingle()
 
-  const cookies = document.cookie.split(";")
-  for (let i = 0; i < cookies.length; i++) {
-    const cookie = cookies[i].trim()
-    if (cookie.startsWith(name + "=")) {
-      return cookie.substring(name.length + 1)
+    if (profileError) {
+      console.error("Error fetching user profile:", profileError)
+      return { user, profile: null, error: profileError.message }
+    }
+
+    return { user, profile, error: null }
+  } catch (error) {
+    console.error("Error in getCurrentUser:", error)
+    return {
+      user: null,
+      profile: null,
+      error: error instanceof Error ? error.message : "Unknown error",
     }
   }
-  return null
 }
 
-// Client-side auth utilities
-export const clientAuth = {
-  // Save session data
-  saveSession: (user: User, profile: UserProfile) => {
-    try {
-      // Store in localStorage for compatibility
-      localStorage.setItem("erigga_user", JSON.stringify(user))
-      localStorage.setItem("erigga_profile", JSON.stringify(profile))
+export async function requireAuth(): Promise<{
+  user: any
+  profile: UserProfile
+}> {
+  const { user, profile, error } = await getCurrentUser()
 
-      // Store in cookies for better security and persistence
-      const sessionData = btoa(JSON.stringify({ user, profile, timestamp: Date.now() }))
+  if (error) {
+    throw new Error(`Authentication error: ${error}`)
+  }
 
-      // Set a secure, http-only cookie with a long expiration
-      document.cookie = `erigga_auth_session=${sessionData}; path=/; max-age=${SESSION_EXPIRY}; SameSite=Lax`
+  if (!user || !profile) {
+    throw new Error("Authentication required")
+  }
 
-      // Set a simple auth flag cookie for middleware checks
-      document.cookie = `erigga_auth=1; path=/; max-age=${SESSION_EXPIRY}; SameSite=Lax`
-    } catch (error) {
-      console.error("Error saving session:", error)
-    }
-  },
+  return { user, profile }
+}
 
-  // Get session data
-  getSession: (): Session | null => {
-    try {
-      // First check for an active session in cookies
-      const sessionCookie = getCookie("erigga_auth_session")
+export async function requireAdmin(): Promise<{
+  user: any
+  profile: UserProfile
+}> {
+  const { user, profile } = await requireAuth()
 
-      if (sessionCookie) {
-        try {
-          const sessionData = JSON.parse(atob(sessionCookie))
-          if (sessionData && sessionData.user && sessionData.profile) {
-            return sessionData as Session
-          }
-        } catch (e) {
-          console.error("Error parsing session cookie:", e)
-        }
-      }
+  if (profile.role !== "admin") {
+    throw new Error("Admin access required")
+  }
 
-      // Fallback to localStorage if cookie approach fails
-      const storedUser = localStorage.getItem("erigga_user")
-      const storedProfile = localStorage.getItem("erigga_profile")
+  return { user, profile }
+}
 
-      if (storedUser && storedProfile) {
-        const user = JSON.parse(storedUser)
-        const profile = JSON.parse(storedProfile)
-        return { user, profile, timestamp: Date.now() }
-      }
+export function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
 
-      return null
-    } catch (error) {
-      console.error("Error getting session:", error)
-      return null
-    }
-  },
+export function isValidUsername(username: string): boolean {
+  const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/
+  return usernameRegex.test(username)
+}
 
-  // Clear session data
-  clearSession: () => {
-    try {
-      // Clear localStorage
-      localStorage.removeItem("erigga_user")
-      localStorage.removeItem("erigga_profile")
+export function generateSecurePassword(length = 12): string {
+  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+  let password = ""
+  for (let i = 0; i < length; i++) {
+    password += charset.charAt(Math.floor(Math.random() * charset.length))
+  }
+  return password
+}
 
-      // Clear cookies
-      document.cookie = "erigga_auth_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
-      document.cookie = "erigga_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
-    } catch (error) {
-      console.error("Error clearing session:", error)
-    }
-  },
+export function sanitizeUserInput(input: string): string {
+  return input.trim().replace(/[<>]/g, "")
+}
 
-  // Refresh session to extend expiry
-  refreshSession: () => {
-    try {
-      const session = clientAuth.getSession()
-      if (session?.user && session?.profile) {
-        clientAuth.saveSession(session.user, session.profile)
-      }
-    } catch (error) {
-      console.error("Error refreshing session:", error)
-    }
-  },
-
-  // Check if user is authenticated
-  isAuthenticated: (): boolean => {
-    return !!clientAuth.getSession()
-  },
+export function hashUserId(userId: string): string {
+  // Simple hash for user ID obfuscation (not cryptographically secure)
+  let hash = 0
+  for (let i = 0; i < userId.length; i++) {
+    const char = userId.charCodeAt(i)
+    hash = (hash << 5) - hash + char
+    hash = hash & hash // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36)
 }
