@@ -17,6 +17,7 @@ type ThemeProviderProps = {
 type ThemeProviderState = {
   theme: Theme
   setTheme: (theme: Theme) => void
+  toggleTheme: () => void
   resolvedTheme: "dark" | "light"
   isLoading: boolean
 }
@@ -24,6 +25,7 @@ type ThemeProviderState = {
 const initialState: ThemeProviderState = {
   theme: "system",
   setTheme: () => null,
+  toggleTheme: () => null,
   resolvedTheme: "light",
   isLoading: true,
 }
@@ -90,6 +92,15 @@ export function ThemeProvider({
       }
       setTheme(theme)
     },
+    toggleTheme: () => {
+      const newTheme = resolvedTheme === "dark" ? "light" : "dark"
+      try {
+        localStorage.setItem(storageKey, newTheme)
+      } catch (error) {
+        console.warn("Failed to save theme to localStorage:", error)
+      }
+      setTheme(newTheme)
+    },
     resolvedTheme,
     isLoading,
   }
@@ -110,9 +121,4 @@ export const useTheme = () => {
   }
 
   return context
-}
-
-// Safe theme provider with error boundary
-export function SafeThemeProvider({ children, ...props }: ThemeProviderProps) {
-  return <ThemeProvider {...props}>{children}</ThemeProvider>
 }

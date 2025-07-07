@@ -166,8 +166,8 @@ export function MainNavigation() {
 
   const pathname = usePathname()
   const router = useRouter()
-  const { user, profile, signOut, isAuthenticated, isLoading } = useAuth()
-  const { theme, setTheme } = useTheme()
+  const { user, profile, signOut, isAuthenticated, loading } = useAuth()
+  const { theme, setTheme, toggleTheme } = useTheme()
 
   // Screen size detection
   const updateScreenSize = useCallback(() => {
@@ -433,7 +433,7 @@ export function MainNavigation() {
             </div>
 
             {/* User Actions */}
-            {!isLoading && (
+            {!loading && (
               <>
                 {isAuthenticated && profile ? (
                   <>
