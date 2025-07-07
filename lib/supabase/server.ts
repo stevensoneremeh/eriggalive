@@ -1,56 +1,41 @@
-import { createServerClient as supabaseCreateServerClient, type CookieOptions } from "@supabase/ssr"
-import { cookies } from "next/headers"
+/**
+ * Server-side Supabase helper.
+ *  – Injects the request/response cookies so RLS continues to work
+ *  – Exposes `createClientSupabase` (+ legacy alias) & a convenience `supabase` getter
+ */
+
+import { cookies, headers } from "next/headers"
+import { createClient as createSupabaseServerClient } from "@supabase/supabase-js"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 
-export async function createServerSupabaseClient() {
-  const cookieStore = await cookies()
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  return supabaseCreateServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value, ...options })
-          } catch (error) {
-            // The `set` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
-        remove(name: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value: "", ...options })
-          } catch (error) {
-            // The `delete` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
+let _serverClient: SupabaseClient<Database> | null = null
+
+export function createClientSupabase(): SupabaseClient<Database> {
+  if (_serverClient) return _serverClient
+
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error("[Supabase] SUPABASE_SERVICE_ROLE_KEY (or anon key) / URL missing in server environment.")
+  }
+
+  _serverClient = createSupabaseServerClient<Database>(supabaseUrl, serviceKey, {
+    // Forward client cookies to maintain auth context for RLS
+    global: {
+      headers: {
+        cookie: cookies().toString(),
+        ...Object.fromEntries(headers()),
       },
     },
-  )
+  })
+
+  return _serverClient
 }
 
-export async function createAdminSupabaseClient() {
-  return supabaseCreateServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        get() {
-          return undefined
-        },
-        set() {},
-        remove() {},
-      },
-    },
-  )
-}
+// Convenience singleton
+export const supabase = createClientSupabase()
 
-// ---- Back-compat alias ----
-export const createClient = createServerSupabaseClient
+// Legacy alias
+export { createClientSupabase as createClient }

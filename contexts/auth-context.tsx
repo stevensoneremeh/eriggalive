@@ -44,52 +44,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false)
   const router = useRouter()
 
+  /** Fetch the user profile stored in our `users` table. */
   const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     try {
       const { data, error } = await supabase
-        .from("users") // ← back to the correct table
+        .from("users")
         .select("*")
         .eq("auth_user_id", userId)
         .order("created_at", { ascending: false })
         .limit(1)
-        .maybeSingle() // ← don’t error if 0 or >1 rows
+        .maybeSingle()
 
       if (error && error.code !== "PGRST116") {
+        // Not found error codes are ignored – we treat them as “no profile yet”
         console.error("Error fetching profile:", error)
+        toast.error("Unable to fetch your profile data.")
         return null
       }
 
       return data as Profile | null
-    } catch (error) {
-      console.error("Error in fetchProfile:", error)
+    } catch (err) {
+      console.error("Error fetching profile:", err)
+      toast.error("Network error fetching profile.")
       return null
     }
   }, [])
 
+  /** Refresh the profile when needed (pull-to-refresh behaviour). */
   const refreshProfile = useCallback(async () => {
     if (!user?.id) return
-
+    setLoading(true)
     const profileData = await fetchProfile(user.id)
     setProfile(profileData)
+    setLoading(false)
   }, [user?.id, fetchProfile])
 
   const updateProfile = useCallback(
     async (updates: Partial<Profile>) => {
       if (!user?.id) return
-
       try {
-        const { error } = await supabase
-          .from("users") // ← consistent table
-          .update(updates)
-          .eq("auth_user_id", user.id)
-
+        const { error } = await supabase.from("users").update(updates).eq("auth_user_id", user.id)
         if (error) throw error
-
         setProfile((prev) => (prev ? { ...prev, ...updates } : null))
-        toast.success("Profile updated successfully")
-      } catch (error) {
-        console.error("Error updating profile:", error)
-        toast.error("Failed to update profile")
+        toast.success("Profile updated")
+      } catch (err) {
+        console.error("Error updating profile:", err)
+        toast.error("Unable to update profile")
       }
     },
     [user?.id],
@@ -99,26 +99,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string, password: string) => {
       try {
         setLoading(true)
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
-
-        if (error) {
-          return { error: error.message }
-        }
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+        if (error) return { error: error.message }
 
         if (data.user) {
           const profileData = await fetchProfile(data.user.id)
           setProfile(profileData)
-          toast.success("Signed in successfully!")
-          router.push("/dashboard")
+          router.replace("/dashboard")
+          toast.success("Signed in")
         }
-
         return {}
-      } catch (error) {
-        console.error("Sign in error:", error)
-        return { error: "An unexpected error occurred" }
+      } catch (err) {
+        console.error("Sign-in error:", err)
+        return { error: "Network or server error" }
       } finally {
         setLoading(false)
       }
@@ -129,70 +122,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = useCallback(async (email: string, password: string, username: string) => {
     try {
       setLoading(true)
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            username,
-          },
-        },
+        options: { data: { username } },
       })
-
-      if (error) {
-        return { error: error.message }
-      }
-
-      toast.success("Account created! Please check your email to verify your account.")
+      if (error) return { error: error.message }
+      toast.success("Account created – check your email to verify!")
       return {}
-    } catch (error) {
-      console.error("Sign up error:", error)
-      return { error: "An unexpected error occurred" }
+    } catch (err) {
+      console.error("Sign-up error:", err)
+      return { error: "Network or server error" }
     } finally {
       setLoading(false)
     }
   }, [])
 
   const signOut = useCallback(async () => {
+    setLoading(true)
     try {
-      setLoading(true)
       await supabase.auth.signOut()
       setUser(null)
       setProfile(null)
       setSession(null)
-      toast.success("Signed out successfully")
-      router.push("/")
-    } catch (error) {
-      console.error("Sign out error:", error)
-      toast.error("Error signing out")
+      router.replace("/")
+      toast.success("Signed out")
+    } catch (err) {
+      console.error("Sign-out error:", err)
+      toast.error("Unable to sign out")
     } finally {
       setLoading(false)
     }
   }, [router])
 
+  /* ---------- INITIALISE AUTH STATE ---------- */
   useEffect(() => {
     let mounted = true
 
-    const initializeAuth = async () => {
+    const init = async () => {
       try {
-        // Get initial session
         const {
           data: { session: initialSession },
         } = await supabase.auth.getSession()
 
-        if (mounted) {
-          setSession(initialSession)
-          setUser(initialSession?.user ?? null)
+        if (!mounted) return
 
-          if (initialSession?.user) {
-            const profileData = await fetchProfile(initialSession.user.id)
-            if (mounted) {
-              setProfile(profileData)
-            }
-          }
+        setSession(initialSession)
+        setUser(initialSession?.user ?? null)
+
+        if (initialSession?.user) {
+          const profileData = await fetchProfile(initialSession.user.id)
+          if (mounted) setProfile(profileData)
         }
-      } catch (error) {
-        console.error("Error initializing auth:", error)
+      } catch (err) {
+        console.error("Auth initialise error:", err)
       } finally {
         if (mounted) {
           setLoading(false)
@@ -201,30 +184,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    initializeAuth()
+    init()
 
-    // Listen for auth changes
+    // Listen for auth state changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_, newSession) => {
       if (!mounted) return
+      setSession(newSession)
+      setUser(newSession?.user ?? null)
 
-      console.log("Auth state changed:", event, session?.user?.id)
-
-      setSession(session)
-      setUser(session?.user ?? null)
-
-      if (session?.user) {
-        const profileData = await fetchProfile(session.user.id)
-        if (mounted) {
-          setProfile(profileData)
-        }
+      if (newSession?.user) {
+        const profileData = await fetchProfile(newSession.user.id)
+        if (mounted) setProfile(profileData)
       } else {
         setProfile(null)
-      }
-
-      if (mounted) {
-        setLoading(false)
       }
     })
 
@@ -234,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchProfile])
 
-  const value: AuthContextType = {
+  const ctx: AuthContextType = {
     user,
     profile,
     session,
@@ -248,13 +222,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshProfile,
   }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={ctx}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
-  }
-  return context
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error("useAuth must be used within an AuthProvider")
+  return ctx
 }
