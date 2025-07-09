@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useTheme } from "@/contexts/theme-context"
-import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Music, Video, Newspaper, Users, ShoppingBag, Calendar } from "lucide-react"
@@ -14,7 +13,6 @@ import EriggaRadio from "@/components/erigga-radio"
 
 export default function HomePage() {
   const { theme } = useTheme()
-  const { isAuthenticated, profile } = useAuth()
   const [currentSlide, setCurrentSlide] = useState(0)
   const [mounted, setMounted] = useState(false)
   const videoSources = getOptimizedVideoSources()

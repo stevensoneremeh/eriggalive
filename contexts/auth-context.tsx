@@ -15,6 +15,7 @@ interface Profile {
   coins: number
   points: number
   level: number
+  avatar_url?: string | null
   created_at: string
   updated_at: string
 }
@@ -43,8 +44,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /* ----------------  helpers  ---------------- */
   const fetchProfile = useCallback(
     async (uid: string) => {
-      const { data } = await supabase.from("users").select("*").eq("auth_user_id", uid).maybeSingle()
-      return data as Profile | null
+      try {
+        const { data } = await supabase.from("users").select("*").eq("auth_user_id", uid).maybeSingle()
+        return data as Profile | null
+      } catch (error) {
+        console.error("Error fetching profile:", error)
+        return null
+      }
     },
     [supabase],
   )
@@ -52,61 +58,89 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = useCallback(async () => {
     if (!user) return
     setLoading(true)
-    setProfile(await fetchProfile(user.id))
+    const profileData = await fetchProfile(user.id)
+    setProfile(profileData)
     setLoading(false)
   }, [user, fetchProfile])
 
   /* ---------------  auth actions  ------------- */
   const signIn = async (email: string, password: string) => {
     setLoading(true)
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        setLoading(false)
+        return { error: error.message }
+      }
+      setUser(data.user!)
+      await refreshProfile()
+      toast.success("Signed in!")
       setLoading(false)
-      return { error: error.message }
+      return {}
+    } catch (error: any) {
+      setLoading(false)
+      return { error: error.message || "An error occurred" }
     }
-    setUser(data.user!)
-    await refreshProfile()
-    toast.success("Signed in!")
-    setLoading(false)
-    return {}
   }
 
   const signUp = async (email: string, password: string, meta: any) => {
     setLoading(true)
-    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: meta } })
-    if (error) {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: meta },
+      })
+      if (error) {
+        setLoading(false)
+        return { error: error.message }
+      }
+      toast.success("Account created!")
       setLoading(false)
-      return { error: error.message }
+      return {}
+    } catch (error: any) {
+      setLoading(false)
+      return { error: error.message || "An error occurred" }
     }
-    toast.success("Account created!")
-    setLoading(false)
-    return {}
   }
 
   const signOut = async () => {
     setLoading(true)
-    await supabase.auth.signOut()
-    setUser(null)
-    setProfile(null)
-    toast.success("Signed out")
-    setLoading(false)
+    try {
+      await supabase.auth.signOut()
+      setUser(null)
+      setProfile(null)
+      toast.success("Signed out")
+    } catch (error) {
+      console.error("Sign out error:", error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   /* -------------  initial load & listener ------------- */
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const { data } = await supabase.auth.getSession()
-      if (!alive) return
-      if (data.session?.user) {
-        setUser(data.session.user)
-        setProfile(await fetchProfile(data.session.user.id))
+      try {
+        const { data } = await supabase.auth.getSession()
+        if (!alive) return
+        if (data.session?.user) {
+          setUser(data.session.user)
+          const profileData = await fetchProfile(data.session.user.id)
+          setProfile(profileData)
+        }
+      } catch (error) {
+        console.error("Session error:", error)
+      } finally {
+        if (alive) {
+          setLoading(false)
+          setIsInit(true)
+        }
       }
-      setLoading(false)
-      setIsInit(true)
     })()
 
-    const { data: listener } = supabase.auth.onAuthStateChange((ev, sess) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (ev, sess) => {
       if (!alive) return
       if (ev === "SIGNED_OUT") {
         setUser(null)
@@ -114,7 +148,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       if (ev === "SIGNED_IN" && sess?.user) {
         setUser(sess.user)
-        refreshProfile()
+        const profileData = await fetchProfile(sess.user.id)
+        setProfile(profileData)
       }
     })
 
@@ -122,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       alive = false
       listener.subscription.unsubscribe()
     }
-  }, [fetchProfile, refreshProfile, supabase])
+  }, [fetchProfile, supabase])
 
   const value: AuthCtx = {
     user,

@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import Image from "next/image"
 import { cn } from "@/lib/utils"
-import { ChevronLeft, ChevronRight, Play, Pause } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { getOptimizedVideoSources, getVideoFallbackImage, tryPlayVideo } from "@/utils/video-utils"
 
 interface SafeHeroVideoCarouselProps {
   images: string[]
@@ -13,182 +13,151 @@ interface SafeHeroVideoCarouselProps {
 
 export function SafeHeroVideoCarousel({ images, videoUrl, className }: SafeHeroVideoCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [showVideo, setShowVideo] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false)
+  const [isVideoLoaded, setIsVideoLoaded] = useState(false)
+  const [isVideoError, setIsVideoError] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const videoSources = getOptimizedVideoSources()
+  const fallbackImage = getVideoFallbackImage()
 
+  // Handle video loading and errors
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    if (!videoUrl || !videoRef.current) return
 
-  useEffect(() => {
-    if (!showVideo) {
-      const interval = setInterval(() => {
-        setCurrentIndex((prev) => (prev + 1) % images.length)
-      }, 5000)
-      return () => clearInterval(interval)
+    const video = videoRef.current
+
+    const handleCanPlay = () => {
+      setIsVideoLoaded(true)
+      tryPlayVideo(video).then((success) => {
+        setIsVideoPlaying(success)
+        if (!success) {
+          console.warn("Video autoplay was prevented. Using image carousel instead.")
+        }
+      })
     }
-  }, [images.length, showVideo])
 
-  const handleVideoToggle = () => {
-    if (!videoRef.current) return
+    const handleError = (e: Event) => {
+      console.error("Video error:", e)
+      setIsVideoError(true)
+    }
 
-    if (isPlaying) {
+    video.addEventListener("canplay", handleCanPlay)
+    video.addEventListener("error", handleError)
+
+    // Try to load the video
+    video.load()
+
+    return () => {
+      video.removeEventListener("canplay", handleCanPlay)
+      video.removeEventListener("error", handleError)
+    }
+  }, [videoUrl])
+
+  // Auto-advance carousel if video is not playing
+  useEffect(() => {
+    if (isVideoPlaying) return
+
+    const interval = setInterval(() => {
+      setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length)
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [images.length, isVideoPlaying])
+
+  // Handle manual navigation
+  const goToSlide = (index: number) => {
+    if (isVideoPlaying && videoRef.current) {
+      // Stop video and switch to images
       videoRef.current.pause()
-      setIsPlaying(false)
-    } else {
-      videoRef.current.play()
-      setIsPlaying(true)
+      setIsVideoPlaying(false)
     }
+    setCurrentIndex(index)
   }
 
-  const handleVideoClick = () => {
-    setShowVideo(true)
-    setTimeout(() => {
-      if (videoRef.current) {
-        videoRef.current.play()
-        setIsPlaying(true)
-      }
-    }, 100)
-  }
+  // Toggle video playback
+  const toggleVideo = () => {
+    if (!videoRef.current || isVideoError) return
 
-  const nextSlide = () => {
-    setCurrentIndex((prev) => (prev + 1) % images.length)
-  }
-
-  const prevSlide = () => {
-    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length)
-  }
-
-  if (!mounted) {
-    return (
-      <div className={cn("relative w-full h-full bg-gray-900", className)}>
-        <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
-      </div>
-    )
+    if (videoRef.current.paused) {
+      tryPlayVideo(videoRef.current).then((success) => {
+        setIsVideoPlaying(success)
+      })
+    } else {
+      videoRef.current.pause()
+      setIsVideoPlaying(false)
+    }
   }
 
   return (
     <div className={cn("relative w-full h-full overflow-hidden", className)}>
-      {/* Background Images */}
-      {!showVideo && (
-        <div className="absolute inset-0">
-          {images.map((image, index) => (
-            <div
-              key={index}
-              className={cn(
-                "absolute inset-0 transition-opacity duration-1000",
-                index === currentIndex ? "opacity-100" : "opacity-0",
-              )}
-            >
-              <img
-                src={image || "/placeholder.svg"}
-                alt={`Hero ${index + 1}`}
-                className="w-full h-full object-cover"
-                loading={index === 0 ? "eager" : "lazy"}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Video */}
-      {showVideo && videoUrl && (
-        <div className="absolute inset-0">
+      {/* Video Background (if available and playing) */}
+      {videoUrl && !isVideoError && (
+        <div className={cn("absolute inset-0 w-full h-full", isVideoPlaying ? "opacity-100" : "opacity-0")}>
           <video
             ref={videoRef}
             className="w-full h-full object-cover"
-            loop
-            muted
             playsInline
-            onEnded={() => setIsPlaying(false)}
+            muted
+            loop
+            autoPlay
+            poster={fallbackImage}
           >
-            <source src={videoUrl} type="video/mp4" />
+            {videoSources.map((source, index) => (
+              <source key={index} src={source.src} type={source.type} />
+            ))}
             Your browser does not support the video tag.
           </video>
         </div>
       )}
 
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
-
-      {/* Navigation Controls */}
-      {!showVideo && (
-        <>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 z-20"
-            onClick={prevSlide}
+      {/* Image Carousel (fallback or when video is not playing) */}
+      <div className={cn("absolute inset-0 w-full h-full", isVideoPlaying ? "opacity-0" : "opacity-100")}>
+        {images.map((image, index) => (
+          <div
+            key={index}
+            className={cn(
+              "absolute inset-0 w-full h-full transition-opacity duration-1000",
+              index === currentIndex ? "opacity-100" : "opacity-0",
+            )}
           >
-            <ChevronLeft className="h-6 w-6" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 z-20"
-            onClick={nextSlide}
-          >
-            <ChevronRight className="h-6 w-6" />
-          </Button>
-        </>
-      )}
-
-      {/* Video Controls */}
-      {videoUrl && (
-        <div className="absolute bottom-4 right-4 z-20 flex gap-2">
-          {!showVideo ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleVideoClick}
-              className="bg-white/20 hover:bg-white/30 text-white border-white/30"
-            >
-              <Play className="h-4 w-4 mr-2" />
-              Watch Video
-            </Button>
-          ) : (
-            <>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleVideoToggle}
-                className="bg-white/20 hover:bg-white/30 text-white border-white/30"
-              >
-                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setShowVideo(false)
-                  setIsPlaying(false)
-                  if (videoRef.current) {
-                    videoRef.current.pause()
-                  }
-                }}
-                className="bg-white/20 hover:bg-white/30 text-white border-white/30"
-              >
-                Back to Images
-              </Button>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Indicators */}
-      {!showVideo && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
-          {images.map((_, index) => (
-            <button
-              key={index}
-              className={cn("w-2 h-2 rounded-full transition-all", index === currentIndex ? "bg-white" : "bg-white/50")}
-              onClick={() => setCurrentIndex(index)}
+            <Image
+              src={image || "/placeholder.svg"}
+              alt={`Hero image ${index + 1}`}
+              fill
+              priority={index === 0}
+              className="object-cover"
+              sizes="100vw"
             />
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
+
+      {/* Gradient Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+
+      {/* Navigation Dots */}
+      <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-10">
+        {images.map((_, index) => (
+          <button
+            key={index}
+            onClick={() => goToSlide(index)}
+            className={cn(
+              "w-2 h-2 rounded-full transition-all",
+              index === currentIndex && !isVideoPlaying ? "bg-white w-4" : "bg-white/50",
+            )}
+            aria-label={`Go to slide ${index + 1}`}
+          />
+        ))}
+        {videoUrl && !isVideoError && (
+          <button
+            onClick={toggleVideo}
+            className={cn("w-2 h-2 rounded-full transition-all", isVideoPlaying ? "bg-white w-4" : "bg-white/50")}
+            aria-label="Toggle video"
+          >
+            <span className="sr-only">Video</span>
+          </button>
+        )}
+      </div>
     </div>
   )
 }
