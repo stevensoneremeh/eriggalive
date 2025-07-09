@@ -822,3 +822,8 @@ export async function fetchCommunityCategories() {
     return []
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Aliases for legacy imports
+// ─────────────────────────────────────────────────────────────────────────────
+export { createCommunityPost as createCommunityPostAction }
