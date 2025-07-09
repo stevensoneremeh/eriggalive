@@ -1,170 +1,166 @@
 "use client"
 
-import type { ReactNode } from "react"
-import { createContext, useContext, useEffect, useState, useCallback } from "react"
-import type { User } from "@supabase/supabase-js"
-import { toast } from "sonner"
+import type React from "react"
+import { createContext, useContext, useEffect, useState } from "react"
+// This now imports the clean, non-singleton version.
 import { createClient } from "@/lib/supabase/client"
+import type { User, Session } from "@supabase/supabase-js"
+import type { Database } from "@/types/database"
 
-interface Profile {
-  id: string
-  username: string | null
-  full_name: string | null
-  email: string
-  tier: string
-  coins: number
-  points: number
-  level: number
-  avatar_url?: string | null
-  created_at: string
-  updated_at: string
-}
+type UserProfile = Database["public"]["Tables"]["users"]["Row"]
 
-interface AuthCtx {
+interface AuthContextType {
   user: User | null
-  profile: Profile | null
+  session: Session | null
+  profile: UserProfile | null
   loading: boolean
-  isAuthenticated: boolean
-  isInitialized: boolean
-  signIn: (e: string, p: string) => Promise<{ error?: string }>
-  signUp: (e: string, p: string, meta: any) => Promise<{ error?: string }>
+  signIn: (email: string, password: string) => Promise<{ error: any }>
+  signUp: (
+    email: string,
+    password: string,
+    userData: { username: string; full_name: string; tier?: string },
+  ) => Promise<{ error: any }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthCtx | undefined>(undefined)
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  // Lazily initialize the client
+  const [supabase] = useState(() => createClient())
+
   const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isInit, setIsInit] = useState(false)
-  const supabase = createClient()
 
-  /* ----------------  helpers  ---------------- */
-  const fetchProfile = useCallback(
-    async (uid: string) => {
-      try {
-        const { data } = await supabase.from("users").select("*").eq("auth_user_id", uid).maybeSingle()
-        return data as Profile | null
-      } catch (error) {
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
+
+      if (error) {
         console.error("Error fetching profile:", error)
         return null
       }
-    },
-    [supabase],
-  )
 
-  const refreshProfile = useCallback(async () => {
-    if (!user) return
-    setLoading(true)
-    const profileData = await fetchProfile(user.id)
-    setProfile(profileData)
-    setLoading(false)
-  }, [user, fetchProfile])
-
-  /* ---------------  auth actions  ------------- */
-  const signIn = async (email: string, password: string) => {
-    setLoading(true)
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) {
-        setLoading(false)
-        return { error: error.message }
-      }
-      setUser(data.user!)
-      await refreshProfile()
-      toast.success("Signed in!")
-      setLoading(false)
-      return {}
-    } catch (error: any) {
-      setLoading(false)
-      return { error: error.message || "An error occurred" }
+      return data
+    } catch (error) {
+      console.error("Error in fetchProfile:", error)
+      return null
     }
   }
 
-  const signUp = async (email: string, password: string, meta: any) => {
-    setLoading(true)
+  const refreshProfile = async () => {
+    if (user) {
+      const profileData = await fetchProfile(user.id)
+      setProfile(profileData)
+    }
+  }
+
+  useEffect(() => {
+    const getSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      setSession(session)
+      setUser(session?.user ?? null)
+      if (session?.user) {
+        await fetchProfile(session.user.id).then(setProfile)
+      }
+      setLoading(false)
+    }
+    getSession()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+      if (session?.user) {
+        const profileData = await fetchProfile(session.user.id)
+        setProfile(profileData)
+      } else {
+        setProfile(null)
+      }
+      setLoading(false)
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [supabase])
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      return { error }
+    } catch (error) {
+      return { error }
+    }
+  }
+
+  const signUp = async (
+    email: string,
+    password: string,
+    userData: { username: string; full_name: string; tier?: string },
+  ) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: meta },
+        options: {
+          data: {
+            username: userData.username,
+            full_name: userData.full_name,
+          },
+        },
       })
-      if (error) {
-        setLoading(false)
-        return { error: error.message }
+
+      if (error) return { error }
+
+      // Create user profile
+      if (data.user) {
+        const tier = userData.tier || "grassroot"
+        const coins = tier === "grassroot" ? 100 : tier === "pioneer" ? 500 : 1000
+
+        const { error: profileError } = await supabase.from("users").insert({
+          auth_user_id: data.user.id,
+          email: email,
+          username: userData.username,
+          full_name: userData.full_name,
+          tier: tier as any,
+          coins: coins,
+          level: 1,
+          points: 0,
+          is_active: true,
+          is_verified: false,
+          is_banned: false,
+        })
+
+        if (profileError) {
+          console.error("Error creating profile:", profileError)
+        }
       }
-      toast.success("Account created!")
-      setLoading(false)
-      return {}
-    } catch (error: any) {
-      setLoading(false)
-      return { error: error.message || "An error occurred" }
+
+      return { error: null }
+    } catch (error) {
+      return { error }
     }
   }
 
   const signOut = async () => {
-    setLoading(true)
-    try {
-      await supabase.auth.signOut()
-      setUser(null)
-      setProfile(null)
-      toast.success("Signed out")
-    } catch (error) {
-      console.error("Sign out error:", error)
-    } finally {
-      setLoading(false)
-    }
+    await supabase.auth.signOut()
   }
 
-  /* -------------  initial load & listener ------------- */
-  useEffect(() => {
-    let alive = true
-    ;(async () => {
-      try {
-        const { data } = await supabase.auth.getSession()
-        if (!alive) return
-        if (data.session?.user) {
-          setUser(data.session.user)
-          const profileData = await fetchProfile(data.session.user.id)
-          setProfile(profileData)
-        }
-      } catch (error) {
-        console.error("Session error:", error)
-      } finally {
-        if (alive) {
-          setLoading(false)
-          setIsInit(true)
-        }
-      }
-    })()
-
-    const { data: listener } = supabase.auth.onAuthStateChange(async (ev, sess) => {
-      if (!alive) return
-      if (ev === "SIGNED_OUT") {
-        setUser(null)
-        setProfile(null)
-      }
-      if (ev === "SIGNED_IN" && sess?.user) {
-        setUser(sess.user)
-        const profileData = await fetchProfile(sess.user.id)
-        setProfile(profileData)
-      }
-    })
-
-    return () => {
-      alive = false
-      listener.subscription.unsubscribe()
-    }
-  }, [fetchProfile, supabase])
-
-  const value: AuthCtx = {
+  const value = {
     user,
+    session,
     profile,
     loading,
-    isAuthenticated: !!user,
-    isInitialized: isInit,
     signIn,
     signUp,
     signOut,
@@ -175,7 +171,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>")
-  return ctx
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider")
+  }
+  return context
 }

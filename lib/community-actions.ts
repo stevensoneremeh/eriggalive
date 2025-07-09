@@ -60,52 +60,111 @@ async function getCurrentPublicUserProfile(
 }
 
 // --- Post Actions ---
-/**
- * Original server action that inserts a post.
- * Kept internal; exported at the bottom for legacy imports.
- */
-async function createCommunityPost(formData: FormData) {
-  const supabase = createClient()
+export async function createCommunityPost(formData: FormData) {
+  try {
+    const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: "Auth required" }
+    // Get current user safely
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
-  const content = (formData.get("content") as string | null)?.trim() ?? ""
-  const categoryId = Number(formData.get("categoryId") ?? 0)
+    if (authError || !user) {
+      return { success: false, error: "Authentication required" }
+    }
 
-  if (!content) return { success: false, error: "Content is empty" }
-  if (!categoryId) return { success: false, error: "Category is missing" }
+    // Get user profile safely
+    const { data: userProfile, error: profileError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .single()
 
-  const { data: profile } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
+    if (profileError || !userProfile) {
+      return { success: false, error: "User profile not found" }
+    }
 
-  if (!profile) return { success: false, error: "Profile not found" }
+    const content = formData.get("content") as string
+    const categoryId = formData.get("categoryId") as string
+    const mediaFile = formData.get("mediaFile") as File | null
 
-  const { data, error } = await supabase
-    .from("community_posts")
-    .insert({
-      user_id: profile.id,
-      category_id: categoryId,
-      content: DOMPurify.sanitize(content),
+    if (!content?.trim() && !mediaFile) {
+      return { success: false, error: "Please provide content or upload media." }
+    }
+
+    if (!categoryId) {
+      return { success: false, error: "Please select a category." }
+    }
+
+    const sanitizedContent = DOMPurify.sanitize(content)
+
+    let media_url: string | undefined = undefined
+    let media_type: string | undefined = undefined
+    let media_metadata: Record<string, any> | undefined = undefined
+
+    if (mediaFile && mediaFile.size > 0) {
+      const fileExt = mediaFile.name.split(".").pop()
+      const fileName = `${userProfile.id}-${Date.now()}.${fileExt}`
+      const filePath = `community_media/${fileName}`
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("eriggalive-assets")
+        .upload(filePath, mediaFile)
+
+      if (uploadError) {
+        console.error("Media upload error:", uploadError)
+        return { success: false, error: `Media upload failed: ${uploadError.message}` }
+      }
+
+      const { data: publicUrlData } = supabase.storage.from("eriggalive-assets").getPublicUrl(uploadData.path)
+      media_url = publicUrlData.publicUrl
+
+      if (mediaFile.type.startsWith("image/")) media_type = "image"
+      else if (mediaFile.type.startsWith("audio/")) media_type = "audio"
+      else if (mediaFile.type.startsWith("video/")) media_type = "video"
+
+      media_metadata = {
+        name: mediaFile.name,
+        size: mediaFile.size,
+        type: mediaFile.type,
+      }
+    }
+
+    const postData = {
+      user_id: userProfile.id,
+      category_id: Number.parseInt(categoryId),
+      content: sanitizedContent,
+      media_url,
+      media_type,
+      media_metadata,
       is_published: true,
       is_deleted: false,
-    })
-    .select()
-    .single()
+      vote_count: 0,
+      comment_count: 0,
+    }
 
-  if (error) return { success: false, error: error.message }
+    const { data: newPost, error } = await supabase
+      .from("community_posts")
+      .insert(postData)
+      .select(`
+        *,
+        user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
+        category:community_categories!community_posts_category_id_fkey(id, name, slug)
+      `)
+      .single()
 
-  revalidatePath("/community")
-  return { success: true, post: data }
-}
+    if (error) {
+      console.error("Post creation error:", error)
+      return { success: false, error: error.message }
+    }
 
-/**
- * NEW async wrapper so imports that expect
- * `createCommunityPostAction` keep working.
- */
-export async function createCommunityPostAction(formData: FormData) {
-  return createCommunityPost(formData)
+    revalidatePath("/community")
+    return { success: true, post: newPost }
+  } catch (error: any) {
+    console.error("Create post action error:", error)
+    return { success: false, error: error.message || "Failed to create post" }
+  }
 }
 
 export async function editPostAction(postId: number, formData: FormData) {
@@ -763,7 +822,3 @@ export async function fetchCommunityCategories() {
     return []
   }
 }
-
-// Alias so legacy `import { createCommunityPostAction }` continues to work: from "./community-actions"
-
-export { createCommunityPost } // still export the original if some code uses it

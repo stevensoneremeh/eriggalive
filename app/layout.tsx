@@ -9,9 +9,9 @@ const inter = Inter({
 })
 
 import { AuthProvider } from "@/contexts/auth-context"
-import { ThemeProvider } from "@/contexts/theme-context"
+import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
-import { Toaster as SonnerToaster } from "@/components/ui/sonner"
+import { PreviewModeIndicator } from "@/components/preview-mode-indicator"
 import { MainNavigation } from "@/components/navigation/main-navigation"
 
 export const metadata: Metadata = {
@@ -80,13 +80,13 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#f97316" />
         <meta name="msapplication-tap-highlight" content="no" />
       </head>
-      <body className={inter.className} suppressHydrationWarning>
+      <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <AuthProvider>
             <MainNavigation />
             <main className="pt-16 pb-20 md:pb-0">{children}</main>
             <Toaster />
-            <SonnerToaster />
+            <PreviewModeIndicator />
           </AuthProvider>
         </ThemeProvider>
       </body>
