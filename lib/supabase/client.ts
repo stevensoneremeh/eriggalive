@@ -1,204 +1,122 @@
 /**
- * Client-side Supabase helper with session logging
- * ------------------------------------------------------------------
- *  • Provides a singleton Supabase browser client
- *  • Logs all session state changes for debugging
- *  • Falls back to a harmless mock if the env vars are not present
+ * --------------------------------------------------------------------
+ *  Supabase Browser Client  with  Verbose Session Logging
+ * --------------------------------------------------------------------
+ *  – Singleton pattern (avoids duplicate clients on Fast-Refresh)
+ *  – Uses @supabase/ssr `createBrowserClient`
+ *  – Emits detailed logs for every auth-state change
+ *  – Falls back to a harmless mock when env-vars are missing
+ *  – Re-exports everything the rest of the codebase expects
  */
-import { createBrowserClient } from "@supabase/ssr"
+
+import { createBrowserClient, type SupabaseClient } from "@supabase/ssr"
 import type { Database } from "@/types/database"
 
 /* ------------------------------------------------------------------ */
-/* Environment                                                        */
+/* Environment helpers                                                */
 /* ------------------------------------------------------------------ */
+const PLACEHOLDER_URL = "https://placeholder.supabase.co"
+const PLACEHOLDER_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder-key"
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://placeholder.supabase.co"
-const SUPABASE_ANON_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder"
-
-/* ------------------------------------------------------------------ */
-/* Session Logging Utilities                                          */
-/* ------------------------------------------------------------------ */
-
-const LOG_PREFIX = "[Supabase Client]"
-
-function logSessionEvent(event: string, details?: any) {
-  const timestamp = new Date().toISOString()
-  console.log(`${LOG_PREFIX} ${timestamp} - ${event}`, details ? JSON.stringify(details, null, 2) : "")
-}
-
-function logError(context: string, error: any) {
-  const timestamp = new Date().toISOString()
-  console.error(`${LOG_PREFIX} ${timestamp} - ERROR in ${context}:`, error)
-}
-
-function logWarning(context: string, message: string, details?: any) {
-  const timestamp = new Date().toISOString()
-  console.warn(`${LOG_PREFIX} ${timestamp} - WARNING in ${context}: ${message}`, details || "")
-}
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? PLACEHOLDER_URL
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? PLACEHOLDER_KEY
 
 /* ------------------------------------------------------------------ */
-/* Singleton with Enhanced Logging                                    */
+/* Logger helpers                                                     */
 /* ------------------------------------------------------------------ */
+const LOG = "[Supabase-Client]"
+const now = () => new Date().toISOString()
+const log = (msg: string, obj?: unknown) => console.log(`${LOG} ${now()} – ${msg}`, obj ?? "")
+const warn = (msg: string, obj?: unknown) => console.warn(`${LOG} ${now()} – ⚠️  ${msg}`, obj ?? "")
+const errorLog = (msg: string, obj?: unknown) => console.error(`${LOG} ${now()} – ❌ ${msg}`, obj)
 
-let client: ReturnType<typeof createBrowserClient<Database>> | undefined
+/* ------------------------------------------------------------------ */
+/* Singleton creator                                                  */
+/* ------------------------------------------------------------------ */
+let client: SupabaseClient<Database> | undefined
 
-export function createClient() {
-  // Create a singleton supabase client on the client side
+/** Returns a singleton Supabase browser client */
+export function createClient(): SupabaseClient<Database> {
   if (!client) {
-    logSessionEvent("Creating new Supabase client", {
-      url: SUPABASE_URL,
-      hasValidUrl: SUPABASE_URL !== "https://placeholder.supabase.co",
-      hasValidKey: SUPABASE_ANON_KEY !== "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder",
-    })
-
-    try {
-      client = createBrowserClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY)
-
-      // Add session state change logging
-      client.auth.onAuthStateChange((event, session) => {
-        logSessionEvent(`Auth state changed: ${event}`, {
-          event,
-          hasSession: !!session,
-          userId: session?.user?.id,
-          userEmail: session?.user?.email,
-          expiresAt: session?.expires_at,
-          accessToken: session?.access_token ? "present" : "missing",
-          refreshToken: session?.refresh_token ? "present" : "missing",
-        })
-
-        // Log session expiry warnings
-        if (session?.expires_at) {
-          const expiresAt = new Date(session.expires_at * 1000)
-          const now = new Date()
-          const timeUntilExpiry = expiresAt.getTime() - now.getTime()
-          const minutesUntilExpiry = Math.floor(timeUntilExpiry / (1000 * 60))
-
-          if (minutesUntilExpiry < 5 && minutesUntilExpiry > 0) {
-            logWarning("Session Management", `Session expires in ${minutesUntilExpiry} minutes`, {
-              expiresAt: expiresAt.toISOString(),
-              userId: session.user?.id,
-            })
-          }
-        }
+    if (SUPABASE_URL !== PLACEHOLDER_URL && SUPABASE_ANON_KEY !== PLACEHOLDER_KEY) {
+      log("Initialising Supabase client")
+      client = createBrowserClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: true,
+        },
+        global: {
+          headers: { "X-Client-Info": "erigga-live-web-client" },
+        },
       })
 
-      logSessionEvent("Supabase client created successfully")
-    } catch (error) {
-      logError("Client Creation", error)
-      throw error
+      /* ------------  verbose auth-state logging  ------------------- */
+      client.auth.onAuthStateChange((event, session) => {
+        console.log(`[Auth] ${event}`, {
+          userId: session?.user?.id,
+          email: session?.user?.email,
+          expires: session?.expires_at,
+        })
+      })
+    } else {
+      /* --------------  mock for Preview / CI  ---------------------- */
+      warn("Environment vars missing – using mock Supabase client")
+      client = {
+        auth: {
+          getSession: async () => ({ data: { session: null }, error: null }),
+          onAuthStateChange: () => ({
+            data: { subscription: { unsubscribe() {} } },
+          }),
+          signInWithPassword: async () => ({
+            data: null,
+            error: { message: "Supabase not configured" },
+          }),
+          signUp: async () => ({
+            data: null,
+            error: { message: "Supabase not configured" },
+          }),
+          signOut: async () => ({ error: null }),
+        },
+        from() {
+          return {
+            select: () => ({
+              maybeSingle: async () => ({ data: null, error: null }),
+            }),
+            insert: async () => ({
+              data: null,
+              error: { message: "Supabase not configured" },
+            }),
+            update() {
+              return {
+                eq: async () => ({
+                  data: null,
+                  error: { message: "Supabase not configured" },
+                }),
+              }
+            },
+          }
+        },
+      } as any
     }
   }
-
   return client
 }
 
-export function createClientSupabase() {
-  return createClient()
-}
-
+/* ------------------------------------------------------------------ */
+/* Public re-exports (what other files expect)                        */
+/* ------------------------------------------------------------------ */
+export const createClientSupabase = createClient
 export const supabase = createClient()
-export default supabase
-
-/* ------------------------------------------------------------------ */
-/* Enhanced Auth Methods with Logging                                 */
-/* ------------------------------------------------------------------ */
-
 export const authLogger = {
-  async logCurrentSession() {
+  logCurrentSession: async () => {
     try {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession()
-
-      if (error) {
-        logError("Session Check", error)
-        return
-      }
-
-      logSessionEvent("Current session status", {
-        hasSession: !!session,
-        userId: session?.user?.id,
-        userEmail: session?.user?.email,
-        isExpired: session ? new Date(session.expires_at * 1000) < new Date() : null,
-        expiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
-      })
-    } catch (error) {
-      logError("Session Status Check", error)
-    }
-  },
-
-  async logUserProfile(userId: string) {
-    try {
-      const { data: profile, error } = await supabase
-        .from("users")
-        .select("id, username, email, tier, level, points, coins, created_at")
-        .eq("auth_user_id", userId)
-        .single()
-
-      if (error) {
-        logWarning("Profile Fetch", `Could not fetch profile for user ${userId}`, error)
-        return
-      }
-
-      logSessionEvent("User profile loaded", {
-        userId,
-        username: profile.username,
-        email: profile.email,
-        tier: profile.tier,
-        level: profile.level,
-        accountAge: profile.created_at,
-      })
-    } catch (error) {
-      logError("Profile Logging", error)
-    }
-  },
-
-  logAuthAction(action: string, success: boolean, details?: any) {
-    if (success) {
-      logSessionEvent(`Auth action succeeded: ${action}`, details)
-    } else {
-      logError(`Auth action failed: ${action}`, details)
-    }
-  },
-
-  startSessionMonitoring() {
-    logSessionEvent("Starting session monitoring")
-
-    // Check session status every 5 minutes
-    setInterval(
-      async () => {
-        await this.logCurrentSession()
-      },
-      5 * 60 * 1000,
-    )
-
-    // Log page visibility changes (user switching tabs)
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", () => {
-        logSessionEvent("Page visibility changed", {
-          hidden: document.hidden,
-          visibilityState: document.visibilityState,
-        })
-      })
-    }
-
-    // Log when user comes back online
-    if (typeof window !== "undefined") {
-      window.addEventListener("online", () => {
-        logSessionEvent("User came back online")
-        this.logCurrentSession()
-      })
-
-      window.addEventListener("offline", () => {
-        logSessionEvent("User went offline")
-      })
+      const { data } = await supabase.auth.getSession()
+      log("Current session snapshot", data.session)
+    } catch (e) {
+      errorLog("Failed to get current session", e)
     }
   },
 }
 
-// Auto-start session monitoring in browser environment
-if (typeof window !== "undefined") {
-  authLogger.startSessionMonitoring()
-}
+export default supabase

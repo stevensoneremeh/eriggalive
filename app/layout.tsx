@@ -2,17 +2,16 @@ import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
 import { Inter } from "next/font/google"
+import { AuthProvider } from "@/contexts/auth-context"
+import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from "@/components/ui/sonner"
+import { MainNavigation } from "@/components/navigation/main-navigation"
 
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
 })
-
-import { AuthProvider } from "@/contexts/auth-context"
-import { ThemeProvider } from "@/contexts/theme-context"
-import { Toaster } from "@/components/ui/toaster"
-import { Toaster as SonnerToaster } from "@/components/ui/sonner"
-import { MainNavigation } from "@/components/navigation/main-navigation"
 
 export const metadata: Metadata = {
   title: "Erigga Live - Official Fan Platform",
@@ -22,11 +21,6 @@ export const metadata: Metadata = {
   authors: [{ name: "Erigga Live Team" }],
   creator: "Erigga Live",
   publisher: "Erigga Live",
-  formatDetection: {
-    email: false,
-    address: false,
-    telephone: false,
-  },
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://eriggalive.vercel.app"),
   openGraph: {
     title: "Erigga Live - Official Fan Platform",
@@ -47,16 +41,6 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-    },
-  },
-  verification: {
-    google: process.env.GOOGLE_SITE_VERIFICATION,
   },
     generator: 'v0.dev'
 }
@@ -77,14 +61,14 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Erigga Live" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="msapplication-TileColor" content="#f97316" />
-        <meta name="msapplication-tap-highlight" content="no" />
       </head>
-      <body className={inter.className} suppressHydrationWarning>
+      <body className={`${inter.className} min-h-screen bg-background font-sans antialiased`} suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <AuthProvider>
-            <MainNavigation />
-            <main className="pt-16 pb-20 md:pb-0">{children}</main>
+            <div className="relative flex min-h-screen flex-col">
+              <MainNavigation />
+              <main className="flex-1 pt-16">{children}</main>
+            </div>
             <Toaster />
             <SonnerToaster />
           </AuthProvider>

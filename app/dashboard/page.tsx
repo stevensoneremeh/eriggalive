@@ -19,6 +19,7 @@ import {
   Settings,
   Bell,
   Star,
+  Users,
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -59,16 +60,15 @@ export default function DashboardPage() {
             <h2 className="text-xl font-semibold text-white mb-4">Access Denied</h2>
             <p className="text-gray-300 mb-6">Please sign in to access your dashboard.</p>
             <div className="flex gap-3 justify-center">
-              <Link href="/login">
-                <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10">
-                  Login
-                </Button>
-              </Link>
-              <Link href="/signup">
-                <Button className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600">
-                  Sign Up
-                </Button>
-              </Link>
+              <Button variant="outline" asChild className="bg-transparent border-white/30 text-white hover:bg-white/10">
+                <Link href="/login">Login</Link>
+              </Button>
+              <Button
+                asChild
+                className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+              >
+                <Link href="/signup">Sign Up</Link>
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -103,7 +103,7 @@ export default function DashboardPage() {
 
   const currentXP = profile?.points || 0
   const nextLevelXP = getNextLevelXP((profile?.level || 1) + 1)
-  const progressPercentage = (currentXP / nextLevelXP) * 100
+  const progressPercentage = Math.min((currentXP / nextLevelXP) * 100, 100)
 
   const recentActivity = [
     { type: "like", content: "Liked a post by EriggaFan001", time: "2 hours ago", icon: Heart },
@@ -281,30 +281,42 @@ export default function DashboardPage() {
                   <CardDescription className="text-gray-300">Jump to your favorite features</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Link href="/community">
-                    <Button className="w-full justify-start bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
-                      <MessageSquare className="h-4 w-4 mr-2" />
+                  <Button
+                    asChild
+                    className="w-full justify-start bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                  >
+                    <Link href="/community">
+                      <Users className="h-4 w-4 mr-2" />
                       Visit Community
-                    </Button>
-                  </Link>
-                  <Link href="/vault">
-                    <Button className="w-full justify-start bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600">
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    className="w-full justify-start bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600"
+                  >
+                    <Link href="/vault">
                       <Music className="h-4 w-4 mr-2" />
                       Browse Music
-                    </Button>
-                  </Link>
-                  <Link href="/chat">
-                    <Button className="w-full justify-start bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600">
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    className="w-full justify-start bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                  >
+                    <Link href="/chat">
                       <MessageSquare className="h-4 w-4 mr-2" />
                       Join Chat
-                    </Button>
-                  </Link>
-                  <Link href="/coins">
-                    <Button className="w-full justify-start bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600">
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    className="w-full justify-start bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
+                  >
+                    <Link href="/coins">
                       <Coins className="h-4 w-4 mr-2" />
                       Manage Coins
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                 </CardContent>
               </Card>
             </div>
@@ -409,7 +421,9 @@ export default function DashboardPage() {
                   {achievements.map((achievement, index) => (
                     <div
                       key={index}
-                      className={`p-4 rounded-lg border-2 ${achievement.earned ? "bg-green-500/10 border-green-500/30" : "bg-gray-500/10 border-gray-500/30"}`}
+                      className={`p-4 rounded-lg border-2 ${
+                        achievement.earned ? "bg-green-500/10 border-green-500/30" : "bg-gray-500/10 border-gray-500/30"
+                      }`}
                     >
                       <div className="flex items-center space-x-3">
                         <div className={`p-2 rounded-lg ${achievement.earned ? "bg-green-500" : "bg-gray-500"}`}>

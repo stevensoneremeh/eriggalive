@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Image from "next/image"
+import { cn } from "@/lib/utils"
 
 interface DynamicLogoProps {
   width?: number
@@ -60,17 +61,24 @@ export function DynamicLogo({ width = 120, height = 32, className = "" }: Dynami
   const logoSrc = isDark ? "/images/loggotrans-dark.png" : "/images/loggotrans-light.png"
 
   return (
-    <Image
-      src={logoSrc || "/placeholder.svg"}
-      alt="Erigga Live Logo"
-      width={width}
-      height={height}
-      className={className}
-      priority
-      onError={() => {
-        // Fallback to a simple text logo if images fail
-        console.warn("Logo image failed to load")
-      }}
-    />
+    <div className={cn("relative", className)}>
+      <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center">
+        <span className="text-white font-bold text-lg">E</span>
+      </div>
+      {logoSrc && (
+        <Image
+          src={logoSrc || "/placeholder.svg"}
+          alt="Erigga Live Logo"
+          width={width}
+          height={height}
+          className="absolute top-0 left-0"
+          priority
+          onError={() => {
+            // Fallback to a simple text logo if images fail
+            console.warn("Logo image failed to load")
+          }}
+        />
+      )}
+    </div>
   )
 }

@@ -27,9 +27,11 @@ import {
   MoreHorizontal,
   Flag,
   Bookmark,
+  ThumbsUp,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/components/ui/use-toast"
+import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 
 interface Post {
@@ -74,7 +76,7 @@ const categories = [
   { id: "news", name: "News & Updates" },
 ]
 
-const mockPosts: Post[] = [
+const initialPosts: Post[] = [
   {
     id: "1",
     author: {
@@ -136,7 +138,7 @@ const mockPosts: Post[] = [
   },
 ]
 
-const mockComments: { [key: string]: Comment[] } = {
+const initialComments: { [key: string]: Comment[] } = {
   "1": [
     {
       id: "c1",
@@ -183,11 +185,12 @@ const communityStats = {
 export default function CommunityPage() {
   const { isAuthenticated, profile, loading } = useAuth()
   const { toast } = useToast()
+  const supabase = createClient()
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("feed")
-  const [posts, setPosts] = useState<Post[]>(mockPosts)
+  const [posts, setPosts] = useState<Post[]>(initialPosts)
   const [selectedPost, setSelectedPost] = useState<Post | null>(null)
-  const [comments, setComments] = useState<{ [key: string]: Comment[] }>(mockComments)
+  const [comments, setComments] = useState<{ [key: string]: Comment[] }>(initialComments)
   const [newComment, setNewComment] = useState("")
   const [showCreatePost, setShowCreatePost] = useState(false)
   const [newPost, setNewPost] = useState({
@@ -283,7 +286,7 @@ export default function CommunityPage() {
     }
   }
 
-  const handleCreatePost = () => {
+  const handleCreatePost = async () => {
     if (!isAuthenticated) {
       toast({
         title: "Login Required",
@@ -539,19 +542,19 @@ export default function CommunityPage() {
                       <h3 className="text-xl font-semibold text-white mb-2">Join the Conversation!</h3>
                       <p className="text-gray-300 mb-4">Sign up to post, comment, and connect with other fans</p>
                       <div className="flex gap-3 justify-center">
-                        <Link href="/login">
-                          <Button
-                            variant="outline"
-                            className="bg-transparent border-white/30 text-white hover:bg-white/10"
-                          >
-                            Login
-                          </Button>
-                        </Link>
-                        <Link href="/signup">
-                          <Button className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600">
-                            Sign Up
-                          </Button>
-                        </Link>
+                        <Button
+                          variant="outline"
+                          asChild
+                          className="bg-transparent border-white/30 text-white hover:bg-white/10"
+                        >
+                          <Link href="/login">Login</Link>
+                        </Button>
+                        <Button
+                          asChild
+                          className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                        >
+                          <Link href="/signup">Sign Up</Link>
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -776,24 +779,24 @@ export default function CommunityPage() {
                 <CardTitle className="text-white text-lg">Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Link href="/vault">
-                  <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10">
+                <Button asChild variant="ghost" className="w-full justify-start text-white hover:bg-white/10">
+                  <Link href="/vault">
                     <Music className="h-4 w-4 mr-2" />
                     Browse Music
-                  </Button>
-                </Link>
-                <Link href="/chat">
-                  <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10">
+                  </Link>
+                </Button>
+                <Button asChild variant="ghost" className="w-full justify-start text-white hover:bg-white/10">
+                  <Link href="/chat">
                     <MessageSquare className="h-4 w-4 mr-2" />
                     Join Chat
-                  </Button>
-                </Link>
-                <Link href="/tickets">
-                  <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10">
+                  </Link>
+                </Button>
+                <Button asChild variant="ghost" className="w-full justify-start text-white hover:bg-white/10">
+                  <Link href="/tickets">
                     <Calendar className="h-4 w-4 mr-2" />
                     View Events
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </CardContent>
             </Card>
 
@@ -859,7 +862,9 @@ export default function CommunityPage() {
                         </div>
                         <div className="flex items-center space-x-4 mt-2">
                           <Button variant="ghost" size="sm" className="text-gray-400 hover:text-red-400 h-6 px-2">
-                            <Heart className={`h-3 w-3 mr-1 ${comment.isLiked ? "fill-current text-red-400" : ""}`} />
+                            <ThumbsUp
+                              className={`h-3 w-3 mr-1 ${comment.isLiked ? "fill-current text-red-400" : ""}`}
+                            />
                             {comment.likes}
                           </Button>
                           <Button variant="ghost" size="sm" className="text-gray-400 hover:text-blue-400 h-6 px-2">
