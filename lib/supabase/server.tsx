@@ -1,11 +1,8 @@
-/**
- * Server-side Supabase helpers
- */
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import type { Database } from "@/types/database"
 
-export async function createServerSupabaseClient() {
+export async function createClient() {
   const cookieStore = await cookies()
 
   return createServerClient<Database>(
@@ -20,29 +17,12 @@ export async function createServerSupabaseClient() {
           try {
             cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
           } catch {
-            // Called from Server Component - safe to ignore
+            // The `setAll` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
           }
         },
       },
     },
   )
 }
-
-export async function createAdminSupabaseClient() {
-  return createServerClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-    cookies: {
-      getAll() {
-        return []
-      },
-      setAll() {
-        // Admin client doesn't need cookies
-      },
-    },
-  })
-}
-
-export const createClient = createServerSupabaseClient
