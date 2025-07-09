@@ -1,430 +1,445 @@
 "use client"
 
-import { useState } from "react"
-import { useAuth } from "@/contexts/auth-context"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ShoppingCart, Heart, Star, Coins, CreditCard } from "lucide-react"
-import { CoinBalance } from "@/components/coin-balance"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
+import { ShoppingCart, Star, Minus, Plus, Trash2 } from "lucide-react"
+import { PaystackCheckout } from "@/components/paystack-checkout"
+import { useAuth } from "@/contexts/auth-context"
+import { toast } from "sonner"
 
-// Mock product data - in a real app, this would come from the API
-const products = [
-  {
-    id: 1,
-    name: "Paper Boi Hoodie",
-    description: "Premium quality hoodie with Erigga's signature Paper Boi design",
-    price: 15000,
-    coin_price: 1500,
-    images: ["/placeholder.svg?height=400&width=400"],
-    sizes: ["S", "M", "L", "XL", "XXL"],
-    category: "clothing",
-    is_premium_only: false,
-    stock_quantity: 25,
-    rating: 4.8,
-    reviews: 124,
-  },
-  {
-    id: 2,
-    name: "Warri Vibe T-Shirt",
-    description: "Comfortable cotton t-shirt representing Warri culture",
-    price: 8000,
-    coin_price: 800,
-    images: ["/placeholder.svg?height=400&width=400"],
-    sizes: ["S", "M", "L", "XL"],
-    category: "clothing",
-    is_premium_only: false,
-    stock_quantity: 50,
-    rating: 4.6,
-    reviews: 89,
-  },
-  {
-    id: 3,
-    name: "Erigga Signature Cap",
-    description: "Adjustable cap with embroidered Erigga logo",
-    price: 5000,
-    coin_price: 500,
-    images: ["/placeholder.svg?height=400&width=400"],
-    sizes: ["One Size"],
-    category: "accessories",
-    is_premium_only: false,
-    stock_quantity: 75,
-    rating: 4.7,
-    reviews: 156,
-  },
-  {
-    id: 4,
-    name: "Limited Edition Vinyl Record",
-    description: "Exclusive vinyl record of 'The Erigma' album - Blood tier exclusive",
-    price: 25000,
-    coin_price: 2500,
-    images: ["/placeholder.svg?height=400&width=400"],
-    sizes: ["Standard"],
-    category: "collectibles",
-    is_premium_only: true,
-    required_tier: "blood",
-    stock_quantity: 10,
-    rating: 5.0,
-    reviews: 23,
-  },
-  {
-    id: 5,
-    name: "Street Chronicles Poster Set",
-    description: "Set of 3 high-quality posters from different eras",
-    price: 3000,
-    coin_price: 300,
-    images: ["/placeholder.svg?height=400&width=400"],
-    sizes: ["A2"],
-    category: "collectibles",
-    is_premium_only: false,
-    stock_quantity: 100,
-    rating: 4.5,
-    reviews: 67,
-  },
-  {
-    id: 6,
-    name: "Erigga Phone Case",
-    description: "Protective phone case with custom Erigga artwork",
-    price: 4500,
-    coin_price: 450,
-    images: ["/placeholder.svg?height=400&width=400"],
-    sizes: ["iPhone 14", "iPhone 15", "Samsung S23", "Samsung S24"],
-    category: "accessories",
-    is_premium_only: false,
-    stock_quantity: 40,
-    rating: 4.4,
-    reviews: 78,
-  },
-]
-
-interface ProductCardProps {
-  product: (typeof products)[0]
-  onAddToCart: (product: (typeof products)[0], size: string, paymentMethod: "cash" | "coins") => void
+interface Product {
+  id: string
+  name: string
+  description: string
+  price: number
+  coin_price: number
+  images: string[]
+  sizes: string[]
+  category: string
+  is_premium_only: boolean
+  required_tier: string | null
+  stock_quantity: number
+  rating: number
+  review_count: number
+  is_active: boolean
 }
 
-function ProductCard({ product, onAddToCart }: ProductCardProps) {
-  const { profile } = useAuth()
-  const [selectedSize, setSelectedSize] = useState(product.sizes[0])
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "coins">("cash")
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-
-  const canPurchase = () => {
-    if (product.is_premium_only && product.required_tier) {
-      if (!profile) return false
-
-      const tierLevels = {
-        grassroot: 0,
-        pioneer: 1,
-        elder: 2,
-        blood: 3,
-      }
-
-      const userLevel = tierLevels[profile.tier]
-      const requiredLevel = tierLevels[product.required_tier as keyof typeof tierLevels]
-
-      return userLevel >= requiredLevel
-    }
-
-    return true
-  }
-
-  const handlePurchase = () => {
-    if (paymentMethod === "coins" && profile && profile.coins < product.coin_price) {
-      alert("Insufficient coins. Please purchase more coins or pay with cash.")
-      return
-    }
-
-    onAddToCart(product, selectedSize, paymentMethod)
-    setIsDialogOpen(false)
-  }
-
-  return (
-    <Card className="group hover:shadow-lg transition-all duration-300 bg-card/50 border-orange-500/20">
-      <div className="relative overflow-hidden">
-        <img
-          src={product.images[0] || "/placeholder.svg"}
-          alt={product.name}
-          className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
-        />
-        {product.is_premium_only && (
-          <Badge className="absolute top-2 left-2 bg-red-500 text-white">
-            {product.required_tier?.toUpperCase()} Only
-          </Badge>
-        )}
-        <Button variant="ghost" size="icon" className="absolute top-2 right-2 bg-white/80 hover:bg-white">
-          <Heart className="h-4 w-4" />
-        </Button>
-      </div>
-
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-2">
-          <h3 className="font-semibold text-lg group-hover:text-orange-500 transition-colors">{product.name}</h3>
-          <div className="flex items-center gap-1">
-            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-            <span className="text-sm text-muted-foreground">{product.rating}</span>
-          </div>
-        </div>
-
-        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{product.description}</p>
-
-        <div className="flex items-center justify-between mb-4">
-          <div className="space-y-1">
-            <div className="font-bold text-lg">₦{product.price.toLocaleString()}</div>
-            <div className="flex items-center text-sm text-muted-foreground">
-              <Coins className="h-3 w-3 text-yellow-500 mr-1" />
-              {product.coin_price} coins
-            </div>
-          </div>
-          <Badge variant="outline" className="text-xs">
-            {product.stock_quantity} in stock
-          </Badge>
-        </div>
-
-        {canPurchase() ? (
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="w-full bg-orange-500 hover:bg-orange-600 text-black">
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Add to Cart
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add to Cart</DialogTitle>
-                <DialogDescription>Configure your purchase options for {product.name}</DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-6 py-4">
-                <div className="space-y-2">
-                  <Label>Size</Label>
-                  <Select value={selectedSize} onValueChange={setSelectedSize}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {product.sizes.map((size) => (
-                        <SelectItem key={size} value={size}>
-                          {size}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-4">
-                  <Label>Payment Method</Label>
-                  <RadioGroup
-                    value={paymentMethod}
-                    onValueChange={(value) => setPaymentMethod(value as "cash" | "coins")}
-                    className="grid grid-cols-2 gap-4"
-                  >
-                    <div
-                      className={`border rounded-lg p-4 cursor-pointer ${
-                        paymentMethod === "cash" ? "border-orange-500 bg-orange-500/10" : ""
-                      }`}
-                    >
-                      <RadioGroupItem value="cash" id="cash" className="sr-only" />
-                      <Label htmlFor="cash" className="flex items-center cursor-pointer">
-                        <CreditCard className="h-5 w-5 mr-2" />
-                        <div>
-                          <div className="font-medium">Cash Payment</div>
-                          <div className="text-sm text-muted-foreground">₦{product.price.toLocaleString()}</div>
-                        </div>
-                      </Label>
-                    </div>
-
-                    <div
-                      className={`border rounded-lg p-4 cursor-pointer ${
-                        paymentMethod === "coins" ? "border-orange-500 bg-orange-500/10" : ""
-                      }`}
-                    >
-                      <RadioGroupItem value="coins" id="coins" className="sr-only" />
-                      <Label htmlFor="coins" className="flex items-center cursor-pointer">
-                        <Coins className="h-5 w-5 mr-2 text-yellow-500" />
-                        <div>
-                          <div className="font-medium">Erigga Coins</div>
-                          <div className="text-sm text-muted-foreground">{product.coin_price} coins</div>
-                        </div>
-                      </Label>
-                    </div>
-                  </RadioGroup>
-
-                  {paymentMethod === "coins" && profile && (
-                    <div className="p-3 bg-muted rounded-lg">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Your Balance:</span>
-                        <div className="flex items-center font-medium">
-                          <Coins className="h-4 w-4 text-yellow-500 mr-1" />
-                          {profile.coins} coins
-                        </div>
-                      </div>
-                      {profile.coins < product.coin_price && (
-                        <p className="text-xs text-red-500 mt-1">
-                          Insufficient coins. You need {product.coin_price - profile.coins} more coins.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-4">
-                  <Button
-                    className="flex-1 bg-orange-500 hover:bg-orange-600 text-black"
-                    onClick={handlePurchase}
-                    disabled={paymentMethod === "coins" && profile && profile.coins < product.coin_price}
-                  >
-                    Add to Cart
-                  </Button>
-
-                  <Button variant="outline" className="flex-1" onClick={() => setIsDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        ) : (
-          <Button disabled className="w-full">
-            {product.required_tier?.toUpperCase()} Members Only
-          </Button>
-        )}
-      </CardContent>
-    </Card>
-  )
+interface CartItem {
+  product: Product
+  size: string
+  quantity: number
+  paymentMethod: "cash" | "coins"
 }
 
 export default function MerchPage() {
-  const { profile } = useAuth()
-  const [selectedCategory, setSelectedCategory] = useState("all")
-  const [cart, setCart] = useState<
-    Array<{
-      product: (typeof products)[0]
-      size: string
-      paymentMethod: "cash" | "coins"
-      quantity: number
-    }>
-  >([])
+  const { user, userProfile } = useAuth()
+  const [products, setProducts] = useState<Product[]>([])
+  const [cart, setCart] = useState<CartItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isCartOpen, setIsCartOpen] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState<string>("all")
 
-  const categories = [
-    { value: "all", label: "All Items" },
-    { value: "clothing", label: "Clothing" },
-    { value: "accessories", label: "Accessories" },
-    { value: "collectibles", label: "Collectibles" },
-  ]
+  useEffect(() => {
+    fetchProducts()
+    loadCartFromStorage()
+  }, [])
 
-  const filteredProducts =
-    selectedCategory === "all" ? products : products.filter((product) => product.category === selectedCategory)
+  useEffect(() => {
+    saveCartToStorage()
+  }, [cart])
 
-  const handleAddToCart = (product: (typeof products)[0], size: string, paymentMethod: "cash" | "coins") => {
-    setCart((prev) => {
-      const existingItem = prev.find(
-        (item) => item.product.id === product.id && item.size === size && item.paymentMethod === paymentMethod,
-      )
-
-      if (existingItem) {
-        return prev.map((item) => (item === existingItem ? { ...item, quantity: item.quantity + 1 } : item))
-      } else {
-        return [...prev, { product, size, paymentMethod, quantity: 1 }]
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch("/api/merch/products")
+      if (response.ok) {
+        const data = await response.json()
+        setProducts(data)
       }
-    })
+    } catch (error) {
+      console.error("Error fetching products:", error)
+      toast.error("Failed to load products")
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    // Show success message
-    alert(`${product.name} (${size}) added to cart!`)
+  const loadCartFromStorage = () => {
+    if (typeof window !== "undefined") {
+      const savedCart = localStorage.getItem("erigga-cart")
+      if (savedCart) {
+        setCart(JSON.parse(savedCart))
+      }
+    }
+  }
+
+  const saveCartToStorage = () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("erigga-cart", JSON.stringify(cart))
+    }
+  }
+
+  const addToCart = (product: Product, size: string, paymentMethod: "cash" | "coins") => {
+    if (!user) {
+      toast.error("Please sign in to add items to cart")
+      return
+    }
+
+    // Check tier access for premium products
+    if (product.is_premium_only && product.required_tier) {
+      const tierOrder = ["grassroot", "pioneer", "elder", "blood"]
+      const userTierIndex = tierOrder.indexOf(userProfile?.tier || "grassroot")
+      const requiredTierIndex = tierOrder.indexOf(product.required_tier)
+
+      if (userTierIndex < requiredTierIndex) {
+        toast.error(`This item requires ${product.required_tier} tier or higher`)
+        return
+      }
+    }
+
+    // Check coin balance for coin payments
+    if (paymentMethod === "coins" && (userProfile?.coins || 0) < product.coin_price) {
+      toast.error("Insufficient Erigga Coins")
+      return
+    }
+
+    const existingItemIndex = cart.findIndex(
+      (item) => item.product.id === product.id && item.size === size && item.paymentMethod === paymentMethod,
+    )
+
+    if (existingItemIndex > -1) {
+      const newCart = [...cart]
+      newCart[existingItemIndex].quantity += 1
+      setCart(newCart)
+    } else {
+      setCart([...cart, { product, size, quantity: 1, paymentMethod }])
+    }
+
+    toast.success("Added to cart!")
+  }
+
+  const updateCartItemQuantity = (index: number, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      removeFromCart(index)
+      return
+    }
+
+    const newCart = [...cart]
+    newCart[index].quantity = newQuantity
+    setCart(newCart)
+  }
+
+  const removeFromCart = (index: number) => {
+    const newCart = cart.filter((_, i) => i !== index)
+    setCart(newCart)
+    toast.success("Removed from cart")
+  }
+
+  const clearCart = () => {
+    setCart([])
+    toast.success("Cart cleared")
+  }
+
+  const getCartTotal = () => {
+    return cart.reduce((total, item) => {
+      if (item.paymentMethod === "cash") {
+        return total + item.product.price * item.quantity
+      }
+      return total
+    }, 0)
+  }
+
+  const getCartCoinTotal = () => {
+    return cart.reduce((total, item) => {
+      if (item.paymentMethod === "coins") {
+        return total + item.product.coin_price * item.quantity
+      }
+      return total
+    }, 0)
+  }
+
+  const getCartItemCount = () => {
+    return cart.reduce((total, item) => total + item.quantity, 0)
+  }
+
+  const categories = ["all", ...Array.from(new Set(products.map((p) => p.category)))]
+  const filteredProducts =
+    selectedCategory === "all" ? products : products.filter((p) => p.category === selectedCategory)
+
+  const canAccessProduct = (product: Product) => {
+    if (!product.is_premium_only) return true
+    if (!user) return false
+    if (!product.required_tier) return true
+
+    const tierOrder = ["grassroot", "pioneer", "elder", "blood"]
+    const userTierIndex = tierOrder.indexOf(userProfile?.tier || "grassroot")
+    const requiredTierIndex = tierOrder.indexOf(product.required_tier)
+
+    return userTierIndex >= requiredTierIndex
+  }
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <div className="h-64 bg-gray-200 rounded-t-lg"></div>
+              <CardContent className="p-4">
+                <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded mb-4"></div>
+                <div className="h-6 bg-gray-200 rounded"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen py-8 px-4">
-      <div className="container mx-auto max-w-7xl">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
-          <div>
-            <h1 className="font-street text-4xl md:text-6xl text-gradient mb-2">MERCH STORE</h1>
-            <p className="text-muted-foreground">Official Erigga merchandise and collectibles</p>
-          </div>
+    <div className="container mx-auto px-4 py-8">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold">Erigga Merch Store</h1>
+          <p className="text-muted-foreground">Official merchandise and collectibles</p>
+        </div>
 
-          <div className="flex items-center gap-4">
-            {profile && <CoinBalance size="md" />}
-            <Button variant="outline" className="relative">
+        <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" className="relative bg-transparent">
               <ShoppingCart className="h-4 w-4 mr-2" />
-              Cart ({cart.reduce((sum, item) => sum + item.quantity, 0)})
+              Cart
+              {getCartItemCount() > 0 && (
+                <Badge className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center">
+                  {getCartItemCount()}
+                </Badge>
+              )}
             </Button>
+          </SheetTrigger>
+          <SheetContent className="w-full sm:max-w-lg">
+            <SheetHeader>
+              <SheetTitle>Shopping Cart ({getCartItemCount()} items)</SheetTitle>
+            </SheetHeader>
+
+            <div className="mt-6 space-y-4">
+              {cart.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">Your cart is empty</p>
+              ) : (
+                <>
+                  {cart.map((item, index) => (
+                    <div key={index} className="flex items-center space-x-4 p-4 border rounded-lg">
+                      <img
+                        src={item.product.images[0] || "/placeholder.svg"}
+                        alt={item.product.name}
+                        className="w-16 h-16 object-cover rounded"
+                      />
+                      <div className="flex-1">
+                        <h4 className="font-medium">{item.product.name}</h4>
+                        <p className="text-sm text-muted-foreground">Size: {item.size}</p>
+                        <p className="text-sm font-medium">
+                          {item.paymentMethod === "cash"
+                            ? `₦${item.product.price.toLocaleString()}`
+                            : `${item.product.coin_price} coins`}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => updateCartItemQuantity(index, item.quantity - 1)}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-8 text-center">{item.quantity}</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => updateCartItemQuantity(index, item.quantity + 1)}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => removeFromCart(index)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    {getCartTotal() > 0 && (
+                      <div className="flex justify-between">
+                        <span>Cash Total:</span>
+                        <span className="font-medium">₦{getCartTotal().toLocaleString()}</span>
+                      </div>
+                    )}
+                    {getCartCoinTotal() > 0 && (
+                      <div className="flex justify-between">
+                        <span>Coin Total:</span>
+                        <span className="font-medium">{getCartCoinTotal()} coins</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <PaystackCheckout
+                      cart={cart}
+                      onSuccess={() => {
+                        clearCart()
+                        setIsCartOpen(false)
+                      }}
+                    />
+                    <Button variant="outline" className="w-full bg-transparent" onClick={clearCart}>
+                      Clear Cart
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {/* Category Filter */}
+      <div className="mb-6">
+        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Select category" />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.map((category) => (
+              <SelectItem key={category} value={category}>
+                {category === "all" ? "All Categories" : category.charAt(0).toUpperCase() + category.slice(1)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Products Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredProducts.map((product) => (
+          <ProductCard
+            key={product.id}
+            product={product}
+            onAddToCart={addToCart}
+            canAccess={canAccessProduct(product)}
+            userCoins={userProfile?.coins || 0}
+          />
+        ))}
+      </div>
+
+      {filteredProducts.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">No products found in this category.</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface ProductCardProps {
+  product: Product
+  onAddToCart: (product: Product, size: string, paymentMethod: "cash" | "coins") => void
+  canAccess: boolean
+  userCoins: number
+}
+
+function ProductCard({ product, onAddToCart, canAccess, userCoins }: ProductCardProps) {
+  const [selectedSize, setSelectedSize] = useState<string>("")
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "coins">("cash")
+
+  const handleAddToCart = () => {
+    if (!selectedSize && product.sizes.length > 0) {
+      toast.error("Please select a size")
+      return
+    }
+
+    onAddToCart(product, selectedSize || "One Size", paymentMethod)
+  }
+
+  return (
+    <Card className={`${!canAccess ? "opacity-60" : ""}`}>
+      <CardHeader className="p-0">
+        <div className="relative">
+          <img
+            src={product.images[0] || "/placeholder.svg"}
+            alt={product.name}
+            className="w-full h-64 object-cover rounded-t-lg"
+          />
+          {product.is_premium_only && (
+            <Badge className="absolute top-2 right-2" variant="secondary">
+              {product.required_tier} Only
+            </Badge>
+          )}
+          {product.stock_quantity <= 5 && product.stock_quantity > 0 && (
+            <Badge className="absolute top-2 left-2" variant="destructive">
+              Only {product.stock_quantity} left
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+
+      <CardContent className="p-4">
+        <CardTitle className="text-lg mb-2">{product.name}</CardTitle>
+        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{product.description}</p>
+
+        <div className="flex items-center mb-3">
+          <div className="flex items-center">
+            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+            <span className="ml-1 text-sm">{product.rating}</span>
+            <span className="ml-1 text-sm text-muted-foreground">({product.review_count})</span>
           </div>
         </div>
 
-        {/* Category Filter */}
-        <div className="mb-8">
-          <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
-            <TabsList className="grid grid-cols-4 w-full max-w-md">
-              {categories.map((category) => (
-                <TabsTrigger key={category.value} value={category.value} className="text-xs">
-                  {category.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <span className="text-lg font-bold">₦{product.price.toLocaleString()}</span>
+            <span className="text-sm text-muted-foreground">or {product.coin_price} coins</span>
+          </div>
+
+          {product.sizes.length > 0 && (
+            <Select value={selectedSize} onValueChange={setSelectedSize}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select size" />
+              </SelectTrigger>
+              <SelectContent>
+                {product.sizes.map((size) => (
+                  <SelectItem key={size} value={size}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          <Select value={paymentMethod} onValueChange={(value: "cash" | "coins") => setPaymentMethod(value)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="cash">Pay with Cash (₦{product.price.toLocaleString()})</SelectItem>
+              <SelectItem value="coins" disabled={userCoins < product.coin_price}>
+                Pay with Coins ({product.coin_price} coins)
+                {userCoins < product.coin_price && " - Insufficient"}
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
+      </CardContent>
 
-        {/* Products Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
-          ))}
-        </div>
-
-        {/* Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-card/50 border-orange-500/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Coins className="h-5 w-5 text-yellow-500" />
-                Pay with Erigga Coins
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Use your Erigga Coins to purchase merchandise at discounted rates. Earn coins by engaging with content
-                and participating in the community.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/50 border-orange-500/20">
-            <CardHeader>
-              <CardTitle>Free Shipping</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Free shipping on orders over ₦10,000 within Nigeria. International shipping available for premium
-                members.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/50 border-orange-500/20">
-            <CardHeader>
-              <CardTitle>Exclusive Items</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Some items are exclusive to higher-tier members. Upgrade your membership to access limited edition
-                collectibles.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
+      <CardFooter className="p-4 pt-0">
+        <Button className="w-full" onClick={handleAddToCart} disabled={!canAccess || product.stock_quantity === 0}>
+          {!canAccess ? "Tier Required" : product.stock_quantity === 0 ? "Out of Stock" : "Add to Cart"}
+        </Button>
+      </CardFooter>
+    </Card>
   )
 }
