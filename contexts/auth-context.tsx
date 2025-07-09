@@ -37,60 +37,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     try {
-      // First check if profile exists
-      const { data, error, count } = await supabase
-        .from("users")
-        .select("*", { count: "exact" })
-        .eq("auth_user_id", userId)
+      const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
 
       if (error) {
-        console.error("Error fetching profile:", error)
-        return null
-      }
+        if (error.code === "PGRST116") {
+          // No profile exists, create one
+          const { data: authUser } = await supabase.auth.getUser()
 
-      // If no profile exists, create one
-      if (!data || data.length === 0) {
-        console.log("No profile found, creating one...")
-        const { data: authUser } = await supabase.auth.getUser()
-        
-        if (authUser.user) {
-          const newProfile = {
-            auth_user_id: userId,
-            email: authUser.user.email || "",
-            username: authUser.user.user_metadata?.username || authUser.user.email?.split("@")[0] || "user",
-            full_name: authUser.user.user_metadata?.full_name || authUser.user.email || "",
-            tier: "grassroot" as const,
-            coins: 100,
-            level: 1,
-            points: 0,
-            is_active: true,
-            is_verified: false,
-            is_banned: false,
+          if (authUser.user) {
+            const newProfile = {
+              auth_user_id: userId,
+              email: authUser.user.email || "",
+              username: authUser.user.user_metadata?.username || authUser.user.email?.split("@")[0] || "user",
+              full_name: authUser.user.user_metadata?.full_name || authUser.user.email || "",
+              subscription_tier: "grassroot" as const,
+              coins_balance: 100,
+              level: 1,
+              points: 0,
+              is_active: true,
+              is_verified: false,
+              is_banned: false,
+            }
+
+            const { data: createdProfile, error: createError } = await supabase
+              .from("users")
+              .insert(newProfile)
+              .select()
+              .single()
+
+            if (createError) {
+              console.error("Error creating profile:", createError)
+              return null
+            }
+
+            return createdProfile
           }
-
-          const { data: createdProfile, error: createError } = await supabase
-            .from("users")
-            .insert(newProfile)
-            .select()
-            .single()
-
-          if (createError) {
-            console.error("Error creating profile:", createError)
-            return null
-          }
-
-          return createdProfile
+        } else {
+          console.error("Error fetching profile:", error)
         }
         return null
       }
 
-      // If multiple profiles exist, return the first one
-      if (data.length > 1) {
-        console.warn("Multiple profiles found for user, using the first one")
-        return data[0]
-      }
-
-      return data[0]
+      return data
     } catch (error) {
       console.error("Error in fetchProfile:", error)
       return null
@@ -107,16 +95,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setSession(session)
-      setUser(session?.user ?? null)
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        setSession(session)
+        setUser(session?.user ?? null)
 
-      if (session?.user) {
-        const profileData = await fetchProfile(session.user.id)
-        setProfile(profileData)
+        if (session?.user) {
+          const profileData = await fetchProfile(session.user.id)
+          setProfile(profileData)
+        }
+      } catch (error) {
+        console.error("Error getting initial session:", error)
+      } finally {
+        setLoading(false)
       }
-
-      setLoading(false)
     }
 
     getInitialSession()
@@ -173,7 +167,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) return { error }
 
-      // Profile will be created automatically by the auth state change listener
       return { error: null }
     } catch (error) {
       return { error }

@@ -1,15 +1,12 @@
 "use client"
-
-import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
-import { useAuth } from "@/contexts/auth-context"
-import { Music, Users, Calendar, TrendingUp, Clock, Home } from "lucide-react"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { useAuth } from "@/contexts/auth-context"
+import { Music, Users, Calendar, TrendingUp, Clock, Home, Coins, Crown, Gift, MessageCircle } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 // Mock data for the dashboard
 const mockRecentTracks = [
@@ -29,15 +26,55 @@ const mockCommunityPosts = [
 ]
 
 export default function DashboardPage() {
-  const { profile } = useAuth()
+  const { profile, isAuthenticated, isLoading } = useAuth()
   const [activeTab, setActiveTab] = useState("overview")
+  const router = useRouter()
 
-  if (!profile) {
-    return null // This will be handled by the DashboardLayout
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login?redirect=/dashboard")
+    }
+  }, [isAuthenticated, isLoading, router])
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="space-y-6">
+          <div className="h-8 bg-muted animate-pulse rounded" />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-muted animate-pulse rounded" />
+            ))}
+          </div>
+          <div className="h-64 bg-muted animate-pulse rounded" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated || !profile) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="text-center py-12">
+            <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
+            <p className="text-muted-foreground mb-6">Please sign in to access your dashboard</p>
+            <div className="space-x-4">
+              <Button asChild>
+                <Link href="/login">Sign In</Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href="/signup">Sign Up</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
-    <DashboardLayout>
+    <div className="container mx-auto px-4 py-8">
       <div className="space-y-6">
         {/* Breadcrumb Navigation */}
         <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
@@ -70,7 +107,7 @@ export default function DashboardPage() {
                   <Coins className="h-4 w-4 text-yellow-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{profile.coins} Coins</div>
+                  <div className="text-2xl font-bold">{profile.coins_balance || 0} Coins</div>
                   <p className="text-xs text-muted-foreground">Use coins to unlock premium content</p>
                 </CardContent>
               </Card>
@@ -78,11 +115,11 @@ export default function DashboardPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Membership Tier</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <Crown className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold capitalize">{profile.tier}</div>
-                  <p className="text-xs text-muted-foreground">{getTierDescription(profile.tier)}</p>
+                  <div className="text-2xl font-bold capitalize">{profile.subscription_tier}</div>
+                  <p className="text-xs text-muted-foreground">{getTierDescription(profile.subscription_tier)}</p>
                 </CardContent>
               </Card>
 
@@ -112,15 +149,33 @@ export default function DashboardPage() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
               <Card className="col-span-2">
                 <CardHeader>
-                  <CardTitle>Coin Management</CardTitle>
-                  <CardDescription>Buy, withdraw, and manage your Erigga Coins</CardDescription>
+                  <CardTitle>Quick Actions</CardTitle>
+                  <CardDescription>Manage your account and explore content</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <Button asChild className="bg-green-500 hover:bg-green-600">
                       <Link href="/coins">
                         <Coins className="h-4 w-4 mr-2" />
                         Manage Coins
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline">
+                      <Link href="/community">
+                        <Users className="h-4 w-4 mr-2" />
+                        Community
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline">
+                      <Link href="/chat">
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Chat Rooms
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline">
+                      <Link href="/rooms/freebies">
+                        <Gift className="h-4 w-4 mr-2" />
+                        Freebies
                       </Link>
                     </Button>
                   </div>
@@ -204,6 +259,12 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <p>Visit the Media Vault for full access to music content.</p>
+                <Button asChild className="mt-4">
+                  <Link href="/vault">
+                    <Music className="h-4 w-4 mr-2" />
+                    Open Media Vault
+                  </Link>
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -216,6 +277,12 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <p>Visit the Community page to see all posts and discussions.</p>
+                <Button asChild className="mt-4">
+                  <Link href="/community">
+                    <Users className="h-4 w-4 mr-2" />
+                    Join Community
+                  </Link>
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -228,12 +295,18 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <p>Visit the Events page to see all upcoming events and purchase tickets.</p>
+                <Button asChild className="mt-4">
+                  <Link href="/chronicles">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    View Events
+                  </Link>
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
       </div>
-    </DashboardLayout>
+    </div>
   )
 }
 
@@ -262,27 +335,4 @@ function getTierDescription(tier: string): string {
     default:
       return "Fan membership tier"
   }
-}
-
-// Coins icon component
-function Coins(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="8" cy="8" r="6" />
-      <path d="M18.09 10.37A6 6 0 1 1 10.34 18" />
-      <path d="M7 6h1v4" />
-      <path d="m16.71 13.88.7.71-2.82 2.82" />
-    </svg>
-  )
 }

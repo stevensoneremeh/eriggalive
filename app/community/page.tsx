@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Plus, Heart, MessageCircle, Share2, Search, TrendingUp, Clock, Users, Loader2 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { createCommunityPost, voteOnPost } from "@/lib/community-actions"
 import { formatDistanceToNow } from "date-fns"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -78,13 +77,11 @@ export default function CommunityPage() {
 
       if (data.error) {
         console.error("Error loading posts:", data.error)
-        toast.error("Failed to load posts")
       } else {
         setPosts(data.posts || [])
       }
     } catch (error) {
       console.error("Error loading posts:", error)
-      toast.error("Failed to load posts")
     } finally {
       setLoading(false)
     }
@@ -111,14 +108,26 @@ export default function CommunityPage() {
       return
     }
 
+    if (!isAuthenticated) {
+      toast.error("Please sign in to create posts")
+      return
+    }
+
     setCreating(true)
 
     try {
-      const formData = new FormData()
-      formData.append("content", newPostContent)
-      formData.append("categoryId", selectedCategory)
+      const response = await fetch("/api/community/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content: newPostContent,
+          categoryId: Number.parseInt(selectedCategory),
+        }),
+      })
 
-      const result = await createCommunityPost(formData)
+      const result = await response.json()
 
       if (result.success) {
         toast.success("Post created successfully!")
@@ -144,7 +153,15 @@ export default function CommunityPage() {
     }
 
     try {
-      const result = await voteOnPost(postId)
+      const response = await fetch("/api/community/vote", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ postId }),
+      })
+
+      const result = await response.json()
 
       if (result.success) {
         // Update local state
