@@ -1,32 +1,78 @@
 "use client"
 
 import { useAuth } from "@/contexts/auth-context"
-import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
-import { Users, MessageSquare, Coins, Trophy, Music } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Music,
+  MessageSquare,
+  Trophy,
+  Coins,
+  TrendingUp,
+  Heart,
+  Play,
+  Share2,
+  Settings,
+  Bell,
+  Star,
+} from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 
 export default function DashboardPage() {
-  const { user, profile, loading } = useAuth()
+  const { user, profile, loading, isAuthenticated, isInitialized } = useAuth()
+  const router = useRouter()
 
-  if (loading) {
+  useEffect(() => {
+    if (isInitialized && !isAuthenticated && !loading) {
+      router.push("/login?redirect=/dashboard")
+    }
+  }, [isAuthenticated, loading, isInitialized, router])
+
+  if (!isInitialized || loading) {
     return (
-      <DashboardLayout>
-        <div className="space-y-6">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-32 bg-gray-200 rounded"></div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
+        <div className="container mx-auto px-4 py-8">
+          <div className="animate-pulse space-y-6">
+            <div className="h-8 bg-gray-700 rounded w-1/3"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="h-32 bg-gray-700 rounded-lg"></div>
               ))}
             </div>
           </div>
         </div>
-      </DashboardLayout>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center">
+        <Card className="w-full max-w-md bg-white/10 backdrop-blur border-white/20">
+          <CardContent className="p-6 text-center">
+            <h2 className="text-xl font-semibold text-white mb-4">Access Denied</h2>
+            <p className="text-gray-300 mb-6">Please sign in to access your dashboard.</p>
+            <div className="flex gap-3 justify-center">
+              <Link href="/login">
+                <Button variant="outline" className="bg-transparent border-white/30 text-white hover:bg-white/10">
+                  Login
+                </Button>
+              </Link>
+              <Link href="/signup">
+                <Button className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600">
+                  Sign Up
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
@@ -47,183 +93,343 @@ export default function DashboardPage() {
     }
   }
 
-  const stats = [
-    {
-      title: "Total Coins",
-      value: profile?.coins || 0,
-      icon: Coins,
-      color: "text-yellow-600",
-      bgColor: "bg-yellow-100",
-    },
-    {
-      title: "Community Points",
-      value: profile?.points || 0,
-      icon: Trophy,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
-    },
-    {
-      title: "Messages Sent",
-      value: "0", // This would come from your chat system
-      icon: MessageSquare,
-      color: "text-green-600",
-      bgColor: "bg-green-100",
-    },
-    {
-      title: "Friends",
-      value: "0", // This would come from your social system
-      icon: Users,
-      color: "text-purple-600",
-      bgColor: "bg-purple-100",
-    },
-  ]
+  const getTierLabel = (tier: string) => {
+    return tier?.charAt(0).toUpperCase() + tier?.slice(1) || "Grassroot"
+  }
+
+  const getNextLevelXP = (level: number) => {
+    return level * 1000
+  }
+
+  const currentXP = profile?.points || 0
+  const nextLevelXP = getNextLevelXP((profile?.level || 1) + 1)
+  const progressPercentage = (currentXP / nextLevelXP) * 100
 
   const recentActivity = [
-    {
-      type: "join",
-      message: "Joined Erigga Live community",
-      time: "2 hours ago",
-      icon: Users,
-    },
-    {
-      type: "coins",
-      message: "Earned 50 coins from daily login",
-      time: "1 day ago",
-      icon: Coins,
-    },
-    {
-      type: "music",
-      message: "Listened to new track 'Paper Boi'",
-      time: "2 days ago",
-      icon: Music,
-    },
+    { type: "like", content: "Liked a post by EriggaFan001", time: "2 hours ago", icon: Heart },
+    { type: "comment", content: "Commented on 'Paper Boi Discussion'", time: "4 hours ago", icon: MessageSquare },
+    { type: "play", content: "Played 'A Very Very Good Bad Guy'", time: "6 hours ago", icon: Play },
+    { type: "share", content: "Shared a track with the community", time: "1 day ago", icon: Share2 },
+  ]
+
+  const achievements = [
+    { name: "First Post", description: "Made your first community post", earned: true, icon: MessageSquare },
+    { name: "Music Lover", description: "Played 100 tracks", earned: true, icon: Music },
+    { name: "Community Star", description: "Received 50 likes", earned: false, icon: Star },
+    { name: "Trendsetter", description: "Started a trending topic", earned: false, icon: TrendingUp },
+  ]
+
+  const favoriteTracksData = [
+    { title: "Paper Boi", artist: "Erigga", plays: 45, duration: "3:24" },
+    { title: "A Very Very Good Bad Guy", artist: "Erigga", plays: 38, duration: "4:12" },
+    { title: "Welcome To Warri", artist: "Erigga", plays: 32, duration: "3:45" },
+    { title: "Motivation", artist: "Erigga", plays: 28, duration: "3:18" },
   ]
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        {/* Welcome Section */}
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white">Welcome back, {profile?.username || user?.email}!</h1>
-            <p className="text-gray-300 mt-2">Here's what's happening in your Erigga Live experience</p>
+            <h1 className="text-4xl font-bold text-white mb-2">
+              Welcome back, {profile?.username || user?.email?.split("@")[0]}!
+            </h1>
+            <p className="text-gray-300">Here's what's happening in your Erigga Live experience</p>
           </div>
           <div className="flex items-center space-x-4">
-            <Badge className={`${getTierColor(profile?.tier || "grassroot")} text-white`}>
-              {profile?.tier || "grassroot"} Member
-            </Badge>
-            <Avatar className="h-12 w-12">
-              <AvatarImage src={profile?.avatar_url || ""} />
-              <AvatarFallback>
-                {profile?.username?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "U"}
-              </AvatarFallback>
-            </Avatar>
+            <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+              <Bell className="h-4 w-4 mr-2" />
+              Notifications
+            </Button>
+            <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat) => (
-            <Card key={stat.title} className="bg-white/10 backdrop-blur border-white/20">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-300">{stat.title}</p>
-                    <p className="text-2xl font-bold text-white">{stat.value}</p>
+        {/* Profile Overview */}
+        <Card className="bg-white/10 backdrop-blur border-white/20 mb-8">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+              <Avatar className="h-24 w-24">
+                <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
+                <AvatarFallback className="text-2xl">
+                  {profile?.username?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+
+              <div className="flex-1">
+                <div className="flex items-center space-x-3 mb-2">
+                  <h2 className="text-2xl font-bold text-white">{profile?.username || "User"}</h2>
+                  <Badge className={`${getTierColor(profile?.tier || "grassroot")} text-white`}>
+                    {getTierLabel(profile?.tier || "grassroot")}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-white">{profile?.level || 1}</div>
+                    <div className="text-sm text-gray-300">Level</div>
                   </div>
-                  <div className={`p-3 rounded-full ${stat.bgColor}`}>
-                    <stat.icon className={`h-6 w-6 ${stat.color}`} />
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-yellow-400">{profile?.coins || 1000}</div>
+                    <div className="text-sm text-gray-300">Coins</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-400">{profile?.points || 0}</div>
+                    <div className="text-sm text-gray-300">Points</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-400">12</div>
+                    <div className="text-sm text-gray-300">Achievements</div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent Activity */}
-          <Card className="lg:col-span-2 bg-white/10 backdrop-blur border-white/20">
-            <CardHeader>
-              <CardTitle className="text-white">Recent Activity</CardTitle>
-              <CardDescription className="text-gray-300">Your latest interactions and achievements</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {recentActivity.map((activity, index) => (
-                  <div key={index} className="flex items-center space-x-4 p-3 rounded-lg bg-white/5">
-                    <div className="p-2 rounded-full bg-white/10">
-                      <activity.icon className="h-4 w-4 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm text-white">{activity.message}</p>
-                      <p className="text-xs text-gray-400">{activity.time}</p>
-                    </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-300">Progress to Level {(profile?.level || 1) + 1}</span>
+                    <span className="text-white">
+                      {currentXP}/{nextLevelXP} XP
+                    </span>
                   </div>
-                ))}
+                  <Progress value={progressPercentage} className="h-2" />
+                </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions */}
-          <Card className="bg-white/10 backdrop-blur border-white/20">
-            <CardHeader>
-              <CardTitle className="text-white">Quick Actions</CardTitle>
-              <CardDescription className="text-gray-300">Jump into your favorite activities</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button asChild className="w-full justify-start bg-transparent" variant="outline">
-                <Link href="/community">
-                  <Users className="mr-2 h-4 w-4" />
-                  Join Community
-                </Link>
-              </Button>
-              <Button asChild className="w-full justify-start bg-transparent" variant="outline">
-                <Link href="/chat">
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  Start Chatting
-                </Link>
-              </Button>
-              <Button asChild className="w-full justify-start bg-transparent" variant="outline">
-                <Link href="/vault">
-                  <Music className="mr-2 h-4 w-4" />
-                  Browse Music
-                </Link>
-              </Button>
-              <Button asChild className="w-full justify-start bg-transparent" variant="outline">
-                <Link href="/coins">
-                  <Coins className="mr-2 h-4 w-4" />
-                  Manage Coins
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Tier Progress */}
-        <Card className="bg-white/10 backdrop-blur border-white/20">
-          <CardHeader>
-            <CardTitle className="text-white">Tier Progress</CardTitle>
-            <CardDescription className="text-gray-300">Your journey to the next tier level</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-300">Current Tier</span>
-                <Badge className={`${getTierColor(profile?.tier || "grassroot")} text-white`}>
-                  {profile?.tier || "grassroot"}
-                </Badge>
-              </div>
-              <Progress value={33} className="h-2" />
-              <div className="flex items-center justify-between text-sm text-gray-400">
-                <span>Progress to next tier</span>
-                <span>33%</span>
-              </div>
-              <p className="text-xs text-gray-400">Keep engaging with the community to unlock the next tier!</p>
             </div>
           </CardContent>
         </Card>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <Card className="bg-white/10 backdrop-blur border-white/20">
+            <CardContent className="p-4 text-center">
+              <Music className="h-8 w-8 text-blue-400 mx-auto mb-2" />
+              <div className="text-2xl font-bold text-white">143</div>
+              <div className="text-sm text-gray-300">Tracks Played</div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/10 backdrop-blur border-white/20">
+            <CardContent className="p-4 text-center">
+              <MessageSquare className="h-8 w-8 text-green-400 mx-auto mb-2" />
+              <div className="text-2xl font-bold text-white">28</div>
+              <div className="text-sm text-gray-300">Posts Created</div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/10 backdrop-blur border-white/20">
+            <CardContent className="p-4 text-center">
+              <Heart className="h-8 w-8 text-red-400 mx-auto mb-2" />
+              <div className="text-2xl font-bold text-white">156</div>
+              <div className="text-sm text-gray-300">Likes Received</div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/10 backdrop-blur border-white/20">
+            <CardContent className="p-4 text-center">
+              <Trophy className="h-8 w-8 text-yellow-400 mx-auto mb-2" />
+              <div className="text-2xl font-bold text-white">7</div>
+              <div className="text-sm text-gray-300">Achievements</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="grid w-full grid-cols-4 bg-white/10 border-white/20 mb-6">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-white/20 text-white">
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="music" className="data-[state=active]:bg-white/20 text-white">
+              Music
+            </TabsTrigger>
+            <TabsTrigger value="community" className="data-[state=active]:bg-white/20 text-white">
+              Community
+            </TabsTrigger>
+            <TabsTrigger value="achievements" className="data-[state=active]:bg-white/20 text-white">
+              Achievements
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Recent Activity */}
+              <Card className="bg-white/10 backdrop-blur border-white/20">
+                <CardHeader>
+                  <CardTitle className="text-white">Recent Activity</CardTitle>
+                  <CardDescription className="text-gray-300">Your latest interactions</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {recentActivity.map((activity, index) => (
+                    <div key={index} className="flex items-center space-x-3 p-3 rounded-lg bg-white/5">
+                      <activity.icon className="h-5 w-5 text-gray-400" />
+                      <div className="flex-1">
+                        <p className="text-white text-sm">{activity.content}</p>
+                        <p className="text-gray-400 text-xs">{activity.time}</p>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* Quick Actions */}
+              <Card className="bg-white/10 backdrop-blur border-white/20">
+                <CardHeader>
+                  <CardTitle className="text-white">Quick Actions</CardTitle>
+                  <CardDescription className="text-gray-300">Jump to your favorite features</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Link href="/community">
+                    <Button className="w-full justify-start bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Visit Community
+                    </Button>
+                  </Link>
+                  <Link href="/vault">
+                    <Button className="w-full justify-start bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600">
+                      <Music className="h-4 w-4 mr-2" />
+                      Browse Music
+                    </Button>
+                  </Link>
+                  <Link href="/chat">
+                    <Button className="w-full justify-start bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600">
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Join Chat
+                    </Button>
+                  </Link>
+                  <Link href="/coins">
+                    <Button className="w-full justify-start bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600">
+                      <Coins className="h-4 w-4 mr-2" />
+                      Manage Coins
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="music" className="space-y-6">
+            <Card className="bg-white/10 backdrop-blur border-white/20">
+              <CardHeader>
+                <CardTitle className="text-white">Your Favorite Tracks</CardTitle>
+                <CardDescription className="text-gray-300">Most played songs this month</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {favoriteTracksData.map((track, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-4 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center">
+                          <Music className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-white">{track.title}</h4>
+                          <p className="text-sm text-gray-400">{track.artist}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <div className="text-right">
+                          <p className="text-sm text-white">{track.plays} plays</p>
+                          <p className="text-xs text-gray-400">{track.duration}</p>
+                        </div>
+                        <Button size="sm" variant="ghost" className="text-gray-400 hover:text-white">
+                          <Play className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="community" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="bg-white/10 backdrop-blur border-white/20">
+                <CardHeader>
+                  <CardTitle className="text-white">Community Stats</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-300">Posts Created</span>
+                    <span className="text-white font-semibold">28</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-300">Comments Made</span>
+                    <span className="text-white font-semibold">156</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-300">Likes Received</span>
+                    <span className="text-white font-semibold">342</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-300">Followers</span>
+                    <span className="text-white font-semibold">89</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/10 backdrop-blur border-white/20">
+                <CardHeader>
+                  <CardTitle className="text-white">Recent Posts</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="p-3 rounded-lg bg-white/5">
+                    <p className="text-white text-sm">"Just heard the new track - absolutely fire! 🔥"</p>
+                    <p className="text-gray-400 text-xs mt-1">2 hours ago • 12 likes</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-white/5">
+                    <p className="text-white text-sm">"Can't wait for the concert next month!"</p>
+                    <p className="text-gray-400 text-xs mt-1">1 day ago • 8 likes</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-white/5">
+                    <p className="text-white text-sm">"Erigga's storytelling is unmatched 💯"</p>
+                    <p className="text-gray-400 text-xs mt-1">3 days ago • 15 likes</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="achievements" className="space-y-6">
+            <Card className="bg-white/10 backdrop-blur border-white/20">
+              <CardHeader>
+                <CardTitle className="text-white">Your Achievements</CardTitle>
+                <CardDescription className="text-gray-300">
+                  Unlock badges by being active in the community
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {achievements.map((achievement, index) => (
+                    <div
+                      key={index}
+                      className={`p-4 rounded-lg border-2 ${achievement.earned ? "bg-green-500/10 border-green-500/30" : "bg-gray-500/10 border-gray-500/30"}`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className={`p-2 rounded-lg ${achievement.earned ? "bg-green-500" : "bg-gray-500"}`}>
+                          <achievement.icon className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h4 className={`font-semibold ${achievement.earned ? "text-green-400" : "text-gray-400"}`}>
+                            {achievement.name}
+                          </h4>
+                          <p className="text-sm text-gray-300">{achievement.description}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
-    </DashboardLayout>
+    </div>
   )
 }
