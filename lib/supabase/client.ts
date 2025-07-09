@@ -6,14 +6,14 @@ export function createClient() {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      "Missing Supabase environment variables. NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required on the client.",
-    )
+    throw new Error("Missing Supabase environment variables")
   }
 
   return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
 }
 
-// For backward compatibility
+// Legacy alias for backward compatibility
 export const createClientSupabase = createClient
+
+// Default export
 export default createClient

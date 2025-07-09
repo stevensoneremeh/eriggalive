@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    const supabase = createAdminSupabaseClient()
+    const supabase = await createAdminSupabaseClient()
 
     const { data: categories, error } = await supabase
       .from("community_categories")
@@ -19,12 +19,6 @@ export async function GET() {
     return NextResponse.json({ categories: categories || [] })
   } catch (error) {
     console.error("API Error:", error)
-    return NextResponse.json(
-      {
-        categories: [],
-        error: "Failed to fetch categories",
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ categories: [], error: "Failed to fetch categories" }, { status: 500 })
   }
 }

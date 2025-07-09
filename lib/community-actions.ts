@@ -3,13 +3,39 @@
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import DOMPurify from "isomorphic-dompurify"
-import type { User as PublicUser, CommunityComment, ReportReason, ReportTargetType } from "@/types/database"
+import type { Database } from "@/types/database"
 
-const VOTE_COIN_AMOUNT = 100
+type User = Database["public"]["Tables"]["users"]["Row"]
+
+async function getCurrentUser() {
+  const supabase = await createClient()
+  
+  const {
+    data: { user: authUser },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !authUser) {
+    return null
+  }
+
+  const { data: userProfile, error: profileError } = await supabase
+    .from("users")
+    .select("*")
+    .eq("auth_user_id", authUser.id)
+    .single()
+
+  if (profileError) {
+    console.error("Error fetching user profile:", profileError)
+    return null
+  }
+
+  return userProfile
+}
 
 async function getCurrentPublicUserProfile(
   supabaseClient: ReturnType<typeof createClient>,
-): Promise<PublicUser | null> {
+): Promise<User | null> {
   try {
     const {
       data: { user: authUser },
@@ -63,26 +89,10 @@ async function getCurrentPublicUserProfile(
 export async function createCommunityPost(formData: FormData) {
   try {
     const supabase = await createClient()
+    const user = await getCurrentUser()
 
-    // Get current user safely
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
+    if (!user) {
       return { success: false, error: "Authentication required" }
-    }
-
-    // Get user profile safely
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("id")
-      .eq("auth_user_id", user.id)
-      .single()
-
-    if (profileError || !userProfile) {
-      return { success: false, error: "User profile not found" }
     }
 
     const content = formData.get("content") as string
@@ -105,7 +115,7 @@ export async function createCommunityPost(formData: FormData) {
 
     if (mediaFile && mediaFile.size > 0) {
       const fileExt = mediaFile.name.split(".").pop()
-      const fileName = `${userProfile.id}-${Date.now()}.${fileExt}`
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`
       const filePath = `community_media/${fileName}`
 
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -131,22 +141,20 @@ export async function createCommunityPost(formData: FormData) {
       }
     }
 
-    const postData = {
-      user_id: userProfile.id,
-      category_id: Number.parseInt(categoryId),
-      content: sanitizedContent,
-      media_url,
-      media_type,
-      media_metadata,
-      is_published: true,
-      is_deleted: false,
-      vote_count: 0,
-      comment_count: 0,
-    }
-
     const { data: newPost, error } = await supabase
       .from("community_posts")
-      .insert(postData)
+      .insert({
+        user_id: user.id,
+        category_id: Number.parseInt(categoryId),
+        content: sanitizedContent,
+        media_url,
+        media_type,
+        media_metadata,
+        is_published: true,
+        is_deleted: false,
+        vote_count: 0,
+        comment_count: 0,
+      })
       .select(`
         *,
         user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
@@ -297,6 +305,8 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId: string
         code: "ALREADY_VOTED",
       }
     }
+
+    const VOTE_COIN_AMOUNT = 100
 
     // Call the RPC function
     const { data, error } = await supabase.rpc("handle_post_vote", {
@@ -520,8 +530,8 @@ export async function toggleLikeCommentAction(commentId: number) {
 // --- Report Actions ---
 export async function createReportAction(
   targetId: number,
-  targetType: ReportTargetType,
-  reason: ReportReason,
+  targetType: string,
+  reason: string,
   additionalNotes = "",
 ) {
   try {
@@ -694,7 +704,7 @@ export async function fetchCommentsForPost(postId: number, loggedInUserId?: stri
       }),
     )
 
-    return commentsWithReplies as CommunityComment[]
+    return commentsWithReplies as any[]
   } catch (error: any) {
     console.error("Fetch comments error:", error)
     return []
@@ -827,3 +837,98 @@ export async function fetchCommunityCategories() {
 //  Aliases for legacy imports
 // ─────────────────────────────────────────────────────────────────────────────
 export { createCommunityPost as createCommunityPostAction }
+
+export async function voteOnPost(postId: number) {
+  try {
+    const supabase = await createClient()
+    const user = await getCurrentUser()
+
+    if (!user) {
+      return { success: false, error: "Authentication required" }
+    }
+
+    // Check if user already voted
+    const { data: existingVote } = await supabase
+      .from("community_post_votes")
+      .select("*")
+      .eq("post_id", postId)
+      .eq("user_id", user.id)
+      .single()
+
+    if (existingVote) {
+      // Remove vote
+      const { error } = await supabase
+        .from("community_post_votes")
+        .delete()
+        .eq("post_id", postId)
+        .eq("user_id", user.id)
+
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      revalidatePath("/community")
+      return { success: true, voted: false }
+    } else {
+      // Add vote
+      const { error } = await supabase
+        .from("community_post_votes")
+        .insert({
+          post_id: postId,
+          user_id: user.id,
+        })
+
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      revalidatePath("/community")
+      return { success: true, voted: true }
+    }
+  } catch (error: any) {
+    console.error("Vote error:", error)
+    return { success: false, error: error.message || "Failed to vote" }
+  }
+}
+
+export async function createComment(postId: number, content: string, parentCommentId?: number) {
+  try {
+    const supabase = await createClient()
+    const user = await getCurrentUser()
+
+    if (!user) {
+      return { success: false, error: "Authentication required" }
+    }
+
+    if (!content?.trim()) {
+      return { success: false, error: "Comment cannot be empty" }
+    }
+
+    const sanitizedContent = DOMPurify.sanitize(content)
+
+    const { data: newComment, error } = await supabase
+      .from("community_comments")
+      .insert({
+        post_id: postId,
+        user_id: user.id,
+        content: sanitizedContent,
+        parent_comment_id: parentCommentId || null,
+      })
+      .select(`
+        *,
+        user:users!community_comments_user_id_fkey(id, username, full_name, avatar_url, tier)
+      `)
+      .single()
+
+    if (error) {
+      console.error("Comment creation error:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/community")
+    return { success: true, comment: newComment }
+  } catch (error: any) {
+    console.error("Create comment error:", error)
+    return { success: false, error: error.message || "Failed to create comment" }
+  }
+}

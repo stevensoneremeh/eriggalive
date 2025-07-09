@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-// This now imports the clean, non-singleton version.
 import { createClient } from "@/lib/supabase/client"
 import type { User, Session } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
@@ -14,6 +13,8 @@ interface AuthContextType {
   session: Session | null
   profile: UserProfile | null
   loading: boolean
+  isAuthenticated: boolean
+  isLoading: boolean
   signIn: (email: string, password: string) => Promise<{ error: any }>
   signUp: (
     email: string,
@@ -27,24 +28,69 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Lazily initialize the client
-  const [supabase] = useState(() => createClient())
-
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const supabase = createClient()
+
   const fetchProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
+      // First check if profile exists
+      const { data, error, count } = await supabase
+        .from("users")
+        .select("*", { count: "exact" })
+        .eq("auth_user_id", userId)
 
       if (error) {
         console.error("Error fetching profile:", error)
         return null
       }
 
-      return data
+      // If no profile exists, create one
+      if (!data || data.length === 0) {
+        console.log("No profile found, creating one...")
+        const { data: authUser } = await supabase.auth.getUser()
+        
+        if (authUser.user) {
+          const newProfile = {
+            auth_user_id: userId,
+            email: authUser.user.email || "",
+            username: authUser.user.user_metadata?.username || authUser.user.email?.split("@")[0] || "user",
+            full_name: authUser.user.user_metadata?.full_name || authUser.user.email || "",
+            tier: "grassroot" as const,
+            coins: 100,
+            level: 1,
+            points: 0,
+            is_active: true,
+            is_verified: false,
+            is_banned: false,
+          }
+
+          const { data: createdProfile, error: createError } = await supabase
+            .from("users")
+            .insert(newProfile)
+            .select()
+            .single()
+
+          if (createError) {
+            console.error("Error creating profile:", createError)
+            return null
+          }
+
+          return createdProfile
+        }
+        return null
+      }
+
+      // If multiple profiles exist, return the first one
+      if (data.length > 1) {
+        console.warn("Multiple profiles found for user, using the first one")
+        return data[0]
+      }
+
+      return data[0]
     } catch (error) {
       console.error("Error in fetchProfile:", error)
       return null
@@ -59,37 +105,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    const getSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+    // Get initial session
+    const getInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
       setSession(session)
       setUser(session?.user ?? null)
+
       if (session?.user) {
-        await fetchProfile(session.user.id).then(setProfile)
+        const profileData = await fetchProfile(session.user.id)
+        setProfile(profileData)
       }
+
       setLoading(false)
     }
-    getSession()
 
+    getInitialSession()
+
+    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event, session?.user?.id)
       setSession(session)
       setUser(session?.user ?? null)
+
       if (session?.user) {
         const profileData = await fetchProfile(session.user.id)
         setProfile(profileData)
       } else {
         setProfile(null)
       }
+
       setLoading(false)
     })
 
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [supabase])
+    return () => subscription.unsubscribe()
+  }, [])
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -122,30 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) return { error }
 
-      // Create user profile
-      if (data.user) {
-        const tier = userData.tier || "grassroot"
-        const coins = tier === "grassroot" ? 100 : tier === "pioneer" ? 500 : 1000
-
-        const { error: profileError } = await supabase.from("users").insert({
-          auth_user_id: data.user.id,
-          email: email,
-          username: userData.username,
-          full_name: userData.full_name,
-          tier: tier as any,
-          coins: coins,
-          level: 1,
-          points: 0,
-          is_active: true,
-          is_verified: false,
-          is_banned: false,
-        })
-
-        if (profileError) {
-          console.error("Error creating profile:", profileError)
-        }
-      }
-
+      // Profile will be created automatically by the auth state change listener
       return { error: null }
     } catch (error) {
       return { error }
@@ -161,6 +189,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     profile,
     loading,
+    isAuthenticated: !!user,
+    isLoading: loading,
     signIn,
     signUp,
     signOut,

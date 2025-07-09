@@ -5,17 +5,17 @@ export async function GET() {
   try {
     const supabase = await createAdminSupabaseClient()
 
-    // Check if community_posts table exists, if not use posts table
+    // Fetch posts with user and category information
     const { data: posts, error: postsError } = await supabase
-      .from("posts")
+      .from("community_posts")
       .select(`
         id,
         content,
-        type,
-        media_urls,
-        media_types,
-        thumbnail_urls,
-        like_count,
+        media_url,
+        media_type,
+        media_metadata,
+        hashtags,
+        vote_count,
         comment_count,
         view_count,
         is_featured,
@@ -23,8 +23,21 @@ export async function GET() {
         created_at,
         updated_at,
         user_id,
-        hashtags,
-        tags
+        category_id,
+        user:users!community_posts_user_id_fkey(
+          id,
+          username,
+          full_name,
+          avatar_url,
+          tier
+        ),
+        category:community_categories!community_posts_category_id_fkey(
+          id,
+          name,
+          slug,
+          icon,
+          color
+        )
       `)
       .eq("is_published", true)
       .eq("is_deleted", false)
@@ -40,15 +53,6 @@ export async function GET() {
       return NextResponse.json({ posts: [] })
     }
 
-    // Get unique user IDs
-    const userIds = [...new Set(posts.map((post) => post.user_id))]
-
-    // Fetch users
-    const { data: users } = await supabase
-      .from("users")
-      .select("id, username, full_name, avatar_url, tier")
-      .in("id", userIds)
-
     // Get current user for vote status (if authenticated)
     let userVotes: number[] = []
     try {
@@ -61,9 +65,8 @@ export async function GET() {
         const { data: userData } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
 
         if (userData) {
-          // Check for votes in post_votes or similar table
           const { data: votes } = await supabase
-            .from("post_votes")
+            .from("community_post_votes")
             .select("post_id")
             .eq("user_id", userData.id)
             .in(
@@ -78,29 +81,25 @@ export async function GET() {
       console.warn("Could not fetch user vote status:", error)
     }
 
-    // Combine the data
-    const enrichedPosts = posts.map((post) => {
-      const postUser = users?.find((u) => u.id === post.user_id)
-
-      return {
-        ...post,
-        user: postUser || {
-          id: post.user_id,
-          username: "Unknown User",
-          full_name: "Unknown User",
-          avatar_url: "/placeholder-user.jpg",
-          tier: "grassroot",
-        },
-        category: {
-          id: 1,
-          name: post.type || "General",
-          slug: post.type || "general",
-          icon: "💬",
-          color: "#3B82F6",
-        },
-        has_voted: userVotes.includes(post.id),
-      }
-    })
+    // Format the posts
+    const enrichedPosts = posts.map((post) => ({
+      ...post,
+      user: post.user || {
+        id: post.user_id,
+        username: "Unknown User",
+        full_name: "Unknown User",
+        avatar_url: "/placeholder-user.jpg",
+        tier: "grassroot",
+      },
+      category: post.category || {
+        id: post.category_id,
+        name: "General",
+        slug: "general",
+        icon: "💬",
+        color: "#3B82F6",
+      },
+      has_voted: userVotes.includes(post.id),
+    }))
 
     return NextResponse.json({ posts: enrichedPosts })
   } catch (error) {
@@ -127,10 +126,10 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { content, type = "general", media_urls, media_types, hashtags } = body
+    const { content, category_id, media_url, media_type, hashtags } = body
 
-    if (!content) {
-      return NextResponse.json({ error: "Content is required" }, { status: 400 })
+    if (!content || !category_id) {
+      return NextResponse.json({ error: "Content and category are required" }, { status: 400 })
     }
 
     // Get user's internal ID
@@ -141,26 +140,37 @@ export async function POST(request: Request) {
     }
 
     const { data: post, error } = await supabase
-      .from("posts")
+      .from("community_posts")
       .insert({
         user_id: userData.id,
+        category_id,
         content,
-        type,
-        media_urls: media_urls || [],
-        media_types: media_types || [],
-        thumbnail_urls: [],
+        media_url,
+        media_type,
         hashtags: hashtags || [],
-        tags: [],
-        like_count: 0,
+        vote_count: 0,
         comment_count: 0,
         view_count: 0,
-        share_count: 0,
-        is_featured: false,
-        is_pinned: false,
         is_published: true,
         is_deleted: false,
       })
-      .select()
+      .select(`
+        *,
+        user:users!community_posts_user_id_fkey(
+          id,
+          username,
+          full_name,
+          avatar_url,
+          tier
+        ),
+        category:community_categories!community_posts_category_id_fkey(
+          id,
+          name,
+          slug,
+          icon,
+          color
+        )
+      `)
       .single()
 
     if (error) {
