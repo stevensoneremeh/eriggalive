@@ -4,14 +4,16 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { ShoppingCart, Star, Plus, Minus, Trash2, CreditCard, Coins } from "lucide-react"
+import { ShoppingCart, Star, Minus, Plus, X } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
 import { PaystackCheckout } from "@/components/paystack-checkout"
-import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/contexts/auth-context"
 
 interface Product {
   id: string
@@ -37,31 +39,114 @@ interface CartItem {
   payment_method: "cash" | "coins"
 }
 
-interface CustomerInfo {
-  name: string
-  email: string
-  phone: string
-  address: string
-  city: string
-  state: string
-}
+// Sample products - used as fallback if API fails
+const SAMPLE_PRODUCTS: Product[] = [
+  {
+    id: "1",
+    name: "Paper Boi Hoodie",
+    description: "Premium quality hoodie with Erigga's signature Paper Boi design",
+    price: 15000,
+    coin_price: 1500,
+    images: ["/placeholder.svg?height=400&width=400"],
+    sizes: ["S", "M", "L", "XL", "XXL"],
+    category: "clothing",
+    is_premium_only: false,
+    required_tier: null,
+    stock_quantity: 25,
+    rating: 4.8,
+    review_count: 124,
+    is_active: true,
+  },
+  {
+    id: "2",
+    name: "Warri Vibe T-Shirt",
+    description: "Comfortable cotton t-shirt representing Warri culture",
+    price: 8000,
+    coin_price: 800,
+    images: ["/placeholder.svg?height=400&width=400"],
+    sizes: ["S", "M", "L", "XL"],
+    category: "clothing",
+    is_premium_only: false,
+    required_tier: null,
+    stock_quantity: 50,
+    rating: 4.6,
+    review_count: 89,
+    is_active: true,
+  },
+  {
+    id: "3",
+    name: "Erigga Signature Cap",
+    description: "Adjustable cap with embroidered Erigga logo",
+    price: 5000,
+    coin_price: 500,
+    images: ["/placeholder.svg?height=400&width=400"],
+    sizes: ["One Size"],
+    category: "accessories",
+    is_premium_only: false,
+    required_tier: null,
+    stock_quantity: 75,
+    rating: 4.7,
+    review_count: 156,
+    is_active: true,
+  },
+  {
+    id: "4",
+    name: "Limited Edition Vinyl Record",
+    description: "Exclusive vinyl record of 'The Erigma' album – Blood tier exclusive",
+    price: 25000,
+    coin_price: 2500,
+    images: ["/placeholder.svg?height=400&width=400"],
+    sizes: ["Standard"],
+    category: "collectibles",
+    is_premium_only: true,
+    required_tier: "blood",
+    stock_quantity: 10,
+    rating: 5.0,
+    review_count: 23,
+    is_active: true,
+  },
+  {
+    id: "5",
+    name: "Street Chronicles Poster Set",
+    description: "Set of 3 high-quality posters from different eras",
+    price: 3000,
+    coin_price: 300,
+    images: ["/placeholder.svg?height=400&width=400"],
+    sizes: ["A2"],
+    category: "collectibles",
+    is_premium_only: false,
+    required_tier: null,
+    stock_quantity: 100,
+    rating: 4.5,
+    review_count: 67,
+    is_active: true,
+  },
+  {
+    id: "6",
+    name: "Erigga Phone Case",
+    description: "Protective phone case with custom Erigga artwork",
+    price: 4500,
+    coin_price: 450,
+    images: ["/placeholder.svg?height=400&width=400"],
+    sizes: ["iPhone 14", "iPhone 15", "Samsung S23", "Samsung S24"],
+    category: "accessories",
+    is_premium_only: false,
+    required_tier: null,
+    stock_quantity: 40,
+    rating: 4.4,
+    review_count: 78,
+    is_active: true,
+  },
+]
 
 export default function MerchPage() {
+  const { user } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [cart, setCart] = useState<CartItem[]>([])
-  const [selectedCategory, setSelectedCategory] = useState<string>("all")
-  const [isCartOpen, setIsCartOpen] = useState(false)
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
-  const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
-    city: "",
-    state: "",
-  })
-  const { toast } = useToast()
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState("all")
+  const [showCheckout, setShowCheckout] = useState(false)
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -81,109 +166,122 @@ export default function MerchPage() {
   }, [cart])
 
   // Fetch products from API
-  useEffect(() => {
-    fetchProducts()
-  }, [])
-
   const fetchProducts = async () => {
     try {
-      setLoading(true)
       const response = await fetch("/api/merch/products")
-      if (!response.ok) {
-        throw new Error("Failed to fetch products")
+      if (response.ok) {
+        const data = await response.json()
+        setProducts(data)
+      } else {
+        console.error("Failed to fetch products")
+        setProducts(SAMPLE_PRODUCTS)
       }
-      const data = await response.json()
-      setProducts(data)
     } catch (error) {
       console.error("Error fetching products:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load products. Please try again.",
-        variant: "destructive",
-      })
+      setProducts(SAMPLE_PRODUCTS)
     } finally {
       setLoading(false)
     }
   }
 
+  useEffect(() => {
+    fetchProducts()
+  }, [])
+
+  // Filter products based on search and category
+  const filteredProducts = products.filter((product) => {
+    const matchesSearch =
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.description.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesCategory = selectedCategory === "all" || product.category === selectedCategory
+    return matchesSearch && matchesCategory
+  })
+
+  // Check if user can access premium products
+  const canAccessProduct = (product: Product) => {
+    if (!product.is_premium_only) return true
+    if (!user) return false
+    if (product.required_tier === "blood" && user.tier === "blood") return true
+    return false
+  }
+
+  // Add item to cart
   const addToCart = (product: Product, size: string, paymentMethod: "cash" | "coins") => {
-    const existingItem = cart.find(
+    if (!canAccessProduct(product)) {
+      toast({
+        title: "Access Denied",
+        description: `This item requires ${product.required_tier} tier membership.`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    const existingItemIndex = cart.findIndex(
       (item) => item.product.id === product.id && item.size === size && item.payment_method === paymentMethod,
     )
 
-    if (existingItem) {
-      setCart(cart.map((item) => (item === existingItem ? { ...item, quantity: item.quantity + 1 } : item)))
+    if (existingItemIndex > -1) {
+      const newCart = [...cart]
+      newCart[existingItemIndex].quantity += 1
+      setCart(newCart)
     } else {
       setCart([...cart, { product, size, quantity: 1, payment_method: paymentMethod }])
     }
 
     toast({
-      title: "Added to cart",
-      description: `${product.name} (${size}) added to cart`,
+      title: "Added to Cart",
+      description: `${product.name} (${size}) added to your cart.`,
     })
   }
 
+  // Update cart item quantity
   const updateQuantity = (index: number, newQuantity: number) => {
     if (newQuantity <= 0) {
       removeFromCart(index)
       return
     }
 
-    setCart(cart.map((item, i) => (i === index ? { ...item, quantity: newQuantity } : item)))
+    const newCart = [...cart]
+    newCart[index].quantity = newQuantity
+    setCart(newCart)
   }
 
+  // Remove item from cart
   const removeFromCart = (index: number) => {
-    setCart(cart.filter((_, i) => i !== index))
+    const newCart = cart.filter((_, i) => i !== index)
+    setCart(newCart)
     toast({
-      title: "Removed from cart",
-      description: "Item removed from cart",
+      title: "Removed from Cart",
+      description: "Item removed from your cart.",
     })
   }
 
-  const clearCart = () => {
-    setCart([])
-    toast({
-      title: "Cart cleared",
-      description: "All items removed from cart",
-    })
-  }
+  // Calculate cart totals
+  const cartTotals = cart.reduce(
+    (totals, item) => {
+      const itemTotal =
+        item.payment_method === "cash" ? item.product.price * item.quantity : item.product.coin_price * item.quantity
 
-  const getCartTotal = () => {
-    return cart.reduce((total, item) => {
       if (item.payment_method === "cash") {
-        return total + item.product.price * item.quantity
+        totals.cashTotal += itemTotal
+      } else {
+        totals.coinTotal += itemTotal
       }
-      return total
-    }, 0)
-  }
 
-  const getCartCoinTotal = () => {
-    return cart.reduce((total, item) => {
-      if (item.payment_method === "coins") {
-        return total + item.product.coin_price * item.quantity
-      }
-      return total
-    }, 0)
-  }
+      return totals
+    },
+    { cashTotal: 0, coinTotal: 0 },
+  )
 
-  const categories = ["all", ...Array.from(new Set(products.map((p) => p.category)))]
-  const filteredProducts =
-    selectedCategory === "all" ? products : products.filter((p) => p.category === selectedCategory)
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency: "NGN",
-    }).format(price)
-  }
+  const categories = ["all", "clothing", "accessories", "collectibles"]
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black text-white">
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-500 mx-auto"></div>
-            <p className="mt-4 text-xl">Loading merch...</p>
+      <div className="min-h-screen bg-black text-white p-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto"></div>
+            <p className="mt-4 text-gray-400">Loading merch store...</p>
           </div>
         </div>
       </div>
@@ -192,18 +290,19 @@ export default function MerchPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="container mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto p-4">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-4xl font-bold mb-2">Erigga Official Merch</h1>
-            <p className="text-gray-400">Rep the Paper Boi with official merchandise</p>
+            <h1 className="text-4xl font-bold mb-2">Erigga Merch Store</h1>
+            <p className="text-gray-400">Official merchandise from the Paper Boi himself</p>
           </div>
 
-          <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
+          {/* Cart Button */}
+          <Sheet>
             <SheetTrigger asChild>
-              <Button variant="outline" className="relative mt-4 md:mt-0 bg-transparent">
-                <ShoppingCart className="w-4 h-4 mr-2" />
+              <Button variant="outline" className="relative bg-transparent">
+                <ShoppingCart className="h-4 w-4 mr-2" />
                 Cart ({cart.length})
                 {cart.length > 0 && (
                   <Badge className="absolute -top-2 -right-2 bg-green-500">
@@ -212,96 +311,85 @@ export default function MerchPage() {
                 )}
               </Button>
             </SheetTrigger>
-            <SheetContent className="bg-black border-gray-800 text-white">
+            <SheetContent className="bg-black border-gray-800 text-white w-full sm:max-w-lg">
               <SheetHeader>
                 <SheetTitle className="text-white">Shopping Cart</SheetTitle>
               </SheetHeader>
 
-              <div className="mt-6">
+              <div className="mt-6 space-y-4">
                 {cart.length === 0 ? (
                   <p className="text-gray-400 text-center py-8">Your cart is empty</p>
                 ) : (
                   <>
-                    <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {cart.map((item, index) => (
-                        <div key={index} className="flex items-center space-x-4 p-4 border border-gray-800 rounded-lg">
-                          <img
-                            src={item.product.images[0] || "/placeholder.svg"}
-                            alt={item.product.name}
-                            className="w-16 h-16 object-cover rounded"
-                          />
-                          <div className="flex-1">
-                            <h4 className="font-semibold">{item.product.name}</h4>
-                            <p className="text-sm text-gray-400">Size: {item.size}</p>
-                            <p className="text-sm text-gray-400">
-                              Payment: {item.payment_method === "cash" ? "Cash" : "Coins"}
-                            </p>
-                            <div className="flex items-center space-x-2 mt-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => updateQuantity(index, item.quantity - 1)}
-                              >
-                                <Minus className="w-3 h-3" />
-                              </Button>
-                              <span>{item.quantity}</span>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => updateQuantity(index, item.quantity + 1)}
-                              >
-                                <Plus className="w-3 h-3" />
-                              </Button>
-                              <Button size="sm" variant="destructive" onClick={() => removeFromCart(index)}>
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            {item.payment_method === "cash" ? (
-                              <p className="font-semibold">{formatPrice(item.product.price * item.quantity)}</p>
-                            ) : (
-                              <p className="font-semibold text-yellow-500">
-                                {item.product.coin_price * item.quantity} coins
-                              </p>
-                            )}
+                    {cart.map((item, index) => (
+                      <div key={index} className="flex items-center gap-4 p-4 border border-gray-800 rounded-lg">
+                        <img
+                          src={item.product.images[0] || "/placeholder.svg"}
+                          alt={item.product.name}
+                          className="w-16 h-16 object-cover rounded"
+                        />
+                        <div className="flex-1">
+                          <h4 className="font-semibold">{item.product.name}</h4>
+                          <p className="text-sm text-gray-400">Size: {item.size}</p>
+                          <p className="text-sm text-gray-400">
+                            Payment: {item.payment_method === "cash" ? "Cash" : "Coins"}
+                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateQuantity(index, item.quantity - 1)}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="w-8 text-center">{item.quantity}</span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateQuantity(index, item.quantity + 1)}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                        <div className="text-right">
+                          <p className="font-semibold">
+                            {item.payment_method === "cash"
+                              ? `₦${(item.product.price * item.quantity).toLocaleString()}`
+                              : `${(item.product.coin_price * item.quantity).toLocaleString()} coins`}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => removeFromCart(index)}
+                            className="text-red-400 hover:text-red-300"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
 
-                    <Separator className="my-4" />
+                    <Separator className="bg-gray-800" />
 
                     <div className="space-y-2">
-                      {getCartTotal() > 0 && (
+                      {cartTotals.cashTotal > 0 && (
                         <div className="flex justify-between">
                           <span>Cash Total:</span>
-                          <span className="font-semibold">{formatPrice(getCartTotal())}</span>
+                          <span className="font-semibold">₦{cartTotals.cashTotal.toLocaleString()}</span>
                         </div>
                       )}
-                      {getCartCoinTotal() > 0 && (
+                      {cartTotals.coinTotal > 0 && (
                         <div className="flex justify-between">
                           <span>Coin Total:</span>
-                          <span className="font-semibold text-yellow-500">{getCartCoinTotal()} coins</span>
+                          <span className="font-semibold">{cartTotals.coinTotal.toLocaleString()} coins</span>
                         </div>
                       )}
                     </div>
 
-                    <div className="flex space-x-2 mt-4">
-                      <Button variant="outline" onClick={clearCart} className="flex-1 bg-transparent">
-                        Clear Cart
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setIsCartOpen(false)
-                          setIsCheckoutOpen(true)
-                        }}
-                        className="flex-1 bg-green-600 hover:bg-green-700"
-                        disabled={cart.length === 0}
-                      >
-                        Checkout
-                      </Button>
-                    </div>
+                    <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => setShowCheckout(true)}>
+                      Proceed to Checkout
+                    </Button>
                   </>
                 )}
               </div>
@@ -309,11 +397,19 @@ export default function MerchPage() {
           </Sheet>
         </div>
 
-        {/* Category Filter */}
-        <div className="mb-8">
+        {/* Filters */}
+        <div className="flex flex-col md:flex-row gap-4 mb-8">
+          <div className="flex-1">
+            <Input
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-gray-900 border-gray-700 text-white"
+            />
+          </div>
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-48 bg-gray-900 border-gray-700">
-              <SelectValue placeholder="Select category" />
+            <SelectTrigger className="w-full md:w-48 bg-gray-900 border-gray-700 text-white">
+              <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent className="bg-gray-900 border-gray-700">
               {categories.map((category) => (
@@ -328,30 +424,34 @@ export default function MerchPage() {
         {/* Products Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} onAddToCart={addToCart} />
+            <ProductCard
+              key={product.id}
+              product={product}
+              onAddToCart={addToCart}
+              canAccess={canAccessProduct(product)}
+              user={user}
+            />
           ))}
         </div>
 
         {filteredProducts.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-400 text-xl">No products found in this category</p>
+          <div className="text-center py-20">
+            <p className="text-gray-400 text-lg">No products found matching your criteria.</p>
           </div>
         )}
       </div>
 
       {/* Checkout Modal */}
-      {isCheckoutOpen && (
+      {showCheckout && (
         <PaystackCheckout
           cart={cart}
-          customerInfo={customerInfo}
-          onCustomerInfoChange={setCustomerInfo}
-          onClose={() => setIsCheckoutOpen(false)}
+          onClose={() => setShowCheckout(false)}
           onSuccess={() => {
-            clearCart()
-            setIsCheckoutOpen(false)
+            setCart([])
+            setShowCheckout(false)
             toast({
-              title: "Order placed successfully!",
-              description: "You will receive a confirmation email shortly.",
+              title: "Order Successful!",
+              description: "Your order has been placed successfully.",
             })
           }}
         />
@@ -360,25 +460,23 @@ export default function MerchPage() {
   )
 }
 
+// Product Card Component
 function ProductCard({
   product,
   onAddToCart,
+  canAccess,
+  user,
 }: {
   product: Product
   onAddToCart: (product: Product, size: string, paymentMethod: "cash" | "coins") => void
+  canAccess: boolean
+  user: any
 }) {
-  const [selectedSize, setSelectedSize] = useState(product.sizes[0] || "")
+  const [selectedSize, setSelectedSize] = useState(product.sizes[0])
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "coins">("cash")
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency: "NGN",
-    }).format(price)
-  }
-
   return (
-    <Card className="bg-gray-900 border-gray-700 text-white overflow-hidden">
+    <Card className="bg-gray-900 border-gray-800 text-white overflow-hidden">
       <div className="relative">
         <img src={product.images[0] || "/placeholder.svg"} alt={product.name} className="w-full h-64 object-cover" />
         {product.is_premium_only && (
@@ -390,9 +488,9 @@ function ProductCard({
       <CardHeader>
         <CardTitle className="text-lg">{product.name}</CardTitle>
         <p className="text-gray-400 text-sm">{product.description}</p>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2">
           <div className="flex items-center">
-            <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
             <span className="ml-1 text-sm">{product.rating}</span>
           </div>
           <span className="text-gray-400 text-sm">({product.review_count} reviews)</span>
@@ -402,62 +500,61 @@ function ProductCard({
       <CardContent className="space-y-4">
         <div className="flex justify-between items-center">
           <div>
-            <p className="text-xl font-bold">{formatPrice(product.price)}</p>
-            <p className="text-yellow-500 text-sm">{product.coin_price} coins</p>
+            <p className="text-xl font-bold">₦{product.price.toLocaleString()}</p>
+            <p className="text-sm text-green-400">{product.coin_price.toLocaleString()} coins</p>
           </div>
-          <Badge variant="outline" className="text-green-500 border-green-500">
+          <Badge variant="outline" className="text-gray-400">
             {product.category}
           </Badge>
         </div>
 
-        {product.sizes.length > 1 && (
-          <div>
-            <Label className="text-sm font-medium">Size</Label>
-            <Select value={selectedSize} onValueChange={setSelectedSize}>
-              <SelectTrigger className="bg-gray-800 border-gray-600 mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-gray-800 border-gray-600">
-                {product.sizes.map((size) => (
-                  <SelectItem key={size} value={size} className="text-white">
-                    {size}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {canAccess ? (
+          <>
+            <div>
+              <Label className="text-sm font-medium">Size</Label>
+              <Select value={selectedSize} onValueChange={setSelectedSize}>
+                <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-800 border-gray-700">
+                  {product.sizes.map((size) => (
+                    <SelectItem key={size} value={size} className="text-white">
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {user && (
+              <div>
+                <Label className="text-sm font-medium">Payment Method</Label>
+                <RadioGroup value={paymentMethod} onValueChange={(value: "cash" | "coins") => setPaymentMethod(value)}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="cash" id="cash" />
+                    <Label htmlFor="cash">Cash (₦{product.price.toLocaleString()})</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="coins" id="coins" />
+                    <Label htmlFor="coins">Erigga Coins ({product.coin_price.toLocaleString()})</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-4">
+            <p className="text-red-400 text-sm mb-2">Requires {product.required_tier?.toUpperCase()} tier membership</p>
+            {!user && <p className="text-gray-400 text-xs">Sign in to purchase</p>}
           </div>
         )}
-
-        <div>
-          <Label className="text-sm font-medium">Payment Method</Label>
-          <RadioGroup
-            value={paymentMethod}
-            onValueChange={(value: "cash" | "coins") => setPaymentMethod(value)}
-            className="flex space-x-4 mt-2"
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="cash" id="cash" />
-              <Label htmlFor="cash" className="flex items-center">
-                <CreditCard className="w-4 h-4 mr-1" />
-                Cash
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="coins" id="coins" />
-              <Label htmlFor="coins" className="flex items-center">
-                <Coins className="w-4 h-4 mr-1" />
-                Coins
-              </Label>
-            </div>
-          </RadioGroup>
-        </div>
       </CardContent>
 
       <CardFooter>
         <Button
-          onClick={() => onAddToCart(product, selectedSize, paymentMethod)}
           className="w-full bg-green-600 hover:bg-green-700"
-          disabled={product.stock_quantity === 0}
+          onClick={() => onAddToCart(product, selectedSize, paymentMethod)}
+          disabled={!canAccess || product.stock_quantity === 0}
         >
           {product.stock_quantity === 0 ? "Out of Stock" : "Add to Cart"}
         </Button>

@@ -3,10 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { reference, cash_items, customer_info } = body
+    const { reference, cart, customerInfo, userId } = await request.json()
 
-    if (!reference || !cash_items || !customer_info) {
+    if (!reference || !cart || !customerInfo || !userId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
@@ -17,53 +16,39 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    const paystackData = await paystackResponse.json()
-
-    if (!paystackResponse.ok || !paystackData.status) {
+    if (!paystackResponse.ok) {
       return NextResponse.json({ error: "Payment verification failed" }, { status: 400 })
     }
 
-    const paymentData = paystackData.data
+    const paystackData = await paystackResponse.json()
 
-    // Calculate expected amount
-    const expectedAmount = cash_items.reduce(
-      (total: number, item: any) => total + item.product.price * item.quantity,
-      0,
-    )
+    if (paystackData.data.status !== "success") {
+      return NextResponse.json({ error: "Payment was not successful" }, { status: 400 })
+    }
+
+    const supabase = await createClient()
+
+    // Calculate total amount
+    const totalAmount = cart.reduce((sum: number, item: any) => sum + item.product.price * item.quantity, 0)
 
     // Verify amount matches
-    if (paymentData.amount !== expectedAmount * 100) {
+    if (paystackData.data.amount !== totalAmount * 100) {
       // Paystack amount is in kobo
       return NextResponse.json({ error: "Payment amount mismatch" }, { status: 400 })
     }
 
-    // Get authenticated user
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
-    }
-
-    // Create order in database
+    // Create order
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .insert({
-        user_id: user.id,
-        reference: reference,
-        total_amount: expectedAmount,
-        total_coins: 0,
-        payment_status: "completed",
-        order_status: "confirmed",
-        customer_info: customer_info,
-        payment_data: paymentData,
-        metadata: {
-          payment_method: "paystack",
-          verified_at: new Date().toISOString(),
-        },
+        user_id: userId,
+        total_amount: totalAmount,
+        payment_method: "paystack",
+        payment_reference: reference,
+        status: "confirmed",
+        customer_info: customerInfo,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .select()
       .single()
@@ -74,29 +59,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Create order items
-    const orderItems = cash_items.map((item: any) => ({
+    const orderItems = cart.map((item: any) => ({
       order_id: order.id,
       product_id: item.product.id,
-      product_name: item.product.name,
-      size: item.size,
       quantity: item.quantity,
-      unit_price: item.product.price,
-      unit_coin_price: null,
-      payment_method: "cash",
+      size: item.size,
+      price: item.product.price,
+      created_at: new Date().toISOString(),
     }))
 
     const { error: itemsError } = await supabase.from("order_items").insert(orderItems)
 
     if (itemsError) {
-      console.error("Order items creation error:", itemsError)
+      console.error("Order items error:", itemsError)
       return NextResponse.json({ error: "Failed to create order items" }, { status: 500 })
     }
 
     return NextResponse.json({
       success: true,
-      order_id: order.id,
-      reference: reference,
-      amount: expectedAmount,
+      orderId: order.id,
+      message: "Payment verified and order created successfully",
     })
   } catch (error) {
     console.error("Payment verification error:", error)
