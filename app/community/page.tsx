@@ -27,6 +27,7 @@ interface Category {
 interface Post {
   id: number
   content: string
+  type: string
   media_url?: string
   media_type?: string
   hashtags: string[]
@@ -124,6 +125,7 @@ export default function CommunityPage() {
         body: JSON.stringify({
           content: newPostContent,
           categoryId: Number.parseInt(selectedCategory),
+          type: "post",
         }),
       })
 
@@ -187,7 +189,8 @@ export default function CommunityPage() {
   }
 
   const getTierColor = (tier: string) => {
-    switch (tier.toLowerCase()) {
+    switch (tier?.toLowerCase()) {
+      case "blood_brotherhood":
       case "blood":
         return "bg-red-500"
       case "elder":
@@ -198,6 +201,22 @@ export default function CommunityPage() {
         return "bg-green-500"
       default:
         return "bg-gray-500"
+    }
+  }
+
+  const getTierDisplayName = (tier: string) => {
+    switch (tier?.toLowerCase()) {
+      case "blood_brotherhood":
+      case "blood":
+        return "Blood"
+      case "elder":
+        return "Elder"
+      case "pioneer":
+        return "Pioneer"
+      case "grassroot":
+        return "Grassroot"
+      default:
+        return "Fan"
     }
   }
 
@@ -264,8 +283,8 @@ export default function CommunityPage() {
                 </Avatar>
                 <div>
                   <p className="font-medium">{profile?.username}</p>
-                  <Badge className={cn("text-xs", getTierColor(profile?.subscription_tier || "general"), "text-white")}>
-                    {profile?.subscription_tier}
+                  <Badge className={cn("text-xs", getTierColor(profile?.tier || "grassroot"), "text-white")}>
+                    {getTierDisplayName(profile?.tier || "grassroot")}
                   </Badge>
                 </div>
               </div>
@@ -405,7 +424,7 @@ export default function CommunityPage() {
                     <div className="flex items-center space-x-2 mb-1">
                       <span className="font-medium">{post.user.username}</span>
                       <Badge className={cn("text-xs", getTierColor(post.user.tier), "text-white")}>
-                        {post.user.tier}
+                        {getTierDisplayName(post.user.tier)}
                       </Badge>
                       <span className="text-sm text-muted-foreground">•</span>
                       <span className="text-sm text-muted-foreground">

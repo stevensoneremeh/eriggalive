@@ -1,4 +1,5 @@
 "use client"
+
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -7,6 +8,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { Music, Users, Calendar, TrendingUp, Clock, Home, Coins, Crown, Gift, MessageCircle } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { Skeleton } from "@/components/ui/skeleton"
 
 // Mock data for the dashboard
 const mockRecentTracks = [
@@ -40,13 +42,20 @@ export default function DashboardPage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="space-y-6">
-          <div className="h-8 bg-muted animate-pulse rounded" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-96" />
+          </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-muted animate-pulse rounded" />
+              <Skeleton key={i} className="h-32" />
             ))}
           </div>
-          <div className="h-64 bg-muted animate-pulse rounded" />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            <Skeleton className="col-span-2 h-48" />
+            <Skeleton className="col-span-4 h-48" />
+            <Skeleton className="col-span-3 h-48" />
+          </div>
         </div>
       </div>
     )
@@ -57,8 +66,9 @@ export default function DashboardPage() {
       <div className="container mx-auto px-4 py-8">
         <Card>
           <CardContent className="text-center py-12">
-            <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
-            <p className="text-muted-foreground mb-6">Please sign in to access your dashboard</p>
+            <Crown className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h2 className="text-2xl font-bold mb-4">Access Your Dashboard</h2>
+            <p className="text-muted-foreground mb-6">Please sign in to access your personalized dashboard</p>
             <div className="space-x-4">
               <Button asChild>
                 <Link href="/login">Sign In</Link>
@@ -118,7 +128,7 @@ export default function DashboardPage() {
                   <Crown className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold capitalize">{profile.subscription_tier}</div>
+                  <div className="text-2xl font-bold capitalize">{getTierDisplayName(profile.subscription_tier)}</div>
                   <p className="text-xs text-muted-foreground">{getTierDescription(profile.subscription_tier)}</p>
                 </CardContent>
               </Card>
@@ -323,7 +333,7 @@ function formatNumber(num: number): string {
 
 // Helper function to get tier descriptions
 function getTierDescription(tier: string): string {
-  switch (tier.toLowerCase()) {
+  switch (tier?.toLowerCase()) {
     case "grassroot":
       return "Basic access to content"
     case "pioneer":
@@ -331,8 +341,26 @@ function getTierDescription(tier: string): string {
     case "elder":
       return "Exclusive content and event discounts"
     case "blood_brotherhood":
+    case "blood":
       return "VIP access to all content and events"
     default:
       return "Fan membership tier"
+  }
+}
+
+// Helper function to get tier display names
+function getTierDisplayName(tier: string): string {
+  switch (tier?.toLowerCase()) {
+    case "blood_brotherhood":
+    case "blood":
+      return "Blood"
+    case "elder":
+      return "Elder"
+    case "pioneer":
+      return "Pioneer"
+    case "grassroot":
+      return "Grassroot"
+    default:
+      return "Fan"
   }
 }

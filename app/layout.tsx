@@ -7,8 +7,9 @@ import { AuthProvider } from "@/contexts/auth-context"
 import { RadioProvider } from "@/contexts/radio-context"
 import { MainNavigation } from "@/components/navigation/main-navigation"
 import { FloatingRadioPlayer } from "@/components/floating-radio-player"
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster } from "@/components/ui/sonner"
 import { PreviewModeIndicator } from "@/components/preview-mode-indicator"
+import { cn } from "@/lib/utils"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -64,16 +65,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={cn(inter.className, "antialiased")}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
             <RadioProvider>
               <div className="relative min-h-screen bg-background">
                 <MainNavigation />
-                <main className="pt-16 pb-20 md:pb-4">{children}</main>
+                <main className={cn("pt-16 pb-20 md:pb-4")}>{children}</main>
                 <FloatingRadioPlayer />
                 <PreviewModeIndicator />
-                <Toaster />
+                <Toaster position="top-right" />
               </div>
             </RadioProvider>
           </AuthProvider>

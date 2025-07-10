@@ -48,5 +48,9 @@ export async function createAdminSupabaseClient() {
         // Admin client doesn't need cookies
       },
     },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
   })
 }
