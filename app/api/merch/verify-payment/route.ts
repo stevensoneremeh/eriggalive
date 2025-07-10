@@ -3,16 +3,12 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const body = await request.json()
+    const { reference, cash_items, customer_info } = body
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!reference || !cash_items || !customer_info) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
-
-    const { reference, items, customerInfo, totalAmount } = await request.json()
 
     // Verify payment with Paystack
     const paystackResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
@@ -23,14 +19,33 @@ export async function POST(request: NextRequest) {
 
     const paystackData = await paystackResponse.json()
 
-    if (!paystackData.status || paystackData.data.status !== "success") {
+    if (!paystackResponse.ok || !paystackData.status) {
       return NextResponse.json({ error: "Payment verification failed" }, { status: 400 })
     }
 
+    const paymentData = paystackData.data
+
+    // Calculate expected amount
+    const expectedAmount = cash_items.reduce(
+      (total: number, item: any) => total + item.product.price * item.quantity,
+      0,
+    )
+
     // Verify amount matches
-    const paidAmount = paystackData.data.amount / 100 // Convert from kobo to naira
-    if (Math.abs(paidAmount - totalAmount) > 0.01) {
-      return NextResponse.json({ error: "Amount mismatch" }, { status: 400 })
+    if (paymentData.amount !== expectedAmount * 100) {
+      // Paystack amount is in kobo
+      return NextResponse.json({ error: "Payment amount mismatch" }, { status: 400 })
+    }
+
+    // Get authenticated user
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
     // Create order in database
@@ -39,13 +54,16 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: user.id,
         reference: reference,
-        total_amount: totalAmount,
+        total_amount: expectedAmount,
         total_coins: 0,
         payment_status: "completed",
         order_status: "confirmed",
-        customer_info: customerInfo,
-        payment_data: paystackData.data,
-        metadata: { payment_method: "paystack" },
+        customer_info: customer_info,
+        payment_data: paymentData,
+        metadata: {
+          payment_method: "paystack",
+          verified_at: new Date().toISOString(),
+        },
       })
       .select()
       .single()
@@ -56,28 +74,29 @@ export async function POST(request: NextRequest) {
     }
 
     // Create order items
-    const orderItems = items.map((item: any) => ({
+    const orderItems = cash_items.map((item: any) => ({
       order_id: order.id,
       product_id: item.product.id,
       product_name: item.product.name,
       size: item.size,
       quantity: item.quantity,
       unit_price: item.product.price,
-      unit_coin_price: 0,
+      unit_coin_price: null,
       payment_method: "cash",
     }))
 
     const { error: itemsError } = await supabase.from("order_items").insert(orderItems)
 
     if (itemsError) {
-      console.error("Order items error:", itemsError)
+      console.error("Order items creation error:", itemsError)
       return NextResponse.json({ error: "Failed to create order items" }, { status: 500 })
     }
 
     return NextResponse.json({
       success: true,
       order_id: order.id,
-      message: "Payment verified and order created successfully",
+      reference: reference,
+      amount: expectedAmount,
     })
   } catch (error) {
     console.error("Payment verification error:", error)

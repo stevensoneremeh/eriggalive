@@ -1,16 +1,17 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
-import { ShoppingCart, Star, Minus, Plus, Trash2 } from "lucide-react"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from "@/components/ui/label"
+import { ShoppingCart, Star, Plus, Minus, Trash2, CreditCard, Coins } from "lucide-react"
 import { PaystackCheckout } from "@/components/paystack-checkout"
-import { useAuth } from "@/contexts/auth-context"
-import { toast } from "sonner"
+import { useToast } from "@/hooks/use-toast"
 
 interface Product {
   id: string
@@ -33,120 +34,123 @@ interface CartItem {
   product: Product
   size: string
   quantity: number
-  paymentMethod: "cash" | "coins"
+  payment_method: "cash" | "coins"
+}
+
+interface CustomerInfo {
+  name: string
+  email: string
+  phone: string
+  address: string
+  city: string
+  state: string
 }
 
 export default function MerchPage() {
-  const { user, userProfile } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
-  const [cart, setCart] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [isCartOpen, setIsCartOpen] = useState(false)
+  const [cart, setCart] = useState<CartItem[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [isCartOpen, setIsCartOpen] = useState(false)
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    state: "",
+  })
+  const { toast } = useToast()
 
+  // Load cart from localStorage on mount
   useEffect(() => {
-    fetchProducts()
-    loadCartFromStorage()
+    const savedCart = localStorage.getItem("erigga-cart")
+    if (savedCart) {
+      try {
+        setCart(JSON.parse(savedCart))
+      } catch (error) {
+        console.error("Error loading cart:", error)
+      }
+    }
   }, [])
 
+  // Save cart to localStorage whenever it changes
   useEffect(() => {
-    saveCartToStorage()
+    localStorage.setItem("erigga-cart", JSON.stringify(cart))
   }, [cart])
+
+  // Fetch products from API
+  useEffect(() => {
+    fetchProducts()
+  }, [])
 
   const fetchProducts = async () => {
     try {
+      setLoading(true)
       const response = await fetch("/api/merch/products")
-      if (response.ok) {
-        const data = await response.json()
-        setProducts(data)
+      if (!response.ok) {
+        throw new Error("Failed to fetch products")
       }
+      const data = await response.json()
+      setProducts(data)
     } catch (error) {
       console.error("Error fetching products:", error)
-      toast.error("Failed to load products")
+      toast({
+        title: "Error",
+        description: "Failed to load products. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  const loadCartFromStorage = () => {
-    if (typeof window !== "undefined") {
-      const savedCart = localStorage.getItem("erigga-cart")
-      if (savedCart) {
-        setCart(JSON.parse(savedCart))
-      }
-    }
-  }
-
-  const saveCartToStorage = () => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("erigga-cart", JSON.stringify(cart))
-    }
-  }
-
   const addToCart = (product: Product, size: string, paymentMethod: "cash" | "coins") => {
-    if (!user) {
-      toast.error("Please sign in to add items to cart")
-      return
-    }
-
-    // Check tier access for premium products
-    if (product.is_premium_only && product.required_tier) {
-      const tierOrder = ["grassroot", "pioneer", "elder", "blood"]
-      const userTierIndex = tierOrder.indexOf(userProfile?.tier || "grassroot")
-      const requiredTierIndex = tierOrder.indexOf(product.required_tier)
-
-      if (userTierIndex < requiredTierIndex) {
-        toast.error(`This item requires ${product.required_tier} tier or higher`)
-        return
-      }
-    }
-
-    // Check coin balance for coin payments
-    if (paymentMethod === "coins" && (userProfile?.coins || 0) < product.coin_price) {
-      toast.error("Insufficient Erigga Coins")
-      return
-    }
-
-    const existingItemIndex = cart.findIndex(
-      (item) => item.product.id === product.id && item.size === size && item.paymentMethod === paymentMethod,
+    const existingItem = cart.find(
+      (item) => item.product.id === product.id && item.size === size && item.payment_method === paymentMethod,
     )
 
-    if (existingItemIndex > -1) {
-      const newCart = [...cart]
-      newCart[existingItemIndex].quantity += 1
-      setCart(newCart)
+    if (existingItem) {
+      setCart(cart.map((item) => (item === existingItem ? { ...item, quantity: item.quantity + 1 } : item)))
     } else {
-      setCart([...cart, { product, size, quantity: 1, paymentMethod }])
+      setCart([...cart, { product, size, quantity: 1, payment_method: paymentMethod }])
     }
 
-    toast.success("Added to cart!")
+    toast({
+      title: "Added to cart",
+      description: `${product.name} (${size}) added to cart`,
+    })
   }
 
-  const updateCartItemQuantity = (index: number, newQuantity: number) => {
+  const updateQuantity = (index: number, newQuantity: number) => {
     if (newQuantity <= 0) {
       removeFromCart(index)
       return
     }
 
-    const newCart = [...cart]
-    newCart[index].quantity = newQuantity
-    setCart(newCart)
+    setCart(cart.map((item, i) => (i === index ? { ...item, quantity: newQuantity } : item)))
   }
 
   const removeFromCart = (index: number) => {
-    const newCart = cart.filter((_, i) => i !== index)
-    setCart(newCart)
-    toast.success("Removed from cart")
+    setCart(cart.filter((_, i) => i !== index))
+    toast({
+      title: "Removed from cart",
+      description: "Item removed from cart",
+    })
   }
 
   const clearCart = () => {
     setCart([])
-    toast.success("Cart cleared")
+    toast({
+      title: "Cart cleared",
+      description: "All items removed from cart",
+    })
   }
 
   const getCartTotal = () => {
     return cart.reduce((total, item) => {
-      if (item.paymentMethod === "cash") {
+      if (item.payment_method === "cash") {
         return total + item.product.price * item.quantity
       }
       return total
@@ -155,289 +159,307 @@ export default function MerchPage() {
 
   const getCartCoinTotal = () => {
     return cart.reduce((total, item) => {
-      if (item.paymentMethod === "coins") {
+      if (item.payment_method === "coins") {
         return total + item.product.coin_price * item.quantity
       }
       return total
     }, 0)
   }
 
-  const getCartItemCount = () => {
-    return cart.reduce((total, item) => total + item.quantity, 0)
-  }
-
   const categories = ["all", ...Array.from(new Set(products.map((p) => p.category)))]
   const filteredProducts =
     selectedCategory === "all" ? products : products.filter((p) => p.category === selectedCategory)
 
-  const canAccessProduct = (product: Product) => {
-    if (!product.is_premium_only) return true
-    if (!user) return false
-    if (!product.required_tier) return true
-
-    const tierOrder = ["grassroot", "pioneer", "elder", "blood"]
-    const userTierIndex = tierOrder.indexOf(userProfile?.tier || "grassroot")
-    const requiredTierIndex = tierOrder.indexOf(product.required_tier)
-
-    return userTierIndex >= requiredTierIndex
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat("en-NG", {
+      style: "currency",
+      currency: "NGN",
+    }).format(price)
   }
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <div className="h-64 bg-gray-200 rounded-t-lg"></div>
-              <CardContent className="p-4">
-                <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded mb-4"></div>
-                <div className="h-6 bg-gray-200 rounded"></div>
-              </CardContent>
-            </Card>
-          ))}
+      <div className="min-h-screen bg-black text-white">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-500 mx-auto"></div>
+            <p className="mt-4 text-xl">Loading merch...</p>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold">Erigga Merch Store</h1>
-          <p className="text-muted-foreground">Official merchandise and collectibles</p>
-        </div>
+    <div className="min-h-screen bg-black text-white">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+          <div>
+            <h1 className="text-4xl font-bold mb-2">Erigga Official Merch</h1>
+            <p className="text-gray-400">Rep the Paper Boi with official merchandise</p>
+          </div>
 
-        <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" className="relative bg-transparent">
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              Cart
-              {getCartItemCount() > 0 && (
-                <Badge className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center">
-                  {getCartItemCount()}
-                </Badge>
-              )}
-            </Button>
-          </SheetTrigger>
-          <SheetContent className="w-full sm:max-w-lg">
-            <SheetHeader>
-              <SheetTitle>Shopping Cart ({getCartItemCount()} items)</SheetTitle>
-            </SheetHeader>
+          <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="relative mt-4 md:mt-0 bg-transparent">
+                <ShoppingCart className="w-4 h-4 mr-2" />
+                Cart ({cart.length})
+                {cart.length > 0 && (
+                  <Badge className="absolute -top-2 -right-2 bg-green-500">
+                    {cart.reduce((sum, item) => sum + item.quantity, 0)}
+                  </Badge>
+                )}
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="bg-black border-gray-800 text-white">
+              <SheetHeader>
+                <SheetTitle className="text-white">Shopping Cart</SheetTitle>
+              </SheetHeader>
 
-            <div className="mt-6 space-y-4">
-              {cart.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Your cart is empty</p>
-              ) : (
-                <>
-                  {cart.map((item, index) => (
-                    <div key={index} className="flex items-center space-x-4 p-4 border rounded-lg">
-                      <img
-                        src={item.product.images[0] || "/placeholder.svg"}
-                        alt={item.product.name}
-                        className="w-16 h-16 object-cover rounded"
-                      />
-                      <div className="flex-1">
-                        <h4 className="font-medium">{item.product.name}</h4>
-                        <p className="text-sm text-muted-foreground">Size: {item.size}</p>
-                        <p className="text-sm font-medium">
-                          {item.paymentMethod === "cash"
-                            ? `₦${item.product.price.toLocaleString()}`
-                            : `${item.product.coin_price} coins`}
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateCartItemQuantity(index, item.quantity - 1)}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-8 text-center">{item.quantity}</span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateCartItemQuantity(index, item.quantity + 1)}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={() => removeFromCart(index)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
+              <div className="mt-6">
+                {cart.length === 0 ? (
+                  <p className="text-gray-400 text-center py-8">Your cart is empty</p>
+                ) : (
+                  <>
+                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                      {cart.map((item, index) => (
+                        <div key={index} className="flex items-center space-x-4 p-4 border border-gray-800 rounded-lg">
+                          <img
+                            src={item.product.images[0] || "/placeholder.svg"}
+                            alt={item.product.name}
+                            className="w-16 h-16 object-cover rounded"
+                          />
+                          <div className="flex-1">
+                            <h4 className="font-semibold">{item.product.name}</h4>
+                            <p className="text-sm text-gray-400">Size: {item.size}</p>
+                            <p className="text-sm text-gray-400">
+                              Payment: {item.payment_method === "cash" ? "Cash" : "Coins"}
+                            </p>
+                            <div className="flex items-center space-x-2 mt-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateQuantity(index, item.quantity - 1)}
+                              >
+                                <Minus className="w-3 h-3" />
+                              </Button>
+                              <span>{item.quantity}</span>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateQuantity(index, item.quantity + 1)}
+                              >
+                                <Plus className="w-3 h-3" />
+                              </Button>
+                              <Button size="sm" variant="destructive" onClick={() => removeFromCart(index)}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            {item.payment_method === "cash" ? (
+                              <p className="font-semibold">{formatPrice(item.product.price * item.quantity)}</p>
+                            ) : (
+                              <p className="font-semibold text-yellow-500">
+                                {item.product.coin_price * item.quantity} coins
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
 
-                  <Separator />
+                    <Separator className="my-4" />
 
-                  <div className="space-y-2">
-                    {getCartTotal() > 0 && (
-                      <div className="flex justify-between">
-                        <span>Cash Total:</span>
-                        <span className="font-medium">₦{getCartTotal().toLocaleString()}</span>
-                      </div>
-                    )}
-                    {getCartCoinTotal() > 0 && (
-                      <div className="flex justify-between">
-                        <span>Coin Total:</span>
-                        <span className="font-medium">{getCartCoinTotal()} coins</span>
-                      </div>
-                    )}
-                  </div>
+                    <div className="space-y-2">
+                      {getCartTotal() > 0 && (
+                        <div className="flex justify-between">
+                          <span>Cash Total:</span>
+                          <span className="font-semibold">{formatPrice(getCartTotal())}</span>
+                        </div>
+                      )}
+                      {getCartCoinTotal() > 0 && (
+                        <div className="flex justify-between">
+                          <span>Coin Total:</span>
+                          <span className="font-semibold text-yellow-500">{getCartCoinTotal()} coins</span>
+                        </div>
+                      )}
+                    </div>
 
-                  <div className="space-y-2">
-                    <PaystackCheckout
-                      cart={cart}
-                      onSuccess={() => {
-                        clearCart()
-                        setIsCartOpen(false)
-                      }}
-                    />
-                    <Button variant="outline" className="w-full bg-transparent" onClick={clearCart}>
-                      Clear Cart
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
-
-      {/* Category Filter */}
-      <div className="mb-6">
-        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Select category" />
-          </SelectTrigger>
-          <SelectContent>
-            {categories.map((category) => (
-              <SelectItem key={category} value={category}>
-                {category === "all" ? "All Categories" : category.charAt(0).toUpperCase() + category.slice(1)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Products Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProducts.map((product) => (
-          <ProductCard
-            key={product.id}
-            product={product}
-            onAddToCart={addToCart}
-            canAccess={canAccessProduct(product)}
-            userCoins={userProfile?.coins || 0}
-          />
-        ))}
-      </div>
-
-      {filteredProducts.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">No products found in this category.</p>
+                    <div className="flex space-x-2 mt-4">
+                      <Button variant="outline" onClick={clearCart} className="flex-1 bg-transparent">
+                        Clear Cart
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setIsCartOpen(false)
+                          setIsCheckoutOpen(true)
+                        }}
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                        disabled={cart.length === 0}
+                      >
+                        Checkout
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
+
+        {/* Category Filter */}
+        <div className="mb-8">
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger className="w-48 bg-gray-900 border-gray-700">
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-900 border-gray-700">
+              {categories.map((category) => (
+                <SelectItem key={category} value={category} className="text-white">
+                  {category.charAt(0).toUpperCase() + category.slice(1)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Products Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredProducts.map((product) => (
+            <ProductCard key={product.id} product={product} onAddToCart={addToCart} />
+          ))}
+        </div>
+
+        {filteredProducts.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-gray-400 text-xl">No products found in this category</p>
+          </div>
+        )}
+      </div>
+
+      {/* Checkout Modal */}
+      {isCheckoutOpen && (
+        <PaystackCheckout
+          cart={cart}
+          customerInfo={customerInfo}
+          onCustomerInfoChange={setCustomerInfo}
+          onClose={() => setIsCheckoutOpen(false)}
+          onSuccess={() => {
+            clearCart()
+            setIsCheckoutOpen(false)
+            toast({
+              title: "Order placed successfully!",
+              description: "You will receive a confirmation email shortly.",
+            })
+          }}
+        />
       )}
     </div>
   )
 }
 
-interface ProductCardProps {
+function ProductCard({
+  product,
+  onAddToCart,
+}: {
   product: Product
   onAddToCart: (product: Product, size: string, paymentMethod: "cash" | "coins") => void
-  canAccess: boolean
-  userCoins: number
-}
-
-function ProductCard({ product, onAddToCart, canAccess, userCoins }: ProductCardProps) {
-  const [selectedSize, setSelectedSize] = useState<string>("")
+}) {
+  const [selectedSize, setSelectedSize] = useState(product.sizes[0] || "")
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "coins">("cash")
 
-  const handleAddToCart = () => {
-    if (!selectedSize && product.sizes.length > 0) {
-      toast.error("Please select a size")
-      return
-    }
-
-    onAddToCart(product, selectedSize || "One Size", paymentMethod)
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat("en-NG", {
+      style: "currency",
+      currency: "NGN",
+    }).format(price)
   }
 
   return (
-    <Card className={`${!canAccess ? "opacity-60" : ""}`}>
-      <CardHeader className="p-0">
-        <div className="relative">
-          <img
-            src={product.images[0] || "/placeholder.svg"}
-            alt={product.name}
-            className="w-full h-64 object-cover rounded-t-lg"
-          />
-          {product.is_premium_only && (
-            <Badge className="absolute top-2 right-2" variant="secondary">
-              {product.required_tier} Only
-            </Badge>
-          )}
-          {product.stock_quantity <= 5 && product.stock_quantity > 0 && (
-            <Badge className="absolute top-2 left-2" variant="destructive">
-              Only {product.stock_quantity} left
-            </Badge>
-          )}
+    <Card className="bg-gray-900 border-gray-700 text-white overflow-hidden">
+      <div className="relative">
+        <img src={product.images[0] || "/placeholder.svg"} alt={product.name} className="w-full h-64 object-cover" />
+        {product.is_premium_only && (
+          <Badge className="absolute top-2 right-2 bg-red-600">{product.required_tier?.toUpperCase()} Only</Badge>
+        )}
+        {product.stock_quantity < 10 && <Badge className="absolute top-2 left-2 bg-orange-600">Low Stock</Badge>}
+      </div>
+
+      <CardHeader>
+        <CardTitle className="text-lg">{product.name}</CardTitle>
+        <p className="text-gray-400 text-sm">{product.description}</p>
+        <div className="flex items-center space-x-2">
+          <div className="flex items-center">
+            <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+            <span className="ml-1 text-sm">{product.rating}</span>
+          </div>
+          <span className="text-gray-400 text-sm">({product.review_count} reviews)</span>
         </div>
       </CardHeader>
 
-      <CardContent className="p-4">
-        <CardTitle className="text-lg mb-2">{product.name}</CardTitle>
-        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{product.description}</p>
-
-        <div className="flex items-center mb-3">
-          <div className="flex items-center">
-            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-            <span className="ml-1 text-sm">{product.rating}</span>
-            <span className="ml-1 text-sm text-muted-foreground">({product.review_count})</span>
+      <CardContent className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <p className="text-xl font-bold">{formatPrice(product.price)}</p>
+            <p className="text-yellow-500 text-sm">{product.coin_price} coins</p>
           </div>
+          <Badge variant="outline" className="text-green-500 border-green-500">
+            {product.category}
+          </Badge>
         </div>
 
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="text-lg font-bold">₦{product.price.toLocaleString()}</span>
-            <span className="text-sm text-muted-foreground">or {product.coin_price} coins</span>
-          </div>
-
-          {product.sizes.length > 0 && (
+        {product.sizes.length > 1 && (
+          <div>
+            <Label className="text-sm font-medium">Size</Label>
             <Select value={selectedSize} onValueChange={setSelectedSize}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select size" />
+              <SelectTrigger className="bg-gray-800 border-gray-600 mt-1">
+                <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-gray-800 border-gray-600">
                 {product.sizes.map((size) => (
-                  <SelectItem key={size} value={size}>
+                  <SelectItem key={size} value={size} className="text-white">
                     {size}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          )}
+          </div>
+        )}
 
-          <Select value={paymentMethod} onValueChange={(value: "cash" | "coins") => setPaymentMethod(value)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="cash">Pay with Cash (₦{product.price.toLocaleString()})</SelectItem>
-              <SelectItem value="coins" disabled={userCoins < product.coin_price}>
-                Pay with Coins ({product.coin_price} coins)
-                {userCoins < product.coin_price && " - Insufficient"}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+        <div>
+          <Label className="text-sm font-medium">Payment Method</Label>
+          <RadioGroup
+            value={paymentMethod}
+            onValueChange={(value: "cash" | "coins") => setPaymentMethod(value)}
+            className="flex space-x-4 mt-2"
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="cash" id="cash" />
+              <Label htmlFor="cash" className="flex items-center">
+                <CreditCard className="w-4 h-4 mr-1" />
+                Cash
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="coins" id="coins" />
+              <Label htmlFor="coins" className="flex items-center">
+                <Coins className="w-4 h-4 mr-1" />
+                Coins
+              </Label>
+            </div>
+          </RadioGroup>
         </div>
       </CardContent>
 
-      <CardFooter className="p-4 pt-0">
-        <Button className="w-full" onClick={handleAddToCart} disabled={!canAccess || product.stock_quantity === 0}>
-          {!canAccess ? "Tier Required" : product.stock_quantity === 0 ? "Out of Stock" : "Add to Cart"}
+      <CardFooter>
+        <Button
+          onClick={() => onAddToCart(product, selectedSize, paymentMethod)}
+          className="w-full bg-green-600 hover:bg-green-700"
+          disabled={product.stock_quantity === 0}
+        >
+          {product.stock_quantity === 0 ? "Out of Stock" : "Add to Cart"}
         </Button>
       </CardFooter>
     </Card>

@@ -44,6 +44,7 @@ import {
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useTheme } from "@/contexts/theme-context"
+import { useRadio } from "@/contexts/radio-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
 import { CoinBalance } from "@/components/coin-balance"
 import { UserTierBadge } from "@/components/user-tier-badge"
@@ -169,6 +170,7 @@ export function MainNavigation() {
   const router = useRouter()
   const { user, profile, signOut, isAuthenticated, isLoading } = useAuth()
   const { theme, setTheme } = useTheme()
+  const { currentMood, isPlaying, setIsMinimized } = useRadio()
 
   // Screen size detection
   const updateScreenSize = useCallback(() => {
@@ -248,6 +250,14 @@ export function MainNavigation() {
     }
   }
 
+  const handleRadioClick = () => {
+    if (currentMood && isPlaying) {
+      setIsMinimized(false)
+    } else {
+      router.push("/radio")
+    }
+  }
+
   if (!mounted) {
     return <NavigationSkeleton />
   }
@@ -269,6 +279,19 @@ export function MainNavigation() {
             </Link>
 
             <div className="flex items-center space-x-2">
+              {/* Radio Icon */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("h-9 w-9 relative", currentMood && isPlaying && "text-green-500")}
+                onClick={handleRadioClick}
+              >
+                <Radio className="h-4 w-4" />
+                {currentMood && isPlaying && (
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                )}
+              </Button>
+
               {isAuthenticated && (
                 <>
                   <Button variant="ghost" size="icon" className="h-9 w-9">
@@ -396,6 +419,20 @@ export function MainNavigation() {
 
           {/* Right Actions */}
           <div className="flex items-center space-x-2 shrink-0">
+            {/* Radio Icon */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("h-8 w-8 relative mr-2", currentMood && isPlaying && "text-green-500 bg-green-500/10")}
+              onClick={handleRadioClick}
+              title={currentMood && isPlaying ? `${currentMood.toUpperCase()} Mode Playing` : "Erigga Radio"}
+            >
+              <Radio className="h-4 w-4" />
+              {currentMood && isPlaying && (
+                <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              )}
+            </Button>
+
             {/* Theme Toggle */}
             <div className="hidden md:flex items-center space-x-1 mr-2">
               <Button
@@ -536,6 +573,31 @@ export function MainNavigation() {
             <X className="h-4 w-4" />
           </Button>
         </div>
+
+        {/* Radio Status */}
+        {currentMood && isPlaying && (
+          <div className="p-4 border-b bg-green-500/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                <Radio className="h-5 w-5 text-black" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-green-500">Now Playing</p>
+                <p className="text-xs text-muted-foreground">{currentMood.toUpperCase()} Mode</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto border-green-500 text-green-500 bg-transparent"
+                onClick={() => {
+                  handleNavigation("/radio")
+                }}
+              >
+                Open Radio
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* User Info */}
         {isAuthenticated && profile && (

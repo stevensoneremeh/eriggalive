@@ -2,18 +2,21 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { AuthProvider } from "@/contexts/auth-context"
 import { ThemeProvider } from "@/contexts/theme-context"
+import { AuthProvider } from "@/contexts/auth-context"
+import { RadioProvider } from "@/contexts/radio-context"
 import { MainNavigation } from "@/components/navigation/main-navigation"
-import { Toaster } from "@/components/ui/sonner"
-import { cn } from "@/lib/utils"
+import { FloatingRadioPlayer } from "@/components/floating-radio-player"
+import { Toaster } from "@/components/ui/toaster"
+import { PreviewModeIndicator } from "@/components/preview-mode-indicator"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "EriggaLive - Official Fan Platform",
-  description: "The official fan platform for Erigga - Music, Community, and Exclusive Content",
-  keywords: ["Erigga", "Nigerian Music", "Hip Hop", "Fan Platform", "Music Community"],
+  description:
+    "The official fan platform for Nigerian rapper Erigga. Join the community, access exclusive content, and connect with fellow fans.",
+  keywords: "Erigga, Nigerian rapper, hip hop, music, fan platform, community",
   authors: [{ name: "EriggaLive Team" }],
   creator: "EriggaLive",
   publisher: "EriggaLive",
@@ -25,7 +28,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://eriggalive.vercel.app"),
   openGraph: {
     title: "EriggaLive - Official Fan Platform",
-    description: "The official fan platform for Erigga - Music, Community, and Exclusive Content",
+    description: "The official fan platform for Nigerian rapper Erigga",
     url: "/",
     siteName: "EriggaLive",
     locale: "en_US",
@@ -34,8 +37,8 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "EriggaLive - Official Fan Platform",
-    description: "The official fan platform for Erigga - Music, Community, and Exclusive Content",
-    creator: "@eriggalive",
+    description: "The official fan platform for Nigerian rapper Erigga",
+    creator: "@eriggaofficial",
   },
   robots: {
     index: true,
@@ -61,14 +64,18 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn(inter.className, "antialiased")}>
-        <ThemeProvider>
+      <body className={inter.className}>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
-            <div className="min-h-screen bg-background">
-              <MainNavigation />
-              <main className="pt-16 pb-20 md:pb-4">{children}</main>
-              <Toaster position="top-right" />
-            </div>
+            <RadioProvider>
+              <div className="relative min-h-screen bg-background">
+                <MainNavigation />
+                <main className="pt-16 pb-20 md:pb-4">{children}</main>
+                <FloatingRadioPlayer />
+                <PreviewModeIndicator />
+                <Toaster />
+              </div>
+            </RadioProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>
