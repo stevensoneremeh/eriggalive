@@ -26,7 +26,6 @@ import {
   Users,
   ShoppingBag,
   Calendar,
-  MessageCircle,
   Coins,
   User,
   Settings,
@@ -37,6 +36,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  Shield,
 } from "lucide-react"
 import { DynamicLogo } from "@/components/dynamic-logo"
 import { toast } from "sonner"
@@ -47,7 +47,6 @@ const navigationItems = [
   { name: "Media Vault", href: "/vault", icon: Vault },
   { name: "Merch Store", href: "/merch", icon: ShoppingBag },
   { name: "Chronicles", href: "/chronicles", icon: Calendar },
-  { name: "Chat Rooms", href: "/chat", icon: MessageCircle, requiresAuth: true },
   { name: "Freebies", href: "/rooms/freebies", icon: Gift, requiresAuth: true },
   { name: "Coins", href: "/coins", icon: Coins, requiresAuth: true },
 ]
@@ -81,6 +80,8 @@ export function MainNavigation() {
     router.push("/radio")
     setIsOpen(false)
   }
+
+  const isAdmin = profile?.email === "admin@eriggalive.com"
 
   const getTierColor = (tier: string) => {
     switch (tier?.toLowerCase()) {
@@ -137,7 +138,7 @@ export function MainNavigation() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-2">
               <DynamicLogo />
             </Link>
@@ -254,6 +255,14 @@ export function MainNavigation() {
                       Erigga Radio
                     </Link>
                   </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin" className="flex items-center text-orange-600">
+                        <Shield className="mr-2 h-4 w-4" />
+                        Admin Panel
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem asChild>
                     <Link href="/profile/settings" className="flex items-center">
                       <Settings className="mr-2 h-4 w-4" />
@@ -392,6 +401,17 @@ export function MainNavigation() {
                           <Coins className="h-5 w-5" />
                           <span>Coins ({profile.coins_balance || 0})</span>
                         </Link>
+
+                        {isAdmin && (
+                          <Link
+                            href="/admin"
+                            onClick={() => setIsOpen(false)}
+                            className="flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                          >
+                            <Shield className="h-5 w-5" />
+                            <span>Admin Panel</span>
+                          </Link>
+                        )}
 
                         <Button
                           variant="ghost"
