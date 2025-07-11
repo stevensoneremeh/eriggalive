@@ -9,12 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Plus, Heart, MessageCircle, Share2, Search, TrendingUp, Clock, Users, Loader2 } from "lucide-react"
+import { Plus, Heart, Share2, Search, TrendingUp, Clock, Users, Loader2 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { formatDistanceToNow } from "date-fns"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import Link from "next/link"
+import { CommentSection } from "@/components/community/comment-section"
 
 interface Category {
   id: number
@@ -186,6 +187,19 @@ export default function CommunityPage() {
       console.error("Error voting:", error)
       toast.error("Failed to vote")
     }
+  }
+
+  const handleCommentCountChange = (postId: number, newCount: number) => {
+    setPosts((prev) =>
+      prev.map((post) =>
+        post.id === postId
+          ? {
+              ...post,
+              comment_count: newCount,
+            }
+          : post,
+      ),
+    )
   }
 
   const getTierColor = (tier: string) => {
@@ -477,7 +491,7 @@ export default function CommunityPage() {
                 <Separator className="mb-4" />
 
                 {/* Post Actions */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-4">
                     <Button
                       variant={post.has_voted ? "default" : "ghost"}
@@ -490,11 +504,6 @@ export default function CommunityPage() {
                     </Button>
 
                     <Button variant="ghost" size="sm" className="flex items-center space-x-1">
-                      <MessageCircle className="h-4 w-4" />
-                      <span>{post.comment_count}</span>
-                    </Button>
-
-                    <Button variant="ghost" size="sm" className="flex items-center space-x-1">
                       <Share2 className="h-4 w-4" />
                       <span>Share</span>
                     </Button>
@@ -502,6 +511,13 @@ export default function CommunityPage() {
 
                   <span className="text-sm text-muted-foreground">{post.view_count} views</span>
                 </div>
+
+                {/* Comments Section */}
+                <CommentSection
+                  postId={post.id}
+                  commentCount={post.comment_count}
+                  onCommentCountChange={(newCount) => handleCommentCountChange(post.id, newCount)}
+                />
               </CardContent>
             </Card>
           ))

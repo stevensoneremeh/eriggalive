@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/contexts/auth-context"
 import { useRadio } from "@/contexts/radio-context"
+import { useTheme } from "@/contexts/theme-context"
 import { cn } from "@/lib/utils"
 import {
   Menu,
@@ -33,8 +34,12 @@ import {
   Radio,
   Gift,
   Vault,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react"
 import { DynamicLogo } from "@/components/dynamic-logo"
+import { toast } from "sonner"
 
 const navigationItems = [
   { name: "Home", href: "/", icon: Home },
@@ -54,14 +59,27 @@ export function MainNavigation() {
   const router = useRouter()
   const { user, profile, isAuthenticated, signOut, isLoading } = useAuth()
   const { isPlaying, currentMood, toggleRadio } = useRadio()
+  const { theme, setTheme } = useTheme()
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
   const handleSignOut = async () => {
-    await signOut()
-    router.push("/")
+    try {
+      await signOut()
+      toast.success("Signed out successfully")
+      router.push("/")
+      setIsOpen(false)
+    } catch (error) {
+      console.error("Sign out error:", error)
+      toast.error("Failed to sign out")
+    }
+  }
+
+  const handleRadioClick = () => {
+    router.push("/radio")
+    setIsOpen(false)
   }
 
   const getTierColor = (tier: string) => {
@@ -151,7 +169,7 @@ export function MainNavigation() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={toggleRadio}
+              onClick={handleRadioClick}
               className={cn("flex items-center space-x-1", isPlaying && "text-green-500")}
             >
               <Radio className="h-4 w-4" />
@@ -160,8 +178,37 @@ export function MainNavigation() {
             </Button>
           </div>
 
-          {/* Auth Section */}
+          {/* Right Section */}
           <div className="flex items-center space-x-4">
+            {/* Theme Toggle - Desktop */}
+            <div className="hidden md:flex items-center space-x-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setTheme("light")}
+                className={cn("p-2", theme === "light" && "bg-accent")}
+              >
+                <Sun className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setTheme("dark")}
+                className={cn("p-2", theme === "dark" && "bg-accent")}
+              >
+                <Moon className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setTheme("system")}
+                className={cn("p-2", theme === "system" && "bg-accent")}
+              >
+                <Monitor className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Auth Section */}
             {isLoading ? (
               <div className="flex items-center space-x-2">
                 <div className="h-8 w-8 bg-muted animate-pulse rounded-full" />
@@ -177,8 +224,8 @@ export function MainNavigation() {
                     </Avatar>
                     <div className="hidden md:flex flex-col items-start">
                       <span className="text-sm font-medium">{profile.username}</span>
-                      <Badge className={cn("text-xs", getTierColor(profile.subscription_tier))}>
-                        {getTierDisplayName(profile.subscription_tier)}
+                      <Badge className={cn("text-xs", getTierColor(profile.tier))}>
+                        {getTierDisplayName(profile.tier)}
                       </Badge>
                     </div>
                   </Button>
@@ -199,6 +246,12 @@ export function MainNavigation() {
                     <Link href="/coins" className="flex items-center">
                       <Coins className="mr-2 h-4 w-4" />
                       Coins ({profile.coins_balance || 0})
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/radio" className="flex items-center">
+                      <Radio className="mr-2 h-4 w-4" />
+                      Erigga Radio
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
@@ -264,16 +317,47 @@ export function MainNavigation() {
 
                   <Button
                     variant="ghost"
-                    onClick={() => {
-                      toggleRadio()
-                      setIsOpen(false)
-                    }}
+                    onClick={handleRadioClick}
                     className={cn("w-full justify-start space-x-3 px-3 py-2", isPlaying && "text-green-500")}
                   >
                     <Radio className="h-5 w-5" />
-                    <span>Radio</span>
+                    <span>Erigga Radio</span>
                     {isPlaying && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse ml-auto" />}
                   </Button>
+
+                  {/* Theme Toggle - Mobile */}
+                  <div className="border-t pt-4">
+                    <p className="text-sm font-medium mb-3 px-3">Theme</p>
+                    <div className="grid grid-cols-3 gap-2 px-3">
+                      <Button
+                        variant={theme === "light" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setTheme("light")}
+                        className="flex flex-col items-center py-3 h-auto"
+                      >
+                        <Sun className="h-4 w-4 mb-1" />
+                        <span className="text-xs">Light</span>
+                      </Button>
+                      <Button
+                        variant={theme === "dark" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setTheme("dark")}
+                        className="flex flex-col items-center py-3 h-auto"
+                      >
+                        <Moon className="h-4 w-4 mb-1" />
+                        <span className="text-xs">Dark</span>
+                      </Button>
+                      <Button
+                        variant={theme === "system" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setTheme("system")}
+                        className="flex flex-col items-center py-3 h-auto"
+                      >
+                        <Monitor className="h-4 w-4 mb-1" />
+                        <span className="text-xs">Auto</span>
+                      </Button>
+                    </div>
+                  </div>
 
                   {isAuthenticated && profile && (
                     <>
@@ -285,8 +369,8 @@ export function MainNavigation() {
                           </Avatar>
                           <div>
                             <p className="font-medium">{profile.username}</p>
-                            <Badge className={cn("text-xs", getTierColor(profile.subscription_tier))}>
-                              {getTierDisplayName(profile.subscription_tier)}
+                            <Badge className={cn("text-xs", getTierColor(profile.tier))}>
+                              {getTierDisplayName(profile.tier)}
                             </Badge>
                           </div>
                         </div>
@@ -311,10 +395,7 @@ export function MainNavigation() {
 
                         <Button
                           variant="ghost"
-                          onClick={() => {
-                            handleSignOut()
-                            setIsOpen(false)
-                          }}
+                          onClick={handleSignOut}
                           className="w-full justify-start space-x-3 px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           <LogOut className="h-5 w-5" />

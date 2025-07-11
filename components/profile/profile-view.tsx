@@ -191,7 +191,7 @@ export function ProfileView({ profile, posts, comments, isOwnProfile }: ProfileV
                   <Input
                     value={editData.website}
                     onChange={(e) => setEditData({ ...editData, website: e.target.value })}
-                    placeholder="https://your-website.com"
+                    placeholder="https://www.eriggalive.com/"
                   />
                 </div>
               </div>
