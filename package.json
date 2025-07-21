@@ -1,15 +1,16 @@
 {
-  "name": "eriggalive",
-  "version": "0.1.0",
+  "name": "erigga-fan-platform",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@hookform/resolvers": "^3.3.2",
+    "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "latest",
     "@radix-ui/react-aspect-ratio": "latest",
@@ -29,7 +30,7 @@
     "@radix-ui/react-scroll-area": "latest",
     "@radix-ui/react-select": "latest",
     "@radix-ui/react-separator": "latest",
-    "@radix-ui/react-sheet": "^1.0.4",
+    "@radix-ui/react-sheet": "^1.1.0",
     "@radix-ui/react-slider": "latest",
     "@radix-ui/react-slot": "latest",
     "@radix-ui/react-switch": "latest",
@@ -41,16 +42,15 @@
     "@supabase/auth-helpers-nextjs": "latest",
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
-    "@tiptap/core": "latest",
+    "@tiptap/core": "^2.8.0",
     "@tiptap/extension-link": "latest",
     "@tiptap/extension-mention": "latest",
     "@tiptap/extension-placeholder": "latest",
     "@tiptap/extensions": "latest",
-    "@tiptap/pm": "latest",
+    "@tiptap/pm": "^2.8.0",
     "@tiptap/react": "latest",
     "@tiptap/starter-kit": "latest",
     "@tiptap/suggestion": "latest",
-    "@vercel/blob": "^0.15.1",
     "ably": "latest",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -62,11 +62,11 @@
     "input-otp": "latest",
     "isomorphic-dompurify": "latest",
     "lucide-react": "^0.454.0",
-    "next": "14.2.16",
+    "next": "15.2.4",
     "next-themes": "latest",
-    "react": "^18",
+    "react": "^19",
     "react-day-picker": "latest",
-    "react-dom": "^18",
+    "react-dom": "^19",
     "react-hook-form": "latest",
     "react-resizable-panels": "latest",
     "recharts": "latest",
@@ -75,17 +75,20 @@
     "tailwindcss-animate": "^1.0.7",
     "tippy.js": "latest",
     "vaul": "latest",
-    "zod": "^3.22.4"
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "autoprefixer": "^10.0.1",
-    "eslint": "^8",
-    "eslint-config-next": "14.0.4",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "15.1.0",
     "postcss": "^8.5",
-    "tailwindcss": "^3.3.0",
+    "tailwindcss": "^3.4.17",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }

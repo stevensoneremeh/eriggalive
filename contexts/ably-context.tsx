@@ -1,10 +1,9 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, useCallback } from "react"
+import { getAblyClient, subscribeToChannel, ABLY_CHANNELS, cleanupAbly } from "@/lib/ably"
 import type Ably from "ably"
-import { getAblyClient, ABLY_CHANNELS } from "@/lib/ably"
-import { useAuth } from "@/contexts/auth-context"
 
 interface AblyContextType {
   isConnected: boolean
@@ -12,134 +11,101 @@ interface AblyContextType {
   subscribeToFeed: (callback: (data: any) => void) => () => void
   subscribeToPostVotes: (postId: number, callback: (data: any) => void) => () => void
   subscribeToPostComments: (postId: number, callback: (data: any) => void) => () => void
-  subscribeToCommentLikes: (commentId: number, callback: (data: any) => void) => () => void
+  subscribeToUserNotifications: (userId: string, callback: (data: any) => void) => () => void
 }
 
-const AblyContext = createContext<AblyContextType | undefined>(undefined)
+const AblyContext = createContext<AblyContextType | null>(null)
 
 export function AblyProvider({ children }: { children: React.ReactNode }) {
   const [isConnected, setIsConnected] = useState(false)
   const [connectionState, setConnectionState] = useState("disconnected")
-  const { user } = useAuth()
+  const [client, setClient] = useState<Ably.Realtime | null>(null)
 
   useEffect(() => {
+    // Only initialize Ably on the client side
+    if (typeof window === "undefined") return
+
+    // Check if Ably API key is available
     if (!process.env.NEXT_PUBLIC_ABLY_API_KEY) {
-      console.warn("Ably API key not found. Real-time features will be disabled.")
+      console.warn("Ably API key not configured. Real-time features will be disabled.")
       return
     }
 
     try {
-      const ably = getAblyClient()
+      const ablyClient = getAblyClient()
+      setClient(ablyClient)
 
+      // Set up connection state listeners
       const handleConnectionStateChange = (stateChange: Ably.ConnectionStateChange) => {
         setConnectionState(stateChange.current)
         setIsConnected(stateChange.current === "connected")
       }
 
-      ably.connection.on("connected", () => {
-        setIsConnected(true)
-        setConnectionState("connected")
-      })
+      ablyClient.connection.on(handleConnectionStateChange)
 
-      ably.connection.on("disconnected", () => {
-        setIsConnected(false)
-        setConnectionState("disconnected")
-      })
+      // Set initial state
+      setConnectionState(ablyClient.connection.state)
+      setIsConnected(ablyClient.connection.state === "connected")
 
-      ably.connection.on("failed", () => {
-        setIsConnected(false)
-        setConnectionState("failed")
-      })
-
-      ably.connection.on(handleConnectionStateChange)
-
+      // Cleanup on unmount
       return () => {
-        ably.connection.off(handleConnectionStateChange)
+        ablyClient.connection.off(handleConnectionStateChange)
+        cleanupAbly()
       }
     } catch (error) {
       console.error("Failed to initialize Ably:", error)
+      setIsConnected(false)
+      setConnectionState("failed")
     }
   }, [])
 
-  const subscribeToFeed = (callback: (data: any) => void) => {
-    try {
-      const ably = getAblyClient()
-      const channel = ably.channels.get(ABLY_CHANNELS.COMMUNITY_FEED)
+  const subscribeToFeed = useCallback(
+    (callback: (data: any) => void) => {
+      if (!client) return () => {}
 
-      const messageHandler = (message: Ably.Message) => {
+      return subscribeToChannel(ABLY_CHANNELS.COMMUNITY_FEED, "post:created", (message: Ably.Message) => {
         callback(message.data)
-      }
+      })
+    },
+    [client],
+  )
 
-      channel.subscribe("post:created", messageHandler)
+  const subscribeToPostVotes = useCallback(
+    (postId: number, callback: (data: any) => void) => {
+      if (!client) return () => {}
 
-      return () => {
-        channel.unsubscribe("post:created", messageHandler)
-      }
-    } catch (error) {
-      console.error("Failed to subscribe to feed:", error)
-      return () => {}
-    }
-  }
-
-  const subscribeToPostVotes = (postId: number, callback: (data: any) => void) => {
-    try {
-      const ably = getAblyClient()
-      const channel = ably.channels.get(ABLY_CHANNELS.POST_VOTES(postId))
-
-      const messageHandler = (message: Ably.Message) => {
+      return subscribeToChannel(ABLY_CHANNELS.POST_VOTES(postId), "post:voted", (message: Ably.Message) => {
         callback(message.data)
-      }
+      })
+    },
+    [client],
+  )
 
-      channel.subscribe("post:voted", messageHandler)
+  const subscribeToPostComments = useCallback(
+    (postId: number, callback: (data: any) => void) => {
+      if (!client) return () => {}
 
-      return () => {
-        channel.unsubscribe("post:voted", messageHandler)
-      }
-    } catch (error) {
-      console.error("Failed to subscribe to post votes:", error)
-      return () => {}
-    }
-  }
-
-  const subscribeToPostComments = (postId: number, callback: (data: any) => void) => {
-    try {
-      const ably = getAblyClient()
-      const channel = ably.channels.get(ABLY_CHANNELS.POST_COMMENTS(postId))
-
-      const messageHandler = (message: Ably.Message) => {
+      return subscribeToChannel(ABLY_CHANNELS.POST_COMMENTS(postId), "comment:created", (message: Ably.Message) => {
         callback(message.data)
-      }
+      })
+    },
+    [client],
+  )
 
-      channel.subscribe("comment:created", messageHandler)
+  const subscribeToUserNotifications = useCallback(
+    (userId: string, callback: (data: any) => void) => {
+      if (!client) return () => {}
 
-      return () => {
-        channel.unsubscribe("comment:created", messageHandler)
-      }
-    } catch (error) {
-      console.error("Failed to subscribe to post comments:", error)
-      return () => {}
-    }
-  }
-
-  const subscribeToCommentLikes = (commentId: number, callback: (data: any) => void) => {
-    try {
-      const ably = getAblyClient()
-      const channel = ably.channels.get(ABLY_CHANNELS.COMMENT_LIKES(commentId))
-
-      const messageHandler = (message: Ably.Message) => {
-        callback(message.data)
-      }
-
-      channel.subscribe("comment:liked", messageHandler)
-
-      return () => {
-        channel.unsubscribe("comment:liked", messageHandler)
-      }
-    } catch (error) {
-      console.error("Failed to subscribe to comment likes:", error)
-      return () => {}
-    }
-  }
+      return subscribeToChannel(
+        ABLY_CHANNELS.USER_NOTIFICATIONS(userId),
+        "notification:new",
+        (message: Ably.Message) => {
+          callback(message.data)
+        },
+      )
+    },
+    [client],
+  )
 
   const value: AblyContextType = {
     isConnected,
@@ -147,15 +113,15 @@ export function AblyProvider({ children }: { children: React.ReactNode }) {
     subscribeToFeed,
     subscribeToPostVotes,
     subscribeToPostComments,
-    subscribeToCommentLikes,
+    subscribeToUserNotifications,
   }
 
   return <AblyContext.Provider value={value}>{children}</AblyContext.Provider>
 }
 
-export function useAbly() {
+export function useAbly(): AblyContextType {
   const context = useContext(AblyContext)
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useAbly must be used within an AblyProvider")
   }
   return context
