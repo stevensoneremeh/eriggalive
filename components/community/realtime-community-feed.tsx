@@ -52,7 +52,6 @@ export function RealtimeCommunityFeed({ initialPosts = [] }: CommunityFeedProps)
     }
   }, [initialPosts.length])
 
-  // Subscribe to real-time feed updates
   useEffect(() => {
     const unsubscribe = subscribeToFeed((data) => {
       if (data.post) {
@@ -67,7 +66,6 @@ export function RealtimeCommunityFeed({ initialPosts = [] }: CommunityFeedProps)
     return unsubscribe
   }, [subscribeToFeed, toast])
 
-  // Subscribe to vote updates for all posts
   useEffect(() => {
     const unsubscribers: (() => void)[] = []
 
@@ -117,7 +115,6 @@ export function RealtimeCommunityFeed({ initialPosts = [] }: CommunityFeedProps)
       const data = await response.json()
 
       if (data.success) {
-        // Update local state immediately for better UX
         setPosts((prevPosts) =>
           prevPosts.map((post) => {
             if (post.id === postId) {
@@ -166,7 +163,6 @@ export function RealtimeCommunityFeed({ initialPosts = [] }: CommunityFeedProps)
       const data = await response.json()
 
       if (data.success) {
-        // Update local state
         setPosts((prevPosts) =>
           prevPosts.map((post) => {
             if (post.id === postId) {
@@ -208,13 +204,11 @@ export function RealtimeCommunityFeed({ initialPosts = [] }: CommunityFeedProps)
   }
 
   const renderContent = (content: string) => {
-    // Replace hashtags with styled spans
     let processedContent = content.replace(
       /#(\w+)/g,
       '<span class="text-blue-500 font-medium cursor-pointer hover:text-blue-600">#$1</span>',
     )
 
-    // Replace mentions with styled spans
     processedContent = processedContent.replace(
       /@(\w+)/g,
       '<span class="text-purple-500 font-medium cursor-pointer hover:text-purple-600">@$1</span>',
@@ -265,7 +259,6 @@ export function RealtimeCommunityFeed({ initialPosts = [] }: CommunityFeedProps)
 
   return (
     <div className="space-y-6">
-      {/* Real-time connection indicator */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-gray-500">
           {isConnected ? (
@@ -334,7 +327,6 @@ export function RealtimeCommunityFeed({ initialPosts = [] }: CommunityFeedProps)
               dangerouslySetInnerHTML={renderContent(post.content)}
             />
 
-            {/* Media */}
             {post.media_url && (
               <div className="mt-4">
                 {post.media_type?.startsWith("image") ? (
@@ -350,7 +342,6 @@ export function RealtimeCommunityFeed({ initialPosts = [] }: CommunityFeedProps)
               </div>
             )}
 
-            {/* Hashtags */}
             {post.hashtags && post.hashtags.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-4">
                 {post.hashtags.slice(0, 5).map((hashtag: string, index: number) => (
@@ -370,7 +361,6 @@ export function RealtimeCommunityFeed({ initialPosts = [] }: CommunityFeedProps)
           <CardFooter className="pt-4 border-t bg-gray-50 dark:bg-gray-800/50">
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-1">
-                {/* Vote Button */}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -385,7 +375,6 @@ export function RealtimeCommunityFeed({ initialPosts = [] }: CommunityFeedProps)
                   <span className="font-medium">{post.vote_count}</span>
                 </Button>
 
-                {/* Comments */}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -395,7 +384,6 @@ export function RealtimeCommunityFeed({ initialPosts = [] }: CommunityFeedProps)
                   <span>{post.comment_count}</span>
                 </Button>
 
-                {/* Bookmark */}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -412,7 +400,6 @@ export function RealtimeCommunityFeed({ initialPosts = [] }: CommunityFeedProps)
                   )}
                 </Button>
 
-                {/* Share */}
                 <Button
                   variant="ghost"
                   size="sm"

@@ -47,81 +47,36 @@ BEGIN
     END IF;
 END $$;
 
--- Drop user_bookmarks table if it exists to recreate with correct foreign key
-DROP TABLE IF EXISTS public.user_bookmarks CASCADE;
-
--- Recreate user_bookmarks table with correct foreign key reference
-CREATE TABLE public.user_bookmarks (
-    id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    post_id BIGINT NOT NULL,
+-- Create user_bookmarks table if it doesn't exist
+CREATE TABLE IF NOT EXISTS user_bookmarks (
+    id SERIAL PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    post_id INTEGER NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(user_id, post_id)
 );
 
--- Add foreign key constraints
-ALTER TABLE public.user_bookmarks 
-ADD CONSTRAINT fk_user_bookmarks_user_id 
-FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
-ALTER TABLE public.user_bookmarks 
-ADD CONSTRAINT fk_user_bookmarks_post_id 
-FOREIGN KEY (post_id) REFERENCES public.community_posts(id) ON DELETE CASCADE;
-
--- Create indexes for performance
-CREATE INDEX IF NOT EXISTS idx_user_bookmarks_user_id ON public.user_bookmarks(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_bookmarks_post_id ON public.user_bookmarks(post_id);
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_user_bookmarks_user_id ON user_bookmarks(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_bookmarks_post_id ON user_bookmarks(post_id);
+CREATE INDEX IF NOT EXISTS idx_user_bookmarks_created_at ON user_bookmarks(created_at);
 
 -- Enable RLS
-ALTER TABLE public.user_bookmarks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_bookmarks ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policy
-DROP POLICY IF EXISTS "Users can manage their own bookmarks" ON public.user_bookmarks;
-CREATE POLICY "Users can manage their own bookmarks" ON public.user_bookmarks 
-FOR ALL USING (
-    auth.uid()::text = (
-        SELECT auth_user_id::text 
-        FROM public.users 
-        WHERE id = user_id
-    )
-);
+-- Create RLS policies
+DROP POLICY IF EXISTS "Users can view their own bookmarks" ON user_bookmarks;
+CREATE POLICY "Users can view their own bookmarks" ON user_bookmarks
+    FOR SELECT USING (auth.uid() = user_id);
 
--- Verify the foreign key constraints
-DO $$
-DECLARE
-    constraint_count integer;
-BEGIN
-    SELECT COUNT(*) INTO constraint_count
-    FROM information_schema.table_constraints tc
-    JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
-    WHERE tc.table_name = 'user_bookmarks' 
-    AND tc.constraint_type = 'FOREIGN KEY';
-    
-    RAISE NOTICE 'user_bookmarks table has % foreign key constraints', constraint_count;
-    
-    -- List the constraints
-    FOR constraint_count IN 
-        SELECT 1
-        FROM information_schema.table_constraints tc
-        JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
-        WHERE tc.table_name = 'user_bookmarks' 
-        AND tc.constraint_type = 'FOREIGN KEY'
-    LOOP
-        RAISE NOTICE 'Foreign key constraint exists for user_bookmarks';
-    END LOOP;
-END $$;
+DROP POLICY IF EXISTS "Users can create their own bookmarks" ON user_bookmarks;
+CREATE POLICY "Users can create their own bookmarks" ON user_bookmarks
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Test the constraints work by attempting to insert invalid data (this should fail)
-DO $$
-BEGIN
-    -- This should fail if constraints are working
-    BEGIN
-        INSERT INTO public.user_bookmarks (user_id, post_id) VALUES (99999, 99999);
-        RAISE NOTICE 'WARNING: Foreign key constraints may not be working properly';
-    EXCEPTION
-        WHEN foreign_key_violation THEN
-            RAISE NOTICE 'SUCCESS: Foreign key constraints are working correctly';
-        WHEN OTHERS THEN
-            RAISE NOTICE 'INFO: Test insert failed as expected: %', SQLERRM;
-    END;
-END $$;
+DROP POLICY IF EXISTS "Users can delete their own bookmarks" ON user_bookmarks;
+CREATE POLICY "Users can delete their own bookmarks" ON user_bookmarks
+    FOR DELETE USING (auth.uid() = user_id);
+
+-- Grant permissions
+GRANT ALL ON user_bookmarks TO authenticated;
+GRANT USAGE ON SEQUENCE user_bookmarks_id_seq TO authenticated;

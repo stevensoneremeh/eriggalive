@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -80,7 +79,6 @@ export function RealtimeCreatePostForm({ onPostCreated }: CreatePostFormProps) {
     setIsSubmitting(true)
 
     try {
-      // Extract hashtags from content
       const hashtags = content.match(/#\w+/g)?.map((tag) => tag.slice(1)) || []
 
       const response = await fetch("/api/community/posts", {
@@ -105,16 +103,13 @@ export function RealtimeCreatePostForm({ onPostCreated }: CreatePostFormProps) {
             : "Your post has been shared with the community.",
         })
 
-        // Reset form
         setContent("")
         setCategoryId("")
 
-        // Call callback if provided
         if (onPostCreated) {
           onPostCreated(data.post)
         }
 
-        // Refresh page to show new post (fallback for non-real-time)
         if (!isConnected) {
           router.refresh()
         }
@@ -183,7 +178,6 @@ export function RealtimeCreatePostForm({ onPostCreated }: CreatePostFormProps) {
             </div>
           </div>
 
-          {/* Real-time indicator */}
           <div className="flex items-center gap-2 text-sm text-gray-500">
             {isConnected ? (
               <>

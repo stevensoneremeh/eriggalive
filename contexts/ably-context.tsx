@@ -22,10 +22,8 @@ export function AblyProvider({ children }: { children: React.ReactNode }) {
   const [client, setClient] = useState<Ably.Realtime | null>(null)
 
   useEffect(() => {
-    // Only initialize Ably on the client side
     if (typeof window === "undefined") return
 
-    // Check if Ably API key is available
     if (!process.env.NEXT_PUBLIC_ABLY_API_KEY) {
       console.warn("Ably API key not configured. Real-time features will be disabled.")
       return
@@ -35,7 +33,6 @@ export function AblyProvider({ children }: { children: React.ReactNode }) {
       const ablyClient = getAblyClient()
       setClient(ablyClient)
 
-      // Set up connection state listeners
       const handleConnectionStateChange = (stateChange: Ably.ConnectionStateChange) => {
         setConnectionState(stateChange.current)
         setIsConnected(stateChange.current === "connected")
@@ -43,11 +40,9 @@ export function AblyProvider({ children }: { children: React.ReactNode }) {
 
       ablyClient.connection.on(handleConnectionStateChange)
 
-      // Set initial state
       setConnectionState(ablyClient.connection.state)
       setIsConnected(ablyClient.connection.state === "connected")
 
-      // Cleanup on unmount
       return () => {
         ablyClient.connection.off(handleConnectionStateChange)
         cleanupAbly()

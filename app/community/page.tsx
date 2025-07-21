@@ -1,86 +1,56 @@
 import { Suspense } from "react"
-import { createClient } from "@/lib/supabase/server"
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
 import { RealtimeCommunityFeed } from "@/components/community/realtime-community-feed"
 import { RealtimeCreatePostForm } from "@/components/community/realtime-create-post-form"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 
-async function getCommunityData() {
-  const supabase = await createClient()
+async function getCommunityPosts() {
+  try {
+    const supabase = createServerComponentClient({ cookies })
 
-  // Fetch categories
-  const { data: categories } = await supabase.from("community_categories").select("*").order("name")
+    const { data: posts, error } = await supabase
+      .from("community_posts")
+      .select(`
+        *,
+        user:profiles(id, username, full_name, avatar_url, tier),
+        category:community_categories(id, name, slug, color, icon),
+        votes:community_votes(vote_type),
+        bookmarks:user_bookmarks(id),
+        _count:community_comments(count)
+      `)
+      .order("created_at", { ascending: false })
+      .limit(20)
 
-  // Fetch initial posts
-  const { data: posts } = await supabase
-    .from("community_posts")
-    .select(`
-      *,
-      author:profiles!community_posts_author_id_fkey(
-        id,
-        username,
-        full_name,
-        avatar_url,
-        tier
-      ),
-      category:community_categories!community_posts_category_id_fkey(
-        id,
-        name,
-        slug,
-        color
-      ),
-      _count:community_post_votes(count),
-      user_vote:community_post_votes!left(vote_type),
-      user_bookmark:user_bookmarks!left(id)
-    `)
-    .order("created_at", { ascending: false })
-    .limit(20)
+    if (error) {
+      console.error("Error fetching posts:", error)
+      return []
+    }
 
-  // Transform posts data
-  const transformedPosts =
-    posts?.map((post) => ({
-      ...post,
-      vote_count: post._count?.[0]?.count || 0,
-      user_voted: post.user_vote?.[0]?.vote_type || null,
-      user_bookmarked: !!post.user_bookmark?.[0]?.id,
-    })) || []
-
-  return {
-    categories: categories || [],
-    posts: transformedPosts,
+    return posts || []
+  } catch (error) {
+    console.error("Error in getCommunityPosts:", error)
+    return []
   }
 }
 
 function LoadingSkeleton() {
   return (
     <div className="space-y-6">
-      <Card>
-        <CardContent className="p-6">
-          <div className="space-y-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-10 w-32" />
-          </div>
-        </CardContent>
-      </Card>
-      {Array.from({ length: 3 }).map((_, i) => (
+      {[...Array(3)].map((_, i) => (
         <Card key={i}>
           <CardContent className="p-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-10 w-10 rounded-full" />
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-3 w-24" />
-                </div>
+            <div className="flex items-center space-x-4 mb-4">
+              <Skeleton className="h-12 w-12 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-[200px]" />
+                <Skeleton className="h-4 w-[100px]" />
               </div>
-              <Skeleton className="h-6 w-3/4" />
-              <Skeleton className="h-16 w-full" />
-              <div className="flex gap-4">
-                <Skeleton className="h-8 w-20" />
-                <Skeleton className="h-8 w-20" />
-                <Skeleton className="h-8 w-20" />
-              </div>
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
             </div>
           </CardContent>
         </Card>
@@ -90,24 +60,24 @@ function LoadingSkeleton() {
 }
 
 export default async function CommunityPage() {
-  const { categories, posts } = await getCommunityData()
+  const posts = await getCommunityPosts()
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Community</h1>
-          <p className="text-muted-foreground">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold mb-4">Community</h1>
+          <p className="text-lg text-muted-foreground">
             Connect with fellow fans, share your thoughts, and stay updated with the latest discussions.
           </p>
         </div>
 
         <Suspense fallback={<LoadingSkeleton />}>
-          <div className="space-y-6">
-            <RealtimeCreatePostForm categories={categories} />
+          <RealtimeCreatePostForm />
+        </Suspense>
 
-            <RealtimeCommunityFeed initialPosts={posts} />
-          </div>
+        <Suspense fallback={<LoadingSkeleton />}>
+          <RealtimeCommunityFeed initialPosts={posts} />
         </Suspense>
       </div>
     </div>
