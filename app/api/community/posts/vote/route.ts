@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { publishEvent, ABLY_CHANNELS } from "@/lib/ably"
 
 export async function POST(request: NextRequest) {
   try {
@@ -89,10 +90,25 @@ export async function POST(request: NextRequest) {
     // Get updated vote count
     const { data: updatedPost } = await supabase.from("community_posts").select("vote_count").eq("id", postId).single()
 
+    const voteCount = updatedPost?.vote_count || 0
+
+    // Publish real-time event for vote update
+    try {
+      publishEvent(ABLY_CHANNELS.POST_VOTES(postId), "post:voted", {
+        postId,
+        voteCount,
+        voted,
+        userId: userProfile.id,
+      })
+    } catch (ablyError) {
+      console.error("Failed to publish vote event:", ablyError)
+      // Don't fail the request if Ably fails
+    }
+
     return NextResponse.json({
       success: true,
       voted,
-      voteCount: updatedPost?.vote_count || 0,
+      voteCount,
       message: voted ? "Vote added!" : "Vote removed!",
     })
   } catch (error: any) {

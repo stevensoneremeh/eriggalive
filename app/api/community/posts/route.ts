@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
+import { publishEvent, ABLY_CHANNELS } from "@/lib/ably"
 
 export async function GET(request: NextRequest) {
   try {
@@ -199,14 +200,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create post" }, { status: 500 })
     }
 
+    const postWithStatus = {
+      ...post,
+      is_bookmarked: false,
+      has_voted: false,
+      hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
+    }
+
+    // Publish real-time event for new post
+    try {
+      publishEvent(ABLY_CHANNELS.COMMUNITY_FEED, "post:created", {
+        post: postWithStatus,
+        categoryId: Number.parseInt(categoryId),
+      })
+    } catch (ablyError) {
+      console.error("Failed to publish post creation event:", ablyError)
+      // Don't fail the request if Ably fails
+    }
+
     return NextResponse.json({
       success: true,
-      post: {
-        ...post,
-        is_bookmarked: false,
-        has_voted: false,
-        hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
-      },
+      post: postWithStatus,
     })
   } catch (error) {
     console.error("Create post API error:", error)

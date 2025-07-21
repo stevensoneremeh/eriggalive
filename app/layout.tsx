@@ -2,25 +2,24 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { ThemeProvider } from "@/contexts/theme-context"
+import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/contexts/auth-context"
-import { RadioProvider } from "@/contexts/radio-context"
-import { MainNavigation } from "@/components/navigation/main-navigation"
+import { AblyProvider } from "@/contexts/ably-context"
+import { Toaster } from "@/components/ui/toaster"
+import { Navigation } from "@/components/navigation"
 import { FloatingRadioPlayer } from "@/components/floating-radio-player"
-import { Toaster } from "@/components/ui/sonner"
+import { SessionRefresh } from "@/components/session-refresh"
 import { PreviewModeIndicator } from "@/components/preview-mode-indicator"
-import { cn } from "@/lib/utils"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "EriggaLive - Official Fan Platform",
-  description:
-    "The official fan platform for Nigerian rapper Erigga. Join the community, access exclusive content, and connect with fellow fans.",
-  keywords: "Erigga, Nigerian rapper, hip hop, music, fan platform, community",
-  authors: [{ name: "EriggaLive Team" }],
-  creator: "EriggaLive",
-  publisher: "EriggaLive",
+  title: "Erigga Live - Official Community Platform",
+  description: "Join the official Erigga community platform for exclusive content, live events, and fan interactions.",
+  keywords: "Erigga, music, community, live events, Nigerian artist, hip hop",
+  authors: [{ name: "Erigga Live Team" }],
+  creator: "Erigga Live",
+  publisher: "Erigga Live",
   formatDetection: {
     email: false,
     address: false,
@@ -28,18 +27,20 @@ export const metadata: Metadata = {
   },
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://eriggalive.vercel.app"),
   openGraph: {
-    title: "EriggaLive - Official Fan Platform",
-    description: "The official fan platform for Nigerian rapper Erigga",
-    url: "/",
-    siteName: "EriggaLive",
+    title: "Erigga Live - Official Community Platform",
+    description:
+      "Join the official Erigga community platform for exclusive content, live events, and fan interactions.",
+    url: process.env.NEXT_PUBLIC_APP_URL || "https://eriggalive.vercel.app",
+    siteName: "Erigga Live",
     locale: "en_US",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "EriggaLive - Official Fan Platform",
-    description: "The official fan platform for Nigerian rapper Erigga",
-    creator: "@eriggaofficial",
+    title: "Erigga Live - Official Community Platform",
+    description:
+      "Join the official Erigga community platform for exclusive content, live events, and fan interactions.",
+    creator: "@erigga",
   },
   robots: {
     index: true,
@@ -53,7 +54,7 @@ export const metadata: Metadata = {
     },
   },
   verification: {
-    google: "your-google-verification-code",
+    google: process.env.GOOGLE_SITE_VERIFICATION,
   },
     generator: 'v0.dev'
 }
@@ -65,18 +66,19 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn(inter.className, "antialiased")}>
+      <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
-            <RadioProvider>
-              <div className="relative min-h-screen bg-background">
-                <MainNavigation />
-                <main className={cn("pt-16 pb-20 md:pb-4")}>{children}</main>
-                <FloatingRadioPlayer />
+            <AblyProvider>
+              <div className="min-h-screen bg-background">
                 <PreviewModeIndicator />
-                <Toaster position="top-right" />
+                <Navigation />
+                <main className="flex-1">{children}</main>
+                <FloatingRadioPlayer />
+                <SessionRefresh />
               </div>
-            </RadioProvider>
+              <Toaster />
+            </AblyProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

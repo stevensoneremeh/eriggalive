@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { publishEvent, ABLY_CHANNELS } from "@/lib/ably"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -108,13 +109,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: false, error: commentError.message }, { status: 500 })
     }
 
+    const commentWithStatus = {
+      ...newComment,
+      has_liked: false,
+      replies: [],
+    }
+
+    // Publish real-time event for new comment
+    try {
+      publishEvent(ABLY_CHANNELS.POST_COMMENTS(Number.parseInt(id)), "comment:created", {
+        postId: Number.parseInt(id),
+        comment: commentWithStatus,
+      })
+    } catch (ablyError) {
+      console.error("Failed to publish comment creation event:", ablyError)
+      // Don't fail the request if Ably fails
+    }
+
     return NextResponse.json({
       success: true,
-      comment: {
-        ...newComment,
-        has_liked: false,
-        replies: [],
-      },
+      comment: commentWithStatus,
     })
   } catch (error: any) {
     console.error("Error in create comment API:", error)
