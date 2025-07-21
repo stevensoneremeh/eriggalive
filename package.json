@@ -45,6 +45,7 @@
     "@tiptap/extension-link": "latest",
     "@tiptap/extension-mention": "latest",
     "@tiptap/extension-placeholder": "latest",
+    "@tiptap/extensions": "latest",
     "@tiptap/pm": "latest",
     "@tiptap/react": "latest",
     "@tiptap/starter-kit": "latest",

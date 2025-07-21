@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               email: authUser.user.email || "",
               username: authUser.user.user_metadata?.username || authUser.user.email?.split("@")[0] || "user",
               full_name: authUser.user.user_metadata?.full_name || authUser.user.email || "",
-              subscription_tier: "grassroot" as const,
+              tier: "grassroot" as const,
               coins_balance: 100,
               level: 1,
               points: 0,
