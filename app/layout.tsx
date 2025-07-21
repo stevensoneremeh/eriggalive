@@ -6,56 +6,20 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/contexts/auth-context"
 import { AblyProvider } from "@/contexts/ably-context"
 import { Toaster } from "@/components/ui/toaster"
-import { Navigation } from "@/components/navigation"
-import { FloatingRadioPlayer } from "@/components/floating-radio-player"
 import { SessionRefresh } from "@/components/session-refresh"
+import { RadioProvider } from "@/contexts/radio-context"
+import { FloatingRadioPlayer } from "@/components/floating-radio-player"
 import { PreviewModeIndicator } from "@/components/preview-mode-indicator"
+import { InstallPrompt } from "@/components/pwa/install-prompt"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Erigga Live - Official Community Platform",
-  description: "Join the official Erigga community platform for exclusive content, live events, and fan interactions.",
-  keywords: "Erigga, music, community, live events, Nigerian artist, hip hop",
-  authors: [{ name: "Erigga Live Team" }],
-  creator: "Erigga Live",
-  publisher: "Erigga Live",
-  formatDetection: {
-    email: false,
-    address: false,
-    telephone: false,
-  },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://eriggalive.vercel.app"),
-  openGraph: {
-    title: "Erigga Live - Official Community Platform",
-    description:
-      "Join the official Erigga community platform for exclusive content, live events, and fan interactions.",
-    url: process.env.NEXT_PUBLIC_APP_URL || "https://eriggalive.vercel.app",
-    siteName: "Erigga Live",
-    locale: "en_US",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Erigga Live - Official Community Platform",
-    description:
-      "Join the official Erigga community platform for exclusive content, live events, and fan interactions.",
-    creator: "@erigga",
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-    },
-  },
-  verification: {
-    google: process.env.GOOGLE_SITE_VERIFICATION,
-  },
+  title: "EriggaLive - Official Community Platform",
+  description: "Join the official Erigga community platform for exclusive content, live chats, and more.",
+  manifest: "/manifest.json",
+  themeColor: "#000000",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
     generator: 'v0.dev'
 }
 
@@ -67,17 +31,17 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <AuthProvider>
             <AblyProvider>
-              <div className="min-h-screen bg-background">
-                <PreviewModeIndicator />
-                <Navigation />
-                <main className="flex-1">{children}</main>
-                <FloatingRadioPlayer />
+              <RadioProvider>
                 <SessionRefresh />
-              </div>
-              <Toaster />
+                <PreviewModeIndicator />
+                <InstallPrompt />
+                {children}
+                <FloatingRadioPlayer />
+                <Toaster />
+              </RadioProvider>
             </AblyProvider>
           </AuthProvider>
         </ThemeProvider>

@@ -2,136 +2,126 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { publishEvent, ABLY_CHANNELS } from "@/lib/ably"
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { id } = await params
     const supabase = await createClient()
+    const postId = Number.parseInt(params.id)
 
-    // Get current user for like status
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    let userInternalId: number | undefined
-    if (user) {
-      const { data: userData } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
-      userInternalId = userData?.id
+    if (isNaN(postId)) {
+      return NextResponse.json({ error: "Invalid post ID" }, { status: 400 })
     }
 
-    // Fetch comments with user data and like status
     const { data: comments, error } = await supabase
       .from("community_comments")
       .select(`
         *,
-        user:users!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
-        likes:community_comment_likes(user_id)
+        author:profiles!community_comments_author_id_fkey(
+          id,
+          username,
+          full_name,
+          avatar_url,
+          tier
+        ),
+        _count:community_comment_likes(count),
+        user_liked:community_comment_likes!left(id)
       `)
-      .eq("post_id", Number.parseInt(id))
-      .eq("is_deleted", false)
+      .eq("post_id", postId)
       .order("created_at", { ascending: true })
 
     if (error) {
       console.error("Error fetching comments:", error)
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+      return NextResponse.json({ error: "Failed to fetch comments" }, { status: 500 })
     }
 
-    // Process comments to include like status and organize replies
-    const processedComments = (comments || []).map((comment: any) => ({
-      ...comment,
-      has_liked: userInternalId ? comment.likes.some((like: any) => like.user_id === userInternalId) : false,
-    }))
+    // Transform the data to include like counts and user interactions
+    const transformedComments =
+      comments?.map((comment) => ({
+        ...comment,
+        like_count: comment._count?.[0]?.count || 0,
+        user_liked: !!comment.user_liked?.[0]?.id,
+      })) || []
 
-    // Organize comments into parent-child structure
-    const parentComments = processedComments.filter((c) => !c.parent_comment_id)
-    const childComments = processedComments.filter((c) => c.parent_comment_id)
-
-    const commentsWithReplies = parentComments.map((parent) => ({
-      ...parent,
-      replies: childComments.filter((child) => child.parent_comment_id === parent.id),
-    }))
-
-    return NextResponse.json({ success: true, comments: commentsWithReplies })
-  } catch (error: any) {
-    console.error("Error in comments API:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ comments: transformedComments })
+  } catch (error) {
+    console.error("Error in comments GET API:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { id } = await params
     const supabase = await createClient()
-    const body = await request.json()
-
-    const { content, parent_comment_id } = body
-
-    if (!content?.trim()) {
-      return NextResponse.json({ success: false, error: "Comment content is required" }, { status: 400 })
-    }
-
-    // Get current user
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get user profile
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("id")
-      .eq("auth_user_id", user.id)
-      .single()
-
-    if (profileError || !userProfile) {
-      return NextResponse.json({ success: false, error: "User profile not found" }, { status: 404 })
+    const postId = Number.parseInt(params.id)
+    if (isNaN(postId)) {
+      return NextResponse.json({ error: "Invalid post ID" }, { status: 400 })
     }
 
-    // Create comment
-    const { data: newComment, error: commentError } = await supabase
+    const body = await request.json()
+    const { content, parent_id } = body
+
+    if (!content) {
+      return NextResponse.json({ error: "Content is required" }, { status: 400 })
+    }
+
+    // Insert the comment
+    const { data: comment, error: insertError } = await supabase
       .from("community_comments")
       .insert({
-        post_id: Number.parseInt(id),
-        user_id: userProfile.id,
-        content: content.trim(),
-        parent_comment_id: parent_comment_id || null,
+        content,
+        post_id: postId,
+        author_id: user.id,
+        parent_id: parent_id || null,
       })
       .select(`
         *,
-        user:users!community_comments_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier)
+        author:profiles!community_comments_author_id_fkey(
+          id,
+          username,
+          full_name,
+          avatar_url,
+          tier
+        )
       `)
       .single()
 
-    if (commentError) {
-      console.error("Error creating comment:", commentError)
-      return NextResponse.json({ success: false, error: commentError.message }, { status: 500 })
-    }
-
-    const commentWithStatus = {
-      ...newComment,
-      has_liked: false,
-      replies: [],
+    if (insertError) {
+      console.error("Error creating comment:", insertError)
+      return NextResponse.json({ error: "Failed to create comment" }, { status: 500 })
     }
 
     // Publish real-time event for new comment
     try {
-      publishEvent(ABLY_CHANNELS.POST_COMMENTS(Number.parseInt(id)), "comment:created", {
-        postId: Number.parseInt(id),
-        comment: commentWithStatus,
+      publishEvent(ABLY_CHANNELS.POST_COMMENTS(postId), "comment:created", {
+        postId,
+        comment: {
+          ...comment,
+          like_count: 0,
+          user_liked: false,
+        },
       })
     } catch (ablyError) {
-      console.error("Failed to publish comment creation event:", ablyError)
-      // Don't fail the request if Ably fails
+      console.error("Failed to publish comment event:", ablyError)
+      // Don't fail the request if real-time publishing fails
     }
 
     return NextResponse.json({
-      success: true,
-      comment: commentWithStatus,
+      comment: {
+        ...comment,
+        like_count: 0,
+        user_liked: false,
+      },
     })
-  } catch (error: any) {
-    console.error("Error in create comment API:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
+  } catch (error) {
+    console.error("Error in comments POST API:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

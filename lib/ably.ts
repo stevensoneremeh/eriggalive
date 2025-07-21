@@ -1,14 +1,14 @@
-import { Realtime } from "ably"
+import Ably from "ably"
 
-let ably: Realtime | null = null
+let ably: Ably.Realtime | null = null
 
-export function getAblyClient(): Realtime {
+export function getAblyClient(): Ably.Realtime {
   if (!ably) {
     if (!process.env.NEXT_PUBLIC_ABLY_API_KEY) {
       throw new Error("NEXT_PUBLIC_ABLY_API_KEY is not set")
     }
 
-    ably = new Realtime({
+    ably = new Ably.Realtime({
       key: process.env.NEXT_PUBLIC_ABLY_API_KEY,
       clientId: typeof window !== "undefined" ? `user-${Date.now()}` : undefined,
     })

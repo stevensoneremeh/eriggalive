@@ -2,9 +2,9 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
+import type Ably from "ably"
 import { getAblyClient, ABLY_CHANNELS } from "@/lib/ably"
 import { useAuth } from "@/contexts/auth-context"
-import type { Types } from "ably"
 
 interface AblyContextType {
   isConnected: boolean
@@ -31,7 +31,7 @@ export function AblyProvider({ children }: { children: React.ReactNode }) {
     try {
       const ably = getAblyClient()
 
-      const handleConnectionStateChange = (stateChange: Types.ConnectionStateChange) => {
+      const handleConnectionStateChange = (stateChange: Ably.ConnectionStateChange) => {
         setConnectionState(stateChange.current)
         setIsConnected(stateChange.current === "connected")
       }
@@ -66,7 +66,7 @@ export function AblyProvider({ children }: { children: React.ReactNode }) {
       const ably = getAblyClient()
       const channel = ably.channels.get(ABLY_CHANNELS.COMMUNITY_FEED)
 
-      const messageHandler = (message: Types.Message) => {
+      const messageHandler = (message: Ably.Message) => {
         callback(message.data)
       }
 
@@ -86,7 +86,7 @@ export function AblyProvider({ children }: { children: React.ReactNode }) {
       const ably = getAblyClient()
       const channel = ably.channels.get(ABLY_CHANNELS.POST_VOTES(postId))
 
-      const messageHandler = (message: Types.Message) => {
+      const messageHandler = (message: Ably.Message) => {
         callback(message.data)
       }
 
@@ -106,7 +106,7 @@ export function AblyProvider({ children }: { children: React.ReactNode }) {
       const ably = getAblyClient()
       const channel = ably.channels.get(ABLY_CHANNELS.POST_COMMENTS(postId))
 
-      const messageHandler = (message: Types.Message) => {
+      const messageHandler = (message: Ably.Message) => {
         callback(message.data)
       }
 
@@ -126,7 +126,7 @@ export function AblyProvider({ children }: { children: React.ReactNode }) {
       const ably = getAblyClient()
       const channel = ably.channels.get(ABLY_CHANNELS.COMMENT_LIKES(commentId))
 
-      const messageHandler = (message: Types.Message) => {
+      const messageHandler = (message: Ably.Message) => {
         callback(message.data)
       }
 
