@@ -56,7 +56,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         return NextResponse.json({ error: "Failed to remove bookmark" }, { status: 500 })
       }
 
-      return NextResponse.json({ bookmarked: false })
+      return NextResponse.json({
+        success: true,
+        bookmarked: false,
+        message: "Bookmark removed!",
+      })
     } else {
       // Add bookmark
       const { error: insertError } = await supabase.from("user_bookmarks").insert({
@@ -69,7 +73,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         return NextResponse.json({ error: "Failed to add bookmark" }, { status: 500 })
       }
 
-      return NextResponse.json({ bookmarked: true })
+      return NextResponse.json({
+        success: true,
+        bookmarked: true,
+        message: "Post bookmarked!",
+      })
     }
   } catch (error) {
     console.error("Bookmark API error:", error)

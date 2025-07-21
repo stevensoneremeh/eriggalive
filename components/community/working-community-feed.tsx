@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/contexts/auth-context"
 import { formatDistanceToNow } from "date-fns"
-import { ArrowBigUp, MessageCircle, Share2, Eye, Hash, Bookmark } from "lucide-react"
+import { ArrowBigUp, MessageCircle, Share2, Eye, Hash, Bookmark, BookmarkCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface CommunityFeedProps {
@@ -103,7 +103,7 @@ export function WorkingCommunityFeed({ initialPosts = [] }: CommunityFeedProps) 
     }
   }
 
-  const handleBookmark = async (postId: number) => {
+  const handleBookmark = async (postId: number, isBookmarked: boolean) => {
     if (!user) {
       toast({
         title: "Login Required",
@@ -121,6 +121,19 @@ export function WorkingCommunityFeed({ initialPosts = [] }: CommunityFeedProps) 
       const data = await response.json()
 
       if (data.success) {
+        // Update local state
+        setPosts((prevPosts) =>
+          prevPosts.map((post) => {
+            if (post.id === postId) {
+              return {
+                ...post,
+                is_bookmarked: data.bookmarked,
+              }
+            }
+            return post
+          }),
+        )
+
         toast({
           title: data.bookmarked ? "Bookmarked! 📌" : "Bookmark Removed",
           description: data.message,
@@ -141,7 +154,7 @@ export function WorkingCommunityFeed({ initialPosts = [] }: CommunityFeedProps) 
   const getTierColor = (tier: string) => {
     const colors = {
       admin: "bg-red-500 text-white",
-      blood_brotherhood: "bg-red-600 text-white",
+      blood: "bg-red-600 text-white",
       elder: "bg-purple-500 text-white",
       pioneer: "bg-blue-500 text-white",
       grassroot: "bg-green-500 text-white",
@@ -259,6 +272,22 @@ export function WorkingCommunityFeed({ initialPosts = [] }: CommunityFeedProps) 
               dangerouslySetInnerHTML={renderContent(post.content)}
             />
 
+            {/* Media */}
+            {post.media_url && (
+              <div className="mt-4">
+                {post.media_type?.startsWith("image") ? (
+                  <img
+                    src={post.media_url || "/placeholder.svg"}
+                    alt="Post media"
+                    className="rounded-lg max-w-full h-auto"
+                    loading="lazy"
+                  />
+                ) : post.media_type?.startsWith("video") ? (
+                  <video src={post.media_url} controls className="rounded-lg max-w-full h-auto" preload="metadata" />
+                ) : null}
+              </div>
+            )}
+
             {/* Hashtags */}
             {post.hashtags && post.hashtags.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-4">
@@ -308,10 +337,17 @@ export function WorkingCommunityFeed({ initialPosts = [] }: CommunityFeedProps) 
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="flex items-center gap-2 hover:bg-yellow-100 dark:hover:bg-yellow-900/20"
-                  onClick={() => handleBookmark(post.id)}
+                  className={cn(
+                    "flex items-center gap-2 hover:bg-yellow-100 dark:hover:bg-yellow-900/20",
+                    post.is_bookmarked && "text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20",
+                  )}
+                  onClick={() => handleBookmark(post.id, post.is_bookmarked)}
                 >
-                  <Bookmark className="h-4 w-4" />
+                  {post.is_bookmarked ? (
+                    <BookmarkCheck className="h-4 w-4 fill-current" />
+                  ) : (
+                    <Bookmark className="h-4 w-4" />
+                  )}
                 </Button>
 
                 {/* Share */}

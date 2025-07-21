@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     const limit = Number.parseInt(searchParams.get("limit") || "20")
     const offset = Number.parseInt(searchParams.get("offset") || "0")
 
-    // Get current user for bookmark status
+    // Get current user for bookmark and vote status
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -17,7 +17,6 @@ export async function GET(request: NextRequest) {
 
     if (user) {
       const { data: userData } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
-
       currentUserId = userData?.id || null
     }
 
@@ -67,28 +66,49 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch posts" }, { status: 500 })
     }
 
-    // Get bookmark status for current user if logged in
-    let postsWithBookmarks = posts || []
+    // Get bookmark and vote status for current user if logged in
+    let postsWithStatus = posts || []
 
     if (currentUserId && posts && posts.length > 0) {
       const postIds = posts.map((post) => post.id)
 
+      // Get bookmarks
       const { data: bookmarks } = await supabase
         .from("user_bookmarks")
         .select("post_id")
         .eq("user_id", currentUserId)
         .in("post_id", postIds)
 
-      const bookmarkedPostIds = new Set(bookmarks?.map((b) => b.post_id) || [])
+      // Get votes
+      const { data: votes } = await supabase
+        .from("community_post_votes")
+        .select("post_id")
+        .eq("user_id", currentUserId)
+        .in("post_id", postIds)
 
-      postsWithBookmarks = posts.map((post) => ({
+      const bookmarkedPostIds = new Set(bookmarks?.map((b) => b.post_id) || [])
+      const votedPostIds = new Set(votes?.map((v) => v.post_id) || [])
+
+      postsWithStatus = posts.map((post) => ({
         ...post,
         is_bookmarked: bookmarkedPostIds.has(post.id),
-        has_voted: false, // Will be implemented when we add voting
+        has_voted: votedPostIds.has(post.id),
+        hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
       }))
+    } else {
+      postsWithStatus =
+        posts?.map((post) => ({
+          ...post,
+          is_bookmarked: false,
+          has_voted: false,
+          hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
+        })) || []
     }
 
-    return NextResponse.json({ posts: postsWithBookmarks })
+    return NextResponse.json({
+      success: true,
+      posts: postsWithStatus,
+    })
   } catch (error) {
     console.error("Posts API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -99,10 +119,14 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     const body = await request.json()
-    const { content, category_id, media_url, media_type } = body
+    const { content, categoryId, media_url, media_type } = body
 
     if (!content || content.trim().length === 0) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 })
+    }
+
+    if (!categoryId) {
+      return NextResponse.json({ error: "Category is required" }, { status: 400 })
     }
 
     // Get current user
@@ -127,18 +151,20 @@ export async function POST(request: NextRequest) {
 
     // Extract hashtags from content
     const hashtagRegex = /#[\w]+/g
-    const hashtags = content.match(hashtagRegex) || []
+    const hashtags = content.match(hashtagRegex)?.map((tag: string) => tag.slice(1)) || []
 
     // Create post
     const { data: post, error: insertError } = await supabase
       .from("community_posts")
       .insert({
         user_id: userData.id,
-        category_id: category_id || null,
+        category_id: Number.parseInt(categoryId),
         content: content.trim(),
         media_url,
         media_type,
         hashtags,
+        is_published: true,
+        is_deleted: false,
       })
       .select(`
         id,
@@ -148,7 +174,9 @@ export async function POST(request: NextRequest) {
         hashtags,
         vote_count,
         comment_count,
+        view_count,
         created_at,
+        updated_at,
         user:users!community_posts_user_id_fkey (
           id,
           username,
@@ -171,7 +199,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create post" }, { status: 500 })
     }
 
-    return NextResponse.json({ post })
+    return NextResponse.json({
+      success: true,
+      post: {
+        ...post,
+        is_bookmarked: false,
+        has_voted: false,
+        hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
+      },
+    })
   } catch (error) {
     console.error("Create post API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
