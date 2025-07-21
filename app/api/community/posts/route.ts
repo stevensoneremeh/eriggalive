@@ -4,11 +4,20 @@ import { createClient } from "@/lib/supabase/server"
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
+    const { searchParams } = new URL(request.url)
+    const limit = Number.parseInt(searchParams.get("limit") || "20")
+    const offset = Number.parseInt(searchParams.get("offset") || "0")
 
-    // Get current user
+    // Get current user for vote status
     const {
       data: { user },
     } = await supabase.auth.getUser()
+
+    let userInternalId: number | undefined
+    if (user) {
+      const { data: userData } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
+      userInternalId = userData?.id
+    }
 
     // Fetch posts with user and category information
     const { data: posts, error } = await supabase
@@ -16,23 +25,23 @@ export async function GET(request: NextRequest) {
       .select(`
         id,
         content,
-        type,
         media_url,
         media_type,
         hashtags,
         vote_count,
         comment_count,
         view_count,
+        is_pinned,
         created_at,
         updated_at,
-        user:user_id (
+        user:users!community_posts_user_id_fkey (
           id,
           username,
           full_name,
           avatar_url,
           tier
         ),
-        category:category_id (
+        category:community_categories!community_posts_category_id_fkey (
           id,
           name,
           slug,
@@ -43,7 +52,7 @@ export async function GET(request: NextRequest) {
       .eq("is_published", true)
       .eq("is_deleted", false)
       .order("created_at", { ascending: false })
-      .limit(50)
+      .range(offset, offset + limit - 1)
 
     if (error) {
       console.error("Database error:", error)
@@ -59,7 +68,7 @@ export async function GET(request: NextRequest) {
       const { data: votes } = await supabase
         .from("community_post_votes")
         .select("post_id")
-        .eq("user_id", user.id)
+        .eq("user_id", userInternalId)
         .in("post_id", postIds)
 
       const votedPostIds = new Set(votes?.map((vote) => vote.post_id) || [])
@@ -109,28 +118,30 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { content, categoryId, type = "post" } = body
+    const { content, categoryId, hashtags = [] } = body
 
     if (!content || !categoryId) {
       return NextResponse.json({ error: "Content and category are required" }, { status: 400 })
     }
+
+    // Extract hashtags from content if not provided
+    const extractedHashtags = content.match(/#\w+/g)?.map((tag: string) => tag.slice(1)) || []
+    const finalHashtags = hashtags.length > 0 ? hashtags : extractedHashtags
 
     // Create the post
     const { data: post, error } = await supabase
       .from("community_posts")
       .insert({
         user_id: profile.id,
-        category_id: categoryId,
+        category_id: Number.parseInt(categoryId),
         content: content.trim(),
-        type,
-        hashtags: [],
+        hashtags: finalHashtags,
         is_published: true,
         is_deleted: false,
       })
       .select(`
         id,
         content,
-        type,
         media_url,
         media_type,
         hashtags,
@@ -139,14 +150,14 @@ export async function POST(request: NextRequest) {
         view_count,
         created_at,
         updated_at,
-        user:user_id (
+        user:users!community_posts_user_id_fkey (
           id,
           username,
           full_name,
           avatar_url,
           tier
         ),
-        category:category_id (
+        category:community_categories!community_posts_category_id_fkey (
           id,
           name,
           slug,
@@ -163,7 +174,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      post,
+      post: {
+        ...post,
+        has_voted: false,
+        hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
+      },
     })
   } catch (error) {
     console.error("API error:", error)

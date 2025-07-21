@@ -1,26 +1,24 @@
-import { NextRequest, NextResponse } from "next/server"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { revalidatePath } from "next/cache"
+import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClientComponentClient()
+    const supabase = await createClient()
 
     // Get authenticated user
     const {
-      data: { user: authUser },
-      error: authError,
+      data: { user },
     } = await supabase.auth.getUser()
 
-    if (authError || !authUser) {
+    if (!user) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
     // Get user profile
     const { data: userProfile, error: profileError } = await supabase
-      .from("user_profiles")
-      .select("*")
-      .eq("id", authUser.id)
+      .from("users")
+      .select("id")
+      .eq("auth_user_id", user.id)
       .single()
 
     if (profileError || !userProfile) {
@@ -50,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has already voted
-    const { data: existingVote, error: voteCheckError } = await supabase
+    const { data: existingVote } = await supabase
       .from("community_post_votes")
       .select("*")
       .eq("post_id", postId)
@@ -72,49 +70,30 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Failed to remove vote" }, { status: 500 })
       }
 
-      // Decrease vote count
-      const { error: updateError } = await supabase
-        .from("community_posts")
-        .update({ vote_count: supabase.raw('vote_count - 1') })
-        .eq("id", postId)
-
-      if (updateError) {
-        console.error("Error updating vote count:", updateError)
-      }
-
       voted = false
     } else {
       // Add vote
-      const { error: insertError } = await supabase
-        .from("community_post_votes")
-        .insert({
-          post_id: postId,
-          user_id: userProfile.id
-        })
+      const { error: insertError } = await supabase.from("community_post_votes").insert({
+        post_id: postId,
+        user_id: userProfile.id,
+      })
 
       if (insertError) {
         console.error("Error adding vote:", insertError)
         return NextResponse.json({ error: "Failed to add vote" }, { status: 500 })
       }
 
-      // Increase vote count
-      const { error: updateError } = await supabase
-        .from("community_posts")
-        .update({ vote_count: supabase.raw('vote_count + 1') })
-        .eq("id", postId)
-
-      if (updateError) {
-        console.error("Error updating vote count:", updateError)
-      }
-
       voted = true
     }
 
-    revalidatePath("/community")
-    return NextResponse.json({ 
-      success: true, 
-      voted, 
-      message: voted ? "Vote added!" : "Vote removed!" 
+    // Get updated vote count
+    const { data: updatedPost } = await supabase.from("community_posts").select("vote_count").eq("id", postId).single()
+
+    return NextResponse.json({
+      success: true,
+      voted,
+      voteCount: updatedPost?.vote_count || 0,
+      message: voted ? "Vote added!" : "Vote removed!",
     })
   } catch (error: any) {
     console.error("API Error:", error)

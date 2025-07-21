@@ -40,7 +40,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       has_liked: userInternalId ? comment.likes.some((like: any) => like.user_id === userInternalId) : false,
     }))
 
-    return NextResponse.json({ success: true, comments: processedComments })
+    // Organize comments into parent-child structure
+    const parentComments = processedComments.filter((c) => !c.parent_comment_id)
+    const childComments = processedComments.filter((c) => c.parent_comment_id)
+
+    const commentsWithReplies = parentComments.map((parent) => ({
+      ...parent,
+      replies: childComments.filter((child) => child.parent_comment_id === parent.id),
+    }))
+
+    return NextResponse.json({ success: true, comments: commentsWithReplies })
   } catch (error: any) {
     console.error("Error in comments API:", error)
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
@@ -99,7 +108,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: false, error: commentError.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, comment: newComment })
+    return NextResponse.json({
+      success: true,
+      comment: {
+        ...newComment,
+        has_liked: false,
+        replies: [],
+      },
+    })
   } catch (error: any) {
     console.error("Error in create comment API:", error)
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
