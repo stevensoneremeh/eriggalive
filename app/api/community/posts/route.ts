@@ -1,26 +1,28 @@
-import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { searchParams } = new URL(request.url)
+    const category = searchParams.get("category")
     const limit = Number.parseInt(searchParams.get("limit") || "20")
     const offset = Number.parseInt(searchParams.get("offset") || "0")
 
-    // Get current user for vote status
+    // Get current user for bookmark status
     const {
       data: { user },
     } = await supabase.auth.getUser()
+    let currentUserId: number | null = null
 
-    let userInternalId: number | undefined
     if (user) {
       const { data: userData } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
-      userInternalId = userData?.id
+
+      currentUserId = userData?.id || null
     }
 
-    // Fetch posts with user and category information
-    const { data: posts, error } = await supabase
+    // Build query
+    let query = supabase
       .from("community_posts")
       .select(`
         id,
@@ -54,45 +56,41 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1)
 
+    if (category && category !== "all") {
+      query = query.eq("category.slug", category)
+    }
+
+    const { data: posts, error } = await query
+
     if (error) {
-      console.error("Database error:", error)
+      console.error("Error fetching posts:", error)
       return NextResponse.json({ error: "Failed to fetch posts" }, { status: 500 })
     }
 
-    // Check if user has voted on each post
-    let postsWithVotes = posts || []
+    // Get bookmark status for current user if logged in
+    let postsWithBookmarks = posts || []
 
-    if (user && posts && posts.length > 0) {
+    if (currentUserId && posts && posts.length > 0) {
       const postIds = posts.map((post) => post.id)
 
-      const { data: votes } = await supabase
-        .from("community_post_votes")
+      const { data: bookmarks } = await supabase
+        .from("user_bookmarks")
         .select("post_id")
-        .eq("user_id", userInternalId)
+        .eq("user_id", currentUserId)
         .in("post_id", postIds)
 
-      const votedPostIds = new Set(votes?.map((vote) => vote.post_id) || [])
+      const bookmarkedPostIds = new Set(bookmarks?.map((b) => b.post_id) || [])
 
-      postsWithVotes = posts.map((post) => ({
+      postsWithBookmarks = posts.map((post) => ({
         ...post,
-        has_voted: votedPostIds.has(post.id),
-        hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
+        is_bookmarked: bookmarkedPostIds.has(post.id),
+        has_voted: false, // Will be implemented when we add voting
       }))
-    } else {
-      postsWithVotes =
-        posts?.map((post) => ({
-          ...post,
-          has_voted: false,
-          hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
-        })) || []
     }
 
-    return NextResponse.json({
-      success: true,
-      posts: postsWithVotes,
-    })
+    return NextResponse.json({ posts: postsWithBookmarks })
   } catch (error) {
-    console.error("API error:", error)
+    console.error("Posts API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -100,44 +98,47 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
+    const body = await request.json()
+    const { content, category_id, media_url, media_type } = body
+
+    if (!content || content.trim().length === 0) {
+      return NextResponse.json({ error: "Content is required" }, { status: 400 })
+    }
 
     // Get current user
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get user profile
-    const { data: profile } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
+    // Get user's internal ID
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .single()
 
-    if (!profile) {
-      return NextResponse.json({ error: "User profile not found" }, { status: 404 })
+    if (userError || !userData) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    const body = await request.json()
-    const { content, categoryId, hashtags = [] } = body
+    // Extract hashtags from content
+    const hashtagRegex = /#[\w]+/g
+    const hashtags = content.match(hashtagRegex) || []
 
-    if (!content || !categoryId) {
-      return NextResponse.json({ error: "Content and category are required" }, { status: 400 })
-    }
-
-    // Extract hashtags from content if not provided
-    const extractedHashtags = content.match(/#\w+/g)?.map((tag: string) => tag.slice(1)) || []
-    const finalHashtags = hashtags.length > 0 ? hashtags : extractedHashtags
-
-    // Create the post
-    const { data: post, error } = await supabase
+    // Create post
+    const { data: post, error: insertError } = await supabase
       .from("community_posts")
       .insert({
-        user_id: profile.id,
-        category_id: Number.parseInt(categoryId),
+        user_id: userData.id,
+        category_id: category_id || null,
         content: content.trim(),
-        hashtags: finalHashtags,
-        is_published: true,
-        is_deleted: false,
+        media_url,
+        media_type,
+        hashtags,
       })
       .select(`
         id,
@@ -147,9 +148,7 @@ export async function POST(request: NextRequest) {
         hashtags,
         vote_count,
         comment_count,
-        view_count,
         created_at,
-        updated_at,
         user:users!community_posts_user_id_fkey (
           id,
           username,
@@ -167,21 +166,14 @@ export async function POST(request: NextRequest) {
       `)
       .single()
 
-    if (error) {
-      console.error("Database error:", error)
+    if (insertError) {
+      console.error("Error creating post:", insertError)
       return NextResponse.json({ error: "Failed to create post" }, { status: 500 })
     }
 
-    return NextResponse.json({
-      success: true,
-      post: {
-        ...post,
-        has_voted: false,
-        hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
-      },
-    })
+    return NextResponse.json({ post })
   } catch (error) {
-    console.error("API error:", error)
+    console.error("Create post API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

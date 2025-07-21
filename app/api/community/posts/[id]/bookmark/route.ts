@@ -1,49 +1,54 @@
-import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { type NextRequest, NextResponse } from "next/server"
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { id } = await params
     const supabase = await createClient()
+    const postId = Number.parseInt(params.id)
 
-    // Get authenticated user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    if (isNaN(postId)) {
+      return NextResponse.json({ error: "Invalid post ID" }, { status: 400 })
     }
 
-    // Get user profile
-    const { data: userProfile, error: profileError } = await supabase
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // Get user's internal ID
+    const { data: userData, error: userError } = await supabase
       .from("users")
       .select("id")
       .eq("auth_user_id", user.id)
       .single()
 
-    if (profileError || !userProfile) {
-      return NextResponse.json({ error: "User profile not found" }, { status: 404 })
+    if (userError || !userData) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    const postId = Number.parseInt(id)
-
-    // Check if already bookmarked
-    const { data: existingBookmark } = await supabase
+    // Check if bookmark already exists
+    const { data: existingBookmark, error: checkError } = await supabase
       .from("user_bookmarks")
-      .select("*")
-      .eq("user_id", userProfile.id)
+      .select("id")
+      .eq("user_id", userData.id)
       .eq("post_id", postId)
       .single()
 
-    let bookmarked = false
+    if (checkError && checkError.code !== "PGRST116") {
+      console.error("Error checking bookmark:", checkError)
+      return NextResponse.json({ error: "Database error" }, { status: 500 })
+    }
 
     if (existingBookmark) {
       // Remove bookmark
       const { error: deleteError } = await supabase
         .from("user_bookmarks")
         .delete()
-        .eq("user_id", userProfile.id)
+        .eq("user_id", userData.id)
         .eq("post_id", postId)
 
       if (deleteError) {
@@ -51,11 +56,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return NextResponse.json({ error: "Failed to remove bookmark" }, { status: 500 })
       }
 
-      bookmarked = false
+      return NextResponse.json({ bookmarked: false })
     } else {
       // Add bookmark
       const { error: insertError } = await supabase.from("user_bookmarks").insert({
-        user_id: userProfile.id,
+        user_id: userData.id,
         post_id: postId,
       })
 
@@ -64,16 +69,59 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return NextResponse.json({ error: "Failed to add bookmark" }, { status: 500 })
       }
 
-      bookmarked = true
+      return NextResponse.json({ bookmarked: true })
+    }
+  } catch (error) {
+    console.error("Bookmark API error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const supabase = await createClient()
+    const postId = Number.parseInt(params.id)
+
+    if (isNaN(postId)) {
+      return NextResponse.json({ error: "Invalid post ID" }, { status: 400 })
     }
 
-    return NextResponse.json({
-      success: true,
-      bookmarked,
-      message: bookmarked ? "Post bookmarked!" : "Bookmark removed!",
-    })
-  } catch (error: any) {
-    console.error("API Error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ bookmarked: false })
+    }
+
+    // Get user's internal ID
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .single()
+
+    if (userError || !userData) {
+      return NextResponse.json({ bookmarked: false })
+    }
+
+    // Check if bookmark exists
+    const { data: bookmark, error: checkError } = await supabase
+      .from("user_bookmarks")
+      .select("id")
+      .eq("user_id", userData.id)
+      .eq("post_id", postId)
+      .single()
+
+    if (checkError && checkError.code !== "PGRST116") {
+      console.error("Error checking bookmark:", checkError)
+      return NextResponse.json({ bookmarked: false })
+    }
+
+    return NextResponse.json({ bookmarked: !!bookmark })
+  } catch (error) {
+    console.error("Bookmark check API error:", error)
+    return NextResponse.json({ bookmarked: false })
   }
 }
