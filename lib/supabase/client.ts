@@ -16,14 +16,7 @@ export function createClient() {
     throw new Error("Missing Supabase environment variables")
   }
 
-  supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      flowType: "pkce",
-    },
-  })
+  supabaseClient = createBrowserClient<Database>(supabaseUrl!, supabaseAnonKey!)
 
   return supabaseClient
 }

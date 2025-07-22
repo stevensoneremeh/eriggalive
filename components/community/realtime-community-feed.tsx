@@ -1,44 +1,165 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
+import { createClient } from "@/lib/supabase/client"
+import { useAuth } from "@/contexts/auth-context"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
-import { useAuth } from "@/contexts/auth-context"
-import { useAbly } from "@/contexts/ably-context"
+import {
+  Heart,
+  MessageCircle,
+  Share2,
+  Bookmark,
+  MoreHorizontal,
+  TrendingUp,
+  Clock,
+  Users,
+  Star,
+  Crown,
+  Zap,
+  Flame,
+} from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
-import { ArrowBigUp, MessageCircle, Share2, Eye, Hash, Bookmark, BookmarkCheck, Wifi, WifiOff } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-interface CommunityFeedProps {
-  initialPosts?: any[]
+interface Post {
+  id: string
+  title: string
+  content: string
+  media_urls: string[]
+  vote_count: number
+  comment_count: number
+  created_at: string
+  is_pinned: boolean
+  user: {
+    id: string
+    username: string
+    full_name: string | null
+    avatar_url: string | null
+    tier: string
+  }
+  category: {
+    id: string
+    name: string
+    slug: string
+    color: string
+    icon: string
+  } | null
+  has_voted?: boolean
 }
 
-export function RealtimeCommunityFeed({ initialPosts = [] }: CommunityFeedProps) {
-  const [posts, setPosts] = useState(initialPosts)
+interface RealtimeCommunityFeedProps {
+  initialPosts: Post[]
+}
+
+const TIER_ICONS = {
+  grassroot: Star,
+  pioneer: Zap,
+  elder: Crown,
+  blood_brotherhood: Flame,
+}
+
+const TIER_COLORS = {
+  grassroot: "text-green-500",
+  pioneer: "text-blue-500",
+  elder: "text-purple-500",
+  blood_brotherhood: "text-red-500",
+}
+
+export function RealtimeCommunityFeed({ initialPosts }: RealtimeCommunityFeedProps) {
+  const [posts, setPosts] = useState<Post[]>(initialPosts)
   const [loading, setLoading] = useState(false)
-  const { user } = useAuth()
+  const [sortBy, setSortBy] = useState<"latest" | "popular">("latest")
+
+  const { user, profile } = useAuth()
   const { toast } = useToast()
-  const { isConnected, subscribeToFeed, subscribeToPostVotes } = useAbly()
+  const supabase = createClient()
 
-  const fetchPosts = async () => {
-    setLoading(true)
+  useEffect(() => {
+    // Set up real-time subscription for new posts
+    const channel = supabase
+      .channel("community_posts")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "community_posts",
+        },
+        (payload) => {
+          console.log("New post received:", payload)
+          loadPosts() // Reload posts when new one is added
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [supabase])
+
+  const loadPosts = async () => {
     try {
-      const response = await fetch("/api/community/posts")
-      const data = await response.json()
+      setLoading(true)
+      const orderBy = sortBy === "latest" ? "created_at" : "vote_count"
 
-      if (data.success) {
-        setPosts(data.posts)
-      } else {
-        throw new Error(data.error || "Failed to fetch posts")
+      const { data, error } = await supabase
+        .from("community_posts")
+        .select(`
+          *,
+          user:users!community_posts_user_id_fkey(
+            id,
+            username,
+            full_name,
+            avatar_url,
+            tier
+          ),
+          category:community_categories!community_posts_category_id_fkey(
+            id,
+            name,
+            slug,
+            color,
+            icon
+          )
+        `)
+        .eq("is_published", true)
+        .eq("is_deleted", false)
+        .order(orderBy, { ascending: false })
+        .limit(20)
+
+      if (error) throw error
+
+      // Get vote status for each post if user is logged in
+      let postsWithVoteStatus = data || []
+
+      if (profile) {
+        postsWithVoteStatus = await Promise.all(
+          (data || []).map(async (post) => {
+            const { data: voteData } = await supabase
+              .from("community_post_votes")
+              .select("user_id")
+              .eq("post_id", post.id)
+              .eq("user_id", profile.id)
+              .single()
+
+            return {
+              ...post,
+              has_voted: !!voteData,
+            }
+          }),
+        )
       }
+
+      setPosts(postsWithVoteStatus)
     } catch (error) {
-      console.error("Error fetching posts:", error)
+      console.error("Error loading posts:", error)
       toast({
         title: "Error",
-        description: "Failed to load posts. Please try again.",
+        description: "Failed to load posts",
         variant: "destructive",
       })
     } finally {
@@ -47,200 +168,129 @@ export function RealtimeCommunityFeed({ initialPosts = [] }: CommunityFeedProps)
   }
 
   useEffect(() => {
-    if (initialPosts.length === 0) {
-      fetchPosts()
-    }
-  }, [initialPosts.length])
+    loadPosts()
+  }, [sortBy])
 
-  // Subscribe to real-time feed updates
-  useEffect(() => {
-    const unsubscribe = subscribeToFeed((data) => {
-      if (data.post) {
-        setPosts((prevPosts) => [data.post, ...prevPosts])
-        toast({
-          title: "New Post! 🎉",
-          description: `${data.post.user?.username} shared something new`,
-        })
-      }
-    })
-
-    return unsubscribe
-  }, [subscribeToFeed, toast])
-
-  // Subscribe to vote updates for all posts
-  useEffect(() => {
-    const unsubscribers: (() => void)[] = []
-
-    posts.forEach((post) => {
-      const unsubscribe = subscribeToPostVotes(post.id, (data) => {
-        if (data.userId !== user?.id) {
-          setPosts((prevPosts) =>
-            prevPosts.map((p) => {
-              if (p.id === data.postId) {
-                return {
-                  ...p,
-                  vote_count: data.voteCount,
-                }
-              }
-              return p
-            }),
-          )
-        }
-      })
-      unsubscribers.push(unsubscribe)
-    })
-
-    return () => {
-      unsubscribers.forEach((unsubscribe) => unsubscribe())
-    }
-  }, [posts, subscribeToPostVotes, user?.id])
-
-  const handleVote = async (postId: number, hasVoted: boolean) => {
-    if (!user) {
+  const handleVote = async (postId: string) => {
+    if (!profile) {
       toast({
-        title: "Login Required",
-        description: "Please login to vote on posts.",
+        title: "Sign in required",
+        description: "Please sign in to vote on posts",
         variant: "destructive",
       })
       return
     }
 
     try {
-      const response = await fetch("/api/community/posts/vote", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ postId }),
-      })
+      const { data: existingVote } = await supabase
+        .from("community_post_votes")
+        .select("id")
+        .eq("post_id", postId)
+        .eq("user_id", profile.id)
+        .single()
 
-      const data = await response.json()
+      if (existingVote) {
+        // Remove vote
+        await supabase.from("community_post_votes").delete().eq("post_id", postId).eq("user_id", profile.id)
 
-      if (data.success) {
-        // Update local state immediately for better UX
-        setPosts((prevPosts) =>
-          prevPosts.map((post) => {
-            if (post.id === postId) {
-              return {
-                ...post,
-                has_voted: data.voted,
-                vote_count: data.voteCount,
-              }
-            }
-            return post
-          }),
+        // Update local state
+        setPosts(
+          posts.map((post) =>
+            post.id === postId ? { ...post, vote_count: post.vote_count - 1, has_voted: false } : post,
+          ),
         )
 
-        toast({
-          title: data.voted ? "Vote Added! 🎉" : "Vote Removed",
-          description: data.message,
-        })
+        toast({ title: "Vote removed" })
       } else {
-        throw new Error(data.error || "Failed to vote")
+        // Add vote
+        await supabase.from("community_post_votes").insert({ post_id: postId, user_id: profile.id })
+
+        // Update local state
+        setPosts(
+          posts.map((post) =>
+            post.id === postId ? { ...post, vote_count: post.vote_count + 1, has_voted: true } : post,
+          ),
+        )
+
+        toast({ title: "Vote added!" })
       }
     } catch (error) {
       console.error("Error voting:", error)
       toast({
-        title: "Vote Failed",
-        description: "Something went wrong. Please try again.",
+        title: "Error",
+        description: "Failed to vote on post",
         variant: "destructive",
       })
     }
   }
 
-  const handleBookmark = async (postId: number, isBookmarked: boolean) => {
-    if (!user) {
+  const handleBookmark = async (postId: string) => {
+    if (!profile) {
       toast({
-        title: "Login Required",
-        description: "Please login to bookmark posts.",
+        title: "Sign in required",
+        description: "Please sign in to bookmark posts",
         variant: "destructive",
       })
       return
     }
 
     try {
-      const response = await fetch(`/api/community/posts/${postId}/bookmark`, {
-        method: "POST",
-      })
+      const { data: existingBookmark } = await supabase
+        .from("user_bookmarks")
+        .select("id")
+        .eq("post_id", postId)
+        .eq("user_id", profile.id)
+        .single()
 
-      const data = await response.json()
+      if (existingBookmark) {
+        await supabase.from("user_bookmarks").delete().eq("post_id", postId).eq("user_id", profile.id)
 
-      if (data.success) {
-        // Update local state
-        setPosts((prevPosts) =>
-          prevPosts.map((post) => {
-            if (post.id === postId) {
-              return {
-                ...post,
-                is_bookmarked: data.bookmarked,
-              }
-            }
-            return post
-          }),
-        )
-
-        toast({
-          title: data.bookmarked ? "Bookmarked! 📌" : "Bookmark Removed",
-          description: data.message,
-        })
+        toast({ title: "Bookmark removed" })
       } else {
-        throw new Error(data.error || "Failed to bookmark")
+        await supabase.from("user_bookmarks").insert({ post_id: postId, user_id: profile.id })
+
+        toast({ title: "Post bookmarked!" })
       }
     } catch (error) {
       console.error("Error bookmarking:", error)
       toast({
-        title: "Bookmark Failed",
-        description: "Something went wrong. Please try again.",
+        title: "Error",
+        description: "Failed to bookmark post",
         variant: "destructive",
       })
     }
   }
 
-  const getTierColor = (tier: string) => {
-    const colors = {
-      admin: "bg-red-500 text-white",
-      blood: "bg-red-600 text-white",
-      elder: "bg-purple-500 text-white",
-      pioneer: "bg-blue-500 text-white",
-      grassroot: "bg-green-500 text-white",
-    }
-    return colors[tier as keyof typeof colors] || "bg-gray-500 text-white"
+  const getTierIcon = (tier: string) => {
+    const Icon = TIER_ICONS[tier as keyof typeof TIER_ICONS] || Star
+    return Icon
   }
 
-  const renderContent = (content: string) => {
-    // Replace hashtags with styled spans
-    let processedContent = content.replace(
-      /#(\w+)/g,
-      '<span class="text-blue-500 font-medium cursor-pointer hover:text-blue-600">#$1</span>',
-    )
-
-    // Replace mentions with styled spans
-    processedContent = processedContent.replace(
-      /@(\w+)/g,
-      '<span class="text-purple-500 font-medium cursor-pointer hover:text-purple-600">@$1</span>',
-    )
-
-    return { __html: processedContent }
+  const getTierColor = (tier: string) => {
+    return TIER_COLORS[tier as keyof typeof TIER_COLORS] || "text-gray-500"
   }
 
   if (loading && posts.length === 0) {
     return (
       <div className="space-y-6">
-        {[...Array(3)].map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardHeader>
-              <div className="flex items-center space-x-4">
-                <div className="rounded-full bg-gray-300 h-12 w-12"></div>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Card key={i} className="border-0 shadow-lg">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-full" />
                 <div className="space-y-2">
-                  <div className="h-4 bg-gray-300 rounded w-24"></div>
-                  <div className="h-3 bg-gray-300 rounded w-16"></div>
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-24" />
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="h-4 bg-gray-300 rounded"></div>
-                <div className="h-4 bg-gray-300 rounded w-3/4"></div>
+            <CardContent className="space-y-4">
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="h-16 w-full" />
+              <div className="flex gap-4">
+                <Skeleton className="h-8 w-20" />
+                <Skeleton className="h-8 w-20" />
+                <Skeleton className="h-8 w-20" />
               </div>
             </CardContent>
           </Card>
@@ -249,190 +299,174 @@ export function RealtimeCommunityFeed({ initialPosts = [] }: CommunityFeedProps)
     )
   }
 
-  if (posts.length === 0) {
-    return (
-      <Card className="text-center py-12">
-        <CardContent>
-          <div className="text-gray-500 dark:text-gray-400">
-            <MessageCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <h3 className="text-lg font-medium mb-2">No posts yet</h3>
-            <p>Be the first to share something with the community!</p>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
   return (
     <div className="space-y-6">
-      {/* Real-time connection indicator */}
+      {/* Sort Controls */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          {isConnected ? (
-            <>
-              <Wifi className="h-4 w-4 text-green-500" />
-              <span>Live updates enabled</span>
-            </>
-          ) : (
-            <>
-              <WifiOff className="h-4 w-4 text-red-500" />
-              <span>Offline mode</span>
-            </>
-          )}
+        <div className="flex items-center gap-2">
+          <Button
+            variant={sortBy === "latest" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSortBy("latest")}
+            className="flex items-center gap-2"
+          >
+            <Clock className="h-4 w-4" />
+            Latest
+          </Button>
+          <Button
+            variant={sortBy === "popular" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSortBy("popular")}
+            className="flex items-center gap-2"
+          >
+            <TrendingUp className="h-4 w-4" />
+            Popular
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Users className="h-4 w-4" />
+          <span>{posts.length} posts</span>
         </div>
       </div>
 
-      {posts.map((post) => (
-        <Card
-          key={post.id}
-          className="shadow-lg hover:shadow-xl transition-all duration-300 border-0 bg-white dark:bg-gray-800"
-        >
-          <CardHeader className="pb-4">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-4 flex-1">
-                <Avatar className="h-12 w-12 ring-2 ring-gray-200 dark:ring-gray-700">
-                  <AvatarImage src={post.user?.avatar_url || "/placeholder-user.jpg"} alt={post.user?.username} />
-                  <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold">
-                    {post.user?.username?.charAt(0).toUpperCase() || "U"}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-lg">{post.user?.full_name || post.user?.username}</span>
-                    <Badge className={getTierColor(post.user?.tier)}>
-                      {post.user?.tier?.replace("_", " ").toUpperCase() || "GRASSROOT"}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    <span>@{post.user?.username}</span>
-                    <span>•</span>
-                    <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
-                    {post.category && (
-                      <>
-                        <span>•</span>
-                        <Badge
-                          variant="outline"
-                          style={{
-                            backgroundColor: post.category.color + "20",
-                            borderColor: post.category.color,
-                            color: post.category.color,
-                          }}
-                        >
-                          {post.category.icon} {post.category.name}
+      {/* Posts Feed */}
+      <div className="space-y-6">
+        {posts.map((post) => {
+          const TierIcon = getTierIcon(post.user.tier)
+          const tierColor = getTierColor(post.user.tier)
+
+          return (
+            <Card
+              key={post.id}
+              className={cn(
+                "border-0 shadow-lg bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 hover:shadow-xl transition-all duration-300",
+                post.is_pinned && "ring-2 ring-yellow-500 ring-opacity-50",
+              )}
+            >
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10 ring-2 ring-white dark:ring-gray-800">
+                      <AvatarImage src={post.user.avatar_url || "/placeholder.svg"} />
+                      <AvatarFallback>{post.user.username.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">{post.user.full_name || post.user.username}</span>
+                        <TierIcon className={cn("h-4 w-4", tierColor)} />
+                        <Badge variant="outline" className={cn("text-xs", tierColor)}>
+                          {post.user.tier.charAt(0).toUpperCase() + post.user.tier.slice(1)}
                         </Badge>
-                      </>
-                    )}
+                        {post.is_pinned && (
+                          <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800">
+                            Pinned
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
+                        {post.category && (
+                          <>
+                            <span>•</span>
+                            <Badge
+                              variant="outline"
+                              className="text-xs"
+                              style={{ borderColor: post.category.color, color: post.category.color }}
+                            >
+                              {post.category.name}
+                            </Badge>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
                 </div>
-              </div>
-            </div>
-          </CardHeader>
+              </CardHeader>
 
-          <CardContent className="pb-4">
-            <div
-              className="prose prose-sm max-w-none dark:prose-invert leading-relaxed text-gray-800 dark:text-gray-200"
-              dangerouslySetInnerHTML={renderContent(post.content)}
-            />
+              <CardContent className="space-y-4">
+                <div>
+                  <h3 className="text-xl font-semibold mb-2 leading-tight">{post.title}</h3>
+                  <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{post.content}</p>
+                </div>
 
-            {/* Media */}
-            {post.media_url && (
-              <div className="mt-4">
-                {post.media_type?.startsWith("image") ? (
-                  <img
-                    src={post.media_url || "/placeholder.svg"}
-                    alt="Post media"
-                    className="rounded-lg max-w-full h-auto"
-                    loading="lazy"
-                  />
-                ) : post.media_type?.startsWith("video") ? (
-                  <video src={post.media_url} controls className="rounded-lg max-w-full h-auto" preload="metadata" />
-                ) : null}
-              </div>
-            )}
+                {/* Media */}
+                {post.media_urls && post.media_urls.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2 rounded-lg overflow-hidden">
+                    {post.media_urls.slice(0, 4).map((url, index) => (
+                      <div key={index} className="aspect-video bg-gray-100 dark:bg-gray-800 rounded-md">
+                        <img
+                          src={url || "/placeholder.svg"}
+                          alt={`Media ${index + 1}`}
+                          className="w-full h-full object-cover rounded-md"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-            {/* Hashtags */}
-            {post.hashtags && post.hashtags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-4">
-                {post.hashtags.slice(0, 5).map((hashtag: string, index: number) => (
-                  <Badge
-                    key={index}
-                    variant="secondary"
-                    className="cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900"
+                {/* Actions */}
+                <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleVote(post.id)}
+                      className={cn(
+                        "flex items-center gap-2 transition-all",
+                        post.has_voted && "text-red-500 bg-red-50 hover:bg-red-100",
+                      )}
+                    >
+                      <Heart className={cn("h-4 w-4", post.has_voted && "fill-current")} />
+                      <span>{post.vote_count}</span>
+                    </Button>
+
+                    <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                      <MessageCircle className="h-4 w-4" />
+                      <span>{post.comment_count}</span>
+                    </Button>
+
+                    <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                      <Share2 className="h-4 w-4" />
+                      Share
+                    </Button>
+                  </div>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleBookmark(post.id)}
+                    className="flex items-center gap-2"
                   >
-                    <Hash className="h-3 w-3 mr-1" />
-                    {hashtag}
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </CardContent>
-
-          <CardFooter className="pt-4 border-t bg-gray-50 dark:bg-gray-800/50">
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-1">
-                {/* Vote Button */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "flex items-center gap-2 hover:bg-green-100 dark:hover:bg-green-900/20",
-                    post.has_voted && "text-green-600 bg-green-50 dark:bg-green-900/20",
-                  )}
-                  onClick={() => handleVote(post.id, post.has_voted)}
-                  disabled={post.user?.id === user?.id}
-                >
-                  <ArrowBigUp className={cn("h-5 w-5", post.has_voted && "fill-current")} />
-                  <span className="font-medium">{post.vote_count}</span>
-                </Button>
-
-                {/* Comments */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex items-center gap-2 hover:bg-blue-100 dark:hover:bg-blue-900/20"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  <span>{post.comment_count}</span>
-                </Button>
-
-                {/* Bookmark */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "flex items-center gap-2 hover:bg-yellow-100 dark:hover:bg-yellow-900/20",
-                    post.is_bookmarked && "text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20",
-                  )}
-                  onClick={() => handleBookmark(post.id, post.is_bookmarked)}
-                >
-                  {post.is_bookmarked ? (
-                    <BookmarkCheck className="h-4 w-4 fill-current" />
-                  ) : (
                     <Bookmark className="h-4 w-4" />
-                  )}
-                </Button>
-
-                {/* Share */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex items-center gap-2 hover:bg-purple-100 dark:hover:bg-purple-900/20"
-                >
-                  <Share2 className="h-4 w-4" />
-                  Share
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                <div className="flex items-center gap-1">
-                  <Eye className="h-4 w-4" />
-                  <span>{post.view_count || 0}</span>
+                  </Button>
                 </div>
-              </div>
-            </div>
-          </CardFooter>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+
+      {posts.length === 0 && !loading && (
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
+          <CardContent className="p-12 text-center">
+            <Users className="h-20 w-20 text-gray-400 mx-auto mb-6" />
+            <h3 className="text-2xl font-semibold mb-3">No posts yet</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-lg">
+              Be the first to share something with the community!
+            </p>
+          </CardContent>
         </Card>
-      ))}
+      )}
+
+      {loading && posts.length > 0 && (
+        <div className="text-center py-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+        </div>
+      )}
     </div>
   )
 }
