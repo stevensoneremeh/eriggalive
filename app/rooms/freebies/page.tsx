@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
+import { LudoGame } from "@/components/games/ludo-game"
 import {
   Heart,
   Download,
@@ -23,9 +24,11 @@ import {
   Gift,
   Sparkles,
   Crown,
+  Gamepad2,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { cn } from "@/lib/utils"
+import { Coins } from "lucide-react"
 
 interface FreebieItem {
   id: number
@@ -379,12 +382,16 @@ export default function FreebiesRoom() {
             </h1>
           </div>
           <p className="text-gray-600 dark:text-gray-400 text-lg mt-2">
-            Discover exclusive free content, vote on community posts, and share your thoughts
+            Discover exclusive free content, play games, vote on community posts, and share your thoughts
           </p>
           <div className="flex justify-center gap-8 mt-6 text-sm text-gray-500">
             <span className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               {freebies.length} Freebies Available
+            </span>
+            <span className="flex items-center gap-2">
+              <Gamepad2 className="h-4 w-4" />
+              Interactive Games
             </span>
             <span className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
@@ -398,14 +405,22 @@ export default function FreebiesRoom() {
         </div>
 
         <Tabs defaultValue="freebies" className="space-y-8">
-          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
+          <TabsList className="grid w-full grid-cols-4 max-w-2xl mx-auto">
             <TabsTrigger value="freebies" className="flex items-center gap-2">
               <Gift className="h-4 w-4" />
               Free Downloads
             </TabsTrigger>
+            <TabsTrigger value="games" className="flex items-center gap-2">
+              <Gamepad2 className="h-4 w-4" />
+              Games
+            </TabsTrigger>
             <TabsTrigger value="posts" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Community Posts
+            </TabsTrigger>
+            <TabsTrigger value="leaderboard" className="flex items-center gap-2">
+              <Crown className="h-4 w-4" />
+              Leaderboard
             </TabsTrigger>
           </TabsList>
 
@@ -497,6 +512,10 @@ export default function FreebiesRoom() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="games" className="space-y-6">
+            <LudoGame />
           </TabsContent>
 
           <TabsContent value="posts" className="space-y-6">
@@ -613,6 +632,59 @@ export default function FreebiesRoom() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="leaderboard" className="space-y-6">
+            <Card className="border-0 shadow-xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Crown className="h-5 w-5 text-yellow-500" />
+                  Game Leaderboard
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[
+                    { rank: 1, name: "Ludo Master", games: 45, wins: 38, coins: 1250 },
+                    { rank: 2, name: "Street King", games: 32, wins: 26, coins: 980 },
+                    { rank: 3, name: "Game Warrior", games: 28, wins: 21, coins: 750 },
+                    { rank: 4, name: "Dice Legend", games: 25, wins: 18, coins: 650 },
+                    { rank: 5, name: "Board Master", games: 22, wins: 15, coins: 520 },
+                  ].map((player) => (
+                    <div key={player.rank} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-4">
+                        <div
+                          className={cn(
+                            "w-8 h-8 rounded-full flex items-center justify-center font-bold text-white",
+                            player.rank === 1 && "bg-yellow-500",
+                            player.rank === 2 && "bg-gray-400",
+                            player.rank === 3 && "bg-orange-600",
+                            player.rank > 3 && "bg-gray-500",
+                          )}
+                        >
+                          {player.rank}
+                        </div>
+                        <div>
+                          <p className="font-semibold">{player.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {player.games} games • {player.wins} wins
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="flex items-center gap-1">
+                          <Coins className="h-4 w-4 text-yellow-500" />
+                          <span className="font-semibold">{player.coins}</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {Math.round((player.wins / player.games) * 100)}% win rate
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
