@@ -10,7 +10,9 @@ DECLARE
         'community_comments',
         'community_post_votes',
         'chat_messages',
-        'chat_message_votes'
+        'chat_message_votes',
+        'freebies_posts',
+        'freebies_post_votes'
     ];
 BEGIN
     FOREACH table_name IN ARRAY required_tables
@@ -40,7 +42,9 @@ DECLARE
         'community_comments', 
         'community_post_votes',
         'chat_messages',
-        'chat_message_votes'
+        'chat_message_votes',
+        'freebies_posts',
+        'freebies_post_votes'
     ];
 BEGIN
     FOREACH table_name IN ARRAY rls_tables

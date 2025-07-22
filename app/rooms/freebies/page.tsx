@@ -257,10 +257,8 @@ export default function FreebiesRoom() {
         .single()
 
       if (existingVote?.vote_type === voteType) {
-        // Remove vote
         await supabase.from("freebies_post_votes").delete().eq("post_id", postId).eq("user_id", profile.id)
       } else {
-        // Add or update vote
         await supabase.from("freebies_post_votes").upsert({
           post_id: postId,
           user_id: profile.id,
@@ -268,7 +266,6 @@ export default function FreebiesRoom() {
         })
       }
 
-      // Reload posts to get updated counts
       loadPosts()
     } catch (error) {
       console.error("Error voting on post:", error)
@@ -374,7 +371,6 @@ export default function FreebiesRoom() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 dark:from-gray-900 dark:to-gray-800">
       <div className="max-w-7xl mx-auto p-4">
-        {/* Header */}
         <div className="text-center py-8">
           <div className="flex items-center justify-center mb-4">
             <Gift className="h-10 w-10 text-yellow-500 mr-3" />
@@ -401,7 +397,6 @@ export default function FreebiesRoom() {
           </div>
         </div>
 
-        {/* Main Content */}
         <Tabs defaultValue="freebies" className="space-y-8">
           <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
             <TabsTrigger value="freebies" className="flex items-center gap-2">
@@ -505,7 +500,6 @@ export default function FreebiesRoom() {
           </TabsContent>
 
           <TabsContent value="posts" className="space-y-6">
-            {/* Create Post Form */}
             {profile && (
               <Card className="border-0 shadow-xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
                 <CardHeader>
@@ -538,7 +532,6 @@ export default function FreebiesRoom() {
               </Card>
             )}
 
-            {/* Posts List */}
             <div className="space-y-6">
               {posts.map((post) => {
                 const TierIcon = getTierIcon(post.user.tier)

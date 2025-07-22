@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
@@ -121,7 +120,6 @@ export function TierChatRooms() {
   useEffect(() => {
     if (!isConnected || !profile) return
 
-    // Subscribe to real-time messages for active room
     const unsubscribe = subscribeToFeed((data: any) => {
       if (data.room_id === activeRoom) {
         setMessages((prev) => ({
@@ -183,7 +181,6 @@ export function TierChatRooms() {
   const loadOnlineUsers = async () => {
     try {
       const promises = availableRooms.map(async (room) => {
-        // Simulate online users count (in production, you'd track this via presence)
         const count = Math.floor(Math.random() * 50) + 10
         return { roomId: room.id, count }
       })
@@ -228,7 +225,6 @@ export function TierChatRooms() {
 
       if (error) throw error
 
-      // Add message locally for immediate feedback
       setMessages((prev) => ({
         ...prev,
         [activeRoom]: [...(prev[activeRoom] || []), data],
@@ -249,7 +245,6 @@ export function TierChatRooms() {
     if (!profile) return
 
     try {
-      // Check existing vote
       const { data: existingVote } = await supabase
         .from("chat_message_votes")
         .select("vote_type")
@@ -258,10 +253,8 @@ export function TierChatRooms() {
         .single()
 
       if (existingVote?.vote_type === voteType) {
-        // Remove vote
         await supabase.from("chat_message_votes").delete().eq("message_id", messageId).eq("user_id", profile.id)
       } else {
-        // Add or update vote
         await supabase.from("chat_message_votes").upsert({
           message_id: messageId,
           user_id: profile.id,
@@ -269,7 +262,6 @@ export function TierChatRooms() {
         })
       }
 
-      // Refresh messages to get updated vote counts
       loadMessages()
     } catch (error) {
       console.error("Error voting on message:", error)
@@ -313,7 +305,6 @@ export function TierChatRooms() {
 
   return (
     <div className="space-y-6">
-      {/* Connection Status */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className={cn("w-2 h-2 rounded-full", isConnected ? "bg-green-500" : "bg-red-500")} />
@@ -324,7 +315,6 @@ export function TierChatRooms() {
         </Badge>
       </div>
 
-      {/* Chat Rooms Tabs */}
       <Tabs value={activeRoom} onValueChange={setActiveRoom} className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 gap-2">
           {availableRooms.map((room) => {
@@ -365,7 +355,6 @@ export function TierChatRooms() {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                {/* Messages Area */}
                 <ScrollArea className="h-96 w-full rounded-md border p-4">
                   <div className="space-y-4">
                     {loading ? (
@@ -398,7 +387,6 @@ export function TierChatRooms() {
 
                                 <p className="text-sm">{message.content}</p>
 
-                                {/* Vote buttons */}
                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <Button
                                     variant="ghost"
@@ -428,7 +416,6 @@ export function TierChatRooms() {
                   </div>
                 </ScrollArea>
 
-                {/* Message Input */}
                 <div className="flex gap-2">
                   <Input
                     placeholder={`Message ${room.name}...`}
