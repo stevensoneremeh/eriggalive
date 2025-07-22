@@ -1,127 +1,84 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState, useCallback } from "react"
-import { getAblyClient, subscribeToChannel, ABLY_CHANNELS, cleanupAbly } from "@/lib/ably"
-import type Ably from "ably"
+import { createContext, useContext, useEffect, useState } from "react"
+import { getAblyClient, subscribeToChannel, publishEvent, ABLY_CHANNELS } from "@/lib/ably"
+import { useAuth } from "@/contexts/auth-context"
 
 interface AblyContextType {
   isConnected: boolean
-  connectionState: string
   subscribeToFeed: (callback: (data: any) => void) => () => void
   subscribeToPostVotes: (postId: number, callback: (data: any) => void) => () => void
-  subscribeToPostComments: (postId: number, callback: (data: any) => void) => () => void
-  subscribeToUserNotifications: (userId: string, callback: (data: any) => void) => () => void
+  publishToFeed: (data: any) => Promise<void>
+  publishVoteUpdate: (postId: number, data: any) => Promise<void>
 }
 
-const AblyContext = createContext<AblyContextType | null>(null)
+const AblyContext = createContext<AblyContextType | undefined>(undefined)
 
 export function AblyProvider({ children }: { children: React.ReactNode }) {
   const [isConnected, setIsConnected] = useState(false)
-  const [connectionState, setConnectionState] = useState("disconnected")
-  const [client, setClient] = useState<Ably.Realtime | null>(null)
+  const { isAuthenticated } = useAuth()
 
   useEffect(() => {
-    // Only initialize Ably on the client side
-    if (typeof window === "undefined") return
-
-    // Check if Ably API key is available
-    if (!process.env.NEXT_PUBLIC_ABLY_API_KEY) {
-      console.warn("Ably API key not configured. Real-time features will be disabled.")
-      return
-    }
+    if (!isAuthenticated) return
 
     try {
-      const ablyClient = getAblyClient()
-      setClient(ablyClient)
+      const client = getAblyClient()
 
-      // Set up connection state listeners
-      const handleConnectionStateChange = (stateChange: Ably.ConnectionStateChange) => {
-        setConnectionState(stateChange.current)
-        setIsConnected(stateChange.current === "connected")
-      }
+      client.connection.on("connected", () => {
+        setIsConnected(true)
+      })
 
-      ablyClient.connection.on(handleConnectionStateChange)
+      client.connection.on("disconnected", () => {
+        setIsConnected(false)
+      })
 
-      // Set initial state
-      setConnectionState(ablyClient.connection.state)
-      setIsConnected(ablyClient.connection.state === "connected")
+      client.connection.on("failed", () => {
+        setIsConnected(false)
+      })
 
-      // Cleanup on unmount
-      return () => {
-        ablyClient.connection.off(handleConnectionStateChange)
-        cleanupAbly()
-      }
+      // Initial connection state
+      setIsConnected(client.connection.state === "connected")
     } catch (error) {
       console.error("Failed to initialize Ably:", error)
       setIsConnected(false)
-      setConnectionState("failed")
     }
-  }, [])
+  }, [isAuthenticated])
 
-  const subscribeToFeed = useCallback(
-    (callback: (data: any) => void) => {
-      if (!client) return () => {}
+  const subscribeToFeed = (callback: (data: any) => void) => {
+    return subscribeToChannel(ABLY_CHANNELS.COMMUNITY_FEED, "post:created", (message) => {
+      callback(message.data)
+    })
+  }
 
-      return subscribeToChannel(ABLY_CHANNELS.COMMUNITY_FEED, "post:created", (message: Ably.Message) => {
-        callback(message.data)
-      })
-    },
-    [client],
-  )
+  const subscribeToPostVotes = (postId: number, callback: (data: any) => void) => {
+    return subscribeToChannel(ABLY_CHANNELS.POST_VOTES(postId), "vote:updated", (message) => {
+      callback(message.data)
+    })
+  }
 
-  const subscribeToPostVotes = useCallback(
-    (postId: number, callback: (data: any) => void) => {
-      if (!client) return () => {}
+  const publishToFeed = async (data: any) => {
+    await publishEvent(ABLY_CHANNELS.COMMUNITY_FEED, "post:created", data)
+  }
 
-      return subscribeToChannel(ABLY_CHANNELS.POST_VOTES(postId), "post:voted", (message: Ably.Message) => {
-        callback(message.data)
-      })
-    },
-    [client],
-  )
+  const publishVoteUpdate = async (postId: number, data: any) => {
+    await publishEvent(ABLY_CHANNELS.POST_VOTES(postId), "vote:updated", data)
+  }
 
-  const subscribeToPostComments = useCallback(
-    (postId: number, callback: (data: any) => void) => {
-      if (!client) return () => {}
-
-      return subscribeToChannel(ABLY_CHANNELS.POST_COMMENTS(postId), "comment:created", (message: Ably.Message) => {
-        callback(message.data)
-      })
-    },
-    [client],
-  )
-
-  const subscribeToUserNotifications = useCallback(
-    (userId: string, callback: (data: any) => void) => {
-      if (!client) return () => {}
-
-      return subscribeToChannel(
-        ABLY_CHANNELS.USER_NOTIFICATIONS(userId),
-        "notification:new",
-        (message: Ably.Message) => {
-          callback(message.data)
-        },
-      )
-    },
-    [client],
-  )
-
-  const value: AblyContextType = {
+  const value = {
     isConnected,
-    connectionState,
     subscribeToFeed,
     subscribeToPostVotes,
-    subscribeToPostComments,
-    subscribeToUserNotifications,
+    publishToFeed,
+    publishVoteUpdate,
   }
 
   return <AblyContext.Provider value={value}>{children}</AblyContext.Provider>
 }
 
-export function useAbly(): AblyContextType {
+export function useAbly() {
   const context = useContext(AblyContext)
-  if (!context) {
+  if (context === undefined) {
     throw new Error("useAbly must be used within an AblyProvider")
   }
   return context
