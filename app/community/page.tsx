@@ -2,104 +2,52 @@ import { Suspense } from "react"
 import { createClient } from "@/lib/supabase/server"
 import { RealtimeCommunityFeed } from "@/components/community/realtime-community-feed"
 import { RealtimeCreatePostForm } from "@/components/community/realtime-create-post-form"
-import { TierChatRooms } from "@/components/community/tier-chat-rooms"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 async function getCommunityData() {
-  try {
-    const supabase = await createClient()
+  const supabase = await createClient()
 
-    // Fetch categories first
-    const { data: categories, error: categoriesError } = await supabase
-      .from("community_categories")
-      .select("*")
-      .eq("is_active", true)
-      .order("display_order", { ascending: true })
+  // Fetch categories
+  const { data: categories } = await supabase.from("community_categories").select("*").order("name")
 
-    if (categoriesError) {
-      console.error("Error fetching categories:", categoriesError)
-    }
+  // Fetch initial posts
+  const { data: posts } = await supabase
+    .from("community_posts")
+    .select(`
+      *,
+      author:profiles!community_posts_author_id_fkey(
+        id,
+        username,
+        full_name,
+        avatar_url,
+        tier
+      ),
+      category:community_categories!community_posts_category_id_fkey(
+        id,
+        name,
+        slug,
+        color
+      ),
+      _count:community_post_votes(count),
+      user_vote:community_post_votes!left(vote_type),
+      user_bookmark:user_bookmarks!left(id)
+    `)
+    .order("created_at", { ascending: false })
+    .limit(20)
 
-    // Fetch posts with correct table relationships
-    const { data: posts, error: postsError } = await supabase
-      .from("community_posts")
-      .select(`
-        *,
-        user:users!community_posts_user_id_fkey(
-          id,
-          username,
-          full_name,
-          avatar_url,
-          tier
-        ),
-        category:community_categories!community_posts_category_id_fkey(
-          id,
-          name,
-          slug,
-          color,
-          icon
-        )
-      `)
-      .eq("is_published", true)
-      .eq("is_deleted", false)
-      .order("created_at", { ascending: false })
-      .limit(20)
+  // Transform posts data
+  const transformedPosts =
+    posts?.map((post) => ({
+      ...post,
+      vote_count: post._count?.[0]?.count || 0,
+      user_voted: post.user_vote?.[0]?.vote_type || null,
+      user_bookmarked: !!post.user_bookmark?.[0]?.id,
+    })) || []
 
-    if (postsError) {
-      console.error("Error fetching posts:", postsError)
-      return {
-        categories: categories || [],
-        posts: [],
-      }
-    }
-
-    // Get current user for vote status
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser()
-    let currentUserId = null
-
-    if (authUser) {
-      const { data: userData } = await supabase.from("users").select("id").eq("auth_user_id", authUser.id).single()
-
-      currentUserId = userData?.id
-    }
-
-    // Get vote status for each post if user is logged in
-    const postsWithVoteStatus = await Promise.all(
-      (posts || []).map(async (post) => {
-        let hasVoted = false
-
-        if (currentUserId) {
-          const { data: voteData } = await supabase
-            .from("community_post_votes")
-            .select("user_id")
-            .eq("post_id", post.id)
-            .eq("user_id", currentUserId)
-            .single()
-
-          hasVoted = !!voteData
-        }
-
-        return {
-          ...post,
-          has_voted: hasVoted,
-        }
-      }),
-    )
-
-    return {
-      categories: categories || [],
-      posts: postsWithVoteStatus,
-    }
-  } catch (error) {
-    console.error("Error in getCommunityData:", error)
-    return {
-      categories: [],
-      posts: [],
-    }
+  return {
+    categories: categories || [],
+    posts: transformedPosts,
   }
 }
 
@@ -145,36 +93,22 @@ export default async function CommunityPage() {
   const { categories, posts } = await getCommunityData()
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold mb-2">Community</h1>
           <p className="text-muted-foreground">
-            Connect with fellow fans, share your thoughts, and join tier-based chat rooms.
+            Connect with fellow fans, share your thoughts, and stay updated with the latest discussions.
           </p>
         </div>
 
-        <Tabs defaultValue="posts" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="posts">Posts & Discussions</TabsTrigger>
-            <TabsTrigger value="chat">Live Chat Rooms</TabsTrigger>
-          </TabsList>
+        <Suspense fallback={<LoadingSkeleton />}>
+          <div className="space-y-6">
+            <RealtimeCreatePostForm categories={categories} />
 
-          <TabsContent value="posts" className="space-y-6">
-            <Suspense fallback={<LoadingSkeleton />}>
-              <div className="space-y-6">
-                <RealtimeCreatePostForm categories={categories} />
-                <RealtimeCommunityFeed initialPosts={posts} />
-              </div>
-            </Suspense>
-          </TabsContent>
-
-          <TabsContent value="chat">
-            <Suspense fallback={<LoadingSkeleton />}>
-              <TierChatRooms />
-            </Suspense>
-          </TabsContent>
-        </Tabs>
+            <RealtimeCommunityFeed initialPosts={posts} />
+          </div>
+        </Suspense>
       </div>
     </div>
   )
