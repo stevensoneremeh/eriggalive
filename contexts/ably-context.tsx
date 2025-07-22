@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import Ably from "ably"
 
 interface AblyContextType {
@@ -9,14 +9,28 @@ interface AblyContextType {
   isConnected: boolean
 }
 
-const AblyContext = createContext<AblyContextType | undefined>(undefined)
+const AblyContext = createContext<AblyContextType>({
+  client: null,
+  isConnected: false,
+})
 
-export function AblyProvider({ children }: { children: React.ReactNode }) {
+export const useAbly = () => {
+  const context = useContext(AblyContext)
+  if (!context) {
+    throw new Error("useAbly must be used within an AblyProvider")
+  }
+  return context
+}
+
+interface AblyProviderProps {
+  children: ReactNode
+}
+
+export const AblyProvider: React.FC<AblyProviderProps> = ({ children }) => {
   const [client, setClient] = useState<Ably.Realtime | null>(null)
   const [isConnected, setIsConnected] = useState(false)
 
   useEffect(() => {
-    // Only initialize Ably if we have the key
     const ablyKey = process.env.NEXT_PUBLIC_ABLY_KEY
 
     if (!ablyKey) {
@@ -24,40 +38,36 @@ export function AblyProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    const ablyClient = new Ably.Realtime({
-      key: ablyKey,
-      clientId: `user-${Math.random().toString(36).substr(2, 9)}`,
-    })
+    try {
+      const ablyClient = new Ably.Realtime({
+        key: ablyKey,
+        clientId: `user-${Math.random().toString(36).substr(2, 9)}`,
+      })
 
-    ablyClient.connection.on("connected", () => {
-      setIsConnected(true)
-      console.log("Connected to Ably")
-    })
+      ablyClient.connection.on("connected", () => {
+        setIsConnected(true)
+        console.log("Connected to Ably")
+      })
 
-    ablyClient.connection.on("disconnected", () => {
-      setIsConnected(false)
-      console.log("Disconnected from Ably")
-    })
+      ablyClient.connection.on("disconnected", () => {
+        setIsConnected(false)
+        console.log("Disconnected from Ably")
+      })
 
-    setClient(ablyClient)
+      ablyClient.connection.on("failed", (error) => {
+        setIsConnected(false)
+        console.error("Ably connection failed:", error)
+      })
 
-    return () => {
-      ablyClient.close()
+      setClient(ablyClient)
+
+      return () => {
+        ablyClient.close()
+      }
+    } catch (error) {
+      console.error("Failed to initialize Ably client:", error)
     }
   }, [])
 
-  const value = {
-    client,
-    isConnected,
-  }
-
-  return <AblyContext.Provider value={value}>{children}</AblyContext.Provider>
-}
-
-export function useAbly() {
-  const context = useContext(AblyContext)
-  if (context === undefined) {
-    throw new Error("useAbly must be used within an AblyProvider")
-  }
-  return context
+  return <AblyContext.Provider value={{ client, isConnected }}>{children}</AblyContext.Provider>
 }
