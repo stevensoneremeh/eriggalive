@@ -175,4 +175,50 @@ CREATE POLICY "Users can manage their own freebie votes" ON freebie_votes FOR AL
 
 -- RLS Policies for freebies_posts
 CREATE POLICY "Users can view all freebies posts" ON freebies_posts FOR SELECT USING (true);
-CREATE POLICY "
+CREATE POLICY "Users can insert their own freebies posts" ON freebies_posts FOR INSERT WITH CHECK (auth.uid()::text = (SELECT auth_user_id FROM users WHERE id = user_id));
+CREATE POLICY "Users can update their own freebies posts" ON freebies_posts FOR UPDATE USING (auth.uid()::text = (SELECT auth_user_id FROM users WHERE id = user_id));
+CREATE POLICY "Users can delete their own freebies posts" ON freebies_posts FOR DELETE USING (auth.uid()::text = (SELECT auth_user_id FROM users WHERE id = user_id));
+
+-- RLS Policies for freebies_post_votes
+CREATE POLICY "Users can view all freebies post votes" ON freebies_post_votes FOR SELECT USING (true);
+CREATE POLICY "Users can manage their own freebies post votes" ON freebies_post_votes FOR ALL USING (auth.uid()::text = (SELECT auth_user_id FROM users WHERE id = user_id));
+
+-- Insert some sample freebies
+INSERT INTO freebies (title, description, file_url, thumbnail_url, type, user_id) 
+SELECT 
+    'Erigga - Street Anthem (Free Download)',
+    'Latest street anthem from Erigga, available for free download',
+    'https://example.com/track1.mp3',
+    'https://example.com/track1-thumb.jpg',
+    'track',
+    id
+FROM users WHERE tier = 'admin' LIMIT 1
+ON CONFLICT DO NOTHING;
+
+INSERT INTO freebies (title, description, file_url, thumbnail_url, type, user_id) 
+SELECT 
+    'Behind the Scenes - Studio Session',
+    'Exclusive behind the scenes footage from Erigga''s latest recording session',
+    'https://example.com/video1.mp4',
+    'https://example.com/video1-thumb.jpg',
+    'video',
+    id
+FROM users WHERE tier = 'admin' LIMIT 1
+ON CONFLICT DO NOTHING;
+
+-- Insert sample freebies posts
+INSERT INTO freebies_posts (title, content, user_id)
+SELECT 
+    'New Free Track Alert! 🔥',
+    'Just dropped a new street anthem for all my fans. This one hits different! Download it now and let me know what you think in the comments. Much love to everyone supporting the movement! #EriggaLive #StreetMusic',
+    id
+FROM users WHERE username = 'erigga_official' LIMIT 1
+ON CONFLICT DO NOTHING;
+
+INSERT INTO freebies_posts (title, content, user_id)
+SELECT 
+    'Studio Session Vibes',
+    'Been cooking up some heat in the studio lately. The energy is unmatched! Can''t wait for y''all to hear what we''ve been working on. Stay tuned for more freebies coming your way! 🎵',
+    id
+FROM users WHERE username = 'erigga_official' LIMIT 1
+ON CONFLICT DO NOTHING;
