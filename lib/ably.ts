@@ -4,10 +4,10 @@ let ablyClient: Ably.Realtime | null = null
 
 export function getAblyClient(): Ably.Realtime {
   if (!ablyClient) {
-    const apiKey = process.env.NEXT_PUBLIC_ABLY_API_KEY
+    const apiKey = process.env.NEXT_PUBLIC_ABLY_KEY
 
     if (!apiKey) {
-      console.warn("NEXT_PUBLIC_ABLY_API_KEY is not configured. Real-time features will be disabled.")
+      console.warn("NEXT_PUBLIC_ABLY_KEY is not configured. Real-time features will be disabled.")
       throw new Error("Ably API key not configured")
     }
 

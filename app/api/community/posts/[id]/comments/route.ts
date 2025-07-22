@@ -1,15 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { publishEvent, ABLY_CHANNELS } from "@/lib/ably"
 
-interface RouteParams {
-  params: Promise<{ id: string }>
-}
-
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { id } = await params
     const supabase = await createClient()
-    const postId = Number.parseInt(id)
+    const postId = Number.parseInt(params.id)
 
     if (isNaN(postId)) {
       return NextResponse.json({ error: "Invalid post ID" }, { status: 400 })
@@ -52,9 +48,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-export async function POST(request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { id } = await params
     const supabase = await createClient()
     const {
       data: { user },
@@ -65,7 +60,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const postId = Number.parseInt(id)
+    const postId = Number.parseInt(params.id)
     if (isNaN(postId)) {
       return NextResponse.json({ error: "Invalid post ID" }, { status: 400 })
     }
@@ -101,6 +96,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (insertError) {
       console.error("Error creating comment:", insertError)
       return NextResponse.json({ error: "Failed to create comment" }, { status: 500 })
+    }
+
+    // Publish real-time event for new comment
+    try {
+      publishEvent(ABLY_CHANNELS.POST_COMMENTS(postId), "comment:created", {
+        postId,
+        comment: {
+          ...comment,
+          like_count: 0,
+          user_liked: false,
+        },
+      })
+    } catch (ablyError) {
+      console.error("Failed to publish comment event:", ablyError)
+      // Don't fail the request if real-time publishing fails
     }
 
     return NextResponse.json({

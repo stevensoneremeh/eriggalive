@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-import * as Ably from "ably"
+import Ably from "ably"
 
 interface AblyContextType {
   client: Ably.Realtime | null
