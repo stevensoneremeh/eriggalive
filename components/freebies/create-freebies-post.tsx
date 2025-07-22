@@ -3,85 +3,63 @@
 import type React from "react"
 
 import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 import { createClient } from "@/lib/supabase/client"
-import { useAuth } from "@/contexts/auth-context"
-import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-import { Plus, Star, Crown, Zap, Flame } from "lucide-react"
+import { Plus, Upload } from "lucide-react"
 
-const TIER_ICONS = {
-  grassroot: Star,
-  pioneer: Zap,
-  elder: Crown,
-  blood_brotherhood: Flame,
+interface CreateFreebiesPostProps {
+  onPostCreated?: () => void
 }
 
-const TIER_COLORS = {
-  grassroot: "text-green-500",
-  pioneer: "text-blue-500",
-  elder: "text-purple-500",
-  blood_brotherhood: "text-red-500",
-}
-
-export function CreateFreebiesPost() {
+export function CreateFreebiesPost({ onPostCreated }: CreateFreebiesPostProps) {
+  const [open, setOpen] = useState(false)
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
+  const [imageUrl, setImageUrl] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isExpanded, setIsExpanded] = useState(false)
-
-  const { user, profile } = useAuth()
   const { toast } = useToast()
   const supabase = createClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!profile) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in to create a post",
-        variant: "destructive",
-      })
-      return
-    }
+    if (!title.trim() || !content.trim()) return
 
-    if (!title.trim() || !content.trim()) {
-      toast({
-        title: "Missing information",
-        description: "Please provide both a title and content for your post",
-        variant: "destructive",
-      })
-      return
-    }
-
+    setIsSubmitting(true)
     try {
-      setIsSubmitting(true)
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) throw new Error("Not authenticated")
 
-      const postData = {
+      const { error } = await supabase.from("freebies_posts").insert({
         title: title.trim(),
         content: content.trim(),
-        user_id: profile.id,
-        upvotes: 0,
-        downvotes: 0,
-      }
-
-      const { data, error } = await supabase
-        .from("freebies_posts")
-        .insert(postData)
-        .select()
-        .single()
+        image_url: imageUrl.trim() || null,
+        author_id: user.id,
+      })
 
       if (error) throw error
+
+      toast({
+        title: "Post created!",
+        description: "Your freebie post has been shared with the community.",
+      })
 
       // Reset form
       setTitle("")
       setContent("")
-      setIsExpanded(false)
+      setImageUrl("")
+      setOpen(false)
 
-      toast({
-        title: "Post created!",
-        description: "Your post has been shared in the freebies room",
-      })
+      // Notify parent component
+      if (onPostCreated) {
+        onPostCreated()
+      }
     } catch (error) {
       console.error("Error creating post:", error)
       toast({
@@ -94,20 +72,70 @@ export function CreateFreebiesPost() {
     }
   }
 
-  const getTierIcon = (tier: string) => {
-    const Icon = TIER_ICONS[tier as keyof typeof TIER_ICONS] || Star
-    return Icon
-  }
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button className="bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700">
+          <Plus className="mr-2 h-4 w-4" />
+          Share Freebie
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Share a Freebie</DialogTitle>
+        </DialogHeader>
 
-  const getTierColor = (tier: string) => {
-    return TIER_COLORS[tier as keyof typeof TIER_COLORS] || "text-gray-500"
-  }
-
-  if (!profile) {
-    return (
-      <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
-        <CardContent className="p-8 text-center">
-          <div className="h-16 w-16 rounded-full bg-gray-200 dark:bg-gray-700 mx-auto mb-4 flex items-center justify-center">
-            <Plus className="h-8 w-8 text-gray-400" />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="title">Title</Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="What's the freebie about?"
+              maxLength={200}
+            />
           </div>
-          <h3 className="text-lg font-semibold mb-2">Share in Freeb\
+
+          <div className="space-y-2">
+            <Label htmlFor="content">Description</Label>
+            <Textarea
+              id="content"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Describe the freebie, how to get it, any requirements..."
+              rows={4}
+              maxLength={1000}
+            />
+            <div className="text-xs text-muted-foreground text-right">{content.length}/1000</div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="imageUrl">Image URL (Optional)</Label>
+            <div className="flex space-x-2">
+              <Input
+                id="imageUrl"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://example.com/image.jpg"
+                type="url"
+              />
+              <Button type="button" variant="outline" size="icon">
+                <Upload className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!title.trim() || !content.trim() || isSubmitting}>
+              {isSubmitting ? "Sharing..." : "Share Freebie"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}

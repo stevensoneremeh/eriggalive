@@ -2,46 +2,53 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-import { useAuth } from "./auth-context"
+import * as Ably from "ably"
 
 interface AblyContextType {
+  client: Ably.Realtime | null
   isConnected: boolean
-  subscribeToFeed: (callback: (data: any) => void) => () => void
 }
 
 const AblyContext = createContext<AblyContextType | undefined>(undefined)
 
 export function AblyProvider({ children }: { children: React.ReactNode }) {
+  const [client, setClient] = useState<Ably.Realtime | null>(null)
   const [isConnected, setIsConnected] = useState(false)
-  const { user } = useAuth()
 
   useEffect(() => {
-    // Simulate connection status
-    const timer = setTimeout(() => {
+    // Only initialize Ably if we have the key
+    const ablyKey = process.env.NEXT_PUBLIC_ABLY_KEY
+
+    if (!ablyKey) {
+      console.warn("Ably key not found. Real-time features will be disabled.")
+      return
+    }
+
+    const ablyClient = new Ably.Realtime({
+      key: ablyKey,
+      clientId: `user-${Math.random().toString(36).substr(2, 9)}`,
+    })
+
+    ablyClient.connection.on("connected", () => {
       setIsConnected(true)
-    }, 1000)
+      console.log("Connected to Ably")
+    })
 
-    return () => clearTimeout(timer)
-  }, [user])
+    ablyClient.connection.on("disconnected", () => {
+      setIsConnected(false)
+      console.log("Disconnected from Ably")
+    })
 
-  const subscribeToFeed = (callback: (data: any) => void) => {
-    // Mock subscription - in real app, this would use Ably
-    const interval = setInterval(() => {
-      // Simulate receiving data
-      if (Math.random() > 0.95) {
-        callback({
-          type: "message",
-          data: { message: "Mock real-time message" },
-        })
-      }
-    }, 5000)
+    setClient(ablyClient)
 
-    return () => clearInterval(interval)
-  }
+    return () => {
+      ablyClient.close()
+    }
+  }, [])
 
   const value = {
+    client,
     isConnected,
-    subscribeToFeed,
   }
 
   return <AblyContext.Provider value={value}>{children}</AblyContext.Provider>
