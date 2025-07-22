@@ -1,107 +1,91 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
-// Check if we're in preview mode
-const isPreviewMode = (request: NextRequest) => {
-  return (
-    request.nextUrl.hostname.includes("vusercontent.net") ||
-    request.nextUrl.hostname.includes("v0.dev") ||
-    process.env.NEXT_PUBLIC_VERCEL_ENV === "preview" ||
-    process.env.VERCEL_ENV === "preview"
-  )
-}
-
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
   })
 
-  // Skip middleware for preview mode
-  if (isPreviewMode(request)) {
-    return supabaseResponse
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  // Skip middleware if Supabase is not configured
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return supabaseResponse
-  }
-
-  try {
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
+        get(name: string) {
+          return request.cookies.get(name)?.value
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request,
+        set(name: string, value: string, options) {
+          request.cookies.set({
+            name,
+            value,
+            ...options,
           })
-          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+        },
+        remove(name: string, options) {
+          request.cookies.set({
+            name,
+            value: "",
+            ...options,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value: "",
+            ...options,
+          })
         },
       },
-    })
+    },
+  )
 
-    // IMPORTANT: Avoid writing any logic between createServerClient and
-    // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-    // issues with users being randomly logged out.
+  // Refresh session if expired
+  await supabase.auth.getSession()
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-    // Protected routes that require authentication
-    const protectedPaths = ["/dashboard", "/community", "/premium", "/coins", "/vault", "/admin"]
+  const { pathname } = request.nextUrl
 
-    // Admin-only routes
-    const adminPaths = ["/admin"]
+  // Protected routes that require authentication
+  const protectedRoutes = ["/dashboard", "/chat", "/coins", "/settings", "/profile", "/rooms/freebies"]
 
-    const { pathname } = request.nextUrl
+  // Auth routes that should redirect if already logged in
+  const authRoutes = ["/login", "/signup"]
 
-    // Check if the current path is protected
-    const isProtectedPath = protectedPaths.some((path) => pathname.startsWith(path))
-    const isAdminPath = adminPaths.some((path) => pathname.startsWith(path))
+  // Check if current path is protected
+  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
+  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
 
-    // Redirect to login if accessing protected route without authentication
-    if (isProtectedPath && !user) {
-      const redirectUrl = new URL("/login", request.url)
-      redirectUrl.searchParams.set("redirectTo", pathname)
-      return NextResponse.redirect(redirectUrl)
-    }
-
-    // Check admin access
-    if (isAdminPath && user) {
-      try {
-        const { data: userProfile } = await supabase
-          .from("users")
-          .select("role, tier")
-          .eq("auth_user_id", user.id)
-          .single()
-
-        if (!userProfile || (userProfile.role !== "admin" && userProfile.tier !== "admin")) {
-          return NextResponse.redirect(new URL("/dashboard", request.url))
-        }
-      } catch (error) {
-        console.error("Error checking admin access:", error)
-        return NextResponse.redirect(new URL("/dashboard", request.url))
-      }
-    }
-
-    // Redirect authenticated users away from auth pages
-    if (user && (pathname.startsWith("/login") || pathname.startsWith("/signup"))) {
-      const redirectTo = request.nextUrl.searchParams.get("redirectTo")
-      return NextResponse.redirect(new URL(redirectTo || "/dashboard", request.url))
-    }
-
-    return supabaseResponse
-  } catch (error) {
-    console.error("Middleware error:", error)
-    // Return the response without modification if there's an error
-    return supabaseResponse
+  // Redirect unauthenticated users from protected routes to login
+  if (isProtectedRoute && !user) {
+    const redirectUrl = new URL("/login", request.url)
+    redirectUrl.searchParams.set("redirect", pathname)
+    return NextResponse.redirect(redirectUrl)
   }
+
+  // Redirect authenticated users from auth routes to dashboard
+  if (isAuthRoute && user) {
+    return NextResponse.redirect(new URL("/dashboard", request.url))
+  }
+
+  return response
 }
 
 export const config = {

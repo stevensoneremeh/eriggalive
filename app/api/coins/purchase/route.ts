@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 
 // Check if we're in preview/development mode
 const isPreviewMode = () => {
@@ -10,26 +11,34 @@ const isPreviewMode = () => {
   )
 }
 
-// Enhanced user verification with better error handling
-function verifyUser(request: NextRequest) {
+// Enhanced user verification with Supabase
+async function verifyUser(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization")
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return { error: "Missing or invalid authorization header", user: null }
+    const supabase = await createClient()
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { error: "Authentication required", user: null, profile: null }
     }
 
-    // In production, verify JWT token here
-    // For now, return mock user data
-    const mockUser = {
-      id: "user-123",
-      email: "user@example.com",
-      username: "testuser",
-      coins: 15000, // Mock current balance
+    // Get user profile
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("auth_user_id", user.id)
+      .single()
+
+    if (profileError) {
+      return { error: "Profile not found", user: null, profile: null }
     }
 
-    return { user: mockUser, error: null }
+    return { user, profile, error: null }
   } catch (error) {
-    return { error: "Authentication failed", user: null }
+    return { error: "Authentication failed", user: null, profile: null }
   }
 }
 
@@ -97,9 +106,11 @@ async function verifyWithPaystack(reference: string, paystackSecretKey: string) 
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient()
+
     // Verify user authentication
-    const { user, error: authError } = verifyUser(request)
-    if (authError || !user) {
+    const { user, profile, error: authError } = await verifyUser(request)
+    if (authError || !user || !profile) {
       return NextResponse.json(
         {
           success: false,
@@ -207,10 +218,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Update user's coin balance in database
+    const newBalance = (profile.coins_balance || 0) + coins
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({
+        coins_balance: newBalance,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", profile.id)
+
+    if (updateError) {
+      console.error("Error updating coin balance:", updateError)
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to update coin balance",
+          code: "UPDATE_ERROR",
+        },
+        { status: 500 },
+      )
+    }
+
     // Create transaction record
     const transaction = {
       id: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      userId: user.id,
+      userId: profile.id,
       type: "purchase",
       coinAmount: coins,
       nairaAmount: amount,
@@ -231,9 +264,6 @@ export async function POST(request: NextRequest) {
 
     // In production, save transaction to database
     console.log("Transaction completed:", transaction)
-
-    // Calculate new balance (in production, update database)
-    const newBalance = user.coins + coins
 
     return NextResponse.json({
       success: true,
