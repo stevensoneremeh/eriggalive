@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = createClientComponentClient()
+    const supabase = await createClient()
 
     const { data: categories, error } = await supabase
       .from("community_categories")
@@ -12,22 +12,16 @@ export async function GET() {
       .order("display_order", { ascending: true })
 
     if (error) {
-      console.error("Error fetching categories:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error("Database error:", error)
+      return NextResponse.json({ error: "Failed to fetch categories" }, { status: 500 })
     }
 
-    // Return default categories if none exist
-    const defaultCategories = [
-      { id: 1, name: "General", slug: "general", is_active: true },
-      { id: 2, name: "Bars", slug: "bars", is_active: true },
-      { id: 3, name: "Music Discussion", slug: "music-discussion", is_active: true },
-    ]
-
-    return NextResponse.json({ 
-      categories: categories && categories.length > 0 ? categories : defaultCategories 
+    return NextResponse.json({
+      success: true,
+      categories: categories || [],
     })
-  } catch (error: any) {
-    console.error("API Error:", error)
+  } catch (error) {
+    console.error("API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

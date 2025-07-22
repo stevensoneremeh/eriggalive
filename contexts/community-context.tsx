@@ -3,9 +3,12 @@
 import type React from "react"
 import { createContext, useContext, useReducer, useCallback, useEffect } from "react"
 import type { CommunityPost, CommunityCategory } from "@/types/database"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import type { Database } from "@/types/database"
+import { createClientSupabase } from "@/lib/supabase/client"
 import { useAuth } from "./auth-context"
+
+/* -------------------------------------------------------------------------- */
+/*                                State & Types                               */
+/* -------------------------------------------------------------------------- */
 
 interface CommunityState {
   posts: CommunityPost[]
@@ -94,6 +97,10 @@ function communityReducer(state: CommunityState, action: CommunityAction): Commu
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/*                               Context Setup                                */
+/* -------------------------------------------------------------------------- */
+
 interface CommunityContextType {
   state: CommunityState
   loadPosts: (reset?: boolean) => Promise<void>
@@ -107,185 +114,152 @@ interface CommunityContextType {
 
 const CommunityContext = createContext<CommunityContextType | undefined>(undefined)
 
+/* -------------------------------------------------------------------------- */
+/*                            Provider Implementation                          */
+/* -------------------------------------------------------------------------- */
+
 export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(communityReducer, initialState)
   const { user, profile } = useAuth()
-  const supabase = createClientComponentClient<Database>()
+  const supabase = createClientSupabase()
+
+  /* ------------------------- Category Loading ---------------------------- */
 
   const loadCategories = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("community_categories")
-        .select("*")
-        .eq("is_active", true)
-        .order("display_order", { ascending: true })
-
-      if (error) throw error
-      dispatch({ type: "SET_CATEGORIES", payload: data || [] })
-    } catch (error: any) {
-      console.error("Error loading categories:", error)
-      dispatch({ type: "SET_ERROR", payload: error.message })
+      const res = await fetch("/api/community/categories")
+      if (!res.ok) {
+        const errorText = await res.text()
+        throw new Error(errorText || "Failed to fetch categories")
+      }
+      const data = await res.json()
+      dispatch({ type: "SET_CATEGORIES", payload: data.categories || [] })
+    } catch (err) {
+      console.error("Error loading categories:", err)
+      // Set fallback categories
+      dispatch({
+        type: "SET_CATEGORIES",
+        payload: [
+          {
+            id: 1,
+            name: "General Discussion",
+            slug: "general",
+            description: "General discussions",
+            icon: "💬",
+            color: "#3B82F6",
+            display_order: 1,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ] as CommunityCategory[],
+      })
     }
-  }, [supabase])
+  }, [])
+
+  /* --------------------------- Posts Loading ---------------------------- */
 
   const loadPosts = useCallback(
     async (reset = false) => {
       if (state.loading && !reset) return
 
       dispatch({ type: "SET_LOADING", payload: true })
-      if (reset) {
-        dispatch({ type: "RESET_POSTS" })
-      }
+      if (reset) dispatch({ type: "RESET_POSTS" })
 
       try {
-        const page = reset ? 1 : state.currentPage
-        const limit = 10
-        const offset = (page - 1) * limit
-
-        // Get current user's internal ID for vote status
-        let userInternalId: number | undefined
-        if (user) {
-          const { data: userData } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
-          userInternalId = userData?.id
+        const res = await fetch("/api/community/posts")
+        if (!res.ok) {
+          const errorText = await res.text()
+          throw new Error(errorText || "Failed to fetch posts")
         }
 
-        let query = supabase
-          .from("community_posts")
-          .select(`
-            *,
-            user:users!community_posts_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
-            category:community_categories!community_posts_category_id_fkey(id, name, slug),
-            votes:community_post_votes(user_id)
-          `)
-          .eq("is_published", true)
-          .eq("is_deleted", false)
-
-        // Apply filters
-        if (state.filters.category) {
-          query = query.eq("category_id", state.filters.category)
-        }
-
-        if (state.filters.search) {
-          query = query.ilike("content", `%${state.filters.search}%`)
-        }
-
-        // Apply sorting
-        switch (state.filters.sort) {
-          case "newest":
-            query = query.order("created_at", { ascending: false })
-            break
-          case "oldest":
-            query = query.order("created_at", { ascending: true })
-            break
-          case "top":
-            query = query.order("vote_count", { ascending: false }).order("created_at", { ascending: false })
-            break
-        }
-
-        query = query.range(offset, offset + limit - 1)
-
-        const { data, error } = await query
-
-        if (error) throw error
-
-        const postsWithVoteStatus = (data || []).map((post: any) => ({
-          ...post,
-          has_voted: userInternalId ? post.votes.some((vote: any) => vote.user_id === userInternalId) : false,
-        }))
+        const data = await res.json()
+        const posts = data.posts || []
 
         if (reset) {
-          dispatch({ type: "SET_POSTS", payload: postsWithVoteStatus })
+          dispatch({ type: "SET_POSTS", payload: posts })
         } else {
-          dispatch({ type: "ADD_POSTS", payload: postsWithVoteStatus })
+          dispatch({ type: "ADD_POSTS", payload: posts })
         }
 
-        dispatch({ type: "SET_HAS_MORE", payload: postsWithVoteStatus.length === limit })
-        dispatch({ type: "SET_PAGE", payload: page + 1 })
-      } catch (error: any) {
-        console.error("Error loading posts:", error)
-        dispatch({ type: "SET_ERROR", payload: error.message })
+        dispatch({ type: "SET_HAS_MORE", payload: posts.length === 20 })
+        dispatch({ type: "SET_PAGE", payload: state.currentPage + 1 })
+      } catch (err: any) {
+        console.error("Error loading posts:", err)
+        dispatch({ type: "SET_ERROR", payload: err.message || "Failed to load posts" })
       }
     },
-    [supabase, user, state.currentPage, state.loading, state.filters],
+    [state.currentPage, state.loading],
   )
 
+  /* --------------------------- Post Creation ---------------------------- */
+
   const createPost = useCallback(
-    async (postData: {
-      content: string
-      categoryId: number
-      mediaFile?: File
-    }): Promise<{ success: boolean; error?: string; post?: CommunityPost }> => {
-      if (!user || !profile) {
-        return { success: false, error: "You must be logged in to create posts" }
-      }
+    async (postData: { content: string; categoryId: number }) => {
+      if (!user || !profile) return { success: false, error: "You must be logged in to create posts" }
 
       try {
-        const formData = new FormData()
-        formData.append("content", postData.content)
-        formData.append("categoryId", postData.categoryId.toString())
-        if (postData.mediaFile) {
-          formData.append("mediaFile", postData.mediaFile)
-        }
-
-        const response = await fetch("/api/community/posts", {
+        const res = await fetch("/api/community/posts", {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: postData.content,
+            category_id: postData.categoryId,
+          }),
         })
 
-        const result = await response.json()
+        const result = await res.json()
 
         if (result.success && result.post) {
-          // Add the new post to the beginning of the list
           dispatch({ type: "ADD_POST", payload: result.post })
           return { success: true, post: result.post }
-        } else {
-          return { success: false, error: result.error || "Failed to create post" }
         }
-      } catch (error: any) {
-        console.error("Error creating post:", error)
-        return { success: false, error: error.message || "Failed to create post" }
+        return { success: false, error: result.error || "Failed to create post" }
+      } catch (err: any) {
+        console.error("Error creating post:", err)
+        return { success: false, error: err.message }
       }
     },
     [user, profile],
   )
 
+  /* --------------------------- Voting ---------------------------- */
+
   const voteOnPost = useCallback(
-    async (postId: number, postCreatorId: number): Promise<{ success: boolean; error?: string }> => {
-      if (!user || !profile) {
-        return { success: false, error: "You must be logged in to vote" }
-      }
+    async (postId: number, postCreatorId: number) => {
+      if (!user || !profile) return { success: false, error: "You must be logged in to vote" }
 
       try {
-        const response = await fetch("/api/community/posts/vote", {
+        const res = await fetch("/api/community/posts/vote", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ postId, postCreatorId }),
         })
-
-        const result = await response.json()
+        const result = await res.json()
 
         if (result.success) {
-          // Update the post optimistically
           const post = state.posts.find((p) => p.id === postId)
           if (post) {
-            const updatedPost = {
-              ...post,
-              vote_count: result.voted ? post.vote_count + 1 : post.vote_count - 1,
-              has_voted: result.voted,
-            }
-            dispatch({ type: "UPDATE_POST", payload: updatedPost })
+            dispatch({
+              type: "UPDATE_POST",
+              payload: {
+                ...post,
+                vote_count: result.voted ? post.vote_count + 1 : post.vote_count - 1,
+              } as CommunityPost,
+            })
           }
           return { success: true }
-        } else {
-          return { success: false, error: result.error }
         }
-      } catch (error: any) {
-        console.error("Error voting on post:", error)
-        return { success: false, error: error.message || "Failed to vote" }
+        return { success: false, error: result.error }
+      } catch (err: any) {
+        console.error("Error voting:", err)
+        return { success: false, error: err.message }
       }
     },
     [user, profile, state.posts],
   )
+
+  /* --------------------- Misc Update/Delete Helpers -------------------- */
 
   const updatePost = useCallback((postId: number, updates: Partial<CommunityPost>) => {
     dispatch({ type: "UPDATE_POST", payload: { id: postId, ...updates } as CommunityPost })
@@ -295,83 +269,25 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "DELETE_POST", payload: postId })
   }, [])
 
-  const setFilters = useCallback((filters: Partial<CommunityState["filters"]>) => {
-    dispatch({ type: "SET_FILTERS", payload: filters })
-  }, [])
+  const setFilters = useCallback(
+    (filters: Partial<CommunityState["filters"]>) => dispatch({ type: "SET_FILTERS", payload: filters }),
+    [],
+  )
 
-  // Load categories on mount
+  /* ------------------------- Initial Load ------------------------- */
+
   useEffect(() => {
     loadCategories()
-  }, [loadCategories])
+    loadPosts(true)
+  }, [loadCategories, loadPosts])
 
-  // Reload posts when filters change
   useEffect(() => {
     loadPosts(true)
-  }, [state.filters])
+  }, [state.filters, loadPosts])
 
-  // Set up real-time subscriptions
-  useEffect(() => {
-    const channel = supabase
-      .channel("community_posts")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "community_posts",
-          filter: "is_published=eq.true",
-        },
-        (payload) => {
-          // Only add if it's not from the current user (to avoid duplicates)
-          if (payload.new.user_id !== profile?.id) {
-            // Fetch the full post data with relations
-            supabase
-              .from("community_posts")
-              .select(`
-                *,
-                user:users!community_posts_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
-                category:community_categories!community_posts_category_id_fkey(id, name, slug)
-              `)
-              .eq("id", payload.new.id)
-              .single()
-              .then(({ data }) => {
-                if (data) {
-                  dispatch({ type: "ADD_POST", payload: { ...data, has_voted: false } })
-                }
-              })
-          }
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "community_posts",
-        },
-        (payload) => {
-          dispatch({ type: "UPDATE_POST", payload: payload.new as CommunityPost })
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "community_posts",
-        },
-        (payload) => {
-          dispatch({ type: "DELETE_POST", payload: payload.old.id })
-        },
-      )
-      .subscribe()
+  /* ---------------------------- Context Value -------------------------- */
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [supabase, profile?.id])
-
-  const contextValue: CommunityContextType = {
+  const value: CommunityContextType = {
     state,
     loadPosts,
     loadCategories,
@@ -382,13 +298,17 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     voteOnPost,
   }
 
-  return <CommunityContext.Provider value={contextValue}>{children}</CommunityContext.Provider>
+  return <CommunityContext.Provider value={value}>{children}</CommunityContext.Provider>
 }
 
+/* -------------------------------------------------------------------------- */
+/*                               Hook Export                                  */
+/* -------------------------------------------------------------------------- */
+
 export function useCommunity() {
-  const context = useContext(CommunityContext)
-  if (context === undefined) {
+  const ctx = useContext(CommunityContext)
+  if (ctx === undefined) {
     throw new Error("useCommunity must be used within a CommunityProvider")
   }
-  return context
+  return ctx
 }
