@@ -1,10 +1,15 @@
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+interface RouteParams {
+  params: Promise<{ id: string }>
+}
+
+export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
+    const { id } = await params
     const supabase = await createClient()
-    const postId = Number.parseInt(params.id)
+    const postId = Number.parseInt(id)
 
     if (isNaN(postId)) {
       return NextResponse.json({ error: "Invalid post ID" }, { status: 400 })
@@ -85,10 +90,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   }
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    const { id } = await params
     const supabase = await createClient()
-    const postId = Number.parseInt(params.id)
+    const postId = Number.parseInt(id)
 
     if (isNaN(postId)) {
       return NextResponse.json({ error: "Invalid post ID" }, { status: 400 })
