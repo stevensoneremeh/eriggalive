@@ -38,6 +38,7 @@ export const ABLY_CHANNELS = {
   COMMUNITY_FEED: "community:feed",
   POST_VOTES: (postId: number) => `post:${postId}:votes`,
   POST_COMMENTS: (postId: number) => `post:${postId}:comments`,
+  TIER_CHAT: (tier: string) => `chat:tier:${tier.toLowerCase()}`,
   USER_NOTIFICATIONS: (userId: string) => `user:${userId}:notifications`,
 }
 

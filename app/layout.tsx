@@ -2,44 +2,41 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { ThemeProvider } from "@/contexts/theme-context"
+import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/contexts/auth-context"
-import { AblyProvider } from "@/contexts/ably-context"
 import { RadioProvider } from "@/contexts/radio-context"
+import { ThemeContextProvider } from "@/contexts/theme-context"
 import { MainNavigation } from "@/components/navigation/main-navigation"
-import { FloatingRadioPlayer } from "@/components/floating-radio-player"
 import { Toaster } from "@/components/ui/sonner"
-import { PreviewModeIndicator } from "@/components/preview-mode-indicator"
-import { cn } from "@/lib/utils"
+import { Toaster as ToasterUI } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "EriggaLive - Official Fan Platform",
-  description:
-    "The official fan platform for Nigerian rapper Erigga. Join the community, access exclusive content, and connect with fellow fans.",
-  keywords: "Erigga, Nigerian rapper, hip hop, music, fan platform, community",
-  authors: [{ name: "EriggaLive Team" }],
-  creator: "EriggaLive",
-  publisher: "EriggaLive",
+  title: "Erigga Live - Official Community Platform",
+  description: "Connect with Erigga and fellow fans on the official community platform",
+  keywords: ["Erigga", "Music", "Community", "Nigerian Hip Hop", "Warri"],
+  authors: [{ name: "Erigga Live Team" }],
+  creator: "Erigga Live",
+  publisher: "Erigga Live",
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
   },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://eriggalive.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://eriggalive.com"),
   openGraph: {
-    title: "EriggaLive - Official Fan Platform",
-    description: "The official fan platform for Nigerian rapper Erigga",
+    title: "Erigga Live - Official Community Platform",
+    description: "Connect with Erigga and fellow fans on the official community platform",
     url: "/",
-    siteName: "EriggaLive",
+    siteName: "Erigga Live",
     locale: "en_US",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "EriggaLive - Official Fan Platform",
-    description: "The official fan platform for Nigerian rapper Erigga",
+    title: "Erigga Live - Official Community Platform",
+    description: "Connect with Erigga and fellow fans on the official community platform",
     creator: "@eriggaofficial",
   },
   robots: {
@@ -53,6 +50,9 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+  verification: {
+    google: process.env.GOOGLE_SITE_VERIFICATION,
+  },
     generator: 'v0.dev'
 }
 
@@ -63,21 +63,20 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn(inter.className, "antialiased")}>
+      <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <AuthProvider>
-            <AblyProvider>
+          <ThemeContextProvider>
+            <AuthProvider>
               <RadioProvider>
-                <div className="relative min-h-screen bg-background">
+                <div className="min-h-screen bg-background">
                   <MainNavigation />
-                  <main className={cn("pt-16 pb-20 md:pb-4")}>{children}</main>
-                  <FloatingRadioPlayer />
-                  <PreviewModeIndicator />
-                  <Toaster position="top-right" />
+                  <main className="pt-16">{children}</main>
                 </div>
+                <Toaster />
+                <ToasterUI />
               </RadioProvider>
-            </AblyProvider>
-          </AuthProvider>
+            </AuthProvider>
+          </ThemeContextProvider>
         </ThemeProvider>
       </body>
     </html>

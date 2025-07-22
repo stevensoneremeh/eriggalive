@@ -1,32 +1,32 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Separator } from "@/components/ui/separator"
+import { MessageCircle, Share, Bookmark, MoreHorizontal, ChevronUp, ChevronDown } from "lucide-react"
+import { subscribeToChannel, publishEvent, ABLY_CHANNELS } from "@/lib/ably"
 import { formatDistanceToNow } from "date-fns"
+import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
 interface CommunityPost {
   id: number
-  user_id: number
-  category_id: number
   content: string
   media_url?: string
   media_type?: string
   vote_count: number
   comment_count: number
   created_at: string
-  updated_at: string
   has_voted?: boolean
-  user?: {
+  user: {
     id: number
     username: string
     full_name: string
-    avatar_url?: string
+    avatar_url: string | null
     tier: string
   }
   category?: {
@@ -43,95 +43,66 @@ interface RealtimeCommunityFeedProps {
 }
 
 export function RealtimeCommunityFeed({ initialPosts }: RealtimeCommunityFeedProps) {
+  const { profile, isAuthenticated } = useAuth()
   const [posts, setPosts] = useState<CommunityPost[]>(initialPosts)
-  const [loading, setLoading] = useState(false)
-  const supabase = createClient()
+  const [isConnected, setIsConnected] = useState(false)
 
   useEffect(() => {
-    // Set up real-time subscription for new posts
-    const channel = supabase
-      .channel("community_posts")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "community_posts",
-        },
-        async (payload) => {
-          // Fetch the complete post data with relationships
-          const { data: newPost } = await supabase
-            .from("community_posts")
-            .select(`
-              *,
-              user:users!community_posts_user_id_fkey(
-                id,
-                username,
-                full_name,
-                avatar_url,
-                tier
-              ),
-              category:community_categories!community_posts_category_id_fkey(
-                id,
-                name,
-                slug,
-                color,
-                icon
-              )
-            `)
-            .eq("id", payload.new.id)
-            .single()
+    if (!isAuthenticated) return
 
-          if (newPost) {
-            setPosts((current) => [{ ...newPost, has_voted: false }, ...current])
-          }
-        },
-      )
-      .subscribe()
+    // Subscribe to community feed updates
+    const unsubscribe = subscribeToChannel(ABLY_CHANNELS.COMMUNITY_FEED, "post:created", (message) => {
+      const newPost = message.data.post
+      setPosts((prev) => [newPost, ...prev])
+      toast.success("New post added!")
+    })
+
+    setIsConnected(true)
 
     return () => {
-      supabase.removeChannel(channel)
+      unsubscribe()
+      setIsConnected(false)
     }
-  }, [supabase])
+  }, [isAuthenticated])
 
-  const handleVote = async (postId: number, postCreatorAuthId: string) => {
+  const handleVote = async (postId: number) => {
+    if (!isAuthenticated || !profile) {
+      toast.error("Please sign in to vote")
+      return
+    }
+
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-        toast.error("Please log in to vote")
-        return
-      }
-
       const response = await fetch("/api/community/posts/vote", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          postId,
-          postCreatorAuthId,
-        }),
+        body: JSON.stringify({ postId }),
       })
 
       const result = await response.json()
 
       if (result.success) {
-        // Update the post in the local state
-        setPosts((current) =>
-          current.map((post) =>
+        setPosts((prev) =>
+          prev.map((post) =>
             post.id === postId
               ? {
                   ...post,
-                  vote_count: result.voted ? post.vote_count + 1 : post.vote_count - 1,
                   has_voted: result.voted,
+                  vote_count: post.vote_count + (result.voted ? 1 : -1),
                 }
               : post,
           ),
         )
+
         toast.success(result.message)
+
+        // Publish real-time vote update
+        await publishEvent(ABLY_CHANNELS.POST_VOTES(postId), "vote:updated", {
+          postId,
+          voted: result.voted,
+          userId: profile.id,
+        })
       } else {
         toast.error(result.error)
       }
@@ -141,33 +112,42 @@ export function RealtimeCommunityFeed({ initialPosts }: RealtimeCommunityFeedPro
     }
   }
 
-  const getTierColor = (tier: string) => {
-    switch (tier) {
-      case "blood":
-        return "bg-red-500"
-      case "elder":
-        return "bg-purple-500"
-      case "pioneer":
-        return "bg-blue-500"
-      case "grassroot":
-        return "bg-green-500"
-      default:
-        return "bg-gray-500"
+  const handleBookmark = async (postId: number) => {
+    if (!isAuthenticated) {
+      toast.error("Please sign in to bookmark posts")
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/community/posts/${postId}/bookmark`, {
+        method: "POST",
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast.success(result.message)
+      } else {
+        toast.error(result.error)
+      }
+    } catch (error) {
+      console.error("Bookmark error:", error)
+      toast.error("Failed to bookmark post")
     }
   }
 
-  const getTierLabel = (tier: string) => {
-    switch (tier) {
+  const getTierColor = (tier: string) => {
+    switch (tier?.toLowerCase()) {
       case "blood":
-        return "Blood"
+        return "bg-red-500 text-white"
       case "elder":
-        return "Elder"
+        return "bg-purple-500 text-white"
       case "pioneer":
-        return "Pioneer"
+        return "bg-blue-500 text-white"
       case "grassroot":
-        return "Grassroot"
+        return "bg-green-500 text-white"
       default:
-        return "Member"
+        return "bg-gray-500 text-white"
     }
   }
 
@@ -175,7 +155,9 @@ export function RealtimeCommunityFeed({ initialPosts }: RealtimeCommunityFeedPro
     return (
       <Card>
         <CardContent className="p-8 text-center">
-          <p className="text-muted-foreground">No posts yet. Be the first to share something!</p>
+          <MessageCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="text-lg font-semibold mb-2">No posts yet</h3>
+          <p className="text-muted-foreground">Be the first to start a conversation in the community!</p>
         </CardContent>
       </Card>
     )
@@ -183,38 +165,41 @@ export function RealtimeCommunityFeed({ initialPosts }: RealtimeCommunityFeedPro
 
   return (
     <div className="space-y-6">
+      {isConnected && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          Live updates enabled
+        </div>
+      )}
+
       {posts.map((post) => (
         <Card key={post.id} className="overflow-hidden">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Avatar className="h-10 w-10">
-                  <AvatarImage src={post.user?.avatar_url || "/placeholder.svg"} />
-                  <AvatarFallback>{post.user?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                  <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
+                  <AvatarFallback>{post.user.username.charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold">{post.user?.full_name || post.user?.username}</p>
-                    <Badge variant="secondary" className={`text-white ${getTierColor(post.user?.tier || "grassroot")}`}>
-                      {getTierLabel(post.user?.tier || "grassroot")}
-                    </Badge>
+                    <span className="font-semibold">{post.user.username}</span>
+                    <Badge className={cn("text-xs", getTierColor(post.user.tier))}>{post.user.tier}</Badge>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>@{post.user?.username}</span>
-                    <span>•</span>
                     <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
                     {post.category && (
                       <>
                         <span>•</span>
                         <Badge variant="outline" className="text-xs">
-                          {post.category.icon} {post.category.name}
+                          {post.category.name}
                         </Badge>
                       </>
                     )}
                   </div>
                 </div>
               </div>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="icon">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </div>
@@ -222,7 +207,7 @@ export function RealtimeCommunityFeed({ initialPosts }: RealtimeCommunityFeedPro
 
           <CardContent className="pt-0">
             <div className="space-y-4">
-              <p className="whitespace-pre-wrap">{post.content}</p>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">{post.content}</p>
 
               {post.media_url && (
                 <div className="rounded-lg overflow-hidden">
@@ -234,37 +219,40 @@ export function RealtimeCommunityFeed({ initialPosts }: RealtimeCommunityFeedPro
                     />
                   )}
                   {post.media_type === "video" && (
-                    <video src={post.media_url} controls className="w-full h-auto max-h-96" />
+                    <video controls className="w-full h-auto max-h-96">
+                      <source src={post.media_url} type="video/mp4" />
+                    </video>
                   )}
-                  {post.media_type === "audio" && <audio src={post.media_url} controls className="w-full" />}
+                  {post.media_type === "audio" && <audio controls className="w-full" src={post.media_url} />}
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-2 border-t">
+              <Separator />
+
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleVote(post.id, post.user?.id?.toString() || "")}
-                    className={`gap-2 ${post.has_voted ? "text-red-500" : ""}`}
+                    onClick={() => handleVote(post.id)}
+                    className={cn("flex items-center gap-2", post.has_voted && "text-primary")}
                   >
-                    <Heart className={`h-4 w-4 ${post.has_voted ? "fill-current" : ""}`} />
+                    {post.has_voted ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
                     {post.vote_count}
                   </Button>
 
-                  <Button variant="ghost" size="sm" className="gap-2">
+                  <Button variant="ghost" size="sm" className="flex items-center gap-2">
                     <MessageCircle className="h-4 w-4" />
                     {post.comment_count}
                   </Button>
 
-                  <Button variant="ghost" size="sm" className="gap-2">
-                    <Share2 className="h-4 w-4" />
-                    Share
+                  <Button variant="ghost" size="sm" onClick={() => handleBookmark(post.id)}>
+                    <Bookmark className="h-4 w-4" />
                   </Button>
                 </div>
 
                 <Button variant="ghost" size="sm">
-                  <Bookmark className="h-4 w-4" />
+                  <Share className="h-4 w-4" />
                 </Button>
               </div>
             </div>

@@ -2,8 +2,10 @@ import { Suspense } from "react"
 import { createClient } from "@/lib/supabase/server"
 import { RealtimeCommunityFeed } from "@/components/community/realtime-community-feed"
 import { RealtimeCreatePostForm } from "@/components/community/realtime-create-post-form"
+import { TierChatRooms } from "@/components/community/tier-chat-rooms"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 async function getCommunityData() {
   try {
@@ -143,21 +145,36 @@ export default async function CommunityPage() {
   const { categories, posts } = await getCommunityData()
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold mb-2">Community</h1>
           <p className="text-muted-foreground">
-            Connect with fellow fans, share your thoughts, and stay updated with the latest discussions.
+            Connect with fellow fans, share your thoughts, and join tier-based chat rooms.
           </p>
         </div>
 
-        <Suspense fallback={<LoadingSkeleton />}>
-          <div className="space-y-6">
-            <RealtimeCreatePostForm categories={categories} />
-            <RealtimeCommunityFeed initialPosts={posts} />
-          </div>
-        </Suspense>
+        <Tabs defaultValue="posts" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="posts">Posts & Discussions</TabsTrigger>
+            <TabsTrigger value="chat">Live Chat Rooms</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="posts" className="space-y-6">
+            <Suspense fallback={<LoadingSkeleton />}>
+              <div className="space-y-6">
+                <RealtimeCreatePostForm categories={categories} />
+                <RealtimeCommunityFeed initialPosts={posts} />
+              </div>
+            </Suspense>
+          </TabsContent>
+
+          <TabsContent value="chat">
+            <Suspense fallback={<LoadingSkeleton />}>
+              <TierChatRooms />
+            </Suspense>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   )
