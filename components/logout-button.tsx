@@ -1,30 +1,11 @@
-"use client"
+import { signout } from "@/app/auth/actions"
 
-import { Button } from "@/components/ui/button"
-import { useAuth } from "@/contexts/auth-context"
-import { LogOut } from "lucide-react"
-
-interface LogoutButtonProps {
-  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link"
-  size?: "default" | "sm" | "lg" | "icon"
-  className?: string
-}
-
-export function LogoutButton({ variant = "outline", size = "default", className }: LogoutButtonProps) {
-  const { signOut } = useAuth()
-
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-    } catch (error) {
-      console.error("Error signing out:", error)
-    }
-  }
-
+export function LogoutButton() {
   return (
-    <Button variant={variant} size={size} onClick={handleSignOut} className={className}>
-      <LogOut className="h-4 w-4 mr-2" />
-      Sign Out
-    </Button>
+    <form action={signout}>
+      <button type="submit" className="text-sm text-gray-700 hover:text-gray-900">
+        Sign out
+      </button>
+    </form>
   )
 }
