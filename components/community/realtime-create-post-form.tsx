@@ -2,232 +2,255 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { useAuth } from "@/contexts/auth-context"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { ImageIcon, VideoIcon, FileIcon, Send } from "lucide-react"
-import { publishEvent, ABLY_CHANNELS } from "@/lib/ably"
-import { cn } from "@/lib/utils"
-import { toast } from "sonner"
+import { UserTierBadge } from "@/components/user-tier-badge"
+import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/contexts/auth-context"
+import { useAbly } from "@/contexts/ably-context"
+import { useRouter } from "next/navigation"
+import { Send, Hash, Wifi, WifiOff } from "lucide-react"
 
-interface Category {
-  id: number
-  name: string
-  slug: string
-  color?: string
-  icon?: string
+interface CreatePostFormProps {
+  onPostCreated?: (post: any) => void
 }
 
-interface RealtimeCreatePostFormProps {
-  categories: Category[]
-}
-
-export function RealtimeCreatePostForm({ categories }: RealtimeCreatePostFormProps) {
-  const { profile, isAuthenticated } = useAuth()
+export function RealtimeCreatePostForm({ onPostCreated }: CreatePostFormProps) {
   const [content, setContent] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState<string>("")
-  const [mediaFile, setMediaFile] = useState<File | null>(null)
+  const [categoryId, setCategoryId] = useState("")
+  const [categories, setCategories] = useState<any[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const { user, profile } = useAuth()
+  const { toast } = useToast()
+  const router = useRouter()
+  const { isConnected } = useAbly()
 
-  const getTierColor = (tier: string) => {
-    switch (tier?.toLowerCase()) {
-      case "blood":
-        return "bg-red-500 text-white"
-      case "elder":
-        return "bg-purple-500 text-white"
-      case "pioneer":
-        return "bg-blue-500 text-white"
-      case "grassroot":
-        return "bg-green-500 text-white"
-      default:
-        return "bg-gray-500 text-white"
-    }
-  }
+  useEffect(() => {
+    fetchCategories()
+  }, [])
 
-  const handleMediaSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      // Check file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error("File size must be less than 10MB")
-        return
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch("/api/community/categories")
+      const data = await response.json()
+
+      if (data.success) {
+        setCategories(data.categories)
+      } else {
+        throw new Error(data.error || "Failed to fetch categories")
       }
-      setMediaFile(file)
+    } catch (error) {
+      console.error("Error fetching categories:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load categories.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!isAuthenticated || !profile) {
-      toast.error("Please sign in to create a post")
+    if (!user) {
+      toast({
+        title: "Login Required",
+        description: "Please login to create a post.",
+        variant: "destructive",
+      })
       return
     }
 
-    if (!content.trim() && !mediaFile) {
-      toast.error("Please add some content or upload media")
-      return
-    }
-
-    if (!selectedCategory) {
-      toast.error("Please select a category")
+    if (!content.trim() || !categoryId) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      })
       return
     }
 
     setIsSubmitting(true)
 
     try {
-      const formData = new FormData()
-      formData.append("content", content)
-      formData.append("categoryId", selectedCategory)
-      if (mediaFile) {
-        formData.append("mediaFile", mediaFile)
-      }
+      // Extract hashtags from content
+      const hashtags = content.match(/#\w+/g)?.map((tag) => tag.slice(1)) || []
 
       const response = await fetch("/api/community/posts", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content: content.trim(),
+          categoryId,
+          hashtags,
+        }),
       })
 
-      const result = await response.json()
+      const data = await response.json()
 
-      if (result.success) {
-        // Publish real-time event
-        await publishEvent(ABLY_CHANNELS.COMMUNITY_FEED, "post:created", {
-          post: result.post,
-          categoryId: selectedCategory,
+      if (data.success) {
+        toast({
+          title: "Post Created! 🎉",
+          description: isConnected
+            ? "Your post has been shared with the community in real-time."
+            : "Your post has been shared with the community.",
         })
 
         // Reset form
         setContent("")
-        setSelectedCategory("")
-        setMediaFile(null)
+        setCategoryId("")
 
-        toast.success("Post created successfully!")
+        // Call callback if provided
+        if (onPostCreated) {
+          onPostCreated(data.post)
+        }
+
+        // Refresh page to show new post (fallback for non-real-time)
+        if (!isConnected) {
+          router.refresh()
+        }
       } else {
-        toast.error(result.error || "Failed to create post")
+        throw new Error(data.error || "Failed to create post")
       }
     } catch (error) {
-      console.error("Create post error:", error)
-      toast.error("Failed to create post")
+      console.error("Error creating post:", error)
+      toast({
+        title: "Failed to Create Post",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  if (!isAuthenticated) {
+  if (!user) {
     return (
-      <Card>
+      <Card className="shadow-lg border-0 bg-white dark:bg-gray-800">
         <CardContent className="p-6 text-center">
-          <h3 className="text-lg font-semibold mb-2">Join the Community</h3>
-          <p className="text-muted-foreground mb-4">Sign in to create posts and engage with other fans.</p>
-          <Button asChild>
-            <a href="/login">Sign In</a>
-          </Button>
+          <p className="text-gray-500">Please login to create a post.</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (loading) {
+    return (
+      <Card className="shadow-lg border-0 bg-white dark:bg-gray-800">
+        <CardContent className="p-6">
+          <div className="animate-pulse space-y-4">
+            <div className="flex items-center space-x-4">
+              <div className="rounded-full bg-gray-300 h-12 w-12"></div>
+              <div className="space-y-2">
+                <div className="h-4 bg-gray-300 rounded w-24"></div>
+                <div className="h-3 bg-gray-300 rounded w-16"></div>
+              </div>
+            </div>
+            <div className="h-32 bg-gray-300 rounded"></div>
+            <div className="h-10 bg-gray-300 rounded w-48"></div>
+          </div>
         </CardContent>
       </Card>
     )
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-3">
-          <Avatar className="h-10 w-10">
-            <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} />
-            <AvatarFallback>{profile.username.charAt(0).toUpperCase()}</AvatarFallback>
-          </Avatar>
-          <div>
-            <span className="text-lg">What's on your mind?</span>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge className={cn("text-xs", getTierColor(profile.tier))}>{profile.tier}</Badge>
+    <Card className="shadow-lg border-0 bg-white dark:bg-gray-800">
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Avatar className="h-12 w-12">
+              <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} alt={profile?.username} />
+              <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold">
+                {profile?.username?.charAt(0).toUpperCase() || "U"}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">{profile?.full_name || profile?.username}</span>
+                <UserTierBadge tier={profile?.tier} size="sm" />
+              </div>
+              <p className="text-sm text-gray-500">@{profile?.username}</p>
             </div>
           </div>
-        </CardTitle>
+
+          {/* Real-time indicator */}
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            {isConnected ? (
+              <>
+                <Wifi className="h-4 w-4 text-green-500" />
+                <span className="text-green-600">Live</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="h-4 w-4 text-red-500" />
+                <span className="text-red-600">Offline</span>
+              </>
+            )}
+          </div>
+        </div>
       </CardHeader>
 
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Share your thoughts with the community..."
-            className="min-h-[120px] resize-none"
-            disabled={isSubmitting}
-          />
-
-          {mediaFile && (
-            <div className="p-3 bg-muted rounded-lg flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {mediaFile.type.startsWith("image/") && <ImageIcon className="h-4 w-4" />}
-                {mediaFile.type.startsWith("video/") && <VideoIcon className="h-4 w-4" />}
-                {!mediaFile.type.startsWith("image/") && !mediaFile.type.startsWith("video/") && (
-                  <FileIcon className="h-4 w-4" />
-                )}
-                <span className="text-sm">{mediaFile.name}</span>
+          <div>
+            <Textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="What's on your mind? Share your thoughts with the community... Use #hashtags and @mentions!"
+              className="min-h-[120px] resize-none border-0 bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500"
+              maxLength={2000}
+              required
+            />
+            <div className="flex justify-between items-center mt-2 text-sm text-gray-500">
+              <div className="flex items-center gap-4">
+                <span className="flex items-center gap-1">
+                  <Hash className="h-4 w-4" />
+                  Use hashtags
+                </span>
+                {isConnected && <span className="text-green-600 text-xs">✨ Real-time updates enabled</span>}
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setMediaFile(null)}
-                disabled={isSubmitting}
-              >
-                Remove
-              </Button>
+              <span>{content.length}/2000</span>
             </div>
-          )}
+          </div>
 
-          <div className="flex items-center gap-4">
-            <Select value={selectedCategory} onValueChange={setSelectedCategory} disabled={isSubmitting}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select category" />
+          <div className="flex items-center justify-between gap-4">
+            <Select value={categoryId} onValueChange={setCategoryId} required>
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
                 {categories.map((category) => (
                   <SelectItem key={category.id} value={category.id.toString()}>
-                    {category.name}
+                    <div className="flex items-center gap-2">
+                      <span>{category.icon}</span>
+                      <span>{category.name}</span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <div className="flex items-center gap-2">
-              <input
-                type="file"
-                accept="image/*,video/*,audio/*"
-                onChange={handleMediaSelect}
-                className="hidden"
-                id="media-upload"
-                disabled={isSubmitting}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => document.getElementById("media-upload")?.click()}
-                disabled={isSubmitting}
-              >
-                <ImageIcon className="h-4 w-4 mr-2" />
-                Media
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button type="submit" disabled={isSubmitting || (!content.trim() && !mediaFile) || !selectedCategory}>
+            <Button type="submit" disabled={isSubmitting || !content.trim() || !categoryId} className="px-8">
               {isSubmitting ? (
-                "Posting..."
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Posting...
+                </div>
               ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Post
-                </>
+                <div className="flex items-center gap-2">
+                  <Send className="h-4 w-4" />
+                  Share Post
+                </div>
               )}
             </Button>
           </div>

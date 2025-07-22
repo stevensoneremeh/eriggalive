@@ -1,5 +1,6 @@
 import Ably from "ably"
 
+// Ably client instance
 let ablyClient: Ably.Realtime | null = null
 
 export function getAblyClient(): Ably.Realtime {
@@ -7,17 +8,17 @@ export function getAblyClient(): Ably.Realtime {
     const apiKey = process.env.NEXT_PUBLIC_ABLY_API_KEY
 
     if (!apiKey) {
-      console.warn("NEXT_PUBLIC_ABLY_API_KEY is not configured. Real-time features will be disabled.")
-      throw new Error("Ably API key not configured")
+      throw new Error("NEXT_PUBLIC_ABLY_API_KEY is not configured")
     }
 
     ablyClient = new Ably.Realtime({
       key: apiKey,
-      clientId: typeof window !== "undefined" ? `user-${Math.random().toString(36).substr(2, 9)}` : undefined,
+      clientId: `user-${Math.random().toString(36).substr(2, 9)}`,
       autoConnect: true,
       recover: true,
     })
 
+    // Handle connection state changes
     ablyClient.connection.on("connected", () => {
       console.log("Ably: Connected to real-time service")
     })
@@ -34,14 +35,15 @@ export function getAblyClient(): Ably.Realtime {
   return ablyClient
 }
 
+// Channel names
 export const ABLY_CHANNELS = {
   COMMUNITY_FEED: "community:feed",
   POST_VOTES: (postId: number) => `post:${postId}:votes`,
   POST_COMMENTS: (postId: number) => `post:${postId}:comments`,
-  TIER_CHAT: (tier: string) => `chat:tier:${tier.toLowerCase()}`,
   USER_NOTIFICATIONS: (userId: string) => `user:${userId}:notifications`,
 }
 
+// Publish event helper
 export async function publishEvent(channelName: string, eventName: string, data: any) {
   try {
     const client = getAblyClient()
@@ -49,9 +51,11 @@ export async function publishEvent(channelName: string, eventName: string, data:
     await channel.publish(eventName, data)
   } catch (error) {
     console.error("Failed to publish event:", error)
+    throw error
   }
 }
 
+// Subscribe to channel helper
 export function subscribeToChannel(
   channelName: string,
   eventName: string,
@@ -63,15 +67,18 @@ export function subscribeToChannel(
 
     channel.subscribe(eventName, callback)
 
+    // Return unsubscribe function
     return () => {
       channel.unsubscribe(eventName, callback)
     }
   } catch (error) {
     console.error("Failed to subscribe to channel:", error)
+    // Return no-op function if subscription fails
     return () => {}
   }
 }
 
+// Cleanup function
 export function cleanupAbly() {
   if (ablyClient) {
     ablyClient.close()

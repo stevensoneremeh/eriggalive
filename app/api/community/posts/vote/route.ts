@@ -1,116 +1,93 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { publishEvent, ABLY_CHANNELS } from "@/lib/ably"
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-
-    // Get current user
     const {
-      data: { user: authUser },
+      data: { user },
       error: authError,
     } = await supabase.auth.getUser()
 
-    if (authError || !authUser) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get user profile
-    const { data: voterProfile, error: profileError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("auth_user_id", authUser.id)
-      .single()
+    const body = await request.json()
+    const { postId, voteType } = body
 
-    if (profileError || !voterProfile) {
-      return NextResponse.json({ error: "User profile not found" }, { status: 404 })
+    if (!postId || !["up", "down"].includes(voteType)) {
+      return NextResponse.json({ error: "Invalid vote data" }, { status: 400 })
     }
 
-    const { postId, postCreatorAuthId } = await request.json()
-
-    if (!postId) {
-      return NextResponse.json({ error: "Post ID is required" }, { status: 400 })
-    }
-
-    // Check if trying to vote on own post
-    const { data: postData } = await supabase.from("community_posts").select("user_id").eq("id", postId).single()
-
-    if (postData && postData.user_id === voterProfile.id) {
-      return NextResponse.json(
-        {
-          error: "You cannot vote on your own post",
-          code: "SELF_VOTE",
-        },
-        { status: 400 },
-      )
-    }
-
-    // Check if already voted
+    // Check if user already voted
     const { data: existingVote } = await supabase
       .from("community_post_votes")
       .select("*")
       .eq("post_id", postId)
-      .eq("user_id", voterProfile.id)
+      .eq("user_id", user.id)
       .single()
 
+    let voted = false
+    let voteCount = 0
+
     if (existingVote) {
-      // Remove vote
-      const { error: deleteError } = await supabase
-        .from("community_post_votes")
-        .delete()
-        .eq("post_id", postId)
-        .eq("user_id", voterProfile.id)
-
-      if (deleteError) {
-        console.error("Vote delete error:", deleteError)
-        return NextResponse.json({ error: deleteError.message }, { status: 500 })
+      if (existingVote.vote_type === voteType) {
+        // Remove vote if same type
+        await supabase.from("community_post_votes").delete().eq("post_id", postId).eq("user_id", user.id)
+        voted = false
+      } else {
+        // Update vote type
+        await supabase
+          .from("community_post_votes")
+          .update({ vote_type: voteType })
+          .eq("post_id", postId)
+          .eq("user_id", user.id)
+        voted = true
       }
-
-      // Update post vote count
-      const { error: updateError } = await supabase
-        .from("community_posts")
-        .update({ vote_count: supabase.sql`vote_count - 1` })
-        .eq("id", postId)
-
-      if (updateError) {
-        console.error("Vote count update error:", updateError)
-      }
-
-      return NextResponse.json({
-        success: true,
-        voted: false,
-        message: "Vote removed successfully",
-      })
     } else {
-      // Add vote
-      const { error: insertError } = await supabase.from("community_post_votes").insert({
+      // Create new vote
+      await supabase.from("community_post_votes").insert({
         post_id: postId,
-        user_id: voterProfile.id,
+        user_id: user.id,
+        vote_type: voteType,
       })
-
-      if (insertError) {
-        console.error("Vote insert error:", insertError)
-        return NextResponse.json({ error: insertError.message }, { status: 500 })
-      }
-
-      // Update post vote count
-      const { error: updateError } = await supabase
-        .from("community_posts")
-        .update({ vote_count: supabase.sql`vote_count + 1` })
-        .eq("id", postId)
-
-      if (updateError) {
-        console.error("Vote count update error:", updateError)
-      }
-
-      return NextResponse.json({
-        success: true,
-        voted: true,
-        message: "Voted successfully!",
-      })
+      voted = true
     }
+
+    // Get updated vote count
+    const { data: voteCountData } = await supabase
+      .from("community_post_votes")
+      .select("vote_type")
+      .eq("post_id", postId)
+
+    if (voteCountData) {
+      const upVotes = voteCountData.filter((v) => v.vote_type === "up").length
+      const downVotes = voteCountData.filter((v) => v.vote_type === "down").length
+      voteCount = upVotes - downVotes
+    }
+
+    // Publish real-time event for vote update
+    try {
+      publishEvent(ABLY_CHANNELS.POST_VOTES(postId), "post:voted", {
+        postId,
+        voteCount,
+        voted,
+        userId: Number.parseInt(user.id),
+      })
+    } catch (ablyError) {
+      console.error("Failed to publish vote event:", ablyError)
+      // Don't fail the request if real-time publishing fails
+    }
+
+    return NextResponse.json({
+      success: true,
+      voted,
+      voteCount,
+    })
   } catch (error) {
-    console.error("Vote API error:", error)
+    console.error("Error in vote API:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

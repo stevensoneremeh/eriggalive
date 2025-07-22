@@ -51,19 +51,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               username: authUser.user.user_metadata?.username || authUser.user.email?.split("@")[0] || "user",
               full_name: authUser.user.user_metadata?.full_name || authUser.user.email || "",
               tier: "grassroot" as const,
-              coins: 100,
+              coins_balance: 100,
               level: 1,
               points: 0,
               is_active: true,
               is_verified: false,
               is_banned: false,
-              role: "user" as const,
-              login_count: 1,
-              email_verified: !!authUser.user.email_confirmed_at,
-              phone_verified: false,
-              two_factor_enabled: false,
-              preferences: {},
-              metadata: {},
             }
 
             const { data: createdProfile, error: createError } = await supabase

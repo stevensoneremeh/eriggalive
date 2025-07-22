@@ -1,13 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
-interface RouteParams {
-  params: {
-    id: string
-  }
-}
-
-export async function POST(request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const supabase = await createClient()
     const postId = Number.parseInt(params.id)
@@ -91,7 +85,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const supabase = await createClient()
     const postId = Number.parseInt(params.id)
