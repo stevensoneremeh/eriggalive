@@ -15,7 +15,7 @@ export async function login(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword(data)
 
   if (error) {
-    redirect("/error")
+    redirect("/login?error=Could not authenticate user")
   }
 
   revalidatePath("/", "layout")
@@ -25,15 +25,33 @@ export async function login(formData: FormData) {
 export async function signup(formData: FormData) {
   const supabase = await createClient()
 
-  const data = {
-    email: formData.get("email") as string,
-    password: formData.get("password") as string,
+  const email = formData.get("email") as string
+  const password = formData.get("password") as string
+  const username = formData.get("username") as string
+  const fullName = formData.get("fullName") as string
+
+  // Sign up the user
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    email,
+    password,
+  })
+
+  if (authError) {
+    redirect("/signup?error=Could not create user")
   }
 
-  const { error } = await supabase.auth.signUp(data)
+  // Create user profile
+  if (authData.user) {
+    const { error: profileError } = await supabase.from("users").insert({
+      auth_user_id: authData.user.id,
+      username,
+      full_name: fullName,
+      email,
+    })
 
-  if (error) {
-    redirect("/error")
+    if (profileError) {
+      console.error("Profile creation error:", profileError)
+    }
   }
 
   revalidatePath("/", "layout")
@@ -50,5 +68,5 @@ export async function signout() {
   }
 
   revalidatePath("/", "layout")
-  redirect("/login")
+  redirect("/")
 }
