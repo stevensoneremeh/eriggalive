@@ -2,10 +2,10 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-import { Realtime } from "ably"
+import Ably from "ably"
 
 interface AblyContextType {
-  ably: Realtime | null
+  ably: Ably.Realtime | null
   isConnected: boolean
 }
 
@@ -23,7 +23,7 @@ export const useAbly = () => {
 }
 
 export function AblyProvider({ children }: { children: React.ReactNode }) {
-  const [ably, setAbly] = useState<Realtime | null>(null)
+  const [ably, setAbly] = useState<Ably.Realtime | null>(null)
   const [isConnected, setIsConnected] = useState(false)
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export function AblyProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    const ablyInstance = new Realtime({
+    const ablyInstance = new Ably.Realtime({
       key: ablyKey,
       clientId: `user-${Math.random().toString(36).substr(2, 9)}`,
     })
