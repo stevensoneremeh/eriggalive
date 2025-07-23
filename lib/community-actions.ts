@@ -3,13 +3,39 @@
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import DOMPurify from "isomorphic-dompurify"
-import type { User as PublicUser, CommunityComment, ReportReason, ReportTargetType } from "@/types/database"
+import type { Database } from "@/types/database"
 
-const VOTE_COIN_AMOUNT = 100
+type User = Database["public"]["Tables"]["users"]["Row"]
+
+async function getCurrentUser() {
+  const supabase = await createClient()
+  
+  const {
+    data: { user: authUser },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !authUser) {
+    return null
+  }
+
+  const { data: userProfile, error: profileError } = await supabase
+    .from("users")
+    .select("*")
+    .eq("auth_user_id", authUser.id)
+    .single()
+
+  if (profileError) {
+    console.error("Error fetching user profile:", profileError)
+    return null
+  }
+
+  return userProfile
+}
 
 async function getCurrentPublicUserProfile(
   supabaseClient: ReturnType<typeof createClient>,
-): Promise<PublicUser | null> {
+): Promise<User | null> {
   try {
     const {
       data: { user: authUser },
@@ -40,20 +66,6 @@ async function getCurrentPublicUserProfile(
           full_name: authUser.user_metadata?.full_name || authUser.email || "",
           email: authUser.email || "",
           avatar_url: authUser.user_metadata?.avatar_url,
-          tier: "grassroot",
-          role: "user",
-          coins: 100,
-          level: 1,
-          points: 0,
-          is_verified: false,
-          is_active: true,
-          is_banned: false,
-          login_count: 0,
-          email_verified: authUser.email_confirmed_at ? true : false,
-          phone_verified: false,
-          two_factor_enabled: false,
-          preferences: {},
-          metadata: {},
         })
         .select()
         .single()
@@ -77,26 +89,10 @@ async function getCurrentPublicUserProfile(
 export async function createCommunityPost(formData: FormData) {
   try {
     const supabase = await createClient()
+    const user = await getCurrentUser()
 
-    // Get current user safely
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
+    if (!user) {
       return { success: false, error: "Authentication required" }
-    }
-
-    // Get user profile safely
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("id")
-      .eq("auth_user_id", user.id)
-      .single()
-
-    if (profileError || !userProfile) {
-      return { success: false, error: "User profile not found" }
     }
 
     const content = formData.get("content") as string
@@ -111,19 +107,6 @@ export async function createCommunityPost(formData: FormData) {
       return { success: false, error: "Please select a category." }
     }
 
-    // Validate content for URLs and inappropriate content
-    const urlPatterns = [
-      /https?:\/\/[^\s]+/gi,
-      /www\.[^\s]+/gi,
-      /[^\s]+\.(com|net|org|edu|gov|mil|int|co\.uk|io|app|dev)[^\s]*/gi,
-    ]
-
-    for (const pattern of urlPatterns) {
-      if (pattern.test(content)) {
-        return { success: false, error: "URLs are not allowed in posts for security reasons." }
-      }
-    }
-
     const sanitizedContent = DOMPurify.sanitize(content)
 
     let media_url: string | undefined = undefined
@@ -131,32 +114,8 @@ export async function createCommunityPost(formData: FormData) {
     let media_metadata: Record<string, any> | undefined = undefined
 
     if (mediaFile && mediaFile.size > 0) {
-      // Validate file size (50MB max)
-      if (mediaFile.size > 50 * 1024 * 1024) {
-        return { success: false, error: "File size must be less than 50MB" }
-      }
-
-      // Validate file type
-      const allowedTypes = [
-        "image/jpeg",
-        "image/png",
-        "image/gif",
-        "image/webp",
-        "video/mp4",
-        "video/webm",
-        "video/ogg",
-        "audio/mp3",
-        "audio/wav",
-        "audio/ogg",
-        "audio/mpeg",
-      ]
-
-      if (!allowedTypes.includes(mediaFile.type)) {
-        return { success: false, error: "Unsupported file type. Please use images, videos, or audio files." }
-      }
-
       const fileExt = mediaFile.name.split(".").pop()
-      const fileName = `${userProfile.id}-${Date.now()}.${fileExt}`
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`
       const filePath = `community_media/${fileName}`
 
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -182,30 +141,23 @@ export async function createCommunityPost(formData: FormData) {
       }
     }
 
-    const postData = {
-      user_id: userProfile.id,
-      category_id: Number.parseInt(categoryId),
-      content: sanitizedContent,
-      media_url,
-      media_type,
-      media_metadata,
-      is_published: true,
-      is_deleted: false,
-      vote_count: 0,
-      comment_count: 0,
-      is_pinned: false,
-      is_locked: false,
-      is_edited: false,
-      tags: [],
-      mentions: null,
-    }
-
     const { data: newPost, error } = await supabase
       .from("community_posts")
-      .insert(postData)
+      .insert({
+        user_id: user.id,
+        category_id: Number.parseInt(categoryId),
+        content: sanitizedContent,
+        media_url,
+        media_type,
+        media_metadata,
+        is_published: true,
+        is_deleted: false,
+        vote_count: 0,
+        comment_count: 0,
+      })
       .select(`
         *,
-        user:users!community_posts_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
+        user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
         category:community_categories!community_posts_category_id_fkey(id, name, slug)
       `)
       .single()
@@ -238,19 +190,6 @@ export async function editPostAction(postId: number, formData: FormData) {
       return { success: false, error: "Content cannot be empty." }
     }
 
-    // Validate content for URLs
-    const urlPatterns = [
-      /https?:\/\/[^\s]+/gi,
-      /www\.[^\s]+/gi,
-      /[^\s]+\.(com|net|org|edu|gov|mil|int|co\.uk|io|app|dev)[^\s]*/gi,
-    ]
-
-    for (const pattern of urlPatterns) {
-      if (pattern.test(rawContent)) {
-        return { success: false, error: "URLs are not allowed in posts for security reasons." }
-      }
-    }
-
     const sanitizedContent = DOMPurify.sanitize(rawContent)
 
     const { data: existingPost, error: fetchError } = await supabase
@@ -278,7 +217,7 @@ export async function editPostAction(postId: number, formData: FormData) {
       .eq("user_id", userProfile.id)
       .select(`
         *,
-        user:users!community_posts_user_id_fkey(id, auth_user_id, username, full_name, avatar_url, tier),
+        user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
         category:community_categories!community_posts_category_id_fkey(id, name, slug)
       `)
       .single()
@@ -367,95 +306,46 @@ export async function voteOnPostAction(postId: number, postCreatorAuthId: string
       }
     }
 
-    // Check if user has enough coins
-    if (voterProfile.coins < VOTE_COIN_AMOUNT) {
+    const VOTE_COIN_AMOUNT = 100
+
+    // Call the RPC function
+    const { data, error } = await supabase.rpc("handle_post_vote", {
+      p_post_id: postId,
+      p_voter_auth_id: voterProfile.auth_user_id,
+      p_post_creator_auth_id: postCreatorAuthId,
+      p_coin_amount: VOTE_COIN_AMOUNT,
+    })
+
+    if (error) {
+      console.error("Vote error:", error)
+      if (error.message.includes("Insufficient coins")) {
+        return {
+          success: false,
+          error: "Not enough Erigga Coins to vote.",
+          code: "INSUFFICIENT_FUNDS",
+        }
+      }
+      if (error.message.includes("Cannot vote on own post")) {
+        return {
+          success: false,
+          error: "You cannot vote on your own post.",
+          code: "SELF_VOTE",
+        }
+      }
       return {
         success: false,
-        error: "Not enough Erigga Coins to vote.",
-        code: "INSUFFICIENT_FUNDS",
+        error: `Voting failed: ${error.message}`,
+        code: "VOTE_FAILED",
       }
     }
 
-    // Call the RPC function or handle manually
-    try {
-      const { data, error } = await supabase.rpc("handle_post_vote", {
-        p_post_id: postId,
-        p_voter_auth_id: voterProfile.auth_user_id,
-        p_post_creator_auth_id: postCreatorAuthId,
-        p_coin_amount: VOTE_COIN_AMOUNT,
-      })
-
-      if (error) {
-        throw error
-      }
-
-      revalidatePath("/community")
-      return {
-        success: true,
-        voted: data,
-        message: data
-          ? `Voted successfully! ${VOTE_COIN_AMOUNT} coins transferred.`
-          : `Vote removed! ${VOTE_COIN_AMOUNT} coins refunded.`,
-      }
-    } catch (rpcError) {
-      // Fallback to manual handling if RPC doesn't exist
-      console.log("RPC not available, handling vote manually")
-
-      // Add vote
-      const { error: voteError } = await supabase.from("community_post_votes").insert({
-        post_id: postId,
-        user_id: voterProfile.id,
-      })
-
-      if (voteError) {
-        console.error("Vote insert error:", voteError)
-        return {
-          success: false,
-          error: `Voting failed: ${voteError.message}`,
-          code: "VOTE_FAILED",
-        }
-      }
-
-      // Update post vote count
-      const { error: updateError } = await supabase
-        .from("community_posts")
-        .update({ vote_count: supabase.raw("vote_count + 1") })
-        .eq("id", postId)
-
-      if (updateError) {
-        console.error("Vote count update error:", updateError)
-      }
-
-      // Deduct coins from voter
-      const { error: coinError } = await supabase
-        .from("users")
-        .update({ coins: supabase.raw(`coins - ${VOTE_COIN_AMOUNT}`) })
-        .eq("id", voterProfile.id)
-
-      if (coinError) {
-        console.error("Coin deduction error:", coinError)
-      }
-
-      // Add coins to post creator
-      const { data: creatorData } = await supabase
-        .from("users")
-        .select("id")
-        .eq("auth_user_id", postCreatorAuthId)
-        .single()
-
-      if (creatorData) {
-        await supabase
-          .from("users")
-          .update({ coins: supabase.raw(`coins + ${VOTE_COIN_AMOUNT}`) })
-          .eq("id", creatorData.id)
-      }
-
-      revalidatePath("/community")
-      return {
-        success: true,
-        voted: true,
-        message: `Voted successfully! ${VOTE_COIN_AMOUNT} coins transferred.`,
-      }
+    revalidatePath("/community")
+    return {
+      success: true,
+      voted: data,
+      message: data
+        ? `Voted successfully! ${VOTE_COIN_AMOUNT} coins transferred.`
+        : `Vote removed! ${VOTE_COIN_AMOUNT} coins refunded.`,
     }
   } catch (error: any) {
     console.error("Vote action error:", error)
@@ -477,19 +367,6 @@ export async function createCommentAction(postId: number, content: string, paren
       return { success: false, error: "Comment cannot be empty." }
     }
 
-    // Validate content for URLs
-    const urlPatterns = [
-      /https?:\/\/[^\s]+/gi,
-      /www\.[^\s]+/gi,
-      /[^\s]+\.(com|net|org|edu|gov|mil|int|co\.uk|io|app|dev)[^\s]*/gi,
-    ]
-
-    for (const pattern of urlPatterns) {
-      if (pattern.test(content)) {
-        return { success: false, error: "URLs are not allowed in comments for security reasons." }
-      }
-    }
-
     const sanitizedContent = DOMPurify.sanitize(content)
 
     const { data: newComment, error } = await supabase
@@ -498,12 +375,7 @@ export async function createCommentAction(postId: number, content: string, paren
         post_id: postId,
         user_id: userProfile.id,
         content: sanitizedContent,
-        parent_id: parentCommentId || null,
-        vote_count: 0,
-        like_count: 0,
-        reply_count: 0,
-        is_edited: false,
-        is_deleted: false,
+        parent_comment_id: parentCommentId || null,
       })
       .select(`
         *,
@@ -515,12 +387,6 @@ export async function createCommentAction(postId: number, content: string, paren
       console.error("Comment creation error:", error)
       return { success: false, error: error.message }
     }
-
-    // Update post comment count
-    await supabase
-      .from("community_posts")
-      .update({ comment_count: supabase.raw("comment_count + 1") })
-      .eq("id", postId)
 
     revalidatePath("/community")
     return { success: true, comment: newComment }
@@ -541,19 +407,6 @@ export async function editCommentAction(commentId: number, content: string) {
 
     if (!content?.trim()) {
       return { success: false, error: "Comment cannot be empty." }
-    }
-
-    // Validate content for URLs
-    const urlPatterns = [
-      /https?:\/\/[^\s]+/gi,
-      /www\.[^\s]+/gi,
-      /[^\s]+\.(com|net|org|edu|gov|mil|int|co\.uk|io|app|dev)[^\s]*/gi,
-    ]
-
-    for (const pattern of urlPatterns) {
-      if (pattern.test(content)) {
-        return { success: false, error: "URLs are not allowed in comments for security reasons." }
-      }
     }
 
     const sanitizedContent = DOMPurify.sanitize(content)
@@ -652,12 +505,6 @@ export async function toggleLikeCommentAction(commentId: number) {
         return { success: false, error: deleteError.message, liked: true }
       }
 
-      // Update comment like count
-      await supabase
-        .from("community_comments")
-        .update({ like_count: supabase.raw("GREATEST(like_count - 1, 0)") })
-        .eq("id", commentId)
-
       revalidatePath("/community")
       return { success: true, liked: false }
     } else {
@@ -671,12 +518,6 @@ export async function toggleLikeCommentAction(commentId: number) {
         return { success: false, error: insertError.message, liked: false }
       }
 
-      // Update comment like count
-      await supabase
-        .from("community_comments")
-        .update({ like_count: supabase.raw("like_count + 1") })
-        .eq("id", commentId)
-
       revalidatePath("/community")
       return { success: true, liked: true }
     }
@@ -689,8 +530,8 @@ export async function toggleLikeCommentAction(commentId: number) {
 // --- Report Actions ---
 export async function createReportAction(
   targetId: number,
-  targetType: ReportTargetType,
-  reason: ReportReason,
+  targetType: string,
+  reason: string,
   additionalNotes = "",
 ) {
   try {
@@ -711,7 +552,6 @@ export async function createReportAction(
       target_type: targetType,
       reason,
       additional_notes: additionalNotes || null,
-      is_resolved: false,
     })
 
     if (error) {
@@ -719,6 +559,7 @@ export async function createReportAction(
       return { success: false, error: error.message }
     }
 
+    // We don't need to revalidate a specific path, but you can do so if you show reports somewhere
     return { success: true }
   } catch (error: any) {
     console.error("Create report action error:", error)
@@ -822,7 +663,7 @@ export async function fetchCommentsForPost(postId: number, loggedInUserId?: stri
       `)
       .eq("post_id", postId)
       .eq("is_deleted", false)
-      .is("parent_id", null)
+      .is("parent_comment_id", null)
       .order("created_at", { ascending: true })
 
     if (error) {
@@ -840,7 +681,7 @@ export async function fetchCommentsForPost(postId: number, loggedInUserId?: stri
             likes:community_comment_likes(user_id)
           `)
           .eq("post_id", postId)
-          .eq("parent_id", comment.id)
+          .eq("parent_comment_id", comment.id)
           .eq("is_deleted", false)
           .order("created_at", { ascending: true })
 
@@ -863,7 +704,7 @@ export async function fetchCommentsForPost(postId: number, loggedInUserId?: stri
       }),
     )
 
-    return commentsWithReplies as CommunityComment[]
+    return commentsWithReplies as any[]
   } catch (error: any) {
     console.error("Fetch comments error:", error)
     return []
@@ -879,8 +720,6 @@ export async function searchUsersForMention(query: string) {
       .from("users")
       .select("id, username, full_name, avatar_url")
       .or(`username.ilike.%${query}%,full_name.ilike.%${query}%`)
-      .eq("is_active", true)
-      .eq("is_banned", false)
       .limit(5)
 
     if (error) {
@@ -917,8 +756,6 @@ export async function getDummyPosts() {
       is_published: true,
       is_edited: false,
       is_deleted: false,
-      is_pinned: false,
-      is_locked: false,
       deleted_at: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -928,7 +765,7 @@ export async function getDummyPosts() {
         username: "eriggaofficial",
         full_name: "Erigga",
         avatar_url: "/placeholder-user.jpg",
-        tier: "blood_brotherhood" as const,
+        tier: "blood" as const,
       },
       category: {
         id: 1,
@@ -953,8 +790,6 @@ export async function getDummyPosts() {
       is_published: true,
       is_edited: false,
       is_deleted: false,
-      is_pinned: false,
-      is_locked: false,
       deleted_at: null,
       created_at: new Date(Date.now() - 3600000).toISOString(),
       updated_at: new Date(Date.now() - 3600000).toISOString(),
@@ -968,8 +803,8 @@ export async function getDummyPosts() {
       },
       category: {
         id: 2,
-        name: "Music",
-        slug: "music",
+        name: "Bars",
+        slug: "bars",
       },
       has_voted: false,
     },
@@ -988,74 +823,112 @@ export async function fetchCommunityCategories() {
 
     if (error) {
       console.error("Error fetching categories:", error)
-      return [
-        {
-          id: 1,
-          name: "General",
-          slug: "general",
-          description: "General discussions",
-          is_active: true,
-          display_order: 1,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: 2,
-          name: "Music",
-          slug: "music",
-          description: "Music discussions and bars",
-          is_active: true,
-          display_order: 2,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: 3,
-          name: "Events",
-          slug: "events",
-          description: "Upcoming events and shows",
-          is_active: true,
-          display_order: 3,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ]
+      return []
     }
 
     return categories || []
   } catch (error) {
     console.error("Error in fetchCommunityCategories:", error)
-    return [
-      {
-        id: 1,
-        name: "General",
-        slug: "general",
-        description: "General discussions",
-        is_active: true,
-        display_order: 1,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: 2,
-        name: "Music",
-        slug: "music",
-        description: "Music discussions and bars",
-        is_active: true,
-        display_order: 2,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: 3,
-        name: "Events",
-        slug: "events",
-        description: "Upcoming events and shows",
-        is_active: true,
-        display_order: 3,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ]
+    return []
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Aliases for legacy imports
+// ─────────────────────────────────────────────────────────────────────────────
+export { createCommunityPost as createCommunityPostAction }
+
+export async function voteOnPost(postId: number) {
+  try {
+    const supabase = await createClient()
+    const user = await getCurrentUser()
+
+    if (!user) {
+      return { success: false, error: "Authentication required" }
+    }
+
+    // Check if user already voted
+    const { data: existingVote } = await supabase
+      .from("community_post_votes")
+      .select("*")
+      .eq("post_id", postId)
+      .eq("user_id", user.id)
+      .single()
+
+    if (existingVote) {
+      // Remove vote
+      const { error } = await supabase
+        .from("community_post_votes")
+        .delete()
+        .eq("post_id", postId)
+        .eq("user_id", user.id)
+
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      revalidatePath("/community")
+      return { success: true, voted: false }
+    } else {
+      // Add vote
+      const { error } = await supabase
+        .from("community_post_votes")
+        .insert({
+          post_id: postId,
+          user_id: user.id,
+        })
+
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      revalidatePath("/community")
+      return { success: true, voted: true }
+    }
+  } catch (error: any) {
+    console.error("Vote error:", error)
+    return { success: false, error: error.message || "Failed to vote" }
+  }
+}
+
+export async function createComment(postId: number, content: string, parentCommentId?: number) {
+  try {
+    const supabase = await createClient()
+    const user = await getCurrentUser()
+
+    if (!user) {
+      return { success: false, error: "Authentication required" }
+    }
+
+    if (!content?.trim()) {
+      return { success: false, error: "Comment cannot be empty" }
+    }
+
+    const sanitizedContent = DOMPurify.sanitize(content)
+
+    const { data: newComment, error } = await supabase
+      .from("community_comments")
+      .insert({
+        post_id: postId,
+        user_id: user.id,
+        content: sanitizedContent,
+        parent_comment_id: parentCommentId || null,
+      })
+      .select(`
+        *,
+        user:users!community_comments_user_id_fkey(id, username, full_name, avatar_url, tier)
+      `)
+      .single()
+
+    if (error) {
+      console.error("Comment creation error:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/community")
+    return { success: true, comment: newComment }
+  } catch (error: any) {
+    console.error("Create comment error:", error)
+    return { success: false, error: error.message || "Failed to create comment" }
   }
 }

@@ -1,4 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
+import { createServerSupabase } from "@/lib/supabase/server"
 
 // Check if we're in preview/development mode
 const isPreviewMode = () => {
@@ -10,26 +12,34 @@ const isPreviewMode = () => {
   )
 }
 
-// Enhanced user verification with better error handling
-function verifyUser(request: NextRequest) {
+// Enhanced user verification with Supabase
+async function verifyUser(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization")
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return { error: "Missing or invalid authorization header", user: null }
+    const supabase = await createClient()
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { error: "Authentication required", user: null, profile: null }
     }
 
-    // In production, verify JWT token here
-    // For now, return mock user data
-    const mockUser = {
-      id: "user-123",
-      email: "user@example.com",
-      username: "testuser",
-      coins: 15000, // Mock current balance
+    // Get user profile
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("auth_user_id", user.id)
+      .single()
+
+    if (profileError) {
+      return { error: "Profile not found", user: null, profile: null }
     }
 
-    return { user: mockUser, error: null }
+    return { user, profile, error: null }
   } catch (error) {
-    return { error: "Authentication failed", user: null }
+    return { error: "Authentication failed", user: null, profile: null }
   }
 }
 
@@ -97,162 +107,79 @@ async function verifyWithPaystack(reference: string, paystackSecretKey: string) 
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify user authentication
-    const { user, error: authError } = verifyUser(request)
+    const supabase = createServerSupabase()
+    const body = await request.json()
+    const { amount, paymentMethod, transactionId } = body
+
+    // Validate input
+    if (!amount || amount <= 0) {
+      return NextResponse.json({ error: "Invalid amount" }, { status: 400 })
+    }
+
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
     if (authError || !user) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: authError || "Unauthorized",
-          code: "AUTH_ERROR",
-        },
-        { status: 401 },
-      )
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Parse and validate request body
-    let requestData
+    // Get current profile
+    const { data: profile, error: profileError } = await supabase
+      .from("user_profiles")
+      .select("coins_balance")
+      .eq("user_id", user.id)
+      .single()
+
+    if (profileError) {
+      console.error("Profile fetch error:", profileError)
+      return NextResponse.json({ error: "Failed to fetch profile" }, { status: 500 })
+    }
+
+    const currentBalance = profile?.coins_balance || 0
+    const newBalance = currentBalance + amount
+
+    // Update user's coin balance
+    const { error: updateError } = await supabase
+      .from("user_profiles")
+      .update({
+        coins_balance: newBalance,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", user.id)
+
+    if (updateError) {
+      console.error("Balance update error:", updateError)
+      return NextResponse.json({ error: "Failed to update balance" }, { status: 500 })
+    }
+
+    // Record transaction (if you have a transactions table)
     try {
-      requestData = await request.json()
-    } catch (error) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid JSON in request body",
-          code: "INVALID_JSON",
-        },
-        { status: 400 },
-      )
+      await supabase.from("coin_transactions").insert({
+        user_id: user.id,
+        type: "purchase",
+        amount: amount,
+        payment_method: paymentMethod || "unknown",
+        transaction_id: transactionId,
+        status: "completed",
+        created_at: new Date().toISOString(),
+      })
+    } catch (transactionError) {
+      // Don't fail the request if transaction logging fails
+      console.error("Transaction logging error:", transactionError)
     }
-
-    // Validate request data
-    const validationErrors = validatePurchaseRequest(requestData)
-    if (validationErrors.length > 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: validationErrors.join(", "),
-          code: "VALIDATION_ERROR",
-        },
-        { status: 400 },
-      )
-    }
-
-    const { amount, reference, coins } = requestData
-
-    // Verify transaction with Paystack (or mock in preview mode)
-    let paystackData
-    try {
-      if (isPreviewMode()) {
-        console.log("Using mock Paystack verification for preview mode")
-        paystackData = await mockPaystackVerification(reference, amount)
-      } else {
-        const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY
-        if (!paystackSecretKey) {
-          console.error("Paystack secret key not configured")
-          return NextResponse.json(
-            {
-              success: false,
-              error: "Payment gateway configuration error",
-              code: "CONFIG_ERROR",
-            },
-            { status: 500 },
-          )
-        }
-
-        paystackData = await verifyWithPaystack(reference, paystackSecretKey)
-      }
-
-      if (!paystackData.status || paystackData.data.status !== "success") {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Payment verification failed - transaction not successful",
-            code: "PAYMENT_FAILED",
-          },
-          { status: 400 },
-        )
-      }
-
-      // Verify the amount matches our expected amount (in kobo)
-      const expectedAmountKobo = Math.round(amount * 100)
-      const actualAmount = paystackData.data.amount
-
-      if (Math.abs(actualAmount - expectedAmountKobo) > 100) {
-        // Allow 1 NGN tolerance
-        console.error(`Amount mismatch: expected ${expectedAmountKobo}, got ${actualAmount}`)
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Payment amount mismatch",
-            code: "AMOUNT_MISMATCH",
-            details: {
-              expected: expectedAmountKobo,
-              actual: actualAmount,
-            },
-          },
-          { status: 400 },
-        )
-      }
-    } catch (error) {
-      console.error("Payment verification error:", error)
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Payment verification failed - unable to verify with payment gateway",
-          code: "VERIFICATION_ERROR",
-          details: error instanceof Error ? error.message : "Unknown error",
-        },
-        { status: 500 },
-      )
-    }
-
-    // Create transaction record
-    const transaction = {
-      id: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      userId: user.id,
-      type: "purchase",
-      coinAmount: coins,
-      nairaAmount: amount,
-      reference,
-      status: "completed",
-      createdAt: new Date().toISOString(),
-      paymentData: {
-        channel: paystackData.data.channel || "card",
-        paidAt: paystackData.data.paid_at || new Date().toISOString(),
-        currency: paystackData.data.currency || "NGN",
-      },
-      metadata: {
-        paymentMethod: "paystack",
-        exchangeRate: 0.5,
-        isPreviewMode: isPreviewMode(),
-      },
-    }
-
-    // In production, save transaction to database
-    console.log("Transaction completed:", transaction)
-
-    // Calculate new balance (in production, update database)
-    const newBalance = user.coins + coins
 
     return NextResponse.json({
       success: true,
-      transaction,
       newBalance,
-      message: `Successfully purchased ${coins.toLocaleString()} Erigga Coins`,
-      isPreviewMode: isPreviewMode(),
+      amountPurchased: amount,
+      message: `Successfully purchased ${amount} coins`,
     })
   } catch (error) {
-    console.error("Purchase API error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Internal server error",
-        code: "INTERNAL_ERROR",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    )
+    console.error("Coin purchase error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 

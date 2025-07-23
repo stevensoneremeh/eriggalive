@@ -1,377 +1,130 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import {
-  Menu,
-  X,
-  User,
-  LogOut,
-  LogIn,
-  CreditCard,
-  Music,
-  Ticket,
-  ShoppingBag,
-  Home,
-  BookOpen,
-  Users,
-  Crown,
-  LayoutDashboard,
-  Sun,
-  Moon,
-  Monitor,
-} from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
-import { useTheme } from "@/contexts/theme-context"
-import { DynamicLogo } from "@/components/dynamic-logo"
-import { CoinBalance } from "@/components/coin-balance"
-import { UserTierBadge } from "@/components/user-tier-badge"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Home, MessageCircle, User, Bookmark, Settings, LogOut, Music } from "lucide-react"
 
-// Navigation skeleton component
-function NavigationSkeleton() {
-  return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur shadow-md">
-      <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
-          <div className="h-8 w-32 bg-muted animate-pulse rounded" />
-          <div className="hidden lg:flex items-center space-x-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-4 w-16 bg-muted animate-pulse rounded" />
-            ))}
-          </div>
-          <div className="h-8 w-24 bg-muted animate-pulse rounded" />
-        </div>
-      </div>
-    </header>
-  )
+interface NavigationProps {
+  user?: {
+    id: string
+    username: string
+    display_name?: string
+    avatar_url?: string
+  }
 }
 
-// Main navigation content - no useSearchParams here
-function NavigationContent() {
-  const [isScrolled, setIsScrolled] = useState(false)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
+export function Navigation({ user }: NavigationProps) {
   const pathname = usePathname()
-  const { user, profile, signOut, isAuthenticated, isLoading } = useAuth()
-  const { theme, setTheme, resolvedTheme, isLoading: themeLoading } = useTheme()
-
-  // Handle mounting
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Handle scroll effect
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10)
-    }
-    window.addEventListener("scroll", handleScroll)
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
-
-  // Close mobile menu on route change
-  useEffect(() => {
-    setIsMobileMenuOpen(false)
-  }, [pathname])
 
   const navItems = [
-    { name: "Home", href: "/", icon: <Home className="h-5 w-5" /> },
-    { name: "Community", href: "/community", icon: <Users className="h-5 w-5" /> },
-    { name: "Chronicles", href: "/chronicles", icon: <BookOpen className="h-5 w-5" /> },
-    { name: "Media Vault", href: "/vault", icon: <Music className="h-5 w-5" /> },
-    { name: "Dashboard", href: "/dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
-    { name: "Tickets", href: "/tickets", icon: <Ticket className="h-5 w-5" /> },
-    { name: "Premium", href: "/premium", icon: <Crown className="h-5 w-5" /> },
-    { name: "Merch", href: "/merch", icon: <ShoppingBag className="h-5 w-5" /> },
+    { href: "/community", label: "Community", icon: Home },
+    { href: "/chat", label: "Chat", icon: MessageCircle },
   ]
 
-  const isActive = (path: string) => {
-    if (path === "/") {
-      return pathname === "/"
-    }
-    if (path === "/dashboard") {
-      return pathname === "/dashboard" || pathname?.startsWith("/dashboard/")
-    }
-    return pathname?.startsWith(path)
-  }
-
-  // Don't render until mounted to prevent hydration issues
-  if (!mounted || themeLoading) {
-    return <NavigationSkeleton />
-  }
-
   return (
-    <header
-      className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out",
-        isScrolled ? "bg-background/95 backdrop-blur shadow-md" : "bg-background/80 backdrop-blur",
-      )}
-    >
+    <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2 z-10">
-            <DynamicLogo width={120} height={32} />
-          </Link>
+          <div className="flex items-center space-x-8">
+            <Link href="/community" className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2">
+                <Music className="h-6 w-6 text-primary" />
+                <span className="text-xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+                  Erigga Community
+                </span>
+              </div>
+            </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center space-x-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  "px-3 py-2 text-sm font-medium rounded-md transition-all duration-200",
-                  isActive(item.href)
-                    ? "text-primary bg-primary/10 shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent",
-                )}
-              >
-                {item.name}
-              </Link>
-            ))}
-          </nav>
-
-          {/* User Actions */}
-          <div className="flex items-center space-x-2">
-            {/* Theme Toggle - Desktop */}
-            <div className="hidden md:flex items-center space-x-1 mr-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setTheme("light")}
-                className={cn(
-                  "p-2 transition-all duration-200",
-                  theme === "light" && "bg-accent text-accent-foreground",
-                )}
-                title="Light mode"
-              >
-                <Sun className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setTheme("dark")}
-                className={cn(
-                  "p-2 transition-all duration-200",
-                  theme === "dark" && "bg-accent text-accent-foreground",
-                )}
-                title="Dark mode"
-              >
-                <Moon className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setTheme("system")}
-                className={cn(
-                  "p-2 transition-all duration-200",
-                  theme === "system" && "bg-accent text-accent-foreground",
-                )}
-                title="System mode"
-              >
-                <Monitor className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* User Authentication */}
-            {!isLoading && (
-              <>
-                {isAuthenticated && profile ? (
-                  <>
-                    <div className="hidden md:flex items-center space-x-2">
-                      <CoinBalance coins={profile.coins} size="sm" />
-                      <UserTierBadge tier={profile.tier} />
-                    </div>
-                    <Link href="/dashboard">
-                      <Button variant="outline" size="sm" className="hidden md:flex">
-                        <User className="h-4 w-4 mr-2" />
-                        Dashboard
-                      </Button>
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={signOut}
-                      className="text-red-500 hover:text-red-600 hover:bg-red-100/10 hidden md:flex"
-                    >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Logout
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Link href="/login">
-                      <Button variant="outline" size="sm" className="hidden md:flex">
-                        <LogIn className="h-4 w-4 mr-2" />
-                        Login
-                      </Button>
-                    </Link>
-                    <Link href="/signup">
-                      <Button size="sm" className="hidden md:flex bg-primary hover:bg-primary/90">
-                        Sign Up
-                      </Button>
-                    </Link>
-                  </>
-                )}
-              </>
-            )}
-
-            {/* Mobile Menu */}
-            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden">
-                  <Menu className="h-6 w-6" />
-                  <span className="sr-only">Toggle menu</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-80 p-0">
-                <div className="flex flex-col h-full">
-                  {/* Mobile Header */}
-                  <div className="flex items-center justify-between p-4 border-b">
-                    <DynamicLogo width={100} height={28} />
-                    <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)}>
-                      <X className="h-6 w-6" />
-                    </Button>
-                  </div>
-
-                  {/* User Info (Mobile) */}
-                  {isAuthenticated && profile && (
-                    <div className="p-4 border-b">
-                      <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                          <User className="h-6 w-6 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{profile.username || "User"}</p>
-                          <p className="text-xs text-muted-foreground">{profile.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <CoinBalance coins={profile.coins} size="sm" />
-                        <UserTierBadge tier={profile.tier} />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Mobile Navigation */}
-                  <nav className="flex-1 p-4">
-                    <ul className="space-y-2">
-                      {navItems.map((item) => (
-                        <li key={item.name}>
-                          <Link
-                            href={item.href}
-                            className={cn(
-                              "flex items-center px-3 py-3 rounded-md transition-all duration-200",
-                              isActive(item.href)
-                                ? "bg-primary/10 text-primary"
-                                : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                            )}
-                            onClick={() => setIsMobileMenuOpen(false)}
-                          >
-                            <span className="mr-3">{item.icon}</span>
-                            {item.name}
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  </nav>
-
-                  {/* Mobile Theme Toggle */}
-                  <div className="p-4 border-t">
-                    <div className="mb-4">
-                      <p className="text-sm font-medium mb-2">Theme</p>
-                      <div className="grid grid-cols-3 gap-2">
-                        <Button
-                          variant={theme === "light" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTheme("light")}
-                          className="flex flex-col items-center py-3 h-auto"
-                        >
-                          <Sun className="h-4 w-4 mb-1" />
-                          <span className="text-xs">Light</span>
-                        </Button>
-                        <Button
-                          variant={theme === "dark" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTheme("dark")}
-                          className="flex flex-col items-center py-3 h-auto"
-                        >
-                          <Moon className="h-4 w-4 mb-1" />
-                          <span className="text-xs">Dark</span>
-                        </Button>
-                        <Button
-                          variant={theme === "system" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTheme("system")}
-                          className="flex flex-col items-center py-3 h-auto"
-                        >
-                          <Monitor className="h-4 w-4 mb-1" />
-                          <span className="text-xs">Auto</span>
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Mobile Auth Actions */}
-                    {isAuthenticated ? (
-                      <div className="space-y-2">
-                        <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
-                          <Button variant="outline" className="w-full justify-start">
-                            <User className="h-4 w-4 mr-2" />
-                            Dashboard
-                          </Button>
-                        </Link>
-                        <Link href="/coins" onClick={() => setIsMobileMenuOpen(false)}>
-                          <Button variant="outline" className="w-full justify-start">
-                            <CreditCard className="h-4 w-4 mr-2" />
-                            Manage Coins
-                          </Button>
-                        </Link>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-100/10"
-                          onClick={() => {
-                            signOut()
-                            setIsMobileMenuOpen(false)
-                          }}
-                        >
-                          <LogOut className="h-4 w-4 mr-2" />
-                          Logout
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                          <Button variant="outline" className="w-full justify-start">
-                            <LogIn className="h-4 w-4 mr-2" />
-                            Login
-                          </Button>
-                        </Link>
-                        <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)}>
-                          <Button className="w-full justify-start bg-primary hover:bg-primary/90">Sign Up</Button>
-                        </Link>
-                      </div>
+            <div className="hidden md:flex items-center space-x-6">
+              {navItems.map((item) => {
+                const Icon = item.icon
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center space-x-2 text-sm font-medium transition-colors hover:text-primary",
+                      pathname === item.href ? "text-primary" : "text-muted-foreground",
                     )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage
+                        src={user.avatar_url || "/placeholder.svg"}
+                        alt={user.display_name || user.username}
+                      />
+                      <AvatarFallback>{(user.display_name || user.username).charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <div className="flex items-center justify-start gap-2 p-2">
+                    <div className="flex flex-col space-y-1 leading-none">
+                      <p className="font-medium">{user.display_name || user.username}</p>
+                      <p className="w-[200px] truncate text-sm text-muted-foreground">@{user.username}</p>
+                    </div>
                   </div>
-                </div>
-              </SheetContent>
-            </Sheet>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href={`/profile/${user.username}`} className="flex items-center">
+                      <User className="mr-2 h-4 w-4" />
+                      Profile
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/bookmarks" className="flex items-center">
+                      <Bookmark className="mr-2 h-4 w-4" />
+                      Bookmarks
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings" className="flex items-center">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Settings
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-red-600">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Button variant="ghost" asChild>
+                  <Link href="/auth/login">Sign in</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/auth/signup">Join Community</Link>
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>
-    </header>
-  )
-}
-
-// Main Navigation component with Suspense boundary
-export function Navigation() {
-  return (
-    <Suspense fallback={<NavigationSkeleton />}>
-      <NavigationContent />
-    </Suspense>
+    </nav>
   )
 }

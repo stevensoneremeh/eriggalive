@@ -1,131 +1,220 @@
-import { NextRequest, NextResponse } from "next/server"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { revalidatePath } from "next/cache"
+import type { NextRequest } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 
-export async function GET(request: NextRequest) {
+const POST_SELECT = `
+  id,
+  content,
+  "type",
+  media_url,
+  media_type,
+  hashtags,
+  vote_count,
+  comment_count,
+  view_count,
+  created_at,
+  updated_at,
+  user:users!community_posts_user_id_fkey (
+    id,
+    username,
+    full_name,
+    avatar_url,
+    tier
+  ),
+  category:community_categories!community_posts_category_id_fkey (
+    id,
+    name,
+    slug,
+    icon,
+    color
+  )
+`
+
+// Safe response wrapper
+function createResponse(data: any, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-cache",
+    },
+  })
+}
+
+export async function GET(_: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const categoryId = searchParams.get("categoryId")
-    const sortBy = searchParams.get("sortBy") || "newest"
-    const limit = parseInt(searchParams.get("limit") || "20")
+    const supabase = await createClient()
 
-    const supabase = createClientComponentClient()
-
-    let query = supabase
-      .from("community_posts")
-      .select(`
-        *,
-        user:user_profiles!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
-        category:community_categories!community_posts_category_id_fkey(id, name, slug)
-      `)
-      .eq("is_published", true)
-      .eq("is_deleted", false)
-
-    if (categoryId && categoryId !== "all") {
-      query = query.eq("category_id", parseInt(categoryId))
+    // Get auth user safely
+    let authUser = null
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
+      if (!authError && user) {
+        authUser = user
+      }
+    } catch (authErr) {
+      console.warn("Auth check failed (non-critical):", authErr)
     }
 
-    // Apply sorting
-    switch (sortBy) {
-      case "newest":
-        query = query.order("created_at", { ascending: false })
-        break
-      case "oldest":
-        query = query.order("created_at", { ascending: true })
-        break
-      case "top":
-        query = query.order("vote_count", { ascending: false })
-        break
-      default:
-        query = query.order("created_at", { ascending: false })
+    // Fetch posts with error handling
+    let posts = []
+    try {
+      const { data, error } = await supabase
+        .from("community_posts")
+        .select(POST_SELECT)
+        .eq("is_published", true)
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: false })
+        .limit(50)
+
+      if (error) {
+        console.error("Posts fetch error:", error)
+        return createResponse({ error: "Failed to fetch posts", posts: [], count: 0 }, 500)
+      }
+
+      posts = data || []
+    } catch (fetchErr) {
+      console.error("Posts fetch exception:", fetchErr)
+      return createResponse({ error: "Database temporarily unavailable", posts: [], count: 0 }, 503)
     }
 
-    query = query.limit(limit)
+    // Process posts with vote data
+    let postsWithVotes = posts.map((p) => ({
+      ...p,
+      has_voted: false,
+      hashtags: Array.isArray(p.hashtags) ? p.hashtags : [],
+    }))
 
-    const { data: posts, error } = await query
+    // Add vote data if user is authenticated
+    if (authUser && posts.length > 0) {
+      try {
+        const postIds = posts.map((p) => p.id)
+        const { data: votes } = await supabase
+          .from("community_post_votes")
+          .select("post_id")
+          .eq("user_id", authUser.id)
+          .in("post_id", postIds)
 
-    if (error) {
-      console.error("Error fetching posts:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+        if (votes) {
+          const votedIds = new Set(votes.map((v) => v.post_id))
+          postsWithVotes = posts.map((p) => ({
+            ...p,
+            has_voted: votedIds.has(p.id),
+            hashtags: Array.isArray(p.hashtags) ? p.hashtags : [],
+          }))
+        }
+      } catch (voteErr) {
+        console.warn("Vote fetch failed (non-critical):", voteErr)
+        // Continue without vote data
+      }
     }
 
-    return NextResponse.json({ posts: posts || [] })
-  } catch (error: any) {
-    console.error("API Error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return createResponse({
+      success: true,
+      posts: postsWithVotes,
+      count: postsWithVotes.length,
+    })
+  } catch (err) {
+    console.error("Unhandled posts API error:", err)
+    return createResponse({ error: "Internal server error", posts: [], count: 0 }, 500)
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClientComponentClient()
+    const supabase = await createClient()
 
-    // Get authenticated user
-    const {
-      data: { user: authUser },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !authUser) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    // Auth check
+    let authUser = null
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
+      if (authError || !user) {
+        return createResponse({ error: "Authentication required" }, 401)
+      }
+      authUser = user
+    } catch (authErr) {
+      console.error("Auth error:", authErr)
+      return createResponse({ error: "Authentication failed" }, 401)
     }
 
     // Get user profile
-    const { data: userProfile, error: profileError } = await supabase
-      .from("user_profiles")
-      .select("*")
-      .eq("id", authUser.id)
-      .single()
+    let profile = null
+    try {
+      const { data, error: profileError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("auth_user_id", authUser.id)
+        .single()
 
-    if (profileError || !userProfile) {
-      return NextResponse.json({ error: "User profile not found" }, { status: 404 })
+      if (profileError || !data) {
+        return createResponse({ error: "User profile not found" }, 404)
+      }
+      profile = data
+    } catch (profileErr) {
+      console.error("Profile fetch error:", profileErr)
+      return createResponse({ error: "Failed to fetch user profile" }, 500)
     }
 
-    const formData = await request.formData()
-    const content = formData.get("content") as string
-    const categoryId = formData.get("categoryId") as string
+    // Parse request body
+    let body
+    try {
+      body = await request.json()
+    } catch (parseErr) {
+      return createResponse({ error: "Invalid request body" }, 400)
+    }
 
-    if (!content?.trim()) {
-      return NextResponse.json({ error: "Content is required" }, { status: 400 })
+    const { content, categoryId } = body
+
+    if (!content || typeof content !== "string" || content.trim().length === 0) {
+      return createResponse({ error: "Content is required" }, 400)
     }
 
     if (!categoryId) {
-      return NextResponse.json({ error: "Category is required" }, { status: 400 })
+      return createResponse({ error: "Category is required" }, 400)
     }
 
-    // Validate content for URLs
-    const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi
-    if (urlRegex.test(content)) {
-      return NextResponse.json({ error: "Posts cannot contain external links or URLs" }, { status: 400 })
+    // Insert post
+    try {
+      const { data: post, error: insertError } = await supabase
+        .from("community_posts")
+        .insert({
+          user_id: profile.id,
+          category_id: categoryId,
+          content: content.trim(),
+          hashtags: [],
+          is_published: true,
+          is_deleted: false,
+        })
+        .select(POST_SELECT)
+        .single()
+
+      if (insertError) {
+        console.error("Post insert error:", insertError)
+        return createResponse({ error: "Failed to create post" }, 500)
+      }
+
+      if (!post) {
+        return createResponse({ error: "Post created but not returned" }, 500)
+      }
+
+      return createResponse({
+        success: true,
+        post: {
+          ...post,
+          hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
+        },
+      })
+    } catch (insertErr) {
+      console.error("Post insert exception:", insertErr)
+      return createResponse({ error: "Failed to create post" }, 500)
     }
-
-    const postData = {
-      user_id: userProfile.id,
-      category_id: parseInt(categoryId),
-      content: content.trim(),
-      is_published: true,
-      is_deleted: false,
-    }
-
-    const { data: newPost, error: insertError } = await supabase
-      .from("community_posts")
-      .insert(postData)
-      .select(`
-        *,
-        user:user_profiles!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
-        category:community_categories!community_posts_category_id_fkey(id, name, slug)
-      `)
-      .single()
-
-    if (insertError) {
-      console.error("Error creating post:", insertError)
-      return NextResponse.json({ error: insertError.message }, { status: 500 })
-    }
-
-    revalidatePath("/community")
-    return NextResponse.json({ success: true, post: newPost })
-  } catch (error: any) {
-    console.error("API Error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  } catch (err) {
+    console.error("Unhandled POST error:", err)
+    return createResponse({ error: "Internal server error" }, 500)
   }
 }

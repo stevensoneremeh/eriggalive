@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState, useCallback } from "react"
+import { createContext, useContext, useEffect, useState, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { User, Session } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
@@ -13,11 +13,13 @@ interface AuthContextType {
   session: Session | null
   profile: UserProfile | null
   loading: boolean
+  isAuthenticated: boolean
+  isLoading: boolean
   signIn: (email: string, password: string) => Promise<{ error: any }>
   signUp: (
     email: string,
     password: string,
-    userData: { username: string; full_name: string },
+    userData: { username: string; full_name: string; tier?: string },
   ) => Promise<{ error: any }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
@@ -31,45 +33,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [initialized, setInitialized] = useState(false)
+  const supabaseRef = useRef(createClient())
 
-  const supabase = createClient()
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabaseRef.current.from("users").select("*").eq("auth_user_id", userId).single()
 
-  const fetchProfile = useCallback(
-    async (userId: string): Promise<UserProfile | null> => {
-      try {
-        const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
+      if (error) {
+        if (error.message?.includes("PGRST116") || error.code === "PGRST116") {
+          // No profile exists, create one
+          try {
+            const { data: authUser } = await supabaseRef.current.auth.getUser()
 
-        if (error) {
-          console.error("Error fetching profile:", error)
-
-          // If profile doesn't exist, create it
-          if (error.code === "PGRST116") {
-            const {
-              data: { user: authUser },
-            } = await supabase.auth.getUser()
-            if (authUser) {
+            if (authUser.user) {
               const newProfile = {
-                auth_user_id: authUser.id,
-                email: authUser.email || "",
-                username: authUser.user_metadata?.username || authUser.email?.split("@")[0] || "user",
-                full_name: authUser.user_metadata?.full_name || authUser.email || "",
-                tier: "grassroot" as const,
-                role: "user" as const,
-                coins: 100,
+                auth_user_id: userId,
+                email: authUser.user.email || "",
+                username: authUser.user.user_metadata?.username || authUser.user.email?.split("@")[0] || "user",
+                full_name: authUser.user.user_metadata?.full_name || authUser.user.email || "",
+                subscription_tier: "grassroot" as const,
+                coins_balance: 100,
                 level: 1,
                 points: 0,
-                is_verified: false,
                 is_active: true,
+                is_verified: false,
                 is_banned: false,
-                login_count: 0,
-                email_verified: authUser.email_confirmed_at ? true : false,
-                phone_verified: false,
-                two_factor_enabled: false,
-                preferences: {},
-                metadata: {},
               }
 
-              const { data: createdProfile, error: createError } = await supabase
+              const { data: createdProfile, error: createError } = await supabaseRef.current
                 .from("users")
                 .insert(newProfile)
                 .select()
@@ -82,42 +73,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
               return createdProfile
             }
+          } catch (createErr) {
+            console.error("Error in profile creation:", createErr)
+            return null
           }
-          return null
+        } else {
+          console.error("Error fetching profile:", error)
         }
-
-        return data
-      } catch (error) {
-        console.error("Error in fetchProfile:", error)
         return null
       }
-    },
-    [supabase],
-  )
 
-  const refreshProfile = useCallback(async () => {
+      return data
+    } catch (error) {
+      console.error("Error in fetchProfile:", error)
+      return null
+    }
+  }
+
+  const refreshProfile = async () => {
     if (user) {
       const profileData = await fetchProfile(user.id)
       setProfile(profileData)
     }
-  }, [user, fetchProfile])
-
-  const updateLoginCount = useCallback(
-    async (userId: string) => {
-      try {
-        await supabase
-          .from("users")
-          .update({
-            login_count: supabase.raw("login_count + 1"),
-            last_login: new Date().toISOString(),
-          })
-          .eq("auth_user_id", userId)
-      } catch (error) {
-        console.error("Error updating login count:", error)
-      }
-    },
-    [supabase],
-  )
+  }
 
   useEffect(() => {
     let mounted = true
@@ -127,11 +105,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Get initial session
         const {
           data: { session: initialSession },
-          error,
-        } = await supabase.auth.getSession()
+          error: sessionError,
+        } = await supabaseRef.current.auth.getSession()
 
-        if (error) {
-          console.error("Error getting session:", error)
+        if (sessionError) {
+          console.error("Session error:", sessionError)
         }
 
         if (mounted) {
@@ -162,31 +140,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return
+    } = supabaseRef.current.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event)
 
-      console.log("Auth state changed:", event, session?.user?.id)
+      if (mounted && initialized) {
+        setSession(session)
+        setUser(session?.user ?? null)
 
-      setSession(session)
-      setUser(session?.user ?? null)
-
-      if (session?.user) {
-        const profileData = await fetchProfile(session.user.id)
-        if (mounted) {
-          setProfile(profileData)
-        }
-
-        // Update login count on sign in
-        if (event === "SIGNED_IN") {
-          await updateLoginCount(session.user.id)
-        }
-      } else {
-        if (mounted) {
+        if (session?.user) {
+          const profileData = await fetchProfile(session.user.id)
+          if (mounted) {
+            setProfile(profileData)
+          }
+        } else {
           setProfile(null)
         }
-      }
 
-      if (mounted && !loading) {
         setLoading(false)
       }
     })
@@ -195,114 +164,82 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [supabase, fetchProfile, updateLoginCount, loading])
+  }, [initialized])
 
-  const signIn = useCallback(
-    async (email: string, password: string) => {
-      try {
-        setLoading(true)
-        const { error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        })
-        return { error }
-      } catch (error) {
-        console.error("Sign in error:", error)
-        return { error }
-      } finally {
-        setLoading(false)
-      }
-    },
-    [supabase],
-  )
-
-  const signUp = useCallback(
-    async (email: string, password: string, userData: { username: string; full_name: string }) => {
-      try {
-        setLoading(true)
-
-        // Check if username is already taken
-        const { data: existingUser } = await supabase
-          .from("users")
-          .select("username")
-          .eq("username", userData.username.trim())
-          .single()
-
-        if (existingUser) {
-          return { error: { message: "Username is already taken" } }
-        }
-
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            data: {
-              username: userData.username.trim(),
-              full_name: userData.full_name.trim(),
-            },
-          },
-        })
-
-        if (error) return { error }
-
-        // Create user profile
-        if (data.user) {
-          const profileData = {
-            auth_user_id: data.user.id,
-            email: email.trim(),
-            username: userData.username.trim(),
-            full_name: userData.full_name.trim(),
-            tier: "grassroot" as const,
-            role: "user" as const,
-            coins: 100, // Starting coins
-            level: 1,
-            points: 0,
-            is_active: true,
-            is_verified: false,
-            is_banned: false,
-            login_count: 0,
-            email_verified: data.user.email_confirmed_at ? true : false,
-            phone_verified: false,
-            two_factor_enabled: false,
-            preferences: {},
-            metadata: {},
-          }
-
-          const { error: profileError } = await supabase.from("users").insert(profileData)
-
-          if (profileError) {
-            console.error("Error creating profile:", profileError)
-            // Don't return error here as auth user was created successfully
-          }
-        }
-
-        return { error: null }
-      } catch (error) {
-        console.error("Sign up error:", error)
-        return { error }
-      } finally {
-        setLoading(false)
-      }
-    },
-    [supabase],
-  )
-
-  const signOut = useCallback(async () => {
+  const signIn = async (email: string, password: string) => {
     try {
       setLoading(true)
-      await supabase.auth.signOut()
+      const { error } = await supabaseRef.current.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        setLoading(false)
+        return { error }
+      }
+
+      // Don't set loading to false here - let auth state change handle it
+      return { error: null }
+    } catch (error) {
+      setLoading(false)
+      return { error }
+    }
+  }
+
+  const signUp = async (
+    email: string,
+    password: string,
+    userData: { username: string; full_name: string; tier?: string },
+  ) => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabaseRef.current.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username: userData.username,
+            full_name: userData.full_name,
+          },
+        },
+      })
+
+      if (error) {
+        setLoading(false)
+        return { error }
+      }
+
+      // Don't set loading to false here if user needs email confirmation
+      if (!data.user?.email_confirmed_at) {
+        setLoading(false)
+      }
+
+      return { error: null }
+    } catch (error) {
+      setLoading(false)
+      return { error }
+    }
+  }
+
+  const signOut = async () => {
+    try {
+      setLoading(true)
+      await supabaseRef.current.auth.signOut()
+      // Auth state change will handle the rest
     } catch (error) {
       console.error("Sign out error:", error)
-    } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }
 
   const value = {
     user,
     session,
     profile,
-    loading: loading || !initialized,
+    loading,
+    isAuthenticated: !!user,
+    isLoading: loading,
     signIn,
     signUp,
     signOut,

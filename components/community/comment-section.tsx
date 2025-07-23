@@ -4,23 +4,18 @@ import { useState, useEffect } from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatDistanceToNow } from "date-fns"
-import { Heart, Reply, Send, Loader2 } from "lucide-react"
-import { useToast } from "@/components/ui/use-toast"
-import { createCommentAction, fetchCommentsForPost } from "@/lib/community-actions"
-
-interface CommentSectionProps {
-  postId: number
-  currentUserId?: string
-}
+import { MessageCircle, Send, Loader2 } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
+import { cn } from "@/lib/utils"
+import { toast } from "sonner"
+import Link from "next/link"
 
 interface Comment {
   id: number
   content: string
   created_at: string
-  like_count: number
   user: {
     id: number
     username: string
@@ -28,251 +23,207 @@ interface Comment {
     avatar_url?: string
     tier: string
   }
-  replies?: Comment[]
-  has_liked?: boolean
 }
 
-export function CommentSection({ postId, currentUserId }: CommentSectionProps) {
-  const [comments, setComments] = useState<Comment[]>([])
-  const [newComment, setNewComment] = useState("")
-  const [replyingTo, setReplyingTo] = useState<number | null>(null)
-  const [replyContent, setReplyContent] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const { toast } = useToast()
+interface CommentSectionProps {
+  postId: number
+  commentCount: number
+  onCommentCountChange: (newCount: number) => void
+}
 
-  useEffect(() => {
-    loadComments()
-  }, [postId, currentUserId])
+export function CommentSection({ postId, commentCount, onCommentCountChange }: CommentSectionProps) {
+  const { user, profile, isAuthenticated } = useAuth()
+  const [comments, setComments] = useState<Comment[]>([])
+  const [loading, setLoading] = useState(false)
+  const [showComments, setShowComments] = useState(false)
+  const [newComment, setNewComment] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
   const loadComments = async () => {
+    if (!showComments) return
+
     setLoading(true)
     try {
-      const fetchedComments = await fetchCommentsForPost(postId, currentUserId)
-      setComments(fetchedComments)
+      const response = await fetch(`/api/community/posts/${postId}/comments`)
+      const result = await response.json()
+
+      if (result.success) {
+        setComments(result.comments)
+      } else {
+        console.error("Failed to load comments:", result.error)
+      }
     } catch (error) {
-      console.error("Error loading comments:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load comments.",
-        variant: "destructive",
-      })
+      console.error("Failed to load comments:", error)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSubmitComment = async (content: string, parentId?: number) => {
-    if (!currentUserId) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to comment.",
-        variant: "destructive",
-      })
-      return
+  useEffect(() => {
+    if (showComments) {
+      loadComments()
     }
+  }, [showComments, postId])
 
-    if (!content.trim()) {
-      toast({
-        title: "Empty Comment",
-        description: "Please write something before submitting.",
-        variant: "destructive",
-      })
-      return
-    }
+  const handleSubmitComment = async () => {
+    if (!user || !newComment.trim()) return
 
     setSubmitting(true)
+
     try {
-      const result = await createCommentAction(postId, content, parentId)
-      
+      const response = await fetch(`/api/community/posts/${postId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: newComment.trim(),
+        }),
+      })
+
+      const result = await response.json()
+
       if (result.success) {
-        toast({
-          title: "Comment Posted",
-          description: "Your comment has been added.",
-        })
-        
-        // Reset forms
-        if (parentId) {
-          setReplyContent("")
-          setReplyingTo(null)
-        } else {
-          setNewComment("")
-        }
-        
-        // Reload comments to get the new one
-        await loadComments()
+        setComments((prev) => [...prev, result.comment])
+        setNewComment("")
+        onCommentCountChange(commentCount + 1)
+        toast.success("Comment posted!")
       } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to post comment.",
-          variant: "destructive",
-        })
+        toast.error(result.error || "Failed to post comment")
       }
     } catch (error) {
-      console.error("Error submitting comment:", error)
-      toast({
-        title: "Error",
-        description: "Something went wrong. Please try again.",
-        variant: "destructive",
-      })
+      toast.error("Failed to post comment")
     } finally {
       setSubmitting(false)
     }
   }
 
-  const CommentCard = ({ comment, isReply = false }: { comment: Comment; isReply?: boolean }) => (
-    <Card className={`${isReply ? "ml-8 mt-2" : "mb-4"}`}>
-      <CardContent className="p-4">
-        <div className="flex items-start space-x-3">
-          <Avatar className="h-8 w-8">
-            <AvatarImage 
-              src={comment.user?.avatar_url || "/placeholder-user.jpg"} 
-              alt={comment.user?.username} 
-            />
-            <AvatarFallback>
-              {comment.user?.username?.charAt(0).toUpperCase() || "U"}
-            </AvatarFallback>
-          </Avatar>
-          
-          <div className="flex-1">
-            <div className="flex items-center space-x-2 mb-2">
-              <span className="font-semibold text-sm">
-                {comment.user?.full_name || comment.user?.username}
-              </span>
-              <Badge variant="secondary" className="text-xs">
-                {comment.user?.tier || "grassroot"}
-              </Badge>
-              <span className="text-xs text-muted-foreground">
-                {formatDistanceToNow(new Date(comment.created_at))} ago
-              </span>
-            </div>
-            
-            <p className="text-sm mb-3 whitespace-pre-wrap">{comment.content}</p>
-            
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-foreground h-8 px-2"
-              >
-                <Heart className="mr-1 h-3 w-3" />
-                {comment.like_count || 0}
-              </Button>
-              
-              {!isReply && currentUserId && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
-                  className="text-muted-foreground hover:text-foreground h-8 px-2"
-                >
-                  <Reply className="mr-1 h-3 w-3" />
-                  Reply
-                </Button>
-              )}
-            </div>
-            
-            {/* Reply Form */}
-            {replyingTo === comment.id && (
-              <div className="mt-3 space-y-2">
-                <Textarea
-                  placeholder="Write a reply..."
-                  value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                  className="min-h-[80px] text-sm"
-                />
-                <div className="flex items-center space-x-2">
-                  <Button
-                    size="sm"
-                    onClick={() => handleSubmitComment(replyContent, comment.id)}
-                    disabled={submitting || !replyContent.trim()}
-                  >
-                    {submitting ? (
-                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                    ) : (
-                      <Send className="mr-1 h-3 w-3" />
-                    )}
-                    Reply
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setReplyingTo(null)
-                      setReplyContent("")
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
+  const getTierColor = (tier: string) => {
+    switch (tier?.toLowerCase()) {
+      case "blood_brotherhood":
+      case "blood":
+        return "bg-red-500 text-white"
+      case "elder":
+        return "bg-purple-500 text-white"
+      case "pioneer":
+        return "bg-blue-500 text-white"
+      case "grassroot":
+        return "bg-green-500 text-white"
+      default:
+        return "bg-gray-500 text-white"
+    }
+  }
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-muted rounded-full animate-pulse" />
-          <div className="flex-1 space-y-2">
-            <div className="h-3 bg-muted rounded animate-pulse w-1/4" />
-            <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
-          </div>
-        </div>
-      </div>
-    )
+  const getTierDisplayName = (tier: string) => {
+    switch (tier?.toLowerCase()) {
+      case "blood_brotherhood":
+      case "blood":
+        return "Blood"
+      case "elder":
+        return "Elder"
+      case "pioneer":
+        return "Pioneer"
+      case "grassroot":
+        return "Grassroot"
+      default:
+        return "Fan"
+    }
   }
 
   return (
     <div className="space-y-4">
-      {/* New Comment Form */}
-      {currentUserId && (
-        <div className="space-y-3">
-          <Textarea
-            placeholder="Write a comment..."
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            className="min-h-[80px]"
-          />
-          <Button
-            onClick={() => handleSubmitComment(newComment)}
-            disabled={submitting || !newComment.trim()}
-            size="sm"
-          >
-            {submitting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="mr-2 h-4 w-4" />
-            )}
-            Comment
-          </Button>
-        </div>
-      )}
+      {/* Comments Toggle */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setShowComments(!showComments)}
+        className="flex items-center space-x-1"
+      >
+        <MessageCircle className="h-4 w-4" />
+        <span>
+          {commentCount} {commentCount === 1 ? "comment" : "comments"}
+        </span>
+      </Button>
 
-      {/* Comments List */}
-      {comments.length === 0 ? (
-        <p className="text-center text-muted-foreground py-8">
-          No comments yet. {currentUserId ? "Be the first to comment!" : "Sign in to add a comment."}
-        </p>
-      ) : (
-        <div className="space-y-4">
-          {comments.map((comment) => (
-            <div key={comment.id}>
-              <CommentCard comment={comment} />
-              {/* Render replies */}
-              {comment.replies && comment.replies.length > 0 && (
-                <div className="ml-4">
-                  {comment.replies.map((reply) => (
-                    <CommentCard key={reply.id} comment={reply} isReply={true} />
-                  ))}
+      {/* Comments Section */}
+      {showComments && (
+        <div className="space-y-4 border-t pt-4">
+          {/* New Comment Form */}
+          {isAuthenticated && profile ? (
+            <div className="flex space-x-3">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} />
+                <AvatarFallback>{profile.username?.charAt(0).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <Textarea
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Write a comment..."
+                  className="min-h-[60px] text-sm"
+                />
+                <div className="flex justify-end mt-2">
+                  <Button size="sm" onClick={handleSubmitComment} disabled={!newComment.trim() || submitting}>
+                    {submitting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Send className="h-3 w-3 mr-1" />}
+                    Comment
+                  </Button>
                 </div>
-              )}
+              </div>
             </div>
-          ))}
+          ) : (
+            <div className="text-center py-4 text-muted-foreground">
+              <p>
+                <Link href="/login" className="text-primary hover:underline">
+                  Sign in
+                </Link>{" "}
+                to comment on this post.
+              </p>
+            </div>
+          )}
+
+          {/* Comments List */}
+          {loading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : comments.length === 0 ? (
+            <p className="text-center text-muted-foreground py-4">No comments yet. Be the first to comment!</p>
+          ) : (
+            <div className="space-y-4">
+              {comments.map((comment) => (
+                <div key={comment.id} className="flex space-x-3">
+                  <Link href={`/profile/${comment.user.username}`}>
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage
+                        src={comment.user.avatar_url || "/placeholder-user.jpg"}
+                        alt={comment.user.username}
+                      />
+                      <AvatarFallback>{comment.user.username.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                  </Link>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="bg-muted rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Link href={`/profile/${comment.user.username}`} className="hover:underline">
+                          <span className="font-semibold text-sm">
+                            {comment.user.full_name || comment.user.username}
+                          </span>
+                        </Link>
+                        <span className="text-xs text-muted-foreground">@{comment.user.username}</span>
+                        <Badge className={cn("text-xs", getTierColor(comment.user.tier))}>
+                          {getTierDisplayName(comment.user.tier)}
+                        </Badge>
+                      </div>
+                      <p className="text-sm leading-relaxed">{comment.content}</p>
+                    </div>
+
+                    <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                      <span>{formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

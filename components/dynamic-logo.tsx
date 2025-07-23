@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useTheme } from "@/contexts/theme-context"
 import Image from "next/image"
+import { cn } from "@/lib/utils"
 
 interface DynamicLogoProps {
   width?: number
@@ -9,68 +10,35 @@ interface DynamicLogoProps {
   className?: string
 }
 
-export function DynamicLogo({ width = 120, height = 32, className = "" }: DynamicLogoProps) {
-  const [mounted, setMounted] = useState(false)
-  const [isDark, setIsDark] = useState(false)
+export function DynamicLogo({ width = 120, height = 32, className }: DynamicLogoProps) {
+  const { theme, resolvedTheme } = useTheme()
 
-  useEffect(() => {
-    setMounted(true)
-
-    // Check initial theme
-    const checkTheme = () => {
-      const isDarkMode =
-        document.documentElement.classList.contains("dark") ||
-        (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches)
-      setIsDark(isDarkMode)
-    }
-
-    checkTheme()
-
-    // Listen for theme changes
-    const observer = new MutationObserver(checkTheme)
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    })
-
-    // Listen for system theme changes
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
-    const handleChange = () => {
-      if (
-        !document.documentElement.classList.contains("light") &&
-        !document.documentElement.classList.contains("dark")
-      ) {
-        checkTheme()
-      }
-    }
-
-    mediaQuery.addEventListener("change", handleChange)
-
-    return () => {
-      observer.disconnect()
-      mediaQuery.removeEventListener("change", handleChange)
-    }
-  }, [])
-
-  // Don't render until mounted to prevent hydration mismatch
-  if (!mounted) {
-    return <div className={`bg-muted animate-pulse rounded ${className}`} style={{ width, height }} />
-  }
-
-  const logoSrc = isDark ? "/images/loggotrans-dark.png" : "/images/loggotrans-light.png"
+  // Determine which logo to show based on theme
+  const logoSrc = resolvedTheme === "dark" ? "/images/loggotrans-dark.png" : "/images/loggotrans-light.png"
 
   return (
-    <Image
-      src={logoSrc || "/placeholder.svg"}
-      alt="Erigga Live Logo"
-      width={width}
-      height={height}
-      className={className}
-      priority
-      onError={() => {
-        // Fallback to a simple text logo if images fail
-        console.warn("Logo image failed to load")
-      }}
-    />
+    <div className={cn("flex items-center", className)}>
+      <Image
+        src={logoSrc || "/placeholder.svg"}
+        alt="EriggaLive Logo"
+        width={width}
+        height={height}
+        priority
+        className="object-contain"
+        onError={(e) => {
+          // Fallback to text logo if image fails
+          const target = e.target as HTMLImageElement
+          target.style.display = "none"
+          const parent = target.parentElement
+          if (parent) {
+            parent.innerHTML = `
+              <span class="font-bold text-xl bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
+                EriggaLive
+              </span>
+            `
+          }
+        }}
+      />
+    </div>
   )
 }
