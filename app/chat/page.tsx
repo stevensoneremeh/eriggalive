@@ -2,15 +2,37 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { MessageCircle, Users, Crown, Star, Zap, Heart, Shield, Lock, Gift, TrendingUp, Globe } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { useAbly } from "@/contexts/ably-context"
+import { createClient } from "@/lib/supabase/client"
+import { Send, Users, Crown, Star, Zap, Heart, Lock, Globe, Gift } from "lucide-react"
+import { formatDistanceToNow } from "date-fns"
+import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
-import Link from "next/link"
+
+interface ChatMessage {
+  id: string
+  user_id: string
+  room: string
+  content: string
+  upvotes: number
+  created_at: string
+  user: {
+    id: string
+    username: string
+    full_name: string | null
+    avatar_url: string | null
+    tier: string
+  }
+}
 
 interface ChatRoom {
   id: string
@@ -54,7 +76,7 @@ const CHAT_ROOMS: ChatRoom[] = [
     requiredTier: "all",
     memberCount: 1892,
     isLocked: false,
-    href: "/rooms/freebies",
+    href: "/chat/freebies",
   },
   {
     id: "grassroot",
@@ -123,24 +145,129 @@ const TIER_HIERARCHY = {
 }
 
 export default function ChatPage() {
-  const { user, profile, loading } = useAuth()
+  const { user, profile, isAuthenticated, isLoading } = useAuth()
+  const { client: ablyClient, isConnected } = useAbly()
+  const router = useRouter()
+  const { toast } = useToast()
+  const [selectedRoom, setSelectedRoom] = useState<string>("general")
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [newMessage, setNewMessage] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [onlineUsers, setOnlineUsers] = useState<Record<string, number>>({})
 
+  const supabase = createClient()
+
   useEffect(() => {
-    // Simulate online user counts
-    const updateOnlineUsers = () => {
-      const counts: Record<string, number> = {}
-      CHAT_ROOMS.forEach((room) => {
-        counts[room.id] = Math.floor(Math.random() * room.memberCount * 0.1) + 10
-      })
-      setOnlineUsers(counts)
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login")
+      return
     }
+  }, [isAuthenticated, isLoading, router])
 
-    updateOnlineUsers()
-    const interval = setInterval(updateOnlineUsers, 30000) // Update every 30 seconds
+  useEffect(() => {
+    if (isAuthenticated && selectedRoom) {
+      fetchMessages(selectedRoom)
+    }
+  }, [isAuthenticated, selectedRoom])
 
-    return () => clearInterval(interval)
-  }, [])
+  useEffect(() => {
+    if (ablyClient && isConnected && selectedRoom) {
+      const channel = ablyClient.channels.get(`chat-${selectedRoom}`)
+
+      channel.subscribe("new-message", (message) => {
+        const newMsg = message.data as ChatMessage
+        setMessages((prev) => [...prev, newMsg])
+      })
+
+      // Simulate online user counts
+      const updateOnlineUsers = () => {
+        const counts: Record<string, number> = {}
+        CHAT_ROOMS.forEach((room) => {
+          counts[room.id] = Math.floor(Math.random() * room.memberCount * 0.1) + 10
+        })
+        setOnlineUsers(counts)
+      }
+
+      updateOnlineUsers()
+      const interval = setInterval(updateOnlineUsers, 30000)
+
+      return () => {
+        channel.unsubscribe()
+        clearInterval(interval)
+      }
+    }
+  }, [ablyClient, isConnected, selectedRoom])
+
+  const fetchMessages = async (room: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("chat_messages")
+        .select(`
+          *,
+          user:users(id, username, full_name, avatar_url, tier)
+        `)
+        .eq("room", room)
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: true })
+        .limit(50)
+
+      if (error) {
+        console.error("Error fetching messages:", error)
+        return
+      }
+
+      setMessages(data || [])
+    } catch (error) {
+      console.error("Error fetching messages:", error)
+    }
+  }
+
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !profile || !selectedRoom) return
+
+    setIsSubmitting(true)
+    try {
+      const { data, error } = await supabase
+        .from("chat_messages")
+        .insert({
+          user_id: profile.id,
+          room: selectedRoom,
+          content: newMessage.trim(),
+        })
+        .select(`
+          *,
+          user:users(id, username, full_name, avatar_url, tier)
+        `)
+        .single()
+
+      if (error) {
+        console.error("Error sending message:", error)
+        toast({
+          title: "Error",
+          description: "Failed to send message",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Publish to Ably
+      if (ablyClient && isConnected) {
+        const channel = ablyClient.channels.get(`chat-${selectedRoom}`)
+        await channel.publish("new-message", data)
+      }
+
+      setNewMessage("")
+    } catch (error) {
+      console.error("Error sending message:", error)
+      toast({
+        title: "Error",
+        description: "Failed to send message",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   const canAccessRoom = (requiredTier: string) => {
     if (requiredTier === "all") return true
@@ -152,195 +279,212 @@ export default function ChatPage() {
     return userTierLevel >= requiredTierLevel
   }
 
-  if (loading) {
+  const getTierColor = (tier: string) => {
+    switch (tier.toLowerCase()) {
+      case "blood_brotherhood":
+      case "blood":
+        return "bg-red-500"
+      case "elder":
+        return "bg-purple-500"
+      case "pioneer":
+        return "bg-blue-500"
+      case "grassroot":
+        return "bg-green-500"
+      case "admin":
+        return "bg-gray-800"
+      default:
+        return "bg-gray-500"
+    }
+  }
+
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 p-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4 text-muted-foreground">Loading chat rooms...</p>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading chat...</p>
         </div>
       </div>
     )
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 p-4">
-        <div className="max-w-4xl mx-auto">
-          <Card className="border-0 shadow-xl bg-card/80 backdrop-blur-sm">
-            <CardContent className="p-12 text-center">
-              <Shield className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-2xl font-semibold mb-2">Sign In Required</h3>
-              <p className="text-muted-foreground mb-6">Please sign in to access the chat rooms</p>
-              <div className="flex gap-4 justify-center">
-                <Button asChild>
-                  <Link href="/login">Sign In</Link>
-                </Button>
-                <Button variant="outline" asChild>
-                  <Link href="/signup">Create Account</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
+  if (!isAuthenticated) {
+    return null
   }
+
+  const selectedRoomData = CHAT_ROOMS.find((room) => room.id === selectedRoom)
+  const RoomIcon = selectedRoomData?.icon || Globe
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
-      <div className="max-w-7xl mx-auto p-4">
-        {/* Header */}
-        <div className="text-center py-8">
-          <div className="flex items-center justify-center mb-4">
-            <MessageCircle className="h-10 w-10 text-primary mr-3" />
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-primary via-purple-600 to-pink-600 bg-clip-text text-transparent">
-              Chat Rooms
-            </h1>
-          </div>
-          <p className="text-muted-foreground text-lg mt-2">Connect with fellow fans in tier-based discussions</p>
-          <div className="flex justify-center gap-8 mt-6 text-sm text-muted-foreground">
-            <span className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              {CHAT_ROOMS.length} Rooms Available
-            </span>
-            <span className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Real-time Conversations
-            </span>
-            {profile && (
-              <span className="flex items-center gap-2">
-                <Crown className="h-4 w-4" />
-                {profile.tier.charAt(0).toUpperCase() + profile.tier.slice(1)} Tier
-              </span>
-            )}
-          </div>
-        </div>
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-8rem)]">
+          {/* Room List */}
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Chat Rooms
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <ScrollArea className="h-[calc(100vh-12rem)]">
+                <div className="space-y-2 p-4">
+                  {CHAT_ROOMS.map((room) => {
+                    const Icon = room.icon
+                    const hasAccess = canAccessRoom(room.requiredTier)
+                    const isOnline = onlineUsers[room.id] || 0
 
-        {/* User Status */}
-        {profile && (
-          <Card className="mb-8 bg-gradient-to-r from-primary/5 to-purple-500/5 border-primary/20">
-            <CardContent className="p-6">
+                    return (
+                      <button
+                        key={room.id}
+                        onClick={() => hasAccess && setSelectedRoom(room.id)}
+                        disabled={!hasAccess}
+                        className={cn(
+                          "w-full text-left p-3 rounded-lg transition-all",
+                          selectedRoom === room.id
+                            ? "bg-primary text-primary-foreground"
+                            : hasAccess
+                              ? "hover:bg-muted"
+                              : "opacity-50 cursor-not-allowed",
+                          room.bgColor,
+                        )}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Icon className={cn("h-4 w-4", room.textColor)} />
+                            <span className="font-medium">{room.name}</span>
+                          </div>
+                          {!hasAccess && <Lock className="h-4 w-4" />}
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-1">{room.description}</p>
+                        <div className="flex items-center justify-between text-xs">
+                          <span>{room.memberCount.toLocaleString()} members</span>
+                          <div className="flex items-center gap-1 text-green-600">
+                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                            <span>{isOnline}</span>
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+
+          {/* Chat Area */}
+          <Card className="lg:col-span-3 flex flex-col">
+            {/* Chat Header */}
+            <CardHeader className="border-b">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <Avatar className="h-12 w-12">
-                    <AvatarImage src={profile.avatar_url || "/placeholder.svg"} />
-                    <AvatarFallback>{profile.username.charAt(0).toUpperCase()}</AvatarFallback>
-                  </Avatar>
+                <div className="flex items-center gap-3">
+                  <div className={cn("p-2 rounded-lg", selectedRoomData?.bgColor)}>
+                    <RoomIcon className={cn("h-5 w-5", selectedRoomData?.textColor)} />
+                  </div>
                   <div>
-                    <h3 className="font-semibold text-lg">{profile.full_name || profile.username}</h3>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                        {profile.tier.charAt(0).toUpperCase() + profile.tier.slice(1)} Member
-                      </Badge>
-                      <span className="text-sm text-muted-foreground">
-                        Access to {CHAT_ROOMS.filter((room) => canAccessRoom(room.requiredTier)).length} rooms
-                      </span>
-                    </div>
+                    <CardTitle className="text-lg">{selectedRoomData?.name}</CardTitle>
+                    <p className="text-sm text-muted-foreground">{selectedRoomData?.description}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm text-muted-foreground">Your Tier Level</p>
-                  <p className="text-2xl font-bold text-primary">
-                    {TIER_HIERARCHY[profile.tier as keyof typeof TIER_HIERARCHY] || 1}
-                  </p>
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    {onlineUsers[selectedRoom] || 0} online
+                  </span>
+                  {isConnected && (
+                    <span className="flex items-center gap-2 text-green-600">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      Live
+                    </span>
+                  )}
                 </div>
               </div>
+            </CardHeader>
+
+            {/* Messages */}
+            <CardContent className="flex-1 p-0">
+              <ScrollArea className="h-[calc(100vh-20rem)] p-4">
+                <div className="space-y-4">
+                  {messages.length === 0 ? (
+                    <div className="text-center py-8">
+                      <RoomIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">Welcome to {selectedRoomData?.name}</h3>
+                      <p className="text-muted-foreground">Start the conversation!</p>
+                    </div>
+                  ) : (
+                    messages.map((message) => (
+                      <div key={message.id} className="flex items-start space-x-3 group">
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={message.user.avatar_url || "/placeholder-user.jpg"} />
+                          <AvatarFallback>{message.user.username.charAt(0).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="font-medium text-sm">{message.user.username}</span>
+                            <Badge
+                              className={cn("text-xs px-1.5 py-0.5", getTierColor(message.user.tier), "text-white")}
+                            >
+                              {message.user.tier}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+                            </span>
+                          </div>
+                          <p className="text-sm text-foreground break-words">{message.content}</p>
+                          {message.upvotes > 0 && (
+                            <div className="flex items-center space-x-1 mt-1">
+                              <Heart className="h-3 w-3 text-red-500" />
+                              <span className="text-xs text-muted-foreground">{message.upvotes}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
             </CardContent>
+
+            {/* Message Input */}
+            <div className="border-t p-4">
+              <div className="flex items-center space-x-2">
+                <div className="flex-1 relative">
+                  <Input
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault()
+                        sendMessage()
+                      }
+                    }}
+                    placeholder={`Message ${selectedRoomData?.name}...`}
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <Button
+                  onClick={sendMessage}
+                  disabled={!newMessage.trim() || isSubmitting}
+                  className={cn(
+                    "shrink-0 bg-gradient-to-r text-white",
+                    selectedRoom === "grassroot" && "from-green-500 to-green-600",
+                    selectedRoom === "pioneer" && "from-blue-500 to-blue-600",
+                    selectedRoom === "elder" && "from-purple-500 to-purple-600",
+                    selectedRoom === "blood" && "from-red-500 to-red-600",
+                    (selectedRoom === "general" || selectedRoom === "freebies") && "from-gray-500 to-gray-600",
+                  )}
+                >
+                  {isSubmitting ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
           </Card>
-        )}
-
-        {/* Chat Rooms Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {CHAT_ROOMS.map((room) => {
-            const Icon = room.icon
-            const hasAccess = canAccessRoom(room.requiredTier)
-            const isOnline = onlineUsers[room.id] || 0
-
-            return (
-              <Card
-                key={room.id}
-                className={cn(
-                  "relative overflow-hidden transition-all duration-300 hover:scale-105 group",
-                  room.bgColor,
-                  room.borderColor,
-                  hasAccess ? "hover:shadow-xl cursor-pointer" : "opacity-60",
-                )}
-              >
-                <div className={cn("absolute inset-0 bg-gradient-to-r opacity-5", room.color)} />
-
-                <CardHeader className="relative pb-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className={cn("p-3 rounded-xl", room.bgColor, "group-hover:scale-110 transition-transform")}>
-                      <Icon className={cn("h-6 w-6", room.textColor)} />
-                    </div>
-                    {!hasAccess && (
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Lock className="h-4 w-4" />
-                        <span className="text-xs">Locked</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <CardTitle className="text-xl mb-2">{room.name}</CardTitle>
-                  <p className="text-sm text-muted-foreground">{room.description}</p>
-                </CardHeader>
-
-                <CardContent className="relative">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">{room.memberCount.toLocaleString()} members</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                        <span className="text-green-600 font-medium">{isOnline} online</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <Badge variant="outline" className={cn("text-xs", room.textColor, "bg-transparent")}>
-                        {room.requiredTier === "all"
-                          ? "Open to All"
-                          : `${room.requiredTier.charAt(0).toUpperCase() + room.requiredTier.slice(1)}+ Only`}
-                      </Badge>
-
-                      {hasAccess ? (
-                        <Button size="sm" className={cn("bg-gradient-to-r text-white shadow-lg", room.color)} asChild>
-                          <Link href={room.href}>Join Room</Link>
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="outline" disabled>
-                          <Lock className="h-4 w-4 mr-2" />
-                          Upgrade Tier
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
         </div>
-
-        {/* Upgrade Prompt */}
-        {profile && CHAT_ROOMS.some((room) => !canAccessRoom(room.requiredTier)) && (
-          <Card className="mt-8 bg-gradient-to-r from-orange-500/10 to-red-500/10 border-orange-200/20">
-            <CardContent className="p-6 text-center">
-              <Crown className="h-12 w-12 text-orange-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Unlock More Rooms</h3>
-              <p className="text-muted-foreground mb-4">
-                Upgrade your tier to access exclusive chat rooms and connect with higher-tier members
-              </p>
-              <Button className="bg-gradient-to-r from-orange-500 to-red-500 text-white" asChild>
-                <Link href="/premium">Upgrade Your Tier</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   )

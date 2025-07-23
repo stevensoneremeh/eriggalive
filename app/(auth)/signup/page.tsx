@@ -1,19 +1,18 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
-
 import type React from "react"
+
+import { Badge } from "@/components/ui/badge"
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { signUp } from "@/app/auth/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff, Check, Coins, Gift, Crown, Star, Zap } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
 import { cn } from "@/lib/utils"
 
 const TIER_OPTIONS = [
@@ -65,10 +64,10 @@ export default function SignUpPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
-  const { signUp } = useAuth()
-  const router = useRouter()
+  const [error, setError] = useState("")
+  const searchParams = useSearchParams()
+  const errorParam = searchParams.get("error")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -107,21 +106,19 @@ export default function SignUpPage() {
     }
 
     try {
-      const { error } = await signUp(email, password, {
-        username: username.trim(),
-        full_name: fullName.trim(),
-        tier: selectedTier,
-      })
+      const formData = new FormData()
+      formData.append("email", email)
+      formData.append("password", password)
+      formData.append("username", username.trim())
+      formData.append("fullName", fullName.trim())
+      formData.append("tier", selectedTier)
 
-      if (error) {
-        setError(error?.message || "Failed to create account")
-      } else {
-        setSuccess(true)
-        // Redirect to dashboard after showing success message
-        setTimeout(() => {
-          router.push("/dashboard")
-        }, 2000)
-      }
+      await signUp(formData)
+      setSuccess(true)
+      // Redirect to dashboard after showing success message
+      setTimeout(() => {
+        window.location.href = "/dashboard"
+      }, 2000)
     } catch (err) {
       setError("An unexpected error occurred")
     } finally {
@@ -195,7 +192,7 @@ export default function SignUpPage() {
             </div>
 
             <Button
-              onClick={() => router.push("/dashboard")}
+              onClick={() => (window.location.href = "/dashboard")}
               className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
             >
               Go to Dashboard Now
@@ -208,224 +205,197 @@ export default function SignUpPage() {
 
   // Registration form
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl w-full space-y-8">
-        <div className="text-center">
-          <h1 className="font-street text-4xl text-gradient mb-2">JOIN THE MOVEMENT</h1>
-          <p className="text-muted-foreground">Create your Erigga fan account and choose your tier!</p>
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl font-bold text-center">Create Account</CardTitle>
+          <CardDescription className="text-center">Join the Erigga community today</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {errorParam && (
+            <Alert className="mb-4" variant="destructive">
+              <AlertDescription>{errorParam}</AlertDescription>
+            </Alert>
+          )}
 
-        <Card className="bg-card/50 border-orange-500/20 shadow-xl">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              Sign Up
-              <div className="flex items-center text-sm bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 px-2 py-1 rounded-full">
-                <Gift className="h-3 w-3 mr-1" />
-                Welcome Bonus
-              </div>
-            </CardTitle>
-            <CardDescription>Join thousands of fans in the Erigga community</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+          {error && (
+            <Alert className="mb-4" variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
-              {/* Personal Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">Full Name *</Label>
-                  <Input
-                    id="fullName"
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Enter your full name"
-                    required
-                    className="bg-background/50"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="username">Username *</Label>
-                  <Input
-                    id="username"
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Choose a unique username"
-                    required
-                    className="bg-background/50"
-                    minLength={3}
-                  />
-                  <p className="text-xs text-muted-foreground">Minimum 3 characters</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  required
-                  className="bg-background/50"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password *</Label>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Create a strong password"
-                      required
-                      className="bg-background/50 pr-10"
-                      minLength={6}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <Eye className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Minimum 6 characters</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password *</Label>
-                  <div className="relative">
-                    <Input
-                      id="confirmPassword"
-                      type={showConfirmPassword ? "text" : "password"}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Confirm your password"
-                      required
-                      className="bg-background/50 pr-10"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    >
-                      {showConfirmPassword ? (
-                        <EyeOff className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <Eye className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tier Selection */}
-              <div className="space-y-4">
-                <Label className="text-base font-semibold">Choose Your Tier</Label>
-                <RadioGroup value={selectedTier} onValueChange={setSelectedTier} className="space-y-3">
-                  {TIER_OPTIONS.map((tier) => {
-                    const Icon = tier.icon
-                    return (
-                      <div key={tier.id} className="relative">
-                        <RadioGroupItem value={tier.id} id={tier.id} className="sr-only" />
-                        <Label
-                          htmlFor={tier.id}
-                          className={cn(
-                            "flex items-start space-x-4 p-4 rounded-lg border-2 cursor-pointer transition-all duration-200",
-                            selectedTier === tier.id
-                              ? "border-primary bg-primary/5 shadow-md"
-                              : "border-border hover:border-primary/50 hover:bg-accent/50",
-                          )}
-                        >
-                          <div className={cn("p-2 rounded-full bg-gradient-to-r", tier.color)}>
-                            <Icon className="h-5 w-5 text-white" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-2">
-                              <h3 className="font-semibold text-lg flex items-center gap-2">
-                                {tier.name}
-                                {tier.popular && <Badge className="bg-orange-500 text-white text-xs">Popular</Badge>}
-                              </h3>
-                              <span className="font-bold text-primary">{tier.price}</span>
-                            </div>
-                            <p className="text-sm text-muted-foreground mb-3">{tier.description}</p>
-                            <ul className="space-y-1">
-                              {tier.features.map((feature, index) => (
-                                <li key={index} className="text-sm flex items-center gap-2">
-                                  <Check className="h-3 w-3 text-green-500" />
-                                  {feature}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </Label>
-                      </div>
-                    )
-                  })}
-                </RadioGroup>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3"
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your username"
+                required
                 disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating your account...
-                  </>
-                ) : (
-                  <>
-                    <Gift className="mr-2 h-4 w-4" />
-                    Create Account & Get{" "}
-                    {selectedTier === "grassroot" ? "100" : selectedTier === "pioneer" ? "500" : "1000"} Coins
-                  </>
-                )}
-              </Button>
-            </form>
-
-            <div className="text-center space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Already have an account?{" "}
-                <Link href="/login" className="text-orange-500 hover:underline font-medium">
-                  Sign in here
-                </Link>
-              </p>
-
-              <p className="text-xs text-muted-foreground">
-                By creating an account, you agree to our{" "}
-                <Link href="/terms" className="text-primary hover:underline">
-                  Terms of Service
-                </Link>{" "}
-                and{" "}
-                <Link href="/privacy" className="text-primary hover:underline">
-                  Privacy Policy
-                </Link>
-              </p>
+              />
             </div>
-          </CardContent>
-        </Card>
-      </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Full Name</Label>
+              <Input
+                id="fullName"
+                name="fullName"
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Enter your full name"
+                required
+                disabled={loading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                required
+                disabled={loading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  disabled={loading}
+                  className="bg-background/50 pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm your password"
+                  required
+                  disabled={loading}
+                  className="bg-background/50 pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Tier Selection */}
+            <div className="space-y-4">
+              <Label className="text-base font-semibold">Choose Your Tier</Label>
+              <div className="space-y-3">
+                {TIER_OPTIONS.map((tier) => {
+                  const Icon = tier.icon
+                  return (
+                    <div key={tier.id} className="relative">
+                      <div
+                        className={cn(
+                          "flex items-start space-x-4 p-4 rounded-lg border-2 cursor-pointer transition-all duration-200",
+                          selectedTier === tier.id
+                            ? "border-primary bg-primary/5 shadow-md"
+                            : "border-border hover:border-primary/50 hover:bg-accent/50",
+                        )}
+                        onClick={() => setSelectedTier(tier.id)}
+                      >
+                        <div className={cn("p-2 rounded-full bg-gradient-to-r", tier.color)}>
+                          <Icon className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="font-semibold text-lg flex items-center gap-2">
+                              {tier.name}
+                              {tier.popular && <Badge className="bg-orange-500 text-white text-xs">Popular</Badge>}
+                            </h3>
+                            <span className="font-bold text-primary">{tier.price}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-3">{tier.description}</p>
+                          <ul className="space-y-1">
+                            {tier.features.map((feature, index) => (
+                              <li key={index} className="text-sm flex items-center gap-2">
+                                <Check className="h-3 w-3 text-green-500" />
+                                {feature}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating your account...
+                </>
+              ) : (
+                <>
+                  <Gift className="mr-2 h-4 w-4" />
+                  Create Account & Get{" "}
+                  {selectedTier === "grassroot" ? "100" : selectedTier === "pioneer" ? "500" : "1000"} Coins
+                </>
+              )}
+            </Button>
+          </form>
+
+          <div className="mt-4 text-center text-sm">
+            Already have an account?{" "}
+            <Link href="/login" className="text-primary hover:underline">
+              Sign in
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

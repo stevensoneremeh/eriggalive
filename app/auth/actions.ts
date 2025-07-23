@@ -25,19 +25,37 @@ export async function signIn(formData: FormData) {
 export async function signUp(formData: FormData) {
   const supabase = await createClient()
 
-  const data = {
-    email: formData.get("email") as string,
-    password: formData.get("password") as string,
-  }
+  const email = formData.get("email") as string
+  const password = formData.get("password") as string
+  const username = formData.get("username") as string
+  const fullName = formData.get("fullName") as string
 
-  const { error } = await supabase.auth.signUp(data)
+  // Sign up the user
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    email,
+    password,
+  })
 
-  if (error) {
+  if (authError) {
     redirect("/signup?error=Could not create user")
   }
 
+  // Create user profile
+  if (authData.user) {
+    const { error: profileError } = await supabase.from("users").insert({
+      auth_user_id: authData.user.id,
+      username,
+      full_name: fullName,
+      email,
+    })
+
+    if (profileError) {
+      console.error("Profile creation error:", profileError)
+    }
+  }
+
   revalidatePath("/", "layout")
-  redirect("/signup/success")
+  redirect("/dashboard")
 }
 
 export async function signOut() {
