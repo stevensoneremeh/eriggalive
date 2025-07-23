@@ -40,6 +40,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
 
       if (error) {
+        if (error.message === "Supabase not configured") {
+          // Return mock profile for development
+          return {
+            id: "mock-id",
+            auth_user_id: userId,
+            email: "demo@example.com",
+            username: "demo_user",
+            full_name: "Demo User",
+            tier: "grassroot" as const,
+            coins_balance: 100,
+            level: 1,
+            points: 0,
+            is_active: true,
+            is_verified: false,
+            is_banned: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+        }
+
         if (error.code === "PGRST116") {
           // No profile exists, create one
           const { data: authUser } = await supabase.auth.getUser()
