@@ -86,13 +86,10 @@ export default function MeetGreetPage() {
     try {
       setLoading(true)
 
-      // Try to load from database
-      const { data: usersData, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(50)
+      // Fixed Supabase query - separate the operations properly
+      const query = supabase.from("users").select("*").eq("is_active", true)
+
+      const { data: usersData, error } = await query.order("created_at", { ascending: false }).limit(50)
 
       if (error) {
         console.error("Error loading users:", error)
@@ -127,15 +124,15 @@ export default function MeetGreetPage() {
     switch (tier?.toLowerCase()) {
       case "blood_brotherhood":
       case "blood":
-        return "bg-gradient-to-r from-red-500 to-red-600"
+        return "bg-red-500"
       case "elder":
-        return "bg-gradient-to-r from-purple-500 to-purple-600"
+        return "bg-purple-500"
       case "pioneer":
-        return "bg-gradient-to-r from-blue-500 to-blue-600"
+        return "bg-blue-500"
       case "grassroot":
-        return "bg-gradient-to-r from-green-500 to-green-600"
+        return "bg-green-500"
       default:
-        return "bg-gradient-to-r from-gray-500 to-gray-600"
+        return "bg-gray-500"
     }
   }
 
@@ -187,17 +184,15 @@ export default function MeetGreetPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-full text-sm font-medium mb-4">
+          <div className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-medium mb-4">
             <Users className="h-4 w-4" />
             Meet & Greet
           </div>
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent mb-4">
-            Community Directory
-          </h1>
+          <h1 className="text-4xl font-bold mb-4">Community Directory</h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Connect with fellow Erigga fans from around the world. Build friendships and share the love for street
             motivation.
@@ -206,28 +201,28 @@ export default function MeetGreetPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="backdrop-blur-sm bg-white/80 dark:bg-slate-800/80 border-0 shadow-xl">
+          <Card>
             <CardContent className="p-6 text-center">
               <Users className="h-8 w-8 text-blue-500 mx-auto mb-2" />
               <p className="text-2xl font-bold">{users.length}</p>
               <p className="text-sm text-muted-foreground">Total Members</p>
             </CardContent>
           </Card>
-          <Card className="backdrop-blur-sm bg-white/80 dark:bg-slate-800/80 border-0 shadow-xl">
+          <Card>
             <CardContent className="p-6 text-center">
               <div className="w-3 h-3 bg-green-500 rounded-full mx-auto mb-2"></div>
               <p className="text-2xl font-bold">{users.filter((u) => u.is_online).length}</p>
               <p className="text-sm text-muted-foreground">Online Now</p>
             </CardContent>
           </Card>
-          <Card className="backdrop-blur-sm bg-white/80 dark:bg-slate-800/80 border-0 shadow-xl">
+          <Card>
             <CardContent className="p-6 text-center">
               <MapPin className="h-8 w-8 text-green-500 mx-auto mb-2" />
               <p className="text-2xl font-bold">15+</p>
               <p className="text-sm text-muted-foreground">Countries</p>
             </CardContent>
           </Card>
-          <Card className="backdrop-blur-sm bg-white/80 dark:bg-slate-800/80 border-0 shadow-xl">
+          <Card>
             <CardContent className="p-6 text-center">
               <Crown className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
               <p className="text-2xl font-bold">{users.filter((u) => u.tier === "blood_brotherhood").length}</p>
@@ -237,7 +232,7 @@ export default function MeetGreetPage() {
         </div>
 
         {/* Search and Filters */}
-        <Card className="backdrop-blur-sm bg-white/80 dark:bg-slate-800/80 border-0 shadow-xl mb-8">
+        <Card className="mb-8">
           <CardContent className="p-6">
             <div className="flex flex-col lg:flex-row gap-4">
               <div className="relative flex-1">
@@ -246,7 +241,7 @@ export default function MeetGreetPage() {
                   placeholder="Search members by name, username, or location..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-white/50 dark:bg-slate-700/50"
+                  className="pl-10"
                 />
               </div>
 
@@ -254,7 +249,7 @@ export default function MeetGreetPage() {
                 <select
                   value={selectedTier}
                   onChange={(e) => setSelectedTier(e.target.value)}
-                  className="px-3 py-2 border rounded-md bg-white/50 dark:bg-slate-700/50 text-sm"
+                  className="px-3 py-2 border rounded-md bg-background text-sm"
                 >
                   <option value="all">All Tiers</option>
                   <option value="blood_brotherhood">Blood</option>
@@ -266,7 +261,7 @@ export default function MeetGreetPage() {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="px-3 py-2 border rounded-md bg-white/50 dark:bg-slate-700/50 text-sm"
+                  className="px-3 py-2 border rounded-md bg-background text-sm"
                 >
                   <option value="newest">Newest First</option>
                   <option value="oldest">Oldest First</option>
@@ -274,7 +269,7 @@ export default function MeetGreetPage() {
                   <option value="online">Online First</option>
                 </select>
 
-                <div className="flex border rounded-md bg-white/50 dark:bg-slate-700/50">
+                <div className="flex border rounded-md">
                   <Button
                     variant={viewMode === "grid" ? "default" : "ghost"}
                     size="sm"
@@ -304,7 +299,7 @@ export default function MeetGreetPage() {
             <p className="text-muted-foreground">Loading community members...</p>
           </div>
         ) : sortedUsers.length === 0 ? (
-          <Card className="backdrop-blur-sm bg-white/80 dark:bg-slate-800/80 border-0 shadow-xl">
+          <Card>
             <CardContent className="p-12 text-center">
               <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">No members found</h3>
@@ -314,22 +309,15 @@ export default function MeetGreetPage() {
         ) : (
           <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"}>
             {sortedUsers.map((user) => (
-              <Card
-                key={user.id}
-                className="backdrop-blur-sm bg-white/80 dark:bg-slate-800/80 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group"
-              >
+              <Card key={user.id} className="hover:shadow-lg transition-shadow">
                 <CardContent className={viewMode === "grid" ? "p-6" : "p-4"}>
                   <div
                     className={`flex ${viewMode === "grid" ? "flex-col items-center text-center" : "items-center gap-4"}`}
                   >
                     <div className="relative">
-                      <Avatar
-                        className={`${viewMode === "grid" ? "h-20 w-20 mb-4" : "h-16 w-16"} ring-2 ring-white/20`}
-                      >
+                      <Avatar className={`${viewMode === "grid" ? "h-20 w-20 mb-4" : "h-16 w-16"}`}>
                         <AvatarImage src={user.avatar_url || "/placeholder-user.jpg"} alt={user.username} />
-                        <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white text-lg">
-                          {user.username.charAt(0).toUpperCase()}
-                        </AvatarFallback>
+                        <AvatarFallback className="text-lg">{user.username.charAt(0).toUpperCase()}</AvatarFallback>
                       </Avatar>
                       {user.is_online && (
                         <div className="absolute -bottom-1 -right-1 bg-green-500 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center">
@@ -348,7 +336,7 @@ export default function MeetGreetPage() {
                         <h3 className="font-bold text-lg">{user.full_name}</h3>
                         <p className="text-muted-foreground text-sm">@{user.username}</p>
                         <div className="flex items-center gap-2 mt-1 justify-center">
-                          <Badge className={`text-xs ${getTierColor(user.tier)} text-white border-0`}>
+                          <Badge className={`text-xs ${getTierColor(user.tier)} text-white`}>
                             {getTierDisplayName(user.tier)}
                           </Badge>
                           {user.is_online ? (
@@ -387,19 +375,11 @@ export default function MeetGreetPage() {
                       </div>
 
                       <div className={`flex gap-2 ${viewMode === "grid" ? "justify-center" : ""}`}>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 hover:bg-blue-100"
-                        >
+                        <Button size="sm" variant="outline" className="flex-1 bg-transparent">
                           <MessageCircle className="h-3 w-3 mr-1" />
                           Chat
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 hover:bg-green-100"
-                        >
+                        <Button size="sm" variant="outline" className="flex-1 bg-transparent">
                           <UserPlus className="h-3 w-3 mr-1" />
                           Follow
                         </Button>
@@ -415,9 +395,7 @@ export default function MeetGreetPage() {
         {/* Pagination would go here */}
         {sortedUsers.length > 0 && (
           <div className="flex justify-center mt-8">
-            <Button variant="outline" className="bg-white/50 dark:bg-slate-700/50">
-              Load More Members
-            </Button>
+            <Button variant="outline">Load More Members</Button>
           </div>
         )}
       </div>
