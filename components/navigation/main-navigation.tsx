@@ -113,33 +113,15 @@ export function MainNavigation() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-3">
-            <div className="relative w-10 h-10">
-              <Image
-                src="/images/loggotrans-light.png"
-                alt="Erigga"
-                fill
-                className="object-contain dark:hidden"
-                priority
-              />
-              <Image
-                src="/images/loggotrans-dark.png"
-                alt="Erigga"
-                fill
-                className="object-contain hidden dark:block"
-                priority
-              />
-            </div>
-            <div className="hidden sm:block">
-              <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                ERIGGA
-              </h1>
-              <p className="text-xs text-muted-foreground -mt-1">LIVE</p>
+          <Link href="/" className="flex items-center space-x-2">
+            <div className="relative w-8 h-8">
+              <Image src="/images/loggotrans-light.png" alt="Erigga" fill className="object-contain dark:hidden" />
+              <Image src="/images/loggotrans-dark.png" alt="Erigga" fill className="object-contain hidden dark:block" />
             </div>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center space-x-1">
+          <div className="hidden md:flex items-center space-x-1">
             {navigationItems.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href
@@ -148,13 +130,10 @@ export function MainNavigation() {
                   <Button
                     variant={isActive ? "default" : "ghost"}
                     size="sm"
-                    className={cn(
-                      "flex items-center space-x-2 transition-all duration-200",
-                      isActive && "bg-primary text-primary-foreground shadow-md",
-                    )}
+                    className={cn("flex items-center space-x-2", isActive && "bg-primary text-primary-foreground")}
                   >
                     <Icon className="h-4 w-4" />
-                    <span className="hidden xl:inline">{item.name}</span>
+                    <span>{item.name}</span>
                   </Button>
                 </Link>
               )
@@ -162,7 +141,7 @@ export function MainNavigation() {
           </div>
 
           {/* Right Side */}
-          <div className="flex items-center space-x-2 md:space-x-4">
+          <div className="flex items-center space-x-4">
             {/* Theme Toggle */}
             <Button variant="ghost" size="sm" onClick={toggleTheme} className="hidden md:flex">
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -184,15 +163,11 @@ export function MainNavigation() {
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">{profile.username}</p>
                       <p className="text-xs leading-none text-muted-foreground">{profile.email}</p>
-                      <div className="flex items-center justify-between mt-2">
-                        <Badge className={cn("text-xs", getTierColor(profile.tier || "grassroot"), "text-white")}>
-                          {getTierDisplayName(profile.tier || "grassroot")}
-                        </Badge>
-                        <div className="flex items-center space-x-1">
-                          <Coins className="h-3 w-3 text-yellow-500" />
-                          <span className="text-xs font-medium">{profile.coins_balance || 0}</span>
-                        </div>
-                      </div>
+                      <Badge
+                        className={cn("text-xs w-fit mt-1", getTierColor(profile.tier || "grassroot"), "text-white")}
+                      >
+                        {getTierDisplayName(profile.tier || "grassroot")}
+                      </Badge>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
@@ -237,34 +212,12 @@ export function MainNavigation() {
             {/* Mobile Menu */}
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="lg:hidden">
+                <Button variant="ghost" size="sm" className="md:hidden">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-[300px] sm:w-[400px]">
                 <div className="flex flex-col space-y-4 mt-4">
-                  {/* Mobile Logo */}
-                  <div className="flex items-center space-x-3 pb-4 border-b">
-                    <div className="relative w-8 h-8">
-                      <Image
-                        src="/images/loggotrans-light.png"
-                        alt="Erigga"
-                        fill
-                        className="object-contain dark:hidden"
-                      />
-                      <Image
-                        src="/images/loggotrans-dark.png"
-                        alt="Erigga"
-                        fill
-                        className="object-contain hidden dark:block"
-                      />
-                    </div>
-                    <div>
-                      <h1 className="text-lg font-bold">ERIGGA</h1>
-                      <p className="text-xs text-muted-foreground -mt-1">LIVE</p>
-                    </div>
-                  </div>
-
                   {/* Mobile Theme Toggle */}
                   <Button variant="ghost" onClick={toggleTheme} className="justify-start">
                     {theme === "dark" ? (
@@ -302,17 +255,11 @@ export function MainNavigation() {
                           <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} alt={profile.username} />
                           <AvatarFallback>{profile.username?.charAt(0).toUpperCase()}</AvatarFallback>
                         </Avatar>
-                        <div className="flex-1">
+                        <div>
                           <p className="font-medium">{profile.username}</p>
-                          <div className="flex items-center justify-between">
-                            <Badge className={cn("text-xs", getTierColor(profile.tier || "grassroot"), "text-white")}>
-                              {getTierDisplayName(profile.tier || "grassroot")}
-                            </Badge>
-                            <div className="flex items-center space-x-1">
-                              <Coins className="h-3 w-3 text-yellow-500" />
-                              <span className="text-xs">{profile.coins_balance || 0}</span>
-                            </div>
-                          </div>
+                          <Badge className={cn("text-xs", getTierColor(profile.tier || "grassroot"), "text-white")}>
+                            {getTierDisplayName(profile.tier || "grassroot")}
+                          </Badge>
                         </div>
                       </div>
                       <div className="space-y-2">
