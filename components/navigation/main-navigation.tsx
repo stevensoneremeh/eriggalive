@@ -19,7 +19,7 @@ import {
   Home,
   Users,
   Archive,
-  MessageCircle,
+  Video,
   Radio,
   ShoppingBag,
   Ticket,
@@ -42,7 +42,7 @@ const navigationItems = [
   { name: "Home", href: "/", icon: Home },
   { name: "Community", href: "/community", icon: Users },
   { name: "Vault", href: "/vault", icon: Archive },
-  { name: "Chat", href: "/chat", icon: MessageCircle },
+  { name: "Meet & Greet", href: "/meet-greet", icon: Video },
   { name: "Radio", href: "/radio", icon: Radio },
   { name: "Merch", href: "/merch", icon: ShoppingBag },
   { name: "Tickets", href: "/tickets", icon: Ticket },
@@ -115,13 +115,8 @@ export function MainNavigation() {
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
             <div className="relative w-8 h-8">
-              <Image src="/images/loggotrans-light.png" alt="Erigga Live" fill className="object-contain dark:hidden" />
-              <Image
-                src="/images/loggotrans-dark.png"
-                alt="Erigga Live"
-                fill
-                className="object-contain hidden dark:block"
-              />
+              <Image src="/images/loggotrans-light.png" alt="Erigga" fill className="object-contain dark:hidden" />
+              <Image src="/images/loggotrans-dark.png" alt="Erigga" fill className="object-contain hidden dark:block" />
             </div>
           </Link>
 
