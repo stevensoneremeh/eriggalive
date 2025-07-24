@@ -2,21 +2,17 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/contexts/auth-context"
-import { RadioProvider } from "@/contexts/radio-context"
+import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
-import { MainNavigation } from "@/components/navigation/main-navigation"
-import { FloatingRadioPlayer } from "@/components/floating-radio-player"
-import { SessionRefresh } from "@/components/session-refresh"
+import { Navigation } from "@/components/navigation/main-navigation"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Erigga Live - Official Fan Platform",
-  description:
-    "Connect with Erigga and fellow fans. Access exclusive content, join tier-based communities, and experience the ultimate fan platform.",
-  keywords: "Erigga, Nigerian music, hip hop, fan platform, exclusive content",
+  title: "Erigga Live - Official Community Platform",
+  description: "Connect with Erigga and fellow fans in the official community platform",
+  keywords: ["Erigga", "music", "community", "Nigerian music", "hip hop"],
   authors: [{ name: "Erigga Live Team" }],
   creator: "Erigga Live",
   publisher: "Erigga Live",
@@ -25,28 +21,20 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://erigga-live.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
   openGraph: {
-    title: "Erigga Live - Official Fan Platform",
-    description: "Connect with Erigga and fellow fans. Access exclusive content, join tier-based communities.",
+    title: "Erigga Live - Official Community Platform",
+    description: "Connect with Erigga and fellow fans in the official community platform",
     url: "/",
     siteName: "Erigga Live",
-    images: [
-      {
-        url: "/images/hero/erigga1.jpeg",
-        width: 1200,
-        height: 630,
-        alt: "Erigga Live Platform",
-      },
-    ],
     locale: "en_US",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Erigga Live - Official Fan Platform",
-    description: "Connect with Erigga and fellow fans. Access exclusive content, join tier-based communities.",
-    images: ["/images/hero/erigga1.jpeg"],
+    title: "Erigga Live - Official Community Platform",
+    description: "Connect with Erigga and fellow fans in the official community platform",
+    creator: "@erigga",
   },
   robots: {
     index: true,
@@ -72,23 +60,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#000000" />
-        <link rel="apple-touch-icon" href="/images/loggotrans-light.png" />
-      </head>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <AuthProvider>
-            <RadioProvider>
-              <div className="min-h-screen bg-background">
-                <MainNavigation />
-                <main className="pt-16">{children}</main>
-                <FloatingRadioPlayer />
-                <SessionRefresh />
-              </div>
-              <Toaster />
-            </RadioProvider>
+            <div className="min-h-screen bg-background">
+              <Navigation />
+              <main className="pt-16">{children}</main>
+            </div>
+            <Toaster />
           </AuthProvider>
         </ThemeProvider>
       </body>
