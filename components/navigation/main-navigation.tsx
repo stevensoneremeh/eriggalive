@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -18,61 +18,52 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
   Home,
   Users,
-  Archive,
   MessageCircle,
   Radio,
-  ShoppingBag,
-  Ticket,
-  Crown,
+  Music,
   Coins,
-  Menu,
+  ShoppingBag,
+  Calendar,
   User,
   Settings,
   LogOut,
-  Shield,
-  Moon,
-  Sun,
+  Menu,
+  Crown,
+  Sparkles,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
-import Image from "next/image"
 
 const navigationItems = [
   { name: "Home", href: "/", icon: Home },
+  { name: "Dashboard", href: "/dashboard", icon: User, requiresAuth: true },
   { name: "Community", href: "/community", icon: Users },
-  { name: "Vault", href: "/vault", icon: Archive },
-  { name: "Chat", href: "/chat", icon: MessageCircle },
+  { name: "Meet & Greet", href: "/meet-greet", icon: MessageCircle },
   { name: "Radio", href: "/radio", icon: Radio },
+  { name: "Vault", href: "/vault", icon: Music, requiresAuth: true },
+  { name: "Coins", href: "/coins", icon: Coins, requiresAuth: true },
   { name: "Merch", href: "/merch", icon: ShoppingBag },
-  { name: "Tickets", href: "/tickets", icon: Ticket },
-  { name: "Premium", href: "/premium", icon: Crown },
-  { name: "Coins", href: "/coins", icon: Coins },
+  { name: "Chronicles", href: "/chronicles", icon: Calendar },
 ]
 
 export function MainNavigation() {
+  const { isAuthenticated, profile, signOut } = useAuth()
   const pathname = usePathname()
-  const { profile, isAuthenticated, signOut } = useAuth()
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const [isOpen, setIsOpen] = useState(false)
 
   const getTierColor = (tier: string) => {
     switch (tier?.toLowerCase()) {
       case "blood_brotherhood":
       case "blood":
-        return "bg-red-500"
+        return "bg-gradient-to-r from-red-500 to-red-600"
       case "elder":
-        return "bg-purple-500"
+        return "bg-gradient-to-r from-purple-500 to-purple-600"
       case "pioneer":
-        return "bg-blue-500"
+        return "bg-gradient-to-r from-blue-500 to-blue-600"
       case "grassroot":
-        return "bg-green-500"
+        return "bg-gradient-to-r from-green-500 to-green-600"
       default:
-        return "bg-gray-500"
+        return "bg-gradient-to-r from-gray-500 to-gray-600"
     }
   }
 
@@ -92,88 +83,78 @@ export function MainNavigation() {
     }
   }
 
+  const filteredNavItems = navigationItems.filter((item) => !item.requiresAuth || isAuthenticated)
+
   const handleSignOut = async () => {
     try {
       await signOut()
     } catch (error) {
-      console.error("Error signing out:", error)
+      console.error("Sign out error:", error)
     }
   }
 
-  const toggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark")
-  }
-
-  if (!mounted) {
-    return null
-  }
-
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+    <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <div className="relative w-8 h-8">
-              <Image src="/images/loggotrans-light.png" alt="Erigga Live" fill className="object-contain dark:hidden" />
-              <Image
-                src="/images/loggotrans-dark.png"
-                alt="Erigga Live"
-                fill
-                className="object-contain hidden dark:block"
-              />
+            <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-2 rounded-lg">
+              <Sparkles className="h-6 w-6" />
             </div>
-            <span className="font-bold text-xl">Erigga Live</span>
+            <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              Erigga Live
+            </span>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-1">
-            {navigationItems.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href
-              return (
-                <Link key={item.name} href={item.href}>
-                  <Button
-                    variant={isActive ? "default" : "ghost"}
-                    size="sm"
-                    className={cn("flex items-center space-x-2", isActive && "bg-primary text-primary-foreground")}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{item.name}</span>
-                  </Button>
-                </Link>
-              )
-            })}
+            {filteredNavItems.map((item) => (
+              <Link key={item.name} href={item.href}>
+                <Button
+                  variant={pathname === item.href ? "default" : "ghost"}
+                  size="sm"
+                  className={cn(
+                    "flex items-center space-x-2",
+                    pathname === item.href && "bg-gradient-to-r from-purple-500 to-pink-500 text-white",
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.name}</span>
+                </Button>
+              </Link>
+            ))}
           </div>
 
-          {/* Right Side */}
+          {/* User Menu / Auth Buttons */}
           <div className="flex items-center space-x-4">
-            {/* Theme Toggle */}
-            <Button variant="ghost" size="sm" onClick={toggleTheme} className="hidden md:flex">
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-
-            {/* User Menu */}
             {isAuthenticated && profile ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
+                  <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                    <Avatar className="h-10 w-10 ring-2 ring-white/20">
                       <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} alt={profile.username} />
-                      <AvatarFallback>{profile.username?.charAt(0).toUpperCase()}</AvatarFallback>
+                      <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white">
+                        {profile.username?.charAt(0).toUpperCase()}
+                      </AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{profile.username}</p>
-                      <p className="text-xs leading-none text-muted-foreground">{profile.email}</p>
-                      <Badge
-                        className={cn("text-xs w-fit mt-1", getTierColor(profile.tier || "grassroot"), "text-white")}
-                      >
-                        {getTierDisplayName(profile.tier || "grassroot")}
-                      </Badge>
+                    <div className="flex flex-col space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <p className="text-sm font-medium leading-none">{profile.full_name || profile.username}</p>
+                        <Badge className={`text-xs ${getTierColor(profile.tier)} text-white border-0`}>
+                          <Crown className="h-3 w-3 mr-1" />
+                          {getTierDisplayName(profile.tier)}
+                        </Badge>
+                      </div>
+                      <p className="text-xs leading-none text-muted-foreground">@{profile.username}</p>
+                      <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                        <Coins className="h-3 w-3 text-yellow-500" />
+                        <span>{profile.coins_balance || 0} coins</span>
+                      </div>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
@@ -184,124 +165,100 @@ export function MainNavigation() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/profile/settings" className="flex items-center">
+                    <Link href="/profile" className="flex items-center">
                       <Settings className="mr-2 h-4 w-4" />
                       <span>Settings</span>
                     </Link>
                   </DropdownMenuItem>
-                  {profile.role === "admin" && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/admin" className="flex items-center">
-                        <Shield className="mr-2 h-4 w-4" />
-                        <span>Admin Panel</span>
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut}>
+                  <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
                     <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
+                    <span>Sign out</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
               <div className="hidden md:flex items-center space-x-2">
-                <Button variant="ghost" size="sm" asChild>
+                <Button variant="ghost" asChild>
                   <Link href="/login">Sign In</Link>
                 </Button>
-                <Button size="sm" asChild>
+                <Button
+                  asChild
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                >
                   <Link href="/signup">Sign Up</Link>
                 </Button>
               </div>
             )}
 
             {/* Mobile Menu */}
-            <Sheet>
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="md:hidden">
+                <Button variant="ghost" size="icon" className="md:hidden">
                   <Menu className="h-5 w-5" />
+                  <span className="sr-only">Toggle menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-                <div className="flex flex-col space-y-4 mt-4">
-                  {/* Mobile Theme Toggle */}
-                  <Button variant="ghost" onClick={toggleTheme} className="justify-start">
-                    {theme === "dark" ? (
-                      <>
-                        <Sun className="mr-2 h-4 w-4" />
-                        Light Mode
-                      </>
-                    ) : (
-                      <>
-                        <Moon className="mr-2 h-4 w-4" />
-                        Dark Mode
-                      </>
-                    )}
-                  </Button>
+              <SheetContent side="right" className="w-80">
+                <div className="flex flex-col space-y-4 mt-6">
+                  {isAuthenticated && profile && (
+                    <div className="flex items-center space-x-3 p-4 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
+                      <Avatar className="h-12 w-12 ring-2 ring-white/20">
+                        <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} alt={profile.username} />
+                        <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white">
+                          {profile.username?.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{profile.full_name || profile.username}</p>
+                        <p className="text-sm text-muted-foreground">@{profile.username}</p>
+                        <Badge className={`text-xs ${getTierColor(profile.tier)} text-white border-0 mt-1`}>
+                          {getTierDisplayName(profile.tier)}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
 
-                  {/* Mobile Navigation Items */}
-                  {navigationItems.map((item) => {
-                    const Icon = item.icon
-                    const isActive = pathname === item.href
-                    return (
-                      <Link key={item.name} href={item.href}>
-                        <Button variant={isActive ? "default" : "ghost"} className="w-full justify-start">
-                          <Icon className="mr-2 h-4 w-4" />
+                  <div className="space-y-2">
+                    {filteredNavItems.map((item) => (
+                      <Link key={item.name} href={item.href} onClick={() => setIsOpen(false)}>
+                        <Button
+                          variant={pathname === item.href ? "default" : "ghost"}
+                          className={cn(
+                            "w-full justify-start",
+                            pathname === item.href && "bg-gradient-to-r from-purple-500 to-pink-500 text-white",
+                          )}
+                        >
+                          <item.icon className="mr-2 h-4 w-4" />
                           {item.name}
                         </Button>
                       </Link>
-                    )
-                  })}
+                    ))}
+                  </div>
 
-                  {/* Mobile Auth */}
-                  {isAuthenticated && profile ? (
-                    <div className="pt-4 border-t">
-                      <div className="flex items-center space-x-3 mb-4">
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} alt={profile.username} />
-                          <AvatarFallback>{profile.username?.charAt(0).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{profile.username}</p>
-                          <Badge className={cn("text-xs", getTierColor(profile.tier || "grassroot"), "text-white")}>
-                            {getTierDisplayName(profile.tier || "grassroot")}
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Button variant="ghost" className="w-full justify-start" asChild>
-                          <Link href="/dashboard">
-                            <User className="mr-2 h-4 w-4" />
-                            Dashboard
-                          </Link>
-                        </Button>
-                        <Button variant="ghost" className="w-full justify-start" asChild>
-                          <Link href="/profile/settings">
-                            <Settings className="mr-2 h-4 w-4" />
-                            Settings
-                          </Link>
-                        </Button>
-                        {profile.role === "admin" && (
-                          <Button variant="ghost" className="w-full justify-start" asChild>
-                            <Link href="/admin">
-                              <Shield className="mr-2 h-4 w-4" />
-                              Admin Panel
-                            </Link>
-                          </Button>
-                        )}
-                        <Button variant="ghost" className="w-full justify-start" onClick={handleSignOut}>
-                          <LogOut className="mr-2 h-4 w-4" />
-                          Log out
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="pt-4 border-t space-y-2">
+                  {!isAuthenticated && (
+                    <div className="space-y-2 pt-4 border-t">
                       <Button variant="ghost" className="w-full" asChild>
-                        <Link href="/login">Sign In</Link>
+                        <Link href="/login" onClick={() => setIsOpen(false)}>
+                          Sign In
+                        </Link>
                       </Button>
-                      <Button className="w-full" asChild>
-                        <Link href="/signup">Sign Up</Link>
+                      <Button
+                        className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                        asChild
+                      >
+                        <Link href="/signup" onClick={() => setIsOpen(false)}>
+                          Sign Up
+                        </Link>
+                      </Button>
+                    </div>
+                  )}
+
+                  {isAuthenticated && (
+                    <div className="pt-4 border-t">
+                      <Button variant="ghost" className="w-full text-red-600" onClick={handleSignOut}>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign out
                       </Button>
                     </div>
                   )}
