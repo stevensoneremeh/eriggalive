@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     // Check if user has already voted
     const { data: existingVote } = await supabase
       .from("community_post_votes")
-      .select("*")
+      .select("id")
       .eq("post_id", postId)
       .eq("user_id", profile.id)
       .single()
@@ -40,28 +40,50 @@ export async function POST(request: NextRequest) {
 
     if (existingVote) {
       // Remove vote
-      const { error } = await supabase
+      const { error: deleteError } = await supabase
         .from("community_post_votes")
         .delete()
         .eq("post_id", postId)
         .eq("user_id", profile.id)
 
-      if (error) {
-        console.error("Database error:", error)
+      if (deleteError) {
+        console.error("Error removing vote:", deleteError)
         return NextResponse.json({ error: "Failed to remove vote" }, { status: 500 })
+      }
+
+      // Decrease vote count
+      const { error: updateError } = await supabase
+        .from("community_posts")
+        .update({ vote_count: supabase.sql`vote_count - 1` })
+        .eq("id", postId)
+
+      if (updateError) {
+        console.error("Error updating vote count:", updateError)
+        return NextResponse.json({ error: "Failed to update vote count" }, { status: 500 })
       }
 
       voted = false
     } else {
       // Add vote
-      const { error } = await supabase.from("community_post_votes").insert({
+      const { error: insertError } = await supabase.from("community_post_votes").insert({
         post_id: postId,
         user_id: profile.id,
       })
 
-      if (error) {
-        console.error("Database error:", error)
+      if (insertError) {
+        console.error("Error adding vote:", insertError)
         return NextResponse.json({ error: "Failed to add vote" }, { status: 500 })
+      }
+
+      // Increase vote count
+      const { error: updateError } = await supabase
+        .from("community_posts")
+        .update({ vote_count: supabase.sql`vote_count + 1` })
+        .eq("id", postId)
+
+      if (updateError) {
+        console.error("Error updating vote count:", updateError)
+        return NextResponse.json({ error: "Failed to update vote count" }, { status: 500 })
       }
 
       voted = true

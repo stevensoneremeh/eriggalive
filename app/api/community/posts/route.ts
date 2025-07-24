@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    // Fetch posts with user and category information
+    // Fetch posts with user and category information using proper joins
     const { data: posts, error } = await supabase
       .from("community_posts")
       .select(`
@@ -25,14 +25,14 @@ export async function GET(request: NextRequest) {
         view_count,
         created_at,
         updated_at,
-        user:user_id (
+        user:users!community_posts_user_id_fkey (
           id,
           username,
           full_name,
           avatar_url,
           tier
         ),
-        category:category_id (
+        category:community_categories!community_posts_category_id_fkey (
           id,
           name,
           slug,
@@ -54,21 +54,26 @@ export async function GET(request: NextRequest) {
     let postsWithVotes = posts || []
 
     if (user && posts && posts.length > 0) {
-      const postIds = posts.map((post) => post.id)
+      // Get user profile to get the internal user ID
+      const { data: userProfile } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
 
-      const { data: votes } = await supabase
-        .from("community_post_votes")
-        .select("post_id")
-        .eq("user_id", user.id)
-        .in("post_id", postIds)
+      if (userProfile) {
+        const postIds = posts.map((post) => post.id)
 
-      const votedPostIds = new Set(votes?.map((vote) => vote.post_id) || [])
+        const { data: votes } = await supabase
+          .from("community_post_votes")
+          .select("post_id")
+          .eq("user_id", userProfile.id)
+          .in("post_id", postIds)
 
-      postsWithVotes = posts.map((post) => ({
-        ...post,
-        has_voted: votedPostIds.has(post.id),
-        hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
-      }))
+        const votedPostIds = new Set(votes?.map((vote) => vote.post_id) || [])
+
+        postsWithVotes = posts.map((post) => ({
+          ...post,
+          has_voted: votedPostIds.has(post.id),
+          hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
+        }))
+      }
     } else {
       postsWithVotes =
         posts?.map((post) => ({
@@ -139,14 +144,14 @@ export async function POST(request: NextRequest) {
         view_count,
         created_at,
         updated_at,
-        user:user_id (
+        user:users!community_posts_user_id_fkey (
           id,
           username,
           full_name,
           avatar_url,
           tier
         ),
-        category:category_id (
+        category:community_categories!community_posts_category_id_fkey (
           id,
           name,
           slug,
@@ -163,7 +168,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      post,
+      post: {
+        ...post,
+        hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
+      },
     })
   } catch (error) {
     console.error("API error:", error)
