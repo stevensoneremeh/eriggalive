@@ -42,14 +42,14 @@ interface Post {
     full_name: string
     avatar_url?: string
     tier: string
-  }
+  } | null
   category: {
     id: number
     name: string
     slug: string
     icon: string
     color: string
-  }
+  } | null
   has_voted: boolean
 }
 
@@ -79,11 +79,13 @@ export default function CommunityPage() {
 
       if (data.error) {
         console.error("Error loading posts:", data.error)
+        toast.error("Failed to load posts")
       } else {
         setPosts(data.posts || [])
       }
     } catch (error) {
       console.error("Error loading posts:", error)
+      toast.error("Failed to load posts")
     } finally {
       setLoading(false)
     }
@@ -96,11 +98,13 @@ export default function CommunityPage() {
 
       if (data.error) {
         console.error("Error loading categories:", data.error)
+        toast.error("Failed to load categories")
       } else {
         setCategories(data.categories || [])
       }
     } catch (error) {
       console.error("Error loading categories:", error)
+      toast.error("Failed to load categories")
     }
   }
 
@@ -237,7 +241,7 @@ export default function CommunityPage() {
   const filteredPosts = posts.filter((post) => {
     const matchesSearch =
       post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      post.user.username.toLowerCase().includes(searchQuery.toLowerCase())
+      (post.user?.username || "").toLowerCase().includes(searchQuery.toLowerCase())
     return matchesSearch
   })
 
@@ -293,10 +297,10 @@ export default function CommunityPage() {
               <div className="flex items-center space-x-3 mb-4">
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
-                  <AvatarFallback>{profile?.username?.charAt(0).toUpperCase()}</AvatarFallback>
+                  <AvatarFallback>{(profile?.username || "U").charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="font-medium">{profile?.username}</p>
+                  <p className="font-medium">{profile?.username || "Unknown User"}</p>
                   <Badge className={cn("text-xs", getTierColor(profile?.tier || "grassroot"), "text-white")}>
                     {getTierDisplayName(profile?.tier || "grassroot")}
                   </Badge>
@@ -430,15 +434,15 @@ export default function CommunityPage() {
                 {/* Post Header */}
                 <div className="flex items-start space-x-3 mb-4">
                   <Avatar className="h-10 w-10">
-                    <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
-                    <AvatarFallback>{post.user.username.charAt(0).toUpperCase()}</AvatarFallback>
+                    <AvatarImage src={post.user?.avatar_url || "/placeholder-user.jpg"} />
+                    <AvatarFallback>{(post.user?.username || "U").charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
 
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-1">
-                      <span className="font-medium">{post.user.username}</span>
-                      <Badge className={cn("text-xs", getTierColor(post.user.tier), "text-white")}>
-                        {getTierDisplayName(post.user.tier)}
+                      <span className="font-medium">{post.user?.username || "Unknown User"}</span>
+                      <Badge className={cn("text-xs", getTierColor(post.user?.tier || "grassroot"), "text-white")}>
+                        {getTierDisplayName(post.user?.tier || "grassroot")}
                       </Badge>
                       <span className="text-sm text-muted-foreground">•</span>
                       <span className="text-sm text-muted-foreground">
@@ -446,14 +450,16 @@ export default function CommunityPage() {
                       </span>
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      <span
-                        className="text-xs px-2 py-1 rounded-full"
-                        style={{ backgroundColor: post.category.color + "20", color: post.category.color }}
-                      >
-                        {post.category.icon} {post.category.name}
-                      </span>
-                    </div>
+                    {post.category && (
+                      <div className="flex items-center space-x-2">
+                        <span
+                          className="text-xs px-2 py-1 rounded-full"
+                          style={{ backgroundColor: post.category.color + "20", color: post.category.color }}
+                        >
+                          {post.category.icon} {post.category.name}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

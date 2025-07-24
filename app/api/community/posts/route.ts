@@ -8,96 +8,68 @@ export async function GET(request: NextRequest) {
     // Get current user
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser()
 
-    // Fetch posts with user and category information using simple joins
-    const { data: posts, error } = await supabase
+    if (userError) {
+      console.error("Auth error:", userError)
+    }
+
+    // Fetch posts with proper joins
+    const { data: posts, error: postsError } = await supabase
       .from("community_posts")
       .select(`
-        id,
-        content,
-        type,
-        media_url,
-        media_type,
-        hashtags,
-        vote_count,
-        comment_count,
-        view_count,
-        created_at,
-        updated_at,
-        user_id,
-        category_id
+        *,
+        users!community_posts_user_id_fkey (
+          id,
+          username,
+          full_name,
+          avatar_url,
+          subscription_tier
+        ),
+        community_categories!community_posts_category_id_fkey (
+          id,
+          name,
+          slug,
+          icon,
+          color
+        )
       `)
-      .eq("is_published", true)
-      .eq("is_deleted", false)
       .order("created_at", { ascending: false })
-      .limit(50)
 
-    if (error) {
-      console.error("Database error:", error)
-      return NextResponse.json({ error: "Failed to fetch posts" }, { status: 500 })
+    if (postsError) {
+      console.error("Posts error:", postsError)
+      return NextResponse.json({ error: "Failed to fetch posts", details: postsError.message }, { status: 500 })
     }
 
-    if (!posts || posts.length === 0) {
-      return NextResponse.json({
-        success: true,
-        posts: [],
-      })
-    }
-
-    // Get unique user IDs and category IDs
-    const userIds = [...new Set(posts.map((post) => post.user_id))]
-    const categoryIds = [...new Set(posts.map((post) => post.category_id).filter(Boolean))]
-
-    // Fetch users separately
-    const { data: users } = await supabase
-      .from("users")
-      .select("id, username, full_name, avatar_url, tier")
-      .in("id", userIds)
-
-    // Fetch categories separately
-    const { data: categories } = await supabase
-      .from("community_categories")
-      .select("id, name, slug, icon, color")
-      .in("id", categoryIds)
-
-    // Create lookup maps
-    const userMap = new Map(users?.map((user) => [user.id, user]) || [])
-    const categoryMap = new Map(categories?.map((cat) => [cat.id, cat]) || [])
-
-    // Check if user has voted on each post
-    let votedPostIds = new Set()
-    if (user) {
-      // Get user profile to get the internal user ID
-      const { data: userProfile } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
-
-      if (userProfile) {
-        const postIds = posts.map((post) => post.id)
-        const { data: votes } = await supabase
-          .from("community_post_votes")
-          .select("post_id")
-          .eq("user_id", userProfile.id)
-          .in("post_id", postIds)
-
-        votedPostIds = new Set(votes?.map((vote) => vote.post_id) || [])
-      }
-    }
-
-    // Combine the data
-    const postsWithRelations = posts.map((post) => ({
+    // Transform the data to match expected format
+    const transformedPosts = (posts || []).map((post) => ({
       ...post,
-      user: userMap.get(post.user_id) || null,
-      category: categoryMap.get(post.category_id) || null,
-      has_voted: votedPostIds.has(post.id),
-      hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
+      user: post.users
+        ? {
+            id: post.users.id,
+            username: post.users.username,
+            full_name: post.users.full_name,
+            avatar_url: post.users.avatar_url,
+            tier: post.users.subscription_tier,
+          }
+        : null,
+      category: post.community_categories
+        ? {
+            id: post.community_categories.id,
+            name: post.community_categories.name,
+            slug: post.community_categories.slug,
+            icon: post.community_categories.icon,
+            color: post.community_categories.color,
+          }
+        : null,
+      has_voted: false, // TODO: Check if current user has voted
+      hashtags: post.hashtags || [],
     }))
 
-    return NextResponse.json({
-      success: true,
-      posts: postsWithRelations,
-    })
+    return NextResponse.json({ posts: transformedPosts })
   } catch (error) {
-    console.error("API error:", error)
+    console.error("Database error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -105,74 +77,53 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
+    const { content, categoryId, type = "post" } = await request.json()
 
     // Get current user
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser()
 
-    if (!user) {
+    if (userError || !user) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
     // Get user profile
-    const { data: profile } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .single()
 
-    if (!profile) {
+    if (profileError || !profile) {
       return NextResponse.json({ error: "User profile not found" }, { status: 404 })
     }
 
-    const body = await request.json()
-    const { content, categoryId, type = "post" } = body
-
-    if (!content || !categoryId) {
-      return NextResponse.json({ error: "Content and category are required" }, { status: 400 })
-    }
-
     // Create the post
-    const { data: post, error } = await supabase
+    const { data: post, error: postError } = await supabase
       .from("community_posts")
       .insert({
-        user_id: profile.id,
+        content,
         category_id: categoryId,
-        content: content.trim(),
+        user_id: profile.id,
         type,
         hashtags: [],
-        is_published: true,
-        is_deleted: false,
+        vote_count: 0,
+        comment_count: 0,
+        view_count: 0,
       })
-      .select("*")
+      .select()
       .single()
 
-    if (error) {
-      console.error("Database error:", error)
+    if (postError) {
+      console.error("Post creation error:", postError)
       return NextResponse.json({ error: "Failed to create post" }, { status: 500 })
     }
 
-    // Fetch the user and category data separately
-    const { data: userData } = await supabase
-      .from("users")
-      .select("id, username, full_name, avatar_url, tier")
-      .eq("id", post.user_id)
-      .single()
-
-    const { data: categoryData } = await supabase
-      .from("community_categories")
-      .select("id, name, slug, icon, color")
-      .eq("id", post.category_id)
-      .single()
-
-    return NextResponse.json({
-      success: true,
-      post: {
-        ...post,
-        user: userData,
-        category: categoryData,
-        hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
-      },
-    })
+    return NextResponse.json({ success: true, post })
   } catch (error) {
-    console.error("API error:", error)
+    console.error("Error creating post:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
