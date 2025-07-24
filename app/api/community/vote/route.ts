@@ -59,7 +59,6 @@ export async function POST(request: NextRequest) {
 
       if (updateError) {
         console.error("Error updating vote count:", updateError)
-        return NextResponse.json({ error: "Failed to update vote count" }, { status: 500 })
       }
 
       voted = false
@@ -83,7 +82,6 @@ export async function POST(request: NextRequest) {
 
       if (updateError) {
         console.error("Error updating vote count:", updateError)
-        return NextResponse.json({ error: "Failed to update vote count" }, { status: 500 })
       }
 
       voted = true

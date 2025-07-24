@@ -3,268 +3,469 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Archive,
+  Search,
+  Play,
+  Download,
+  Heart,
+  Share2,
+  Music,
+  Video,
+  ImageIcon,
+  FileText,
+  Calendar,
+  Eye,
+  Lock,
+  Crown,
+  Loader2,
+} from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { Archive, Search, Play, Download, Lock, Crown, Star } from "lucide-react"
-import { BlurredContent } from "@/components/blurred-content"
+import { formatDistanceToNow } from "date-fns"
+import { cn } from "@/lib/utils"
+import Link from "next/link"
+import Image from "next/image"
 
 interface MediaItem {
   id: string
   title: string
-  type: "video" | "audio" | "image"
-  thumbnail?: string
-  duration?: string
-  size?: string
-  tier_required: string
-  created_at: string
   description?: string
-  tags?: string[]
+  type: "video" | "audio" | "image" | "document"
+  url: string
+  thumbnail?: string
+  duration?: number
+  size?: number
+  tier_required: string
+  is_premium: boolean
+  views: number
+  likes: number
+  created_at: string
+  tags: string[]
 }
 
+const mockMediaItems: MediaItem[] = [
+  {
+    id: "1",
+    title: "Behind the Scenes - Studio Session",
+    description: "Exclusive footage from the latest recording session",
+    type: "video",
+    url: "/placeholder.mp4",
+    thumbnail: "/images/hero/erigga1.jpeg",
+    duration: 180,
+    tier_required: "pioneer",
+    is_premium: true,
+    views: 1250,
+    likes: 89,
+    created_at: "2024-01-15T10:00:00Z",
+    tags: ["studio", "behind-scenes", "exclusive"],
+  },
+  {
+    id: "2",
+    title: "Unreleased Track - 'Street Dreams'",
+    description: "Brand new unreleased track for Blood Brotherhood members",
+    type: "audio",
+    url: "/placeholder.mp3",
+    duration: 240,
+    tier_required: "blood_brotherhood",
+    is_premium: true,
+    views: 890,
+    likes: 156,
+    created_at: "2024-01-10T15:30:00Z",
+    tags: ["unreleased", "exclusive", "new-music"],
+  },
+  {
+    id: "3",
+    title: "Concert Photos - Lagos Show",
+    description: "High-quality photos from the recent Lagos concert",
+    type: "image",
+    url: "/images/hero/erigga2.jpeg",
+    tier_required: "grassroot",
+    is_premium: false,
+    views: 2100,
+    likes: 234,
+    created_at: "2024-01-05T20:00:00Z",
+    tags: ["concert", "photos", "lagos"],
+  },
+  {
+    id: "4",
+    title: "Lyrics Sheet - 'Paper Boi'",
+    description: "Official handwritten lyrics for Paper Boi",
+    type: "document",
+    url: "/placeholder.pdf",
+    tier_required: "elder",
+    is_premium: true,
+    views: 567,
+    likes: 78,
+    created_at: "2024-01-01T12:00:00Z",
+    tags: ["lyrics", "paper-boi", "handwritten"],
+  },
+]
+
 export default function VaultPage() {
-  const { user, userProfile } = useAuth()
+  const { profile, isAuthenticated } = useAuth()
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedTab, setSelectedTab] = useState("all")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedType, setSelectedType] = useState<string>("all")
+  const [selectedTier, setSelectedTier] = useState<string>("all")
+  const [sortBy, setSortBy] = useState<string>("newest")
 
   useEffect(() => {
-    loadMediaItems()
+    // Simulate loading media items
+    const timer = setTimeout(() => {
+      setMediaItems(mockMediaItems)
+      setLoading(false)
+    }, 1000)
+
+    return () => clearTimeout(timer)
   }, [])
 
-  const loadMediaItems = async () => {
-    try {
-      setLoading(true)
-      // Mock data for now - replace with actual API call
-      const mockData: MediaItem[] = [
-        {
-          id: "1",
-          title: "Exclusive Studio Session",
-          type: "video",
-          thumbnail: "/placeholder.svg?height=200&width=300",
-          duration: "15:30",
-          tier_required: "premium",
-          created_at: "2024-01-15",
-          description: "Behind the scenes studio session",
-          tags: ["studio", "exclusive", "music"],
-        },
-        {
-          id: "2",
-          title: "Unreleased Track Preview",
-          type: "audio",
-          duration: "3:45",
-          tier_required: "vip",
-          created_at: "2024-01-10",
-          description: "Preview of upcoming track",
-          tags: ["unreleased", "preview", "music"],
-        },
-        {
-          id: "3",
-          title: "Concert Photos",
-          type: "image",
-          tier_required: "basic",
-          created_at: "2024-01-05",
-          description: "High-quality concert photography",
-          tags: ["concert", "photos", "live"],
-        },
-      ]
-      setMediaItems(mockData)
-    } catch (error) {
-      console.error("Error loading media items:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const filteredItems = mediaItems.filter((item) => {
-    const matchesSearch =
-      item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesTab = selectedTab === "all" || item.type === selectedTab
-    return matchesSearch && matchesTab
-  })
-
-  const canAccess = (tierRequired: string) => {
-    if (!userProfile?.tier) return false
-    const tierHierarchy = { basic: 1, premium: 2, vip: 3 }
-    const userTierLevel = tierHierarchy[userProfile.tier as keyof typeof tierHierarchy] || 0
-    const requiredLevel = tierHierarchy[tierRequired as keyof typeof tierHierarchy] || 0
-    return userTierLevel >= requiredLevel
-  }
-
-  const getTierIcon = (tier: string) => {
-    switch (tier) {
-      case "vip":
-        return <Crown className="h-4 w-4" />
-      case "premium":
-        return <Star className="h-4 w-4" />
-      default:
-        return null
-    }
-  }
-
   const getTierColor = (tier: string) => {
-    switch (tier) {
-      case "vip":
-        return "bg-yellow-500"
-      case "premium":
+    switch (tier?.toLowerCase()) {
+      case "blood_brotherhood":
+      case "blood":
+        return "bg-red-500"
+      case "elder":
         return "bg-purple-500"
-      case "basic":
+      case "pioneer":
         return "bg-blue-500"
+      case "grassroot":
+        return "bg-green-500"
       default:
         return "bg-gray-500"
     }
   }
 
-  if (!user) {
+  const getTierDisplayName = (tier: string) => {
+    switch (tier?.toLowerCase()) {
+      case "blood_brotherhood":
+      case "blood":
+        return "Blood"
+      case "elder":
+        return "Elder"
+      case "pioneer":
+        return "Pioneer"
+      case "grassroot":
+        return "Grassroot"
+      default:
+        return "Fan"
+    }
+  }
+
+  const canAccessContent = (requiredTier: string) => {
+    if (!isAuthenticated || !profile) return false
+
+    const tierHierarchy = {
+      grassroot: 1,
+      pioneer: 2,
+      elder: 3,
+      blood_brotherhood: 4,
+      blood: 4,
+    }
+
+    const userTierLevel = tierHierarchy[profile.tier?.toLowerCase() as keyof typeof tierHierarchy] || 0
+    const requiredTierLevel = tierHierarchy[requiredTier?.toLowerCase() as keyof typeof tierHierarchy] || 0
+
+    return userTierLevel >= requiredTierLevel
+  }
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case "video":
+        return Video
+      case "audio":
+        return Music
+      case "image":
+        return ImageIcon
+      case "document":
+        return FileText
+      default:
+        return Archive
+    }
+  }
+
+  const formatDuration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`
+  }
+
+  const filteredItems = mediaItems.filter((item) => {
+    const matchesSearch =
+      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+
+    const matchesType = selectedType === "all" || item.type === selectedType
+    const matchesTier = selectedTier === "all" || item.tier_required === selectedTier
+
+    return matchesSearch && matchesType && matchesTier
+  })
+
+  const sortedItems = [...filteredItems].sort((a, b) => {
+    switch (sortBy) {
+      case "newest":
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      case "oldest":
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      case "popular":
+        return b.views - a.views
+      case "liked":
+        return b.likes - a.likes
+      default:
+        return 0
+    }
+  })
+
+  if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <Archive className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Media Vault</h1>
-          <p className="text-muted-foreground mb-4">Please log in to access exclusive content</p>
-          <Button asChild>
-            <a href="/login">Login</a>
-          </Button>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center gap-3 mb-6">
-        <Archive className="h-8 w-8" />
-        <div>
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center space-x-3 mb-4">
+          <Archive className="h-8 w-8 text-primary" />
           <h1 className="text-3xl font-bold">Media Vault</h1>
-          <p className="text-muted-foreground">Exclusive content for Erigga fans</p>
         </div>
+        <p className="text-muted-foreground">
+          Exclusive content, unreleased tracks, behind-the-scenes footage, and more
+        </p>
       </div>
 
-      {/* Search and Filters */}
-      <div className="mb-6">
-        <div className="flex flex-col sm:flex-row gap-4 mb-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search media..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
-
-        <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-          <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="video">Videos</TabsTrigger>
-            <TabsTrigger value="audio">Audio</TabsTrigger>
-            <TabsTrigger value="image">Images</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      {/* Media Grid */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <div className="h-48 bg-muted rounded-t-lg" />
-              <CardContent className="p-4">
-                <div className="h-4 bg-muted rounded mb-2" />
-                <div className="h-3 bg-muted rounded w-2/3" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      {/* Authentication Check */}
+      {!isAuthenticated ? (
+        <Card>
+          <CardContent className="text-center py-12">
+            <Lock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">Access Required</h3>
+            <p className="text-muted-foreground mb-4">Sign in to access exclusive content in the media vault</p>
+            <div className="space-x-2">
+              <Button asChild>
+                <Link href="/login">Sign In</Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href="/signup">Sign Up</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredItems.map((item) => {
-            const hasAccess = canAccess(item.tier_required)
-
-            return (
-              <Card key={item.id} className="overflow-hidden">
-                <div className="relative">
-                  {item.thumbnail && (
-                    <img
-                      src={item.thumbnail || "/placeholder.svg"}
-                      alt={item.title}
-                      className="w-full h-48 object-cover"
-                    />
-                  )}
-                  {!hasAccess && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                      <Lock className="h-8 w-8 text-white" />
-                    </div>
-                  )}
-                  <Badge className={`absolute top-2 right-2 ${getTierColor(item.tier_required)} text-white`}>
-                    {getTierIcon(item.tier_required)}
-                    <span className="ml-1 capitalize">{item.tier_required}</span>
-                  </Badge>
+        <>
+          {/* Filters */}
+          <Card className="mb-6">
+            <CardContent className="p-4">
+              <div className="flex flex-col lg:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search media..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
 
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-semibold line-clamp-1">{item.title}</h3>
-                  </div>
+                <Select value={selectedType} onValueChange={setSelectedType}>
+                  <SelectTrigger className="w-full lg:w-48">
+                    <SelectValue placeholder="Content Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="video">Videos</SelectItem>
+                    <SelectItem value="audio">Audio</SelectItem>
+                    <SelectItem value="image">Images</SelectItem>
+                    <SelectItem value="document">Documents</SelectItem>
+                  </SelectContent>
+                </Select>
 
-                  {item.description && (
-                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{item.description}</p>
-                  )}
+                <Select value={selectedTier} onValueChange={setSelectedTier}>
+                  <SelectTrigger className="w-full lg:w-48">
+                    <SelectValue placeholder="Tier Level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Tiers</SelectItem>
+                    <SelectItem value="grassroot">Grassroot</SelectItem>
+                    <SelectItem value="pioneer">Pioneer</SelectItem>
+                    <SelectItem value="elder">Elder</SelectItem>
+                    <SelectItem value="blood_brotherhood">Blood</SelectItem>
+                  </SelectContent>
+                </Select>
 
-                  <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
-                    <span className="capitalize">{item.type}</span>
-                    {item.duration && <span>{item.duration}</span>}
-                  </div>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-full lg:w-48">
+                    <SelectValue placeholder="Sort By" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest">Newest</SelectItem>
+                    <SelectItem value="oldest">Oldest</SelectItem>
+                    <SelectItem value="popular">Most Viewed</SelectItem>
+                    <SelectItem value="liked">Most Liked</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
 
-                  {item.tags && (
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {item.tags.slice(0, 3).map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-xs">
-                          {tag}
+          {/* Content Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {sortedItems.length === 0 ? (
+              <div className="col-span-full">
+                <Card>
+                  <CardContent className="text-center py-12">
+                    <Archive className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No content found</h3>
+                    <p className="text-muted-foreground">
+                      {searchQuery ? "Try adjusting your search terms" : "No media available at the moment"}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              sortedItems.map((item) => {
+                const TypeIcon = getTypeIcon(item.type)
+                const hasAccess = canAccessContent(item.tier_required)
+
+                return (
+                  <Card key={item.id} className="group hover:shadow-lg transition-shadow">
+                    <div className="relative">
+                      {/* Thumbnail */}
+                      <div className="aspect-video bg-muted rounded-t-lg overflow-hidden">
+                        {item.thumbnail ? (
+                          <Image
+                            src={item.thumbnail || "/placeholder.svg"}
+                            alt={item.title}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-full">
+                            <TypeIcon className="h-12 w-12 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Overlay */}
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-t-lg">
+                        {hasAccess ? (
+                          <Button size="sm" className="bg-white/20 hover:bg-white/30 text-white">
+                            <Play className="h-4 w-4 mr-2" />
+                            Play
+                          </Button>
+                        ) : (
+                          <div className="text-center text-white">
+                            <Lock className="h-6 w-6 mx-auto mb-2" />
+                            <p className="text-sm">Tier Required</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Duration */}
+                      {item.duration && (
+                        <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
+                          {formatDuration(item.duration)}
+                        </div>
+                      )}
+
+                      {/* Premium Badge */}
+                      {item.is_premium && (
+                        <div className="absolute top-2 left-2">
+                          <Badge className="bg-yellow-500 text-black">
+                            <Crown className="h-3 w-3 mr-1" />
+                            Premium
+                          </Badge>
+                        </div>
+                      )}
+
+                      {/* Tier Badge */}
+                      <div className="absolute top-2 right-2">
+                        <Badge className={cn("text-white", getTierColor(item.tier_required))}>
+                          {getTierDisplayName(item.tier_required)}
                         </Badge>
-                      ))}
+                      </div>
                     </div>
-                  )}
 
-                  <div className="flex gap-2">
-                    {hasAccess ? (
-                      <>
-                        <Button size="sm" className="flex-1">
-                          <Play className="h-4 w-4 mr-1" />
-                          {item.type === "image" ? "View" : "Play"}
-                        </Button>
-                        <Button size="sm" variant="outline">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <BlurredContent requiredTier={item.tier_required}>
-                        <Button size="sm" className="flex-1" disabled>
-                          <Lock className="h-4 w-4 mr-1" />
-                          Upgrade Required
-                        </Button>
-                      </BlurredContent>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      )}
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-medium line-clamp-2 flex-1">{item.title}</h3>
+                        <TypeIcon className="h-4 w-4 text-muted-foreground ml-2 flex-shrink-0" />
+                      </div>
 
-      {filteredItems.length === 0 && !loading && (
-        <div className="text-center py-12">
-          <Archive className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No media found</h3>
-          <p className="text-muted-foreground">
-            {searchTerm ? "Try adjusting your search terms" : "No media available at the moment"}
-          </p>
-        </div>
+                      {item.description && (
+                        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{item.description}</p>
+                      )}
+
+                      {/* Tags */}
+                      {item.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {item.tags.slice(0, 3).map((tag) => (
+                            <Badge key={tag} variant="secondary" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Stats */}
+                      <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="flex items-center">
+                            <Eye className="h-3 w-3 mr-1" />
+                            {item.views}
+                          </div>
+                          <div className="flex items-center">
+                            <Heart className="h-3 w-3 mr-1" />
+                            {item.likes}
+                          </div>
+                        </div>
+                        <div className="flex items-center">
+                          <Calendar className="h-3 w-3 mr-1" />
+                          {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center justify-between">
+                        {hasAccess ? (
+                          <div className="flex space-x-2">
+                            <Button size="sm" variant="outline">
+                              <Play className="h-3 w-3 mr-1" />
+                              Play
+                            </Button>
+                            <Button size="sm" variant="outline">
+                              <Download className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button size="sm" variant="outline" asChild>
+                            <Link href="/premium">
+                              <Crown className="h-3 w-3 mr-1" />
+                              Upgrade
+                            </Link>
+                          </Button>
+                        )}
+
+                        <Button size="sm" variant="ghost">
+                          <Share2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })
+            )}
+          </div>
+        </>
       )}
     </div>
   )
