@@ -1,114 +1,182 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Button } from "@/components/ui/button"
 import { useAuth } from "@/contexts/auth-context"
-import { Music, Users, Calendar, TrendingUp, Clock, Home, Coins, Crown, Gift, MessageCircle } from "lucide-react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { toast } from "sonner"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { User, Coins, MessageSquare, Heart, TrendingUp, Calendar, Music, Users, AlertCircle } from "lucide-react"
+import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
 
-// Mock data for the dashboard
-const mockRecentTracks = [
-  { id: 1, title: "Send Her Money", artist: "Erigga ft. Yemi Alade", plays: 5200000 },
-  { id: 2, title: "The Fear of God", artist: "Erigga", plays: 3800000 },
-  { id: 3, title: "Area to the World", artist: "Erigga ft. Zlatan", plays: 4100000 },
-]
-
-const mockUpcomingEvents = [
-  { id: 1, title: "Erigga Live in Lagos", date: "Dec 31, 2024", venue: "Eko Hotel & Suites" },
-  { id: 2, title: "Street Motivation Tour - Abuja", date: "Nov 15, 2024", venue: "ICC Abuja" },
-]
-
-const mockCommunityPosts = [
-  { id: 1, author: "PaperBoi_Fan", content: "Just got my tickets for the Lagos show! Who else is going?", likes: 24 },
-  { id: 2, author: "WarriToTheWorld", content: "That new freestyle is 🔥🔥🔥", likes: 18 },
-]
+interface DashboardStats {
+  totalPosts: number
+  totalVotes: number
+  totalComments: number
+  coinsBalance: number
+  recentActivity: any[]
+}
 
 export default function DashboardPage() {
-  const { profile, isAuthenticated, isLoading, refreshProfile } = useAuth()
-  const [activeTab, setActiveTab] = useState("overview")
+  const { isAuthenticated, profile, loading: authLoading } = useAuth()
+  const [stats, setStats] = useState<DashboardStats>({
+    totalPosts: 0,
+    totalVotes: 0,
+    totalComments: 0,
+    coinsBalance: 0,
+    recentActivity: [],
+  })
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
+  const supabase = createClient()
 
   useEffect(() => {
-    // If not loading and not authenticated, redirect to login
-    if (!isLoading && !isAuthenticated) {
-      toast.error("Please sign in to access your dashboard")
-      router.push("/login?redirect=/dashboard")
-      return
+    if (!authLoading && isAuthenticated && profile) {
+      loadDashboardData()
+    } else if (!authLoading && !isAuthenticated) {
+      setLoading(false)
     }
+  }, [authLoading, isAuthenticated, profile])
 
-    // If authenticated but no profile, try to refresh profile
-    if (isAuthenticated && !profile) {
-      const loadProfile = async () => {
-        try {
-          await refreshProfile()
-        } catch (err) {
-          console.error("Error loading profile:", err)
-          setError("Failed to load your profile. Please try refreshing the page.")
-        }
-      }
-      loadProfile()
+  const loadDashboardData = async () => {
+    if (!profile) return
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Load user stats
+      const [postsResult, votesResult, commentsResult] = await Promise.allSettled([
+        supabase
+          .from("community_posts")
+          .select("id", { count: "exact" })
+          .eq("user_id", profile.id)
+          .eq("is_deleted", false),
+
+        supabase.from("community_post_votes").select("id", { count: "exact" }).eq("user_id", profile.id),
+
+        supabase
+          .from("community_comments")
+          .select("id", { count: "exact" })
+          .eq("user_id", profile.id)
+          .eq("is_deleted", false),
+      ])
+
+      // Load recent activity
+      const { data: recentPosts } = await supabase
+        .from("community_posts")
+        .select(`
+          id,
+          content,
+          created_at,
+          vote_count,
+          comment_count,
+          category:community_categories!community_posts_category_id_fkey(name)
+        `)
+        .eq("user_id", profile.id)
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: false })
+        .limit(5)
+
+      setStats({
+        totalPosts: postsResult.status === "fulfilled" ? postsResult.value.count || 0 : 0,
+        totalVotes: votesResult.status === "fulfilled" ? votesResult.value.count || 0 : 0,
+        totalComments: commentsResult.status === "fulfilled" ? commentsResult.value.count || 0 : 0,
+        coinsBalance: profile.coins_balance || 0,
+        recentActivity: recentPosts || [],
+      })
+    } catch (err) {
+      console.error("Error loading dashboard data:", err)
+      setError("Failed to load dashboard data")
+    } finally {
+      setLoading(false)
     }
-  }, [isAuthenticated, isLoading, profile, router, refreshProfile])
+  }
 
-  // Handle loading state
-  if (isLoading) {
+  const getTierColor = (tier: string) => {
+    switch (tier?.toLowerCase()) {
+      case "blood":
+      case "blood_brotherhood":
+        return "bg-red-500 text-white"
+      case "elder":
+        return "bg-purple-500 text-white"
+      case "pioneer":
+        return "bg-blue-500 text-white"
+      case "grassroot":
+        return "bg-green-500 text-white"
+      default:
+        return "bg-gray-500 text-white"
+    }
+  }
+
+  const getTierDisplayName = (tier: string) => {
+    switch (tier?.toLowerCase()) {
+      case "blood":
+      case "blood_brotherhood":
+        return "Blood Brotherhood"
+      case "elder":
+        return "Elder"
+      case "pioneer":
+        return "Pioneer"
+      case "grassroot":
+        return "Grassroot"
+      default:
+        return "Fan"
+    }
+  }
+
+  if (authLoading || loading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-4 w-96" />
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-32" />
-            ))}
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <Skeleton className="col-span-2 h-48" />
-            <Skeleton className="col-span-4 h-48" />
-            <Skeleton className="col-span-3 h-48" />
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <Skeleton className="h-4 w-16 mb-2" />
+                <Skeleton className="h-8 w-12" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-32" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-32 w-full" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-32" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-32 w-full" />
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
   }
 
-  // Handle error state
-  if (error) {
+  if (!isAuthenticated) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <Alert variant="destructive" className="mb-6">
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-        <Button onClick={() => window.location.reload()}>Refresh Page</Button>
-      </div>
-    )
-  }
-
-  // Handle not authenticated state
-  if (!isAuthenticated || !profile) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardContent className="text-center py-12">
-            <Crown className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-2xl font-bold mb-4">Access Your Dashboard</h2>
-            <p className="text-muted-foreground mb-6">Please sign in to access your personalized dashboard</p>
-            <div className="space-x-4">
-              <Button asChild>
+        <Card className="max-w-md mx-auto">
+          <CardContent className="p-6 text-center">
+            <User className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Access Required</h2>
+            <p className="text-muted-foreground mb-4">Please sign in to access your dashboard</p>
+            <div className="space-y-2">
+              <Button className="w-full" asChild>
                 <Link href="/login?redirect=/dashboard">Sign In</Link>
               </Button>
-              <Button variant="outline" asChild>
-                <Link href="/signup">Sign Up</Link>
+              <Button variant="outline" className="w-full bg-transparent" asChild>
+                <Link href="/signup">Create Account</Link>
               </Button>
             </div>
           </CardContent>
@@ -117,284 +185,216 @@ export default function DashboardPage() {
     )
   }
 
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Alert variant="destructive" className="max-w-md mx-auto">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="space-y-6">
-        {/* Breadcrumb Navigation */}
-        <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <Link href="/" className="hover:text-primary transition-colors flex items-center">
-            <Home className="h-4 w-4 mr-1" />
-            Home
-          </Link>
-          <span>/</span>
-          <span className="text-foreground">Dashboard</span>
-        </nav>
-
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {profile.username || "Fan"}!</h1>
-          <p className="text-muted-foreground">Here's what's happening with your Erigga fan account today.</p>
+      {/* Welcome Section */}
+      <div className="mb-8">
+        <div className="flex items-center space-x-4 mb-4">
+          <Avatar className="h-16 w-16">
+            <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
+            <AvatarFallback className="text-lg">{profile?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+          </Avatar>
+          <div>
+            <h1 className="text-3xl font-bold">Welcome back, {profile?.username || "User"}!</h1>
+            <div className="flex items-center space-x-2 mt-1">
+              <Badge className={getTierColor(profile?.tier || "grassroot")}>
+                {getTierDisplayName(profile?.tier || "grassroot")}
+              </Badge>
+              <span className="text-muted-foreground">•</span>
+              <span className="text-muted-foreground">
+                Member since {new Date(profile?.created_at || "").toLocaleDateString()}
+              </span>
+            </div>
+          </div>
         </div>
-
-        <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="music">Music</TabsTrigger>
-            <TabsTrigger value="community">Community</TabsTrigger>
-            <TabsTrigger value="events">Events</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Your Balance</CardTitle>
-                  <Coins className="h-4 w-4 text-yellow-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{profile.coins_balance || 0} Coins</div>
-                  <p className="text-xs text-muted-foreground">Use coins to unlock premium content</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Membership Tier</CardTitle>
-                  <Crown className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold capitalize">{getTierDisplayName(profile.tier)}</div>
-                  <p className="text-xs text-muted-foreground">{getTierDescription(profile.tier)}</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Upcoming Events</CardTitle>
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">2</div>
-                  <p className="text-xs text-muted-foreground">Events in the next 3 months</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">New Releases</CardTitle>
-                  <Music className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">3</div>
-                  <p className="text-xs text-muted-foreground">New tracks this month</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-              <Card className="col-span-2">
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                  <CardDescription>Manage your account and explore content</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
-                    <Button asChild className="bg-green-500 hover:bg-green-600">
-                      <Link href="/coins">
-                        <Coins className="h-4 w-4 mr-2" />
-                        Manage Coins
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline">
-                      <Link href="/community">
-                        <Users className="h-4 w-4 mr-2" />
-                        Community
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline">
-                      <Link href="/chat">
-                        <MessageCircle className="h-4 w-4 mr-2" />
-                        Chat Rooms
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline">
-                      <Link href="/rooms/freebies">
-                        <Gift className="h-4 w-4 mr-2" />
-                        Freebies
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="col-span-4">
-                <CardHeader>
-                  <CardTitle>Recent Tracks</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {mockRecentTracks.map((track) => (
-                      <div key={track.id} className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{track.title}</p>
-                          <p className="text-sm text-muted-foreground">{track.artist}</p>
-                        </div>
-                        <div className="flex items-center">
-                          <TrendingUp className="h-4 w-4 text-muted-foreground mr-1" />
-                          <span className="text-sm">{formatNumber(track.plays)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="col-span-3">
-                <CardHeader>
-                  <CardTitle>Upcoming Events</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {mockUpcomingEvents.map((event) => (
-                      <div key={event.id} className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{event.title}</p>
-                          <p className="text-sm text-muted-foreground">{event.venue}</p>
-                        </div>
-                        <div className="flex items-center">
-                          <Clock className="h-4 w-4 text-muted-foreground mr-1" />
-                          <span className="text-sm">{event.date}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Community Activity</CardTitle>
-                <CardDescription>Recent posts from the Erigga fan community</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {mockCommunityPosts.map((post) => (
-                    <div key={post.id} className="border-b pb-4 last:border-0 last:pb-0">
-                      <div className="flex items-center mb-2">
-                        <span className="font-medium mr-2">{post.author}</span>
-                        <span className="text-xs text-muted-foreground">Posted recently</span>
-                      </div>
-                      <p>{post.content}</p>
-                      <div className="flex items-center mt-2 text-sm text-muted-foreground">
-                        <span>{post.likes} likes</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="music" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Music Library</CardTitle>
-                <CardDescription>Access your favorite Erigga tracks and albums</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p>Visit the Media Vault for full access to music content.</p>
-                <Button asChild className="mt-4">
-                  <Link href="/vault">
-                    <Music className="h-4 w-4 mr-2" />
-                    Open Media Vault
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="community" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Community Feed</CardTitle>
-                <CardDescription>Connect with other Erigga fans</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p>Visit the Community page to see all posts and discussions.</p>
-                <Button asChild className="mt-4">
-                  <Link href="/community">
-                    <Users className="h-4 w-4 mr-2" />
-                    Join Community
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="events" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Upcoming Events</CardTitle>
-                <CardDescription>Concerts, tours, and meet & greets</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p>Visit the Events page to see all upcoming events and purchase tickets.</p>
-                <Button asChild className="mt-4">
-                  <Link href="/chronicles">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    View Events
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
       </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Posts</p>
+                <p className="text-2xl font-bold">{stats.totalPosts}</p>
+              </div>
+              <MessageSquare className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Votes Given</p>
+                <p className="text-2xl font-bold">{stats.totalVotes}</p>
+              </div>
+              <Heart className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Comments</p>
+                <p className="text-2xl font-bold">{stats.totalComments}</p>
+              </div>
+              <MessageSquare className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Erigga Coins</p>
+                <p className="text-2xl font-bold">{stats.coinsBalance}</p>
+              </div>
+              <Coins className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Activity */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <TrendingUp className="h-5 w-5 mr-2" />
+              Recent Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats.recentActivity.length === 0 ? (
+              <div className="text-center py-8">
+                <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground mb-4">No recent activity</p>
+                <Button asChild>
+                  <Link href="/community">Start Participating</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {stats.recentActivity.map((activity, index) => (
+                  <div key={activity.id || index} className="border-b pb-4 last:border-b-0">
+                    <p className="font-medium mb-1">
+                      {activity.content.length > 100 ? `${activity.content.substring(0, 100)}...` : activity.content}
+                    </p>
+                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                      <span>{new Date(activity.created_at).toLocaleDateString()}</span>
+                      <span>•</span>
+                      <span>{activity.vote_count} votes</span>
+                      <span>•</span>
+                      <span>{activity.comment_count} comments</span>
+                      {activity.category && (
+                        <>
+                          <span>•</span>
+                          <Badge variant="outline" className="text-xs">
+                            {activity.category.name}
+                          </Badge>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4">
+              <Button className="w-full justify-start" asChild>
+                <Link href="/community">
+                  <Users className="h-4 w-4 mr-2" />
+                  Browse Community
+                </Link>
+              </Button>
+
+              <Button className="w-full justify-start bg-transparent" variant="outline" asChild>
+                <Link href="/community/create">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Create Post
+                </Link>
+              </Button>
+
+              <Button className="w-full justify-start bg-transparent" variant="outline" asChild>
+                <Link href="/radio">
+                  <Music className="h-4 w-4 mr-2" />
+                  Listen to Radio
+                </Link>
+              </Button>
+
+              <Button className="w-full justify-start bg-transparent" variant="outline" asChild>
+                <Link href="/coins">
+                  <Coins className="h-4 w-4 mr-2" />
+                  Manage Coins
+                </Link>
+              </Button>
+
+              <Button className="w-full justify-start bg-transparent" variant="outline" asChild>
+                <Link href="/profile">
+                  <User className="h-4 w-4 mr-2" />
+                  Edit Profile
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Upcoming Features */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Calendar className="h-5 w-5 mr-2" />
+            Coming Soon
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center p-4 border rounded-lg">
+              <Music className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              <h3 className="font-medium mb-1">Exclusive Tracks</h3>
+              <p className="text-sm text-muted-foreground">Access unreleased music based on your tier</p>
+            </div>
+
+            <div className="text-center p-4 border rounded-lg">
+              <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              <h3 className="font-medium mb-1">Live Events</h3>
+              <p className="text-sm text-muted-foreground">Join virtual meet & greets with Erigga</p>
+            </div>
+
+            <div className="text-center p-4 border rounded-lg">
+              <TrendingUp className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              <h3 className="font-medium mb-1">Leaderboards</h3>
+              <p className="text-sm text-muted-foreground">Compete with other fans for rewards</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
-}
-
-// Helper function to format large numbers
-function formatNumber(num: number): string {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + "M"
-  }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + "K"
-  }
-  return num.toString()
-}
-
-// Helper function to get tier descriptions
-function getTierDescription(tier: string): string {
-  switch (tier?.toLowerCase()) {
-    case "blood_brotherhood":
-    case "blood":
-      return "VIP access to all content and events"
-    case "elder":
-      return "Exclusive content and event discounts"
-    case "pioneer":
-      return "Early access to new releases"
-    case "grassroot":
-      return "Basic access to content"
-    default:
-      return "Fan membership tier"
-  }
-}
-
-// Helper function to get tier display names
-function getTierDisplayName(tier: string): string {
-  switch (tier?.toLowerCase()) {
-    case "blood_brotherhood":
-    case "blood":
-      return "Blood"
-    case "elder":
-      return "Elder"
-    case "pioneer":
-      return "Pioneer"
-    case "grassroot":
-      return "Grassroot"
-    default:
-      return "Fan"
-  }
 }
