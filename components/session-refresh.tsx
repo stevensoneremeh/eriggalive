@@ -1,52 +1,40 @@
 "use client"
 
 import { useEffect } from "react"
-import { usePathname } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
-import { clientAuth } from "@/lib/auth-utils"
+import { createClient } from "@/lib/supabase/client"
 
 export function SessionRefresh() {
-  const { isAuthenticated, refreshSession } = useAuth()
-  const pathname = usePathname()
+  const { isAuthenticated, refreshProfile } = useAuth()
+  const supabase = createClient()
 
-  // Refresh session on route changes
-  useEffect(() => {
-    if (isAuthenticated) {
-      refreshSession()
-    }
-  }, [pathname, isAuthenticated, refreshSession])
-
-  // Also refresh on initial load
-  useEffect(() => {
-    if (isAuthenticated) {
-      refreshSession()
-    }
-  }, [isAuthenticated, refreshSession])
-
-  // Set up periodic refresh
   useEffect(() => {
     if (!isAuthenticated) return
 
-    // Immediate refresh
-    refreshSession()
-
-    // Set up interval for periodic refresh
+    // Set up an interval to refresh the session every 10 minutes
     const interval = setInterval(
-      () => {
-        refreshSession()
-
-        // Also check if we're still authenticated via our utility
-        const stillAuthenticated = clientAuth.isAuthenticated()
-        if (!stillAuthenticated) {
-          // Force page reload if authentication is lost
-          window.location.href = "/login"
+      async () => {
+        try {
+          // Refresh the session
+          const { error } = await supabase.auth.refreshSession()
+          if (error) {
+            console.error("Error refreshing session:", error)
+          } else {
+            // If session refresh was successful, also refresh the user profile
+            await refreshProfile()
+          }
+        } catch (err) {
+          console.error("Error in session refresh:", err)
         }
       },
-      5 * 60 * 1000,
-    ) // Every 5 minutes
+      10 * 60 * 1000,
+    ) // 10 minutes
 
     return () => clearInterval(interval)
-  }, [isAuthenticated, refreshSession])
+  }, [isAuthenticated, refreshProfile, supabase])
 
-  return null // This component doesn't render anything
+  // This component doesn't render anything
+  return null
 }
+
+export default SessionRefresh

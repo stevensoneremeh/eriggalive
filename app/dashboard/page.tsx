@@ -9,6 +9,8 @@ import { Music, Users, Calendar, TrendingUp, Clock, Home, Coins, Crown, Gift, Me
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { toast } from "sonner"
 
 // Mock data for the dashboard
 const mockRecentTracks = [
@@ -28,16 +30,34 @@ const mockCommunityPosts = [
 ]
 
 export default function DashboardPage() {
-  const { profile, isAuthenticated, isLoading } = useAuth()
+  const { profile, isAuthenticated, isLoading, refreshProfile } = useAuth()
   const [activeTab, setActiveTab] = useState("overview")
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
+    // If not loading and not authenticated, redirect to login
     if (!isLoading && !isAuthenticated) {
+      toast.error("Please sign in to access your dashboard")
       router.push("/login?redirect=/dashboard")
+      return
     }
-  }, [isAuthenticated, isLoading, router])
 
+    // If authenticated but no profile, try to refresh profile
+    if (isAuthenticated && !profile) {
+      const loadProfile = async () => {
+        try {
+          await refreshProfile()
+        } catch (err) {
+          console.error("Error loading profile:", err)
+          setError("Failed to load your profile. Please try refreshing the page.")
+        }
+      }
+      loadProfile()
+    }
+  }, [isAuthenticated, isLoading, profile, router, refreshProfile])
+
+  // Handle loading state
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -61,6 +81,20 @@ export default function DashboardPage() {
     )
   }
 
+  // Handle error state
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Alert variant="destructive" className="mb-6">
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+        <Button onClick={() => window.location.reload()}>Refresh Page</Button>
+      </div>
+    )
+  }
+
+  // Handle not authenticated state
   if (!isAuthenticated || !profile) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -71,7 +105,7 @@ export default function DashboardPage() {
             <p className="text-muted-foreground mb-6">Please sign in to access your personalized dashboard</p>
             <div className="space-x-4">
               <Button asChild>
-                <Link href="/login">Sign In</Link>
+                <Link href="/login?redirect=/dashboard">Sign In</Link>
               </Button>
               <Button variant="outline" asChild>
                 <Link href="/signup">Sign Up</Link>
@@ -97,7 +131,7 @@ export default function DashboardPage() {
         </nav>
 
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {profile.username}!</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {profile.username || "Fan"}!</h1>
           <p className="text-muted-foreground">Here's what's happening with your Erigga fan account today.</p>
         </div>
 
@@ -128,8 +162,8 @@ export default function DashboardPage() {
                   <Crown className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold capitalize">{getTierDisplayName(profile.subscription_tier)}</div>
-                  <p className="text-xs text-muted-foreground">{getTierDescription(profile.subscription_tier)}</p>
+                  <div className="text-2xl font-bold capitalize">{getTierDisplayName(profile.tier)}</div>
+                  <p className="text-xs text-muted-foreground">{getTierDescription(profile.tier)}</p>
                 </CardContent>
               </Card>
 
@@ -334,15 +368,15 @@ function formatNumber(num: number): string {
 // Helper function to get tier descriptions
 function getTierDescription(tier: string): string {
   switch (tier?.toLowerCase()) {
-    case "grassroot":
-      return "Basic access to content"
-    case "pioneer":
-      return "Early access to new releases"
-    case "elder":
-      return "Exclusive content and event discounts"
     case "blood_brotherhood":
     case "blood":
       return "VIP access to all content and events"
+    case "elder":
+      return "Exclusive content and event discounts"
+    case "pioneer":
+      return "Early access to new releases"
+    case "grassroot":
+      return "Basic access to content"
     default:
       return "Fan membership tier"
   }

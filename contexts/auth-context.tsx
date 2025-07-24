@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { User, Session } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
+import { toast } from "sonner"
 
 type UserProfile = Database["public"]["Tables"]["users"]["Row"]
 
@@ -40,8 +41,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
 
       if (error) {
+        console.log("Error fetching profile:", error)
+
+        // If no profile exists, create one
         if (error.code === "PGRST116") {
-          // No profile exists, create one
           const { data: authUser } = await supabase.auth.getUser()
 
           if (authUser.user) {
@@ -49,8 +52,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               auth_user_id: userId,
               email: authUser.user.email || "",
               username: authUser.user.user_metadata?.username || authUser.user.email?.split("@")[0] || "user",
-              full_name: authUser.user.user_metadata?.full_name || authUser.user.email || "",
-              subscription_tier: "grassroot" as const,
+              full_name: authUser.user.user_metadata?.full_name || "",
+              tier: "grassroot",
               coins_balance: 100,
               level: 1,
               points: 0,
@@ -159,8 +162,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
       })
+
+      if (!error) {
+        toast.success("Signed in successfully")
+      }
+
       return { error }
     } catch (error) {
+      console.error("Sign in error:", error)
       return { error }
     }
   }
@@ -184,14 +193,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) return { error }
 
+      // Create user profile
+      if (data.user) {
+        const newProfile = {
+          auth_user_id: data.user.id,
+          email: data.user.email || "",
+          username: userData.username,
+          full_name: userData.full_name,
+          tier: userData.tier || "grassroot",
+          coins_balance: 100,
+          level: 1,
+          points: 0,
+          is_active: true,
+          is_verified: false,
+          is_banned: false,
+        }
+
+        const { error: profileError } = await supabase.from("users").insert(newProfile)
+
+        if (profileError) {
+          console.error("Error creating profile:", profileError)
+          return { error: profileError }
+        }
+
+        toast.success("Account created successfully")
+      }
+
       return { error: null }
     } catch (error) {
+      console.error("Sign up error:", error)
       return { error }
     }
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut()
+      toast.success("Signed out successfully")
+    } catch (error) {
+      console.error("Sign out error:", error)
+      toast.error("Failed to sign out")
+    }
   }
 
   const value = {

@@ -1,533 +1,401 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Plus, Heart, Share2, Search, TrendingUp, Clock, Users, Loader2 } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
-import { formatDistanceToNow } from "date-fns"
-import { cn } from "@/lib/utils"
-import { toast } from "sonner"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { MessageCircle, ThumbsUp, ThumbsDown, AlertCircle } from "lucide-react"
 import Link from "next/link"
-import { CommentSection } from "@/components/community/comment-section"
+import { createClient } from "@/lib/supabase/client"
+
+interface Post {
+  id: number
+  title: string
+  content: string
+  created_at: string
+  user_id: string
+  category_id: number
+  upvotes: number
+  downvotes: number
+  user?: {
+    username: string
+    avatar_url: string | null
+    tier: string
+  }
+  category?: {
+    name: string
+  }
+}
 
 interface Category {
   id: number
   name: string
-  slug: string
-  icon: string
-  color: string
-}
-
-interface Post {
-  id: number
-  content: string
-  type: string
-  media_url?: string
-  media_type?: string
-  hashtags: string[]
-  vote_count: number
-  comment_count: number
-  view_count: number
-  created_at: string
-  user: {
-    id: number
-    username: string
-    full_name: string
-    avatar_url?: string
-    tier: string
-  } | null
-  category: {
-    id: number
-    name: string
-    slug: string
-    icon: string
-    color: string
-  } | null
-  has_voted: boolean
+  description: string
 }
 
 export default function CommunityPage() {
-  const { profile, isAuthenticated } = useAuth()
+  const { isAuthenticated, profile } = useAuth()
   const [posts, setPosts] = useState<Post[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
-  const [showCreateForm, setShowCreateForm] = useState(false)
-
-  // Form state
-  const [newPostContent, setNewPostContent] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [sortBy, setSortBy] = useState("newest")
+  const [error, setError] = useState<string | null>(null)
+  const [activeCategory, setActiveCategory] = useState<number | null>(null)
+  const supabase = createClient()
 
   useEffect(() => {
-    loadPosts()
-    loadCategories()
-  }, [])
+    const loadPosts = async () => {
+      try {
+        // First, fetch posts
+        const { data: postsData, error: postsError } = await supabase
+          .from("community_posts")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(20)
 
-  const loadPosts = async () => {
-    try {
-      const response = await fetch("/api/community/posts")
-      const data = await response.json()
+        if (postsError) {
+          console.error("Error loading posts:", postsError)
+          setError("Failed to fetch posts")
+          return
+        }
 
-      if (data.error) {
-        console.error("Error loading posts:", data.error)
-        toast.error("Failed to load posts")
-      } else {
-        setPosts(data.posts || [])
+        // Then, fetch users and categories separately
+        const userIds = [...new Set(postsData.map((post) => post.user_id))]
+        const categoryIds = [...new Set(postsData.map((post) => post.category_id))]
+
+        // Fetch users
+        const { data: usersData, error: usersError } = await supabase
+          .from("users")
+          .select("auth_user_id, username, avatar_url, tier")
+          .in("auth_user_id", userIds)
+
+        if (usersError) {
+          console.error("Error loading users:", usersError)
+        }
+
+        // Fetch categories
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from("community_categories")
+          .select("id, name")
+          .in("id", categoryIds)
+
+        if (categoriesError) {
+          console.error("Error loading categories:", categoriesError)
+        }
+
+        // Create a map of users and categories for easy lookup
+        const userMap =
+          usersData?.reduce(
+            (acc, user) => {
+              acc[user.auth_user_id] = user
+              return acc
+            },
+            {} as Record<string, any>,
+          ) || {}
+
+        const categoryMap =
+          categoriesData?.reduce(
+            (acc, category) => {
+              acc[category.id] = category
+              return acc
+            },
+            {} as Record<number, any>,
+          ) || {}
+
+        // Combine the data
+        const enrichedPosts = postsData.map((post) => ({
+          ...post,
+          user: userMap[post.user_id] || null,
+          category: categoryMap[post.category_id] || null,
+        }))
+
+        setPosts(enrichedPosts)
+      } catch (err) {
+        console.error("Error loading posts:", err)
+        setError("Failed to fetch posts")
       }
-    } catch (error) {
-      console.error("Error loading posts:", error)
-      toast.error("Failed to load posts")
-    } finally {
+    }
+
+    const loadCategories = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("community_categories")
+          .select("*")
+          .order("name", { ascending: true })
+
+        if (error) {
+          console.error("Error loading categories:", error)
+          setError("Failed to fetch categories")
+          return
+        }
+
+        setCategories(data || [])
+      } catch (err) {
+        console.error("Error loading categories:", err)
+        setError("Failed to fetch categories")
+      }
+    }
+
+    const loadData = async () => {
+      setLoading(true)
+      setError(null)
+      await Promise.all([loadPosts(), loadCategories()])
       setLoading(false)
     }
-  }
 
-  const loadCategories = async () => {
-    try {
-      const response = await fetch("/api/community/categories")
-      const data = await response.json()
+    loadData()
+  }, [supabase])
 
-      if (data.error) {
-        console.error("Error loading categories:", data.error)
-        toast.error("Failed to load categories")
-      } else {
-        setCategories(data.categories || [])
-      }
-    } catch (error) {
-      console.error("Error loading categories:", error)
-      toast.error("Failed to load categories")
-    }
-  }
-
-  const handleCreatePost = async () => {
-    if (!newPostContent.trim() || !selectedCategory) {
-      toast.error("Please fill in all required fields")
-      return
-    }
-
+  const handleVote = async (postId: number, voteType: "up" | "down") => {
     if (!isAuthenticated) {
-      toast.error("Please sign in to create posts")
+      alert("Please sign in to vote")
       return
     }
 
-    setCreating(true)
-
     try {
-      const response = await fetch("/api/community/posts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          content: newPostContent,
-          categoryId: Number.parseInt(selectedCategory),
-          type: "post",
-        }),
+      const { error } = await supabase.from("community_votes").insert({
+        post_id: postId,
+        user_id: profile?.auth_user_id,
+        vote_type: voteType === "up" ? "upvote" : "downvote",
       })
 
-      const result = await response.json()
-
-      if (result.success) {
-        toast.success("Post created successfully!")
-        setNewPostContent("")
-        setSelectedCategory("")
-        setShowCreateForm(false)
-        loadPosts() // Reload posts
-      } else {
-        toast.error(result.error || "Failed to create post")
+      if (error) {
+        console.error("Error voting:", error)
+        return
       }
-    } catch (error) {
-      console.error("Error creating post:", error)
-      toast.error("Failed to create post")
-    } finally {
-      setCreating(false)
-    }
-  }
 
-  const handleVote = async (postId: number) => {
-    if (!isAuthenticated) {
-      toast.error("Please sign in to vote")
-      return
-    }
-
-    try {
-      const response = await fetch("/api/community/vote", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ postId }),
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        // Update local state
-        setPosts((prev) =>
-          prev.map((post) =>
-            post.id === postId
-              ? {
-                  ...post,
-                  vote_count: result.voted ? post.vote_count + 1 : post.vote_count - 1,
-                  has_voted: result.voted,
-                }
-              : post,
-          ),
-        )
-        toast.success(result.voted ? "Vote added!" : "Vote removed!")
-      } else {
-        toast.error(result.error || "Failed to vote")
-      }
-    } catch (error) {
-      console.error("Error voting:", error)
-      toast.error("Failed to vote")
-    }
-  }
-
-  const handleCommentCountChange = (postId: number, newCount: number) => {
-    setPosts((prev) =>
-      prev.map((post) =>
-        post.id === postId
-          ? {
+      // Update the local state
+      setPosts((prevPosts) =>
+        prevPosts.map((post) => {
+          if (post.id === postId) {
+            return {
               ...post,
-              comment_count: newCount,
+              upvotes: voteType === "up" ? post.upvotes + 1 : post.upvotes,
+              downvotes: voteType === "down" ? post.downvotes + 1 : post.downvotes,
             }
-          : post,
-      ),
-    )
-  }
-
-  const getTierColor = (tier: string) => {
-    switch (tier?.toLowerCase()) {
-      case "blood_brotherhood":
-      case "blood":
-        return "bg-red-500"
-      case "elder":
-        return "bg-purple-500"
-      case "pioneer":
-        return "bg-blue-500"
-      case "grassroot":
-        return "bg-green-500"
-      default:
-        return "bg-gray-500"
+          }
+          return post
+        }),
+      )
+    } catch (err) {
+      console.error("Error voting:", err)
     }
   }
 
-  const getTierDisplayName = (tier: string) => {
-    switch (tier?.toLowerCase()) {
-      case "blood_brotherhood":
-      case "blood":
-        return "Blood"
-      case "elder":
-        return "Elder"
-      case "pioneer":
-        return "Pioneer"
-      case "grassroot":
-        return "Grassroot"
-      default:
-        return "Fan"
-    }
-  }
-
-  const filteredPosts = posts.filter((post) => {
-    const matchesSearch =
-      post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (post.user?.username || "").toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesSearch
-  })
-
-  const sortedPosts = [...filteredPosts].sort((a, b) => {
-    switch (sortBy) {
-      case "newest":
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      case "oldest":
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      case "popular":
-        return b.vote_count - a.vote_count
-      default:
-        return 0
-    }
-  })
+  const filteredPosts = activeCategory ? posts.filter((post) => post.category_id === activeCategory) : posts
 
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-2 space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <Card key={i}>
+                  <CardContent className="p-6">
+                    <div className="flex items-center space-x-4 mb-4">
+                      <Skeleton className="h-10 w-10 rounded-full" />
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-3 w-16" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-4 w-full mb-2" />
+                    <Skeleton className="h-4 w-3/4 mb-2" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Categories</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {[...Array(5)].map((_, i) => (
+                    <Skeleton key={i} className="h-6 w-full" />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     )
   }
 
-  return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Community</h1>
-        <p className="text-muted-foreground">Connect with fellow Erigga fans and share your thoughts</p>
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+        <Button onClick={() => window.location.reload()}>Refresh Page</Button>
       </div>
+    )
+  }
 
-      {/* Create Post Section */}
-      {isAuthenticated && profile ? (
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Share with the community</CardTitle>
-              <Button
-                onClick={() => setShowCreateForm(!showCreateForm)}
-                variant={showCreateForm ? "secondary" : "default"}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                {showCreateForm ? "Cancel" : "Create Post"}
-              </Button>
-            </div>
-          </CardHeader>
-
-          {showCreateForm && (
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-3 mb-4">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
-                  <AvatarFallback>{(profile?.username || "U").charAt(0).toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-medium">{profile?.username || "Unknown User"}</p>
-                  <Badge className={cn("text-xs", getTierColor(profile?.tier || "grassroot"), "text-white")}>
-                    {getTierDisplayName(profile?.tier || "grassroot")}
-                  </Badge>
-                </div>
-              </div>
-
-              <Textarea
-                placeholder="What's on your mind?"
-                value={newPostContent}
-                onChange={(e) => setNewPostContent(e.target.value)}
-                className="min-h-[100px]"
-              />
-
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id.toString()}>
-                      <div className="flex items-center space-x-2">
-                        <span>{category.icon}</span>
-                        <span>{category.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setShowCreateForm(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleCreatePost} disabled={creating || !newPostContent.trim() || !selectedCategory}>
-                  {creating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    "Post"
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          )}
-        </Card>
-      ) : (
-        <Card className="mb-6">
-          <CardContent className="text-center py-8">
-            <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">Join the conversation</h3>
-            <p className="text-muted-foreground mb-4">Sign in to create posts, vote, and interact with the community</p>
-            <div className="space-x-2">
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 space-y-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold">Community</h1>
+            {isAuthenticated && (
               <Button asChild>
-                <Link href="/login">Sign In</Link>
+                <Link href="/community/create">Create Post</Link>
               </Button>
-              <Button variant="outline" asChild>
-                <Link href="/signup">Sign Up</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search posts..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">
-                  <div className="flex items-center">
-                    <Clock className="h-4 w-4 mr-2" />
-                    Newest
-                  </div>
-                </SelectItem>
-                <SelectItem value="oldest">
-                  <div className="flex items-center">
-                    <Clock className="h-4 w-4 mr-2" />
-                    Oldest
-                  </div>
-                </SelectItem>
-                <SelectItem value="popular">
-                  <div className="flex items-center">
-                    <TrendingUp className="h-4 w-4 mr-2" />
-                    Most Popular
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            )}
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Posts */}
-      <div className="space-y-6">
-        {sortedPosts.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-12">
-              <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No posts found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchQuery ? "Try adjusting your search terms" : "Be the first to start a conversation!"}
-              </p>
-              {isAuthenticated && !showCreateForm && (
-                <Button onClick={() => setShowCreateForm(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create First Post
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          sortedPosts.map((post) => (
-            <Card key={post.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                {/* Post Header */}
-                <div className="flex items-start space-x-3 mb-4">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={post.user?.avatar_url || "/placeholder-user.jpg"} />
-                    <AvatarFallback>{(post.user?.username || "U").charAt(0).toUpperCase()}</AvatarFallback>
-                  </Avatar>
+          <Tabs defaultValue="all">
+            <TabsList>
+              <TabsTrigger value="all" onClick={() => setActiveCategory(null)}>
+                All Posts
+              </TabsTrigger>
+              <TabsTrigger value="popular">Popular</TabsTrigger>
+              <TabsTrigger value="recent">Recent</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <span className="font-medium">{post.user?.username || "Unknown User"}</span>
-                      <Badge className={cn("text-xs", getTierColor(post.user?.tier || "grassroot"), "text-white")}>
-                        {getTierDisplayName(post.user?.tier || "grassroot")}
-                      </Badge>
-                      <span className="text-sm text-muted-foreground">•</span>
-                      <span className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                      </span>
-                    </div>
-
-                    {post.category && (
-                      <div className="flex items-center space-x-2">
-                        <span
-                          className="text-xs px-2 py-1 rounded-full"
-                          style={{ backgroundColor: post.category.color + "20", color: post.category.color }}
-                        >
-                          {post.category.icon} {post.category.name}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Post Content */}
-                <div className="mb-4">
-                  <p className="text-foreground whitespace-pre-wrap break-words">{post.content}</p>
-
-                  {post.media_url && (
-                    <div className="mt-4">
-                      {post.media_type === "image" && (
-                        <img
-                          src={post.media_url || "/placeholder.svg"}
-                          alt="Post media"
-                          className="rounded-lg max-w-full h-auto max-h-96 object-cover"
-                        />
-                      )}
-                      {post.media_type === "video" && (
-                        <video src={post.media_url} controls className="rounded-lg max-w-full h-auto max-h-96" />
-                      )}
-                      {post.media_type === "audio" && <audio src={post.media_url} controls className="w-full" />}
-                    </div>
-                  )}
-
-                  {post.hashtags && post.hashtags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {post.hashtags.map((tag, index) => (
-                        <span key={index} className="text-sm text-primary hover:underline cursor-pointer">
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <Separator className="mb-4" />
-
-                {/* Post Actions */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-4">
-                    <Button
-                      variant={post.has_voted ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => handleVote(post.id)}
-                      className={cn("flex items-center space-x-1", post.has_voted && "text-red-500")}
-                    >
-                      <Heart className={cn("h-4 w-4", post.has_voted && "fill-current")} />
-                      <span>{post.vote_count}</span>
-                    </Button>
-
-                    <Button variant="ghost" size="sm" className="flex items-center space-x-1">
-                      <Share2 className="h-4 w-4" />
-                      <span>Share</span>
-                    </Button>
-                  </div>
-
-                  <span className="text-sm text-muted-foreground">{post.view_count} views</span>
-                </div>
-
-                {/* Comments Section */}
-                <CommentSection
-                  postId={post.id}
-                  commentCount={post.comment_count}
-                  onCommentCountChange={(newCount) => handleCommentCountChange(post.id, newCount)}
-                />
+          {filteredPosts.length === 0 ? (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <p className="text-muted-foreground">No posts found</p>
+                {isAuthenticated && (
+                  <Button className="mt-4" asChild>
+                    <Link href="/community/create">Create the first post</Link>
+                  </Button>
+                )}
               </CardContent>
             </Card>
-          ))
-        )}
+          ) : (
+            <div className="space-y-4">
+              {filteredPosts.map((post) => (
+                <Card key={post.id}>
+                  <CardContent className="p-6">
+                    <div className="flex items-center space-x-4 mb-4">
+                      <Avatar>
+                        <AvatarImage src={post.user?.avatar_url || "/placeholder-user.jpg"} />
+                        <AvatarFallback>{post.user?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{post.user?.username || "Unknown User"}</p>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(post.created_at).toLocaleDateString()}
+                          </span>
+                          {post.user?.tier && (
+                            <Badge variant="outline" className="text-xs">
+                              {post.user.tier}
+                            </Badge>
+                          )}
+                          {post.category && (
+                            <Badge variant="secondary" className="text-xs">
+                              {post.category.name}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <Link href={`/community/post/${post.id}`}>
+                      <h3 className="text-xl font-bold mb-2 hover:text-primary transition-colors">{post.title}</h3>
+                    </Link>
+                    <p className="text-muted-foreground mb-4">
+                      {post.content.length > 200 ? `${post.content.substring(0, 200)}...` : post.content}
+                    </p>
+                    <div className="flex items-center space-x-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground"
+                        onClick={() => handleVote(post.id, "up")}
+                      >
+                        <ThumbsUp className="h-4 w-4 mr-1" />
+                        <span>{post.upvotes}</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground"
+                        onClick={() => handleVote(post.id, "down")}
+                      >
+                        <ThumbsDown className="h-4 w-4 mr-1" />
+                        <span>{post.downvotes}</span>
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-muted-foreground" asChild>
+                        <Link href={`/community/post/${post.id}`}>
+                          <MessageCircle className="h-4 w-4 mr-1" />
+                          <span>Comments</span>
+                        </Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Categories</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Button
+                  variant={activeCategory === null ? "default" : "ghost"}
+                  className="w-full justify-start"
+                  onClick={() => setActiveCategory(null)}
+                >
+                  All Categories
+                </Button>
+                {categories.map((category) => (
+                  <Button
+                    key={category.id}
+                    variant={activeCategory === category.id ? "default" : "ghost"}
+                    className="w-full justify-start"
+                    onClick={() => setActiveCategory(category.id)}
+                  >
+                    {category.name}
+                  </Button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {!isAuthenticated && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Join the Community</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground mb-4">
+                  Sign in to participate in discussions, create posts, and vote.
+                </p>
+                <div className="space-x-2">
+                  <Button asChild>
+                    <Link href="/login?redirect=/community">Sign In</Link>
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <Link href="/signup">Sign Up</Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   )
