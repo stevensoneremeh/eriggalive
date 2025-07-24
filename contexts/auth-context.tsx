@@ -3,45 +3,86 @@
 import type React from "react"
 import { createContext, useContext, useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { User } from "@supabase/supabase-js"
-import type { Database } from "@/types/database"
+import type { User, Session } from "@supabase/supabase-js"
 
-type UserProfile = Database["public"]["Tables"]["users"]["Row"]
+interface Profile {
+  id: string
+  username: string
+  email: string
+  avatar_url?: string
+  tier: string
+  role: string
+  coins: number
+  created_at: string
+  updated_at: string
+}
 
 interface AuthContextType {
   user: User | null
-  profile: UserProfile | null
+  profile: Profile | null
+  session: Session | null
   isAuthenticated: boolean
-  loading: boolean
-  signIn: (email: string, password: string) => Promise<{ error: any }>
-  signUp: (email: string, password: string, username: string) => Promise<{ error: any }>
+  isLoading: boolean
+  signIn: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string, username: string) => Promise<void>
   signOut: () => Promise<void>
+  updateProfile: (updates: Partial<Profile>) => Promise<void>
   refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  // Create supabase client once
   const [supabase] = useState(() => createClient())
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const fetchUserProfile = useCallback(
+  const fetchProfile = useCallback(
     async (userId: string) => {
       try {
-        const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
+        const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
 
         if (error) {
-          console.error("Error fetching user profile:", error)
+          console.error("Error fetching profile:", error)
           return null
         }
 
         return data
       } catch (error) {
-        console.error("Error fetching user profile:", error)
+        console.error("Error in fetchProfile:", error)
+        return null
+      }
+    },
+    [supabase],
+  )
+
+  const createProfile = useCallback(
+    async (user: User, username?: string) => {
+      try {
+        const profileData = {
+          id: user.id,
+          username: username || user.email?.split("@")[0] || "user",
+          email: user.email || "",
+          tier: "grassroot",
+          role: "user",
+          coins: 0,
+          avatar_url: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+
+        const { data, error } = await supabase.from("profiles").insert([profileData]).select().single()
+
+        if (error) {
+          console.error("Error creating profile:", error)
+          return null
+        }
+
+        return data
+      } catch (error) {
+        console.error("Error in createProfile:", error)
         return null
       }
     },
@@ -49,11 +90,110 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   const refreshProfile = useCallback(async () => {
-    if (user) {
-      const userProfile = await fetchUserProfile(user.id)
-      setProfile(userProfile)
+    if (!user) return
+
+    const profileData = await fetchProfile(user.id)
+    setProfile(profileData)
+  }, [user, fetchProfile])
+
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      setIsLoading(true)
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+
+        if (error) throw error
+
+        if (data.user) {
+          setUser(data.user)
+          setSession(data.session)
+
+          let profileData = await fetchProfile(data.user.id)
+          if (!profileData) {
+            profileData = await createProfile(data.user)
+          }
+          setProfile(profileData)
+        }
+      } catch (error) {
+        console.error("Sign in error:", error)
+        throw error
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [supabase, fetchProfile, createProfile],
+  )
+
+  const signUp = useCallback(
+    async (email: string, password: string, username: string) => {
+      setIsLoading(true)
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+        })
+
+        if (error) throw error
+
+        if (data.user) {
+          setUser(data.user)
+          setSession(data.session)
+
+          const profileData = await createProfile(data.user, username)
+          setProfile(profileData)
+        }
+      } catch (error) {
+        console.error("Sign up error:", error)
+        throw error
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [supabase, createProfile],
+  )
+
+  const signOut = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+
+      setUser(null)
+      setProfile(null)
+      setSession(null)
+    } catch (error) {
+      console.error("Sign out error:", error)
+      throw error
+    } finally {
+      setIsLoading(false)
     }
-  }, [user, fetchUserProfile])
+  }, [supabase])
+
+  const updateProfile = useCallback(
+    async (updates: Partial<Profile>) => {
+      if (!user) return
+
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .update({ ...updates, updated_at: new Date().toISOString() })
+          .eq("id", user.id)
+          .select()
+          .single()
+
+        if (error) throw error
+
+        setProfile(data)
+      } catch (error) {
+        console.error("Update profile error:", error)
+        throw error
+      }
+    },
+    [user, supabase],
+  )
 
   useEffect(() => {
     let mounted = true
@@ -65,26 +205,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error,
         } = await supabase.auth.getSession()
 
-        if (!mounted) return
-
         if (error) {
           console.error("Error getting session:", error)
-          setLoading(false)
           return
         }
 
-        if (session?.user) {
-          setUser(session.user)
-          const userProfile = await fetchUserProfile(session.user.id)
-          if (mounted) {
-            setProfile(userProfile)
+        if (mounted) {
+          setSession(session)
+          setUser(session?.user ?? null)
+
+          if (session?.user) {
+            let profileData = await fetchProfile(session.user.id)
+            if (!profileData) {
+              profileData = await createProfile(session.user)
+            }
+            if (mounted) {
+              setProfile(profileData)
+            }
           }
         }
       } catch (error) {
         console.error("Error in getInitialSession:", error)
       } finally {
         if (mounted) {
-          setLoading(false)
+          setIsLoading(false)
         }
       }
     }
@@ -96,113 +240,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
 
-      console.log("Auth state changed:", event, session?.user?.id)
+      setSession(session)
+      setUser(session?.user ?? null)
 
       if (session?.user) {
-        setUser(session.user)
-        const userProfile = await fetchUserProfile(session.user.id)
+        let profileData = await fetchProfile(session.user.id)
+        if (!profileData) {
+          profileData = await createProfile(session.user)
+        }
         if (mounted) {
-          setProfile(userProfile)
+          setProfile(profileData)
         }
       } else {
-        setUser(null)
         setProfile(null)
       }
 
-      setLoading(false)
+      if (mounted) {
+        setIsLoading(false)
+      }
     })
 
     return () => {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [supabase, fetchUserProfile])
-
-  const signIn = useCallback(
-    async (email: string, password: string) => {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
-
-        if (error) {
-          return { error }
-        }
-
-        if (data.user) {
-          setUser(data.user)
-          const userProfile = await fetchUserProfile(data.user.id)
-          setProfile(userProfile)
-        }
-
-        return { error: null }
-      } catch (error) {
-        return { error }
-      }
-    },
-    [supabase, fetchUserProfile],
-  )
-
-  const signUp = useCallback(
-    async (email: string, password: string, username: string) => {
-      try {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              username,
-            },
-          },
-        })
-
-        if (error) {
-          return { error }
-        }
-
-        // Create user profile
-        if (data.user) {
-          const { error: profileError } = await supabase.from("users").insert({
-            auth_user_id: data.user.id,
-            username,
-            email,
-            full_name: username,
-            tier: "grassroot",
-            coins_balance: 0,
-          })
-
-          if (profileError) {
-            console.error("Error creating user profile:", profileError)
-          }
-        }
-
-        return { error: null }
-      } catch (error) {
-        return { error }
-      }
-    },
-    [supabase],
-  )
-
-  const signOut = useCallback(async () => {
-    try {
-      await supabase.auth.signOut()
-      setUser(null)
-      setProfile(null)
-    } catch (error) {
-      console.error("Error signing out:", error)
-    }
-  }, [supabase])
+  }, [supabase, fetchProfile, createProfile])
 
   const value = {
     user,
     profile,
+    session,
     isAuthenticated: !!user,
-    loading,
+    isLoading,
     signIn,
     signUp,
     signOut,
+    updateProfile,
     refreshProfile,
   }
 

@@ -5,7 +5,7 @@ import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
-import { Navigation } from "@/components/navigation/main-navigation"
+import { MainNavigation } from "@/components/navigation/main-navigation"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -64,7 +64,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <AuthProvider>
             <div className="min-h-screen bg-background">
-              <Navigation />
+              <MainNavigation />
               <main className="pt-16">{children}</main>
             </div>
             <Toaster />

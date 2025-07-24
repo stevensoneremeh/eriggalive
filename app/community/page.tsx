@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Heart, MessageCircle, Share2, Plus, Search, TrendingUp } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Heart, MessageCircle, Share2, TrendingUp, Users, Plus, Search, Filter, Clock } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 
@@ -17,165 +18,125 @@ interface Post {
   title: string
   content: string
   author_id: string
-  created_at: string
-  likes_count: number
-  comments_count: number
-  category: string
   author?: {
     username: string
-    full_name: string
     avatar_url?: string
+    tier: string
   }
+  category: string
+  likes_count: number
+  comments_count: number
+  created_at: string
+  updated_at: string
 }
 
-interface Category {
+interface Comment {
   id: string
-  name: string
-  description: string
-  post_count: number
+  content: string
+  author_id: string
+  author?: {
+    username: string
+    avatar_url?: string
+    tier: string
+  }
+  post_id: string
+  created_at: string
 }
+
+const mockPosts: Post[] = [
+  {
+    id: "1",
+    title: "Welcome to Erigga Live Community!",
+    content:
+      "This is the official community platform for all Erigga fans. Share your thoughts, connect with other fans, and stay updated with the latest news!",
+    author_id: "admin",
+    author: {
+      username: "EriggaOfficial",
+      avatar_url: "/placeholder-user.jpg",
+      tier: "blood_brotherhood",
+    },
+    category: "announcement",
+    likes_count: 45,
+    comments_count: 12,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "2",
+    title: "New Album Coming Soon!",
+    content: "Working on some fire tracks for you all. What kind of vibes do you want to hear on the next project?",
+    author_id: "admin",
+    author: {
+      username: "EriggaOfficial",
+      avatar_url: "/placeholder-user.jpg",
+      tier: "blood_brotherhood",
+    },
+    category: "music",
+    likes_count: 89,
+    comments_count: 34,
+    created_at: new Date(Date.now() - 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 86400000).toISOString(),
+  },
+]
 
 export default function CommunityPage() {
-  const { user, profile, isAuthenticated, loading: authLoading } = useAuth()
+  const { isAuthenticated, profile, isLoading } = useAuth()
   const [posts, setPosts] = useState<Post[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [newPostTitle, setNewPostTitle] = useState("")
+  const [newPostContent, setNewPostContent] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState("general")
   const [searchQuery, setSearchQuery] = useState("")
-  const [showCreatePost, setShowCreatePost] = useState(false)
-  const [newPost, setNewPost] = useState({ title: "", content: "", category: "general" })
+  const [activeTab, setActiveTab] = useState("feed")
 
   const supabase = createClient()
 
   const loadPosts = async () => {
     try {
-      setError(null)
+      setLoading(true)
 
-      // Simple query without complex joins
+      // Try to load from database first
       const { data: postsData, error: postsError } = await supabase
         .from("community_posts")
         .select(`
-          id,
-          title,
-          content,
-          author_id,
-          created_at,
-          likes_count,
-          comments_count,
-          category
+          *,
+          profiles:author_id (
+            username,
+            avatar_url,
+            tier
+          )
         `)
         .order("created_at", { ascending: false })
         .limit(20)
 
       if (postsError) {
         console.error("Error loading posts:", postsError)
-        // Use fallback data
-        setPosts(getFallbackPosts())
+        // Use mock data as fallback
+        setPosts(mockPosts)
         return
       }
 
-      // Get author information separately
-      if (postsData && postsData.length > 0) {
-        const authorIds = [...new Set(postsData.map((post) => post.author_id))]
+      // Transform the data to match our interface
+      const transformedPosts =
+        postsData?.map((post) => ({
+          ...post,
+          author: post.profiles
+            ? {
+                username: post.profiles.username,
+                avatar_url: post.profiles.avatar_url,
+                tier: post.profiles.tier,
+              }
+            : undefined,
+        })) || []
 
-        const { data: authorsData, error: authorsError } = await supabase
-          .from("users")
-          .select("auth_user_id, username, full_name, avatar_url")
-          .in("auth_user_id", authorIds)
-
-        if (!authorsError && authorsData) {
-          const authorsMap = new Map(authorsData.map((author) => [author.auth_user_id, author]))
-
-          const postsWithAuthors = postsData.map((post) => ({
-            ...post,
-            author: authorsMap.get(post.author_id) || {
-              username: "Unknown User",
-              full_name: "Unknown User",
-              avatar_url: null,
-            },
-          }))
-
-          setPosts(postsWithAuthors)
-        } else {
-          setPosts(
-            postsData.map((post) => ({
-              ...post,
-              author: {
-                username: "Unknown User",
-                full_name: "Unknown User",
-                avatar_url: null,
-              },
-            })),
-          )
-        }
-      } else {
-        setPosts([])
-      }
+      setPosts(transformedPosts.length > 0 ? transformedPosts : mockPosts)
     } catch (error) {
-      console.error("Error in loadPosts:", error)
-      setError("Failed to load posts")
-      setPosts(getFallbackPosts())
+      console.error("Error loading posts:", error)
+      setPosts(mockPosts)
+    } finally {
+      setLoading(false)
     }
   }
-
-  const loadCategories = async () => {
-    try {
-      const { data, error } = await supabase.from("community_categories").select("*").order("name")
-
-      if (error) {
-        console.error("Error loading categories:", error)
-        setCategories(getFallbackCategories())
-        return
-      }
-
-      setCategories(data || getFallbackCategories())
-    } catch (error) {
-      console.error("Error in loadCategories:", error)
-      setCategories(getFallbackCategories())
-    }
-  }
-
-  const getFallbackPosts = (): Post[] => [
-    {
-      id: "1",
-      title: "Welcome to Erigga Community!",
-      content:
-        "This is the official community space for all Erigga fans. Share your thoughts, connect with other fans, and stay updated!",
-      author_id: "system",
-      created_at: new Date().toISOString(),
-      likes_count: 25,
-      comments_count: 8,
-      category: "general",
-      author: {
-        username: "erigga_official",
-        full_name: "Erigga Official",
-        avatar_url: null,
-      },
-    },
-    {
-      id: "2",
-      title: "New Music Coming Soon!",
-      content: "Can't wait to share some new tracks with you all. What kind of vibe are you hoping for?",
-      author_id: "system",
-      created_at: new Date(Date.now() - 86400000).toISOString(),
-      likes_count: 42,
-      comments_count: 15,
-      category: "music",
-      author: {
-        username: "erigga_official",
-        full_name: "Erigga Official",
-        avatar_url: null,
-      },
-    },
-  ]
-
-  const getFallbackCategories = (): Category[] => [
-    { id: "general", name: "General", description: "General discussions", post_count: 15 },
-    { id: "music", name: "Music", description: "Music discussions", post_count: 8 },
-    { id: "events", name: "Events", description: "Upcoming events", post_count: 3 },
-    { id: "freebies", name: "Freebies", description: "Free content and giveaways", post_count: 5 },
-  ]
 
   const createPost = async () => {
     if (!isAuthenticated || !profile) {
@@ -183,22 +144,24 @@ export default function CommunityPage() {
       return
     }
 
-    if (!newPost.title.trim() || !newPost.content.trim()) {
-      toast.error("Please fill in all fields")
+    if (!newPostTitle.trim() || !newPostContent.trim()) {
+      toast.error("Please fill in both title and content")
       return
     }
 
     try {
       const { data, error } = await supabase
         .from("community_posts")
-        .insert({
-          title: newPost.title,
-          content: newPost.content,
-          category: newPost.category,
-          author_id: user?.id,
-          likes_count: 0,
-          comments_count: 0,
-        })
+        .insert([
+          {
+            title: newPostTitle.trim(),
+            content: newPostContent.trim(),
+            author_id: profile.id,
+            category: selectedCategory,
+            likes_count: 0,
+            comments_count: 0,
+          },
+        ])
         .select()
         .single()
 
@@ -208,42 +171,80 @@ export default function CommunityPage() {
         return
       }
 
+      // Add the new post to the local state
+      const newPost = {
+        ...data,
+        author: {
+          username: profile.username,
+          avatar_url: profile.avatar_url,
+          tier: profile.tier,
+        },
+      }
+
+      setPosts((prev) => [newPost, ...prev])
+      setNewPostTitle("")
+      setNewPostContent("")
       toast.success("Post created successfully!")
-      setNewPost({ title: "", content: "", category: "general" })
-      setShowCreatePost(false)
-      loadPosts() // Reload posts
     } catch (error) {
       console.error("Error creating post:", error)
       toast.error("Failed to create post")
     }
   }
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true)
-      await Promise.all([loadPosts(), loadCategories()])
-      setLoading(false)
+  const getTierColor = (tier: string) => {
+    switch (tier?.toLowerCase()) {
+      case "blood_brotherhood":
+      case "blood":
+        return "bg-red-500"
+      case "elder":
+        return "bg-purple-500"
+      case "pioneer":
+        return "bg-blue-500"
+      case "grassroot":
+        return "bg-green-500"
+      default:
+        return "bg-gray-500"
     }
+  }
 
-    loadData()
+  const getTierDisplayName = (tier: string) => {
+    switch (tier?.toLowerCase()) {
+      case "blood_brotherhood":
+      case "blood":
+        return "Blood"
+      case "elder":
+        return "Elder"
+      case "pioneer":
+        return "Pioneer"
+      case "grassroot":
+        return "Grassroot"
+      default:
+        return "Fan"
+    }
+  }
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (diffInSeconds < 60) return "Just now"
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
+    return `${Math.floor(diffInSeconds / 86400)}d ago`
+  }
+
+  useEffect(() => {
+    loadPosts()
   }, [])
 
-  const filteredPosts = posts.filter((post) => {
-    const matchesCategory = selectedCategory === "all" || post.category === selectedCategory
-    const matchesSearch =
-      searchQuery === "" ||
-      post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      post.content.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesSearch
-  })
-
-  if (authLoading || loading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
-            <p className="text-white mt-4">Loading community...</p>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading community...</p>
           </div>
         </div>
       </div>
@@ -251,206 +252,282 @@ export default function CommunityPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Erigga Community</h1>
-          <p className="text-blue-200">Connect, share, and vibe with fellow fans</p>
-        </div>
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold mb-2">Community</h1>
+        <p className="text-muted-foreground">
+          Connect with fellow fans, share your thoughts, and stay updated with the latest from Erigga
+        </p>
+      </div>
 
-        {error && (
-          <Card className="mb-6 border-red-500 bg-red-50">
-            <CardContent className="p-4">
-              <p className="text-red-600">{error}</p>
-              <Button
-                onClick={() => {
-                  setError(null)
-                  loadPosts()
-                }}
-                className="mt-2"
-                size="sm"
-              >
-                Retry
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2">
+              <Users className="h-8 w-8 text-blue-500" />
+              <div>
+                <p className="text-2xl font-bold">1,234</p>
+                <p className="text-sm text-muted-foreground">Active Members</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2">
+              <MessageCircle className="h-8 w-8 text-green-500" />
+              <div>
+                <p className="text-2xl font-bold">{posts.length}</p>
+                <p className="text-sm text-muted-foreground">Posts Today</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2">
+              <TrendingUp className="h-8 w-8 text-orange-500" />
+              <div>
+                <p className="text-2xl font-bold">89%</p>
+                <p className="text-sm text-muted-foreground">Engagement Rate</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Sidebar */}
-          <div className="lg:col-span-1">
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Categories
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Button
-                    variant={selectedCategory === "all" ? "default" : "ghost"}
-                    className="w-full justify-start"
-                    onClick={() => setSelectedCategory("all")}
-                  >
-                    All Posts
-                  </Button>
-                  {categories.map((category) => (
-                    <Button
-                      key={category.id}
-                      variant={selectedCategory === category.id ? "default" : "ghost"}
-                      className="w-full justify-between"
-                      onClick={() => setSelectedCategory(category.id)}
-                    >
-                      {category.name}
-                      <Badge variant="secondary">{category.post_count}</Badge>
-                    </Button>
-                  ))}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        {/* Main Content */}
+        <div className="lg:col-span-3">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="feed">Feed</TabsTrigger>
+              <TabsTrigger value="trending">Trending</TabsTrigger>
+              <TabsTrigger value="create">Create Post</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="feed" className="space-y-6">
+              {/* Search and Filter */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search posts..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
-              </CardContent>
-            </Card>
+                <Button variant="outline" size="sm">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filter
+                </Button>
+              </div>
 
-            {/* Community Stats */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Community Stats</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>Total Posts</span>
-                    <span className="font-semibold">{posts.length}</span>
+              {/* Posts */}
+              <div className="space-y-6">
+                {loading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Loading posts...</p>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Categories</span>
-                    <span className="font-semibold">{categories.length}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Active Users</span>
-                    <span className="font-semibold">150+</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                ) : posts.length === 0 ? (
+                  <Card>
+                    <CardContent className="p-8 text-center">
+                      <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">No posts yet</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Be the first to start a conversation in the community!
+                      </p>
+                      <Button onClick={() => setActiveTab("create")}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create First Post
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  posts
+                    .filter(
+                      (post) =>
+                        searchQuery === "" ||
+                        post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        post.content.toLowerCase().includes(searchQuery.toLowerCase()),
+                    )
+                    .map((post) => (
+                      <Card key={post.id} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-6">
+                          <div className="flex items-start space-x-4">
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage
+                                src={post.author?.avatar_url || "/placeholder-user.jpg"}
+                                alt={post.author?.username || "User"}
+                              />
+                              <AvatarFallback>{post.author?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center space-x-2 mb-2">
+                                <h4 className="font-semibold">{post.author?.username || "Anonymous"}</h4>
+                                <Badge
+                                  className={`text-xs ${getTierColor(post.author?.tier || "grassroot")} text-white`}
+                                >
+                                  {getTierDisplayName(post.author?.tier || "grassroot")}
+                                </Badge>
+                                <span className="text-sm text-muted-foreground">•</span>
+                                <span className="text-sm text-muted-foreground flex items-center">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  {formatTimeAgo(post.created_at)}
+                                </span>
+                              </div>
+                              <h3 className="text-lg font-semibold mb-2">{post.title}</h3>
+                              <p className="text-muted-foreground mb-4 whitespace-pre-wrap">{post.content}</p>
+                              <div className="flex items-center space-x-6">
+                                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-red-500">
+                                  <Heart className="h-4 w-4 mr-1" />
+                                  {post.likes_count}
+                                </Button>
+                                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-blue-500">
+                                  <MessageCircle className="h-4 w-4 mr-1" />
+                                  {post.comments_count}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-muted-foreground hover:text-green-500"
+                                >
+                                  <Share2 className="h-4 w-4 mr-1" />
+                                  Share
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                )}
+              </div>
+            </TabsContent>
 
-          {/* Main Content */}
-          <div className="lg:col-span-3">
-            {/* Search and Create Post */}
-            <Card className="mb-6">
-              <CardContent className="p-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="Search posts..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  {isAuthenticated && (
-                    <Button onClick={() => setShowCreatePost(!showCreatePost)}>
+            <TabsContent value="trending" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <TrendingUp className="h-5 w-5 mr-2" />
+                    Trending Posts
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">
+                    Trending posts will appear here based on engagement and activity.
+                  </p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="create" className="space-y-6">
+              {isAuthenticated ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Plus className="h-5 w-5 mr-2" />
+                      Create New Post
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Title</label>
+                      <Input
+                        placeholder="What's on your mind?"
+                        value={newPostTitle}
+                        onChange={(e) => setNewPostTitle(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Content</label>
+                      <Textarea
+                        placeholder="Share your thoughts with the community..."
+                        value={newPostContent}
+                        onChange={(e) => setNewPostContent(e.target.value)}
+                        rows={6}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Category</label>
+                      <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="w-full p-2 border rounded-md bg-background"
+                      >
+                        <option value="general">General</option>
+                        <option value="music">Music</option>
+                        <option value="announcement">Announcement</option>
+                        <option value="discussion">Discussion</option>
+                      </select>
+                    </div>
+                    <Button onClick={createPost} className="w-full">
                       <Plus className="h-4 w-4 mr-2" />
                       Create Post
                     </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Create Post Form */}
-            {showCreatePost && isAuthenticated && (
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle>Create New Post</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <Input
-                      placeholder="Post title..."
-                      value={newPost.title}
-                      onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-                    />
-                    <Textarea
-                      placeholder="What's on your mind?"
-                      value={newPost.content}
-                      onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
-                      rows={4}
-                    />
-                    <select
-                      value={newPost.category}
-                      onChange={(e) => setNewPost({ ...newPost, category: e.target.value })}
-                      className="w-full p-2 border rounded-md"
-                    >
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="flex gap-2">
-                      <Button onClick={createPost}>Post</Button>
-                      <Button variant="outline" onClick={() => setShowCreatePost(false)}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Posts */}
-            <div className="space-y-6">
-              {filteredPosts.length === 0 ? (
-                <Card>
-                  <CardContent className="p-8 text-center">
-                    <p className="text-gray-500">No posts found. Be the first to create one!</p>
                   </CardContent>
                 </Card>
               ) : (
-                filteredPosts.map((post) => (
-                  <Card key={post.id} className="hover:shadow-lg transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex items-start gap-4">
-                        <Avatar>
-                          <AvatarImage src={post.author?.avatar_url || undefined} />
-                          <AvatarFallback>{post.author?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="font-semibold">{post.author?.full_name || "Unknown User"}</h3>
-                            <span className="text-sm text-gray-500">@{post.author?.username || "unknown"}</span>
-                            <Badge variant="secondary">{post.category}</Badge>
-                            <span className="text-sm text-gray-500">
-                              {new Date(post.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <h2 className="text-xl font-bold mb-2">{post.title}</h2>
-                          <p className="text-gray-700 mb-4">{post.content}</p>
-                          <div className="flex items-center gap-6">
-                            <button className="flex items-center gap-2 text-gray-500 hover:text-red-500 transition-colors">
-                              <Heart className="h-4 w-4" />
-                              <span>{post.likes_count}</span>
-                            </button>
-                            <button className="flex items-center gap-2 text-gray-500 hover:text-blue-500 transition-colors">
-                              <MessageCircle className="h-4 w-4" />
-                              <span>{post.comments_count}</span>
-                            </button>
-                            <button className="flex items-center gap-2 text-gray-500 hover:text-green-500 transition-colors">
-                              <Share2 className="h-4 w-4" />
-                              <span>Share</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">Sign in to create posts</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Join the community to share your thoughts and connect with other fans.
+                    </p>
+                    <Button asChild>
+                      <a href="/login">Sign In</a>
+                    </Button>
+                  </CardContent>
+                </Card>
               )}
-            </div>
-          </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Community Guidelines */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Community Guidelines</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p>• Be respectful to all members</p>
+              <p>• No spam or self-promotion</p>
+              <p>• Keep discussions relevant</p>
+              <p>• Report inappropriate content</p>
+            </CardContent>
+          </Card>
+
+          {/* Popular Categories */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Popular Categories</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm">Music</span>
+                <Badge variant="secondary">24</Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm">General</span>
+                <Badge variant="secondary">18</Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm">Discussion</span>
+                <Badge variant="secondary">12</Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm">Announcements</span>
+                <Badge variant="secondary">8</Badge>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
