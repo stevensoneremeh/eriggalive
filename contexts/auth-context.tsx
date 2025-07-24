@@ -1,9 +1,9 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState, useCallback } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { createContext, useContext, useEffect, useState } from "react"
 import type { User } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/client"
 
 interface UserProfile {
   id: string
@@ -30,17 +30,12 @@ interface AuthContextType {
   user: User | null
   profile: UserProfile | null
   isAuthenticated: boolean
-  isLoading: boolean
-  isPreviewMode: boolean
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  signUp: (
-    email: string,
-    password: string,
-    username: string,
-    fullName?: string,
-  ) => Promise<{ success: boolean; error?: string }>
+  loading: boolean
+  signIn: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string, username: string, fullName?: string) => Promise<void>
   signOut: () => Promise<void>
-  updateProfile: (updates: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>
+  resetPassword: (email: string) => Promise<void>
+  updateProfile: (updates: Partial<UserProfile>) => Promise<void>
   refreshProfile: () => Promise<void>
 }
 
@@ -49,209 +44,172 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isPreviewMode] = useState(false) // Set to true for preview mode
+  const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
-  // Fetch user profile
-  const fetchProfile = useCallback(
-    async (userId: string) => {
-      try {
-        const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
-
-        if (error) {
-          console.error("Error fetching profile:", error)
-          return null
-        }
-
-        return data as UserProfile
-      } catch (error) {
-        console.error("Unexpected error fetching profile:", error)
-        return null
-      }
-    },
-    [supabase],
-  )
-
-  // Initialize auth state
   useEffect(() => {
-    let mounted = true
-
-    const initializeAuth = async () => {
+    // Get initial session
+    const getInitialSession = async () => {
       try {
         const {
           data: { session },
           error,
         } = await supabase.auth.getSession()
-
         if (error) {
           console.error("Error getting session:", error)
-          if (mounted) {
-            setIsLoading(false)
-          }
           return
         }
 
-        if (session?.user && mounted) {
+        if (session?.user) {
           setUser(session.user)
-          const userProfile = await fetchProfile(session.user.id)
-          if (mounted) {
-            setProfile(userProfile)
-          }
+          await fetchUserProfile(session.user.id)
         }
       } catch (error) {
-        console.error("Error initializing auth:", error)
+        console.error("Error in getInitialSession:", error)
       } finally {
-        if (mounted) {
-          setIsLoading(false)
-        }
+        setLoading(false)
       }
     }
 
-    initializeAuth()
+    getInitialSession()
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return
+      console.log("Auth state changed:", event, session?.user?.id)
 
-      if (event === "SIGNED_IN" && session?.user) {
+      if (session?.user) {
         setUser(session.user)
-        const userProfile = await fetchProfile(session.user.id)
-        setProfile(userProfile)
-      } else if (event === "SIGNED_OUT") {
+        await fetchUserProfile(session.user.id)
+      } else {
         setUser(null)
         setProfile(null)
       }
 
-      setIsLoading(false)
+      setLoading(false)
     })
 
     return () => {
-      mounted = false
       subscription.unsubscribe()
     }
-  }, [supabase, fetchProfile])
+  }, [])
 
-  // Sign in function
-  const signIn = useCallback(
-    async (email: string, password: string) => {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
-
-        if (error) {
-          return { success: false, error: error.message }
-        }
-
-        if (data.user) {
-          const userProfile = await fetchProfile(data.user.id)
-          setProfile(userProfile)
-        }
-
-        return { success: true }
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "An unexpected error occurred",
-        }
-      }
-    },
-    [supabase, fetchProfile],
-  )
-
-  // Sign up function
-  const signUp = useCallback(
-    async (email: string, password: string, username: string, fullName?: string) => {
-      try {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              username,
-              full_name: fullName || "",
-            },
-          },
-        })
-
-        if (error) {
-          return { success: false, error: error.message }
-        }
-
-        return { success: true }
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "An unexpected error occurred",
-        }
-      }
-    },
-    [supabase],
-  )
-
-  // Sign out function
-  const signOut = useCallback(async () => {
+  const fetchUserProfile = async (userId: string) => {
     try {
-      await supabase.auth.signOut()
+      const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
+
+      if (error) {
+        console.error("Error fetching profile:", error)
+        return
+      }
+
+      if (data) {
+        setProfile(data)
+      }
+    } catch (error) {
+      console.error("Error in fetchUserProfile:", error)
+    }
+  }
+
+  const signIn = async (email: string, password: string) => {
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) throw error
+    } catch (error) {
+      console.error("Sign in error:", error)
+      throw error
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const signUp = async (email: string, password: string, username: string, fullName?: string) => {
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username,
+            full_name: fullName || "",
+          },
+        },
+      })
+
+      if (error) throw error
+    } catch (error) {
+      console.error("Sign up error:", error)
+      throw error
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const signOut = async () => {
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+
       setUser(null)
       setProfile(null)
     } catch (error) {
-      console.error("Error signing out:", error)
+      console.error("Sign out error:", error)
+      throw error
+    } finally {
+      setLoading(false)
     }
-  }, [supabase])
+  }
 
-  // Update profile function
-  const updateProfile = useCallback(
-    async (updates: Partial<UserProfile>) => {
-      if (!user || !profile) {
-        return { success: false, error: "Not authenticated" }
-      }
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
 
-      try {
-        const { data, error } = await supabase
-          .from("users")
-          .update(updates)
-          .eq("auth_user_id", user.id)
-          .select()
-          .single()
+      if (error) throw error
+    } catch (error) {
+      console.error("Reset password error:", error)
+      throw error
+    }
+  }
 
-        if (error) {
-          return { success: false, error: error.message }
-        }
+  const updateProfile = async (updates: Partial<UserProfile>) => {
+    if (!user || !profile) return
 
-        setProfile(data as UserProfile)
-        return { success: true }
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "An unexpected error occurred",
-        }
-      }
-    },
-    [supabase, user, profile],
-  )
+    try {
+      const { error } = await supabase.from("users").update(updates).eq("auth_user_id", user.id)
 
-  // Refresh profile function
-  const refreshProfile = useCallback(async () => {
+      if (error) throw error
+
+      setProfile({ ...profile, ...updates })
+    } catch (error) {
+      console.error("Update profile error:", error)
+      throw error
+    }
+  }
+
+  const refreshProfile = async () => {
     if (!user) return
-
-    const userProfile = await fetchProfile(user.id)
-    setProfile(userProfile)
-  }, [user, fetchProfile])
+    await fetchUserProfile(user.id)
+  }
 
   const value: AuthContextType = {
     user,
     profile,
     isAuthenticated: !!user,
-    isLoading,
-    isPreviewMode,
+    loading,
     signIn,
     signUp,
     signOut,
+    resetPassword,
     updateProfile,
     refreshProfile,
   }
