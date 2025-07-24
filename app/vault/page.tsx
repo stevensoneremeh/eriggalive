@@ -1,4 +1,4 @@
-import { Home } from "lucide-react"
+import { Home, Archive } from "lucide-react"
 import Link from "next/link"
 
 export default function VaultPage() {
@@ -14,7 +14,11 @@ export default function VaultPage() {
         <span className="text-foreground">Media Vault</span>
       </nav>
 
-      <h1 className="text-3xl font-semibold mb-4">Media Vault</h1>
+      <div className="flex items-center gap-3 mb-6">
+        <Archive className="h-8 w-8 text-primary" />
+        <h1 className="text-3xl font-semibold">Media Vault</h1>
+      </div>
+
       <p className="text-muted-foreground">
         Welcome to your media vault. This is where you can store and manage your files.
       </p>
