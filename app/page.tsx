@@ -71,6 +71,14 @@ const communityStats = [
   { label: "Live Sessions", value: "156", icon: Video },
 ]
 
+// Hero images
+const heroImages = [
+  "/images/hero/erigga1.jpeg",
+  "/images/hero/erigga2.jpeg",
+  "/images/hero/erigga3.jpeg",
+  "/images/hero/erigga4.jpeg",
+]
+
 export default function HomePage() {
   const { user, loading } = useAuth()
   const [mounted, setMounted] = useState(false)
@@ -99,11 +107,11 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
       {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <HeroVideoCarousel />
+      <section className="relative h-[80vh] overflow-hidden">
+        <HeroVideoCarousel images={heroImages} videoUrl="/videos/erigga-hero-video.mp4" className="absolute inset-0" />
 
         {/* Hero Content Overlay */}
-        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-20">
           <div className="text-center text-white space-y-6 px-4">
             <h1 className="text-4xl md:text-6xl font-bold">
               Welcome to <span className="text-orange-500">Erigga Live</span>
