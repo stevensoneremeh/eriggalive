@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/contexts/auth-context"
 import { Toaster } from "@/components/ui/sonner"
 import { SessionRefresh } from "@/components/session-refresh"
+import { MainNavigation } from "@/components/navigation/main-navigation"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -29,7 +30,8 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
             <SessionRefresh />
-            {children}
+            <MainNavigation />
+            <main className="pt-16">{children}</main>
             <Toaster />
           </AuthProvider>
         </ThemeProvider>

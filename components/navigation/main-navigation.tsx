@@ -23,7 +23,7 @@ import {
   Users,
   ShoppingBag,
   Radio,
-  Vault,
+  Archive,
   User,
   Settings,
   LogOut,
@@ -38,7 +38,7 @@ const navigationItems = [
   { name: "Home", href: "/", icon: Home, public: true },
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, protected: true },
   { name: "Community", href: "/community", icon: Users, protected: true },
-  { name: "Vault", href: "/vault", icon: Vault, protected: true },
+  { name: "Vault", href: "/vault", icon: Archive, protected: true },
   { name: "Store", href: "/merch", icon: ShoppingBag, protected: true },
   { name: "Radio", href: "/radio", icon: Radio, protected: true },
   { name: "Meet & Greet", href: "/meet-greet", icon: Video, protected: true },
@@ -79,9 +79,9 @@ export function MainNavigation() {
 
   if (!mounted) {
     return (
-      <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <nav className="fixed top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center">
-          <div className="h-10 w-32 bg-gray-200 dark:bg-gray-800 rounded animate-pulse" />
+          <div className="h-12 w-40 bg-gray-200 dark:bg-gray-800 rounded animate-pulse" />
         </div>
       </nav>
     )
@@ -90,12 +90,12 @@ export function MainNavigation() {
   const visibleItems = navigationItems.filter((item) => item.public || (item.protected && user))
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <nav className="fixed top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
         {/* Logo */}
-        <div className="mr-6">
+        <div className="mr-8">
           <Link href="/" className="flex items-center space-x-2">
-            <DynamicLogo className="h-10 md:h-12 lg:h-14 w-auto" />
+            <DynamicLogo className="h-12 md:h-14 lg:h-16 w-auto" />
           </Link>
         </div>
 
@@ -103,7 +103,7 @@ export function MainNavigation() {
         <div className="hidden md:flex md:flex-1 md:items-center md:justify-between">
           <div className="flex items-center space-x-6">
             {visibleItems.map((item) => {
-              const isActive = pathname === item.href
+              const isActive = pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href))
               return (
                 <Button
                   key={item.name}
@@ -197,6 +197,11 @@ export function MainNavigation() {
             </SheetTrigger>
             <SheetContent side="right" className="w-[300px] sm:w-[400px]">
               <div className="flex flex-col space-y-4">
+                {/* Mobile Logo */}
+                <div className="flex items-center justify-center pb-4 border-b">
+                  <DynamicLogo className="h-10 w-auto" />
+                </div>
+
                 {/* User Info */}
                 {user ? (
                   <div className="flex items-center space-x-4 pb-4 border-b">
@@ -234,7 +239,7 @@ export function MainNavigation() {
                 {/* Navigation Items */}
                 <div className="flex flex-col space-y-2">
                   {visibleItems.map((item) => {
-                    const isActive = pathname === item.href
+                    const isActive = pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href))
                     return (
                       <Button
                         key={item.name}

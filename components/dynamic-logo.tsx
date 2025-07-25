@@ -10,7 +10,7 @@ interface DynamicLogoProps {
   height?: number
 }
 
-export function DynamicLogo({ className = "h-10 md:h-12 lg:h-14 w-auto", width, height }: DynamicLogoProps) {
+export function DynamicLogo({ className = "h-12 md:h-14 lg:h-16 w-auto", width, height }: DynamicLogoProps) {
   const { theme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
@@ -29,8 +29,8 @@ export function DynamicLogo({ className = "h-10 md:h-12 lg:h-14 w-auto", width, 
     <Image
       src={logoSrc || "/placeholder.svg"}
       alt="Erigga Live"
-      width={width || 120}
-      height={height || 40}
+      width={width || 140}
+      height={height || 48}
       className={className}
       priority
       style={{
