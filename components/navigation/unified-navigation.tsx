@@ -37,7 +37,6 @@ import { DynamicLogo } from "@/components/dynamic-logo"
 import { CoinBalance } from "@/components/coin-balance"
 import { UserTierBadge } from "@/components/user-tier-badge"
 import { cn } from "@/lib/utils"
-import { toast } from "sonner"
 
 interface NavigationItem {
   name: string
@@ -204,10 +203,8 @@ export function UnifiedNavigation() {
       await signOut()
       setIsMobileMenuOpen(false)
       router.push("/")
-      toast.success("Successfully signed out")
     } catch (error) {
       console.error("Sign out error:", error)
-      toast.error("Failed to sign out")
     }
   }
 
@@ -227,10 +224,10 @@ export function UnifiedNavigation() {
             isScrolled ? "bg-background/95 backdrop-blur-md shadow-lg" : "bg-background/80 backdrop-blur-sm",
           )}
         >
-          <div className="flex items-center justify-between px-4 h-16">
-            {/* Logo - Increased size */}
+          <div className="flex items-center justify-between px-4 h-14">
+            {/* Logo */}
             <Link href="/" className="flex items-center">
-              <DynamicLogo className="py-1" />
+              <DynamicLogo width={120} height={32} className="w-auto h-8 sm:h-9" />
             </Link>
 
             {/* Right Actions */}
@@ -251,7 +248,7 @@ export function UnifiedNavigation() {
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-9 w-9">
-                    <Menu className="h-5 w-5" />
+                    <Menu className="h-4 w-4" />
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-80 p-0">
@@ -320,10 +317,10 @@ export function UnifiedNavigation() {
     >
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 w-full">
-          {/* Logo - Always visible and larger */}
+          {/* Logo - Always visible */}
           <div className="flex items-center shrink-0">
             <Link href="/" className="flex items-center space-x-2">
-              <DynamicLogo className="py-1" />
+              <DynamicLogo width={140} height={38} className="w-auto h-10 md:h-11 lg:h-12" />
             </Link>
           </div>
 
@@ -398,7 +395,7 @@ export function UnifiedNavigation() {
                 {isAuthenticated && profile ? (
                   <>
                     <div className="hidden md:flex items-center space-x-2">
-                      <CoinBalance coins={profile.coins_balance} size="sm" />
+                      <CoinBalance coins={profile.coins} size="sm" />
                       <UserTierBadge tier={profile.tier} />
                     </div>
                     <Link href="/dashboard">
@@ -461,7 +458,7 @@ export function UnifiedNavigation() {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
-            <DynamicLogo width={100} height={28} />
+            <DynamicLogo width={120} height={32} className="w-auto h-8" />
           </Link>
           <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)} className="h-8 w-8">
             <X className="h-4 w-4" />
@@ -485,7 +482,7 @@ export function UnifiedNavigation() {
               </div>
             </div>
             <div className="bg-background/50 rounded-lg p-2">
-              <CoinBalance coins={profile.coins_balance} size="sm" />
+              <CoinBalance coins={profile.coins} size="sm" />
             </div>
           </div>
         )}
@@ -558,10 +555,10 @@ export function UnifiedNavigation() {
               <Button
                 variant="outline"
                 className="w-full justify-start bg-transparent"
-                onClick={() => handleNavigation("/profile")}
+                onClick={() => handleNavigation("/settings")}
               >
                 <Settings className="h-4 w-4 mr-2" />
-                Profile Settings
+                Settings
               </Button>
               <Button
                 variant="ghost"
@@ -599,7 +596,7 @@ function NavigationSkeleton() {
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur shadow-md">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
-          <div className="h-10 w-32 bg-muted animate-pulse rounded" />
+          <div className="h-8 w-32 bg-muted animate-pulse rounded" />
           <div className="hidden lg:flex items-center space-x-4">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="h-4 w-16 bg-muted animate-pulse rounded" />

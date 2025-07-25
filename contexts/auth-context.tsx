@@ -5,7 +5,6 @@ import { createContext, useContext, useEffect, useState } from "react"
 import type { User } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { useRouter, usePathname, useSearchParams } from "next/navigation"
 
 interface UserProfile {
   id: string
@@ -26,7 +25,6 @@ interface UserProfile {
   last_seen: string
   created_at: string
   updated_at: string
-  coins?: number // For backward compatibility
 }
 
 interface AuthContextType {
@@ -55,12 +53,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-
-  // Get redirect URL from search params
-  const redirectTo = searchParams?.get("redirect") || "/dashboard"
 
   useEffect(() => {
     // Get initial session
@@ -74,13 +66,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (error) {
           console.error("Error getting session:", error)
+          setLoading(false)
           return
         }
 
-        console.log("Initial session:", session?.user?.id)
+        console.log("Initial session:", session?.user?.id || "No session")
         if (session?.user) {
           setUser(session.user)
           await fetchUserProfile(session.user.id)
+        } else {
+          setUser(null)
+          setProfile(null)
         }
       } catch (error) {
         console.error("Error in getInitialSession:", error)
@@ -95,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, session?.user?.id)
+      console.log("Auth state changed:", event, session?.user?.id || "No user")
 
       if (session?.user) {
         setUser(session.user)
@@ -113,24 +109,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Check if current path requires authentication
-  useEffect(() => {
-    if (loading) return
-
-    const protectedRoutes = ["/dashboard", "/profile", "/coins", "/settings", "/meet-greet", "/rooms/freebies"]
-
-    const isProtectedRoute = protectedRoutes.some((route) => pathname?.startsWith(route))
-    const isAuthRoute = ["/login", "/signup"].includes(pathname || "")
-
-    if (isProtectedRoute && !user) {
-      // Redirect to login if trying to access protected route while not authenticated
-      router.push(`/login?redirect=${encodeURIComponent(pathname || "/")}`)
-    } else if (isAuthRoute && user) {
-      // Redirect to dashboard if already authenticated and trying to access auth routes
-      router.push("/dashboard")
-    }
-  }, [pathname, user, loading, router])
-
   const fetchUserProfile = async (userId: string) => {
     try {
       console.log("Fetching user profile for:", userId)
@@ -147,12 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log("User profile fetched:", data?.username)
       if (data) {
-        // Ensure coins_balance is available as coins for backward compatibility
-        const profileData = {
-          ...data,
-          coins: data.coins_balance,
-        }
-        setProfile(profileData)
+        setProfile(data)
       }
     } catch (error) {
       console.error("Error in fetchUserProfile:", error)
@@ -192,11 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log("User profile created:", data?.username)
       if (data) {
-        const profileWithCoins = {
-          ...data,
-          coins: data.coins_balance,
-        }
-        setProfile(profileWithCoins)
+        setProfile(data)
       }
     } catch (error) {
       console.error("Error in createUserProfile:", error)
@@ -218,11 +187,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error }
       }
 
-      console.log("Sign in successful")
-      toast.success("Welcome back!")
-
-      // Navigate to the redirect URL or dashboard
-      router.push(redirectTo)
+      if (data.user) {
+        console.log("Sign in successful")
+        toast.success("Welcome back!")
+      }
 
       return { error: null }
     } catch (error) {
@@ -242,7 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true)
     try {
       console.log("Signing up user:", email, metadata)
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -262,12 +230,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log("Sign up successful")
       toast.success("Account created successfully!")
-
-      // If auto-confirm is enabled, user will be logged in automatically
-      if (data.session) {
-        router.push("/dashboard")
-      }
-
       return { error: null }
     } catch (error) {
       console.error("Sign up error:", error)
@@ -289,9 +251,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(null)
       console.log("Sign out successful")
       toast.success("Signed out successfully")
-
-      // Redirect to home page after sign out
-      router.push("/")
     } catch (error) {
       console.error("Sign out error:", error)
       toast.error("Failed to sign out")
@@ -327,13 +286,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error
 
-      const updatedProfile = {
-        ...profile,
-        ...updates,
-        coins: updates.coins_balance || profile.coins_balance,
-      }
-
-      setProfile(updatedProfile)
+      setProfile({ ...profile, ...updates })
       console.log("Profile updated successfully")
       toast.success("Profile updated successfully!")
     } catch (error: any) {

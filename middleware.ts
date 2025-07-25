@@ -62,16 +62,28 @@ export async function middleware(request: NextRequest) {
 
   try {
     // Refresh session if expired
-    await supabase.auth.getSession()
-
     const {
-      data: { user },
-    } = await supabase.auth.getUser()
+      data: { session },
+    } = await supabase.auth.getSession()
+    const user = session?.user
 
     const { pathname } = request.nextUrl
 
     // Protected routes that require authentication
-    const protectedRoutes = ["/dashboard", "/chat", "/coins", "/settings", "/profile", "/rooms/freebies", "/meet-greet"]
+    const protectedRoutes = [
+      "/dashboard",
+      "/community",
+      "/chat",
+      "/coins",
+      "/settings",
+      "/profile",
+      "/rooms",
+      "/vault",
+      "/premium",
+      "/merch",
+      "/tickets",
+      "/meet-greet",
+    ]
 
     // Auth routes that should redirect if already logged in
     const authRoutes = ["/login", "/signup", "/forgot-password", "/reset-password"]
@@ -89,7 +101,10 @@ export async function middleware(request: NextRequest) {
 
     // Redirect authenticated users from auth routes to dashboard
     if (isAuthRoute && user) {
-      return NextResponse.redirect(new URL("/dashboard", request.url))
+      // Check if there's a redirect parameter
+      const redirectTo = request.nextUrl.searchParams.get("redirect")
+      const destination = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/dashboard"
+      return NextResponse.redirect(new URL(destination, request.url))
     }
   } catch (error) {
     console.error("Middleware error:", error)
@@ -107,7 +122,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
+     * - api routes
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 }

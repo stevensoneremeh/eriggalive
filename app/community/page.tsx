@@ -31,6 +31,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
 import { User } from "lucide-react" // Import User icon
+import { useRouter } from "next/navigation"
 
 interface Post {
   id: string
@@ -144,6 +145,7 @@ const mockPosts: Post[] = [
 
 export default function CommunityPage() {
   const { isAuthenticated, profile, isLoading } = useAuth()
+  const router = useRouter()
   const [posts, setPosts] = useState<Post[]>([])
   const [userPosts, setUserPosts] = useState<Post[]>([])
   const [categories, setCategories] = useState<Category[]>(mockCategories)
@@ -157,6 +159,13 @@ export default function CommunityPage() {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all")
 
   const supabase = createClient()
+
+  // Redirect if not authenticated (optional for community - you can make it public)
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login?redirect=/community")
+    }
+  }, [isAuthenticated, isLoading, router])
 
   const loadPosts = async () => {
     try {

@@ -63,6 +63,7 @@
     "dompurify": "latest",
     "embla-carousel-react": "latest",
     "fs": "latest",
+    "geist": "latest",
     "input-otp": "latest",
     "isomorphic-dompurify": "latest",
     "lucide-react": "^0.454.0",

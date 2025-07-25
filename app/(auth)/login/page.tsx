@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -19,19 +19,19 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  const { signIn, isAuthenticated } = useAuth()
+  const { signIn } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
   // Get redirect URL from search params, default to dashboard
-  const redirectTo = searchParams.get("redirect") || "/dashboard"
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.push(redirectTo)
+  const redirectTo = (() => {
+    const redirect = searchParams.get("redirect")
+    // Validate redirect path - must start with / and not be an auth route
+    if (redirect && redirect.startsWith("/") && !redirect.startsWith("/login") && !redirect.startsWith("/signup")) {
+      return redirect
     }
-  }, [isAuthenticated, router, redirectTo])
+    return "/dashboard"
+  })()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,8 +43,11 @@ export default function LoginPage() {
 
       if (error) {
         setError(error?.message || "Failed to sign in")
+      } else {
+        // Successful login - redirect to dashboard or intended page
+        const redirectPath = redirectTo.startsWith("/") ? redirectTo : "/dashboard"
+        router.push(redirectPath)
       }
-      // No need to redirect here as it's handled in the auth context
     } catch (err) {
       setError("An unexpected error occurred")
     } finally {

@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/badge"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -67,15 +67,8 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
-  const { signUp, isAuthenticated } = useAuth()
+  const { signUp } = useAuth()
   const router = useRouter()
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.push("/dashboard")
-    }
-  }, [isAuthenticated, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -127,7 +120,7 @@ export default function SignUpPage() {
         // Redirect to dashboard after showing success message
         setTimeout(() => {
           router.push("/dashboard")
-        }, 2000)
+        }, 1500) // Reduced timeout for better UX
       }
     } catch (err) {
       setError("An unexpected error occurred")

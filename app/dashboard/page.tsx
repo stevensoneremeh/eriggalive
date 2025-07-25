@@ -10,7 +10,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  User,
   Coins,
   MessageCircle,
   Users,
@@ -35,6 +34,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
+import { useRouter } from "next/navigation"
 
 interface DashboardStats {
   totalPosts: number
@@ -60,6 +60,7 @@ interface RecentActivity {
 
 export default function DashboardPage() {
   const { profile, isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
   const [stats, setStats] = useState<DashboardStats>({
     totalPosts: 0,
     totalComments: 0,
@@ -75,6 +76,13 @@ export default function DashboardPage() {
   const [loadingStats, setLoadingStats] = useState(true)
 
   const supabase = createClient()
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login?redirect=/dashboard")
+    }
+  }, [isAuthenticated, isLoading, router])
 
   const loadDashboardStats = async () => {
     if (!profile) return
@@ -237,25 +245,7 @@ export default function DashboardPage() {
   }
 
   if (!isAuthenticated || !profile) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-        <div className="container mx-auto px-4 py-8">
-          <Card className="max-w-md mx-auto backdrop-blur-sm bg-white/80 dark:bg-slate-800/80 border-0 shadow-xl">
-            <CardContent className="p-8 text-center">
-              <User className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <h2 className="text-xl font-semibold mb-2">Access Restricted</h2>
-              <p className="text-muted-foreground mb-6">Please sign in to access your dashboard.</p>
-              <Button
-                asChild
-                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
-              >
-                <Link href="/login">Sign In</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
+    return null // Will redirect via useEffect
   }
 
   return (
