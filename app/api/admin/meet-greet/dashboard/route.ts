@@ -3,68 +3,83 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get current user and verify admin access
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
+
     if (authError || !user) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json({ success: false, message: "Authentication required" }, { status: 401 })
     }
 
-    // Check if user is admin
-    const { data: profile } = await supabase.from("profiles").select("role, tier").eq("id", user.id).single()
+    // Check if user is admin (you can adjust this based on your admin system)
+    const { data: userProfile } = await supabase.from("users").select("role").eq("auth_user_id", user.id).single()
 
-    if (!profile || (profile.role !== "admin" && profile.tier !== "blood")) {
-      return NextResponse.json({ success: false, error: "Insufficient permissions" }, { status: 403 })
+    if (!userProfile || !["admin", "super_admin"].includes(userProfile.role)) {
+      return NextResponse.json({ success: false, message: "Admin access required" }, { status: 403 })
     }
 
-    // Get sessions
-    const { data: sessions, error: sessionsError } = await supabase
-      .from("meet_greet_sessions")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(50)
+    // Get dashboard statistics
+    const [paymentsResult, sessionsResult, notificationsResult] = await Promise.all([
+      // Get payment statistics
+      supabase
+        .from("meet_greet_payments")
+        .select("id, amount, status, created_at")
+        .order("created_at", { ascending: false })
+        .limit(10),
 
-    if (sessionsError) {
-      console.error("Sessions fetch error:", sessionsError)
-      return NextResponse.json({ success: false, error: "Failed to fetch sessions" }, { status: 500 })
-    }
+      // Get session statistics
+      supabase
+        .from("meet_greet_sessions")
+        .select(`
+          id, status, scheduled_time, started_at, ended_at, duration_minutes,
+          user_id, payment_id,
+          payment:meet_greet_payments(email, phone, amount)
+        `)
+        .order("scheduled_time", { ascending: false })
+        .limit(10),
 
-    // Get notifications
-    const { data: notifications, error: notificationsError } = await supabase
-      .from("admin_notifications")
-      .select(`
-        *,
-        meet_greet_sessions (*)
-      `)
-      .eq("is_read", false)
-      .order("created_at", { ascending: false })
+      // Get recent notifications
+      supabase
+        .from("admin_notifications")
+        .select("*")
+        .eq("type", "meet_greet_booking")
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ])
 
-    if (notificationsError) {
-      console.error("Notifications fetch error:", notificationsError)
-    }
+    // Calculate summary statistics
+    const totalRevenue =
+      paymentsResult.data?.filter((p) => p.status === "completed").reduce((sum, p) => sum + Number(p.amount), 0) || 0
 
-    // Calculate stats
-    const stats = {
-      totalSessions: sessions.length,
-      totalRevenue: sessions
-        .filter((s) => s.payment_status === "completed")
-        .reduce((sum, s) => sum + Number.parseFloat(s.amount), 0),
-      upcomingSessions: sessions.filter((s) => s.session_status === "scheduled").length,
-      activeSessions: sessions.filter((s) => s.session_status === "active").length,
-    }
+    const completedSessions = sessionsResult.data?.filter((s) => s.status === "completed").length || 0
+
+    const upcomingSessions =
+      sessionsResult.data?.filter((s) => s.status === "confirmed" && new Date(s.scheduled_time) > new Date()).length ||
+      0
+
+    const activeSessions = sessionsResult.data?.filter((s) => s.status === "active").length || 0
 
     return NextResponse.json({
       success: true,
-      sessions,
-      notifications: notifications || [],
-      stats,
+      data: {
+        summary: {
+          totalRevenue,
+          completedSessions,
+          upcomingSessions,
+          activeSessions,
+          totalBookings: sessionsResult.data?.length || 0,
+        },
+        recentPayments: paymentsResult.data || [],
+        recentSessions: sessionsResult.data || [],
+        recentNotifications: notificationsResult.data || [],
+      },
     })
   } catch (error) {
-    console.error("Dashboard fetch error:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
+    console.error("Admin dashboard error:", error)
+    return NextResponse.json({ success: false, message: "Internal server error" }, { status: 500 })
   }
 }

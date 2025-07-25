@@ -1,47 +1,59 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase-utils"
+import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, amount, metadata } = await request.json()
+    const body = await request.json()
+    const { email, amount, phone, preferredTime, specialRequests } = body
 
-    // Validate input
-    if (!email || !amount || !metadata) {
+    if (!email || !amount || !phone) {
       return NextResponse.json({ success: false, message: "Missing required fields" }, { status: 400 })
     }
 
+    const supabase = await createClient()
+
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ success: false, message: "Authentication required" }, { status: 401 })
+    }
+
     // In a real implementation, you would initialize Paystack payment here
-    // For demo purposes, we'll create a mock payment reference
-    const reference = `mg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    // For demo purposes, we'll create a mock payment record
+    const paymentReference = `ref_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-    // Store payment record in database
-    const supabase = createServerSupabaseClient()
-
-    const { data, error } = await supabase
-      .from("meet_greet_sessions")
+    // Store payment initialization in database
+    const { data: paymentData, error: paymentError } = await supabase
+      .from("meet_greet_payments")
       .insert({
-        user_email: email,
-        user_name: metadata.name,
+        user_id: user.id,
+        email,
+        phone,
         amount: amount / 100, // Convert from kobo to naira
-        payment_reference: reference,
+        preferred_time: preferredTime || null,
+        special_requests: specialRequests || null,
+        payment_reference: paymentReference,
         status: "pending",
-        session_duration: 20 * 60, // 20 minutes in seconds
       })
       .select()
       .single()
 
-    if (error) {
-      console.error("Database error:", error)
-      return NextResponse.json({ success: false, message: "Failed to create session record" }, { status: 500 })
+    if (paymentError) {
+      console.error("Payment creation error:", paymentError)
+      return NextResponse.json({ success: false, message: "Failed to initialize payment" }, { status: 500 })
     }
 
-    // Return success with payment URL (in real implementation, this would be Paystack URL)
+    // In production, you would return Paystack authorization URL
     return NextResponse.json({
       success: true,
       data: {
-        authorization_url: `https://checkout.paystack.com/mock/${reference}`,
-        access_code: reference,
-        reference: reference,
+        authorization_url: `https://checkout.paystack.com/mock/${paymentReference}`,
+        access_code: `access_${paymentReference}`,
+        reference: paymentReference,
       },
     })
   } catch (error) {

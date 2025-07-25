@@ -30,9 +30,14 @@ interface AuthContextType {
   user: User | null
   profile: UserProfile | null
   isAuthenticated: boolean
+  isLoading: boolean
   loading: boolean
-  signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string, username: string, fullName?: string) => Promise<void>
+  signIn: (email: string, password: string) => Promise<{ error?: any }>
+  signUp: (
+    email: string,
+    password: string,
+    metadata?: { username?: string; full_name?: string; tier?: string },
+  ) => Promise<{ error?: any }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>
@@ -51,15 +56,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session
     const getInitialSession = async () => {
       try {
+        console.log("Getting initial session...")
         const {
           data: { session },
           error,
         } = await supabase.auth.getSession()
+
         if (error) {
           console.error("Error getting session:", error)
           return
         }
 
+        console.log("Initial session:", session?.user?.id)
         if (session?.user) {
           setUser(session.user)
           await fetchUserProfile(session.user.id)
@@ -97,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      console.log("Fetching user profile for:", userId)
       const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
 
       if (error) {
@@ -104,6 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
+      console.log("User profile fetched:", data?.username)
       if (data) {
         setProfile(data)
       }
@@ -115,38 +125,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     setLoading(true)
     try {
+      console.log("Signing in user:", email)
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (error) throw error
+      if (error) {
+        console.error("Sign in error:", error)
+        return { error }
+      }
+
+      console.log("Sign in successful")
+      return { error: null }
     } catch (error) {
       console.error("Sign in error:", error)
-      throw error
+      return { error }
     } finally {
       setLoading(false)
     }
   }
 
-  const signUp = async (email: string, password: string, username: string, fullName?: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    metadata?: { username?: string; full_name?: string; tier?: string },
+  ) => {
     setLoading(true)
     try {
+      console.log("Signing up user:", email, metadata)
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            username,
-            full_name: fullName || "",
+            username: metadata?.username || "",
+            full_name: metadata?.full_name || "",
+            tier: metadata?.tier || "grassroot",
           },
         },
       })
 
-      if (error) throw error
+      if (error) {
+        console.error("Sign up error:", error)
+        return { error }
+      }
+
+      console.log("Sign up successful")
+      return { error: null }
     } catch (error) {
       console.error("Sign up error:", error)
-      throw error
+      return { error }
     } finally {
       setLoading(false)
     }
@@ -155,11 +184,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     setLoading(true)
     try {
+      console.log("Signing out user")
       const { error } = await supabase.auth.signOut()
       if (error) throw error
 
       setUser(null)
       setProfile(null)
+      console.log("Sign out successful")
     } catch (error) {
       console.error("Sign out error:", error)
       throw error
@@ -170,11 +201,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resetPassword = async (email: string) => {
     try {
+      console.log("Resetting password for:", email)
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       })
 
       if (error) throw error
+      console.log("Password reset email sent")
     } catch (error) {
       console.error("Reset password error:", error)
       throw error
@@ -185,11 +218,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user || !profile) return
 
     try {
+      console.log("Updating profile:", updates)
       const { error } = await supabase.from("users").update(updates).eq("auth_user_id", user.id)
 
       if (error) throw error
 
       setProfile({ ...profile, ...updates })
+      console.log("Profile updated successfully")
     } catch (error) {
       console.error("Update profile error:", error)
       throw error
@@ -198,6 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = async () => {
     if (!user) return
+    console.log("Refreshing profile")
     await fetchUserProfile(user.id)
   }
 
@@ -205,6 +241,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     profile,
     isAuthenticated: !!user,
+    isLoading: loading,
     loading,
     signIn,
     signUp,

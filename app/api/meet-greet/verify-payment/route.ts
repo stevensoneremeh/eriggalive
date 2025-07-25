@@ -1,57 +1,70 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase-utils"
+import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const { reference } = await request.json()
+    const body = await request.json()
+    const { reference } = body
 
     if (!reference) {
       return NextResponse.json({ success: false, message: "Payment reference is required" }, { status: 400 })
     }
 
+    const supabase = await createClient()
+
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ success: false, message: "Authentication required" }, { status: 401 })
+    }
+
     // In a real implementation, you would verify with Paystack API
     // For demo purposes, we'll simulate successful verification
-    const supabase = createServerSupabaseClient()
 
-    // Update session status to paid
-    const { data, error } = await supabase
-      .from("meet_greet_sessions")
+    // Update payment status
+    const { data: paymentData, error: updateError } = await supabase
+      .from("meet_greet_payments")
       .update({
-        status: "paid",
-        paid_at: new Date().toISOString(),
+        status: "completed",
+        verified_at: new Date().toISOString(),
       })
       .eq("payment_reference", reference)
+      .eq("user_id", user.id)
       .select()
       .single()
 
-    if (error) {
-      console.error("Database error:", error)
-      return NextResponse.json({ success: false, message: "Failed to verify payment" }, { status: 500 })
+    if (updateError) {
+      console.error("Payment update error:", updateError)
+      return NextResponse.json({ success: false, message: "Payment verification failed" }, { status: 500 })
     }
 
-    if (!data) {
-      return NextResponse.json({ success: false, message: "Payment record not found" }, { status: 404 })
-    }
+    // Create meet & greet session
+    const { data: sessionData, error: sessionError } = await supabase
+      .from("meet_greet_sessions")
+      .insert({
+        user_id: user.id,
+        payment_id: paymentData.id,
+        status: "confirmed",
+        scheduled_time: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // 5 minutes from now
+        duration_minutes: 20,
+      })
+      .select()
+      .single()
 
-    // Create admin notification
-    await supabase.from("admin_notifications").insert({
-      type: "new_booking",
-      title: "New Meet & Greet Booking",
-      message: `${data.user_name} has booked a Meet & Greet session`,
-      data: {
-        session_id: data.id,
-        user_name: data.user_name,
-        user_email: data.user_email,
-        amount: data.amount,
-      },
-    })
+    if (sessionError) {
+      console.error("Session creation error:", sessionError)
+      return NextResponse.json({ success: false, message: "Failed to create session" }, { status: 500 })
+    }
 
     return NextResponse.json({
       success: true,
       data: {
-        session_id: data.id,
-        status: data.status,
-        amount: data.amount,
+        payment: paymentData,
+        session: sessionData,
       },
     })
   } catch (error) {

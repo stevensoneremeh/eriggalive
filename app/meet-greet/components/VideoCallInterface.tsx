@@ -1,224 +1,273 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CountdownTimer } from "./CountdownTimer"
-import { Video, VideoOff, Mic, MicOff, PhoneOff, Settings, Maximize } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Video, VideoOff, Mic, MicOff, PhoneOff, Users, Clock, Shield } from "lucide-react"
+import { toast } from "sonner"
 
 interface VideoCallInterfaceProps {
+  roomUrl: string
   onSessionEnd: () => void
-  sessionDuration: number // in seconds
+  sessionDuration: number // in milliseconds
 }
 
-export function VideoCallInterface({ onSessionEnd, sessionDuration }: VideoCallInterfaceProps) {
-  const [timeRemaining, setTimeRemaining] = useState(sessionDuration)
-  const [isVideoOn, setIsVideoOn] = useState(true)
-  const [isAudioOn, setIsAudioOn] = useState(true)
+export function VideoCallInterface({ roomUrl, onSessionEnd, sessionDuration }: VideoCallInterfaceProps) {
+  const [isVideoEnabled, setIsVideoEnabled] = useState(true)
+  const [isAudioEnabled, setIsAudioEnabled] = useState(true)
   const [isConnected, setIsConnected] = useState(false)
-  const [showControls, setShowControls] = useState(true)
+  const [timeRemaining, setTimeRemaining] = useState(sessionDuration)
+  const [sessionStarted, setSessionStarted] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
-  const remoteVideoRef = useRef<HTMLVideoElement>(null)
+  const timerRef = useRef<NodeJS.Timeout>()
 
   useEffect(() => {
-    // Simulate connection after 3 seconds
-    const connectTimer = setTimeout(() => {
-      setIsConnected(true)
-    }, 3000)
-
-    // Start the session timer
-    const timer = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          handleEndSession()
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    // Auto-hide controls after 5 seconds
-    const controlsTimer = setTimeout(() => {
-      setShowControls(false)
-    }, 5000)
+    // Initialize video call
+    initializeCall()
 
     return () => {
-      clearTimeout(connectTimer)
-      clearInterval(timer)
-      clearTimeout(controlsTimer)
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+      }
     }
   }, [])
 
-  const handleEndSession = () => {
-    // Show thank you message with fadeout
-    const thankYouDiv = document.createElement("div")
-    thankYouDiv.className = "fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in"
-    thankYouDiv.innerHTML = `
-      <div class="text-center text-white space-y-4">
-        <h2 class="text-4xl font-bold">Thank You!</h2>
-        <p class="text-xl">Your session with Erigga has ended.</p>
-        <p class="text-lg opacity-75">We hope you enjoyed your exclusive meet & greet!</p>
-      </div>
-    `
-    document.body.appendChild(thankYouDiv)
+  useEffect(() => {
+    if (sessionStarted && timeRemaining > 0) {
+      timerRef.current = setInterval(() => {
+        setTimeRemaining((prev) => {
+          if (prev <= 1000) {
+            handleEndCall()
+            return 0
+          }
+          return prev - 1000
+        })
+      }, 1000)
+    }
 
-    setTimeout(() => {
-      document.body.removeChild(thankYouDiv)
-      onSessionEnd()
-    }, 3000)
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+      }
+    }
+  }, [sessionStarted, timeRemaining])
+
+  const initializeCall = async () => {
+    try {
+      // Get user media
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      })
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+      }
+
+      setIsConnected(true)
+      setSessionStarted(true)
+      toast.success("Connected to video call!")
+    } catch (error) {
+      console.error("Error accessing media devices:", error)
+      toast.error("Failed to access camera/microphone")
+    }
   }
 
   const toggleVideo = () => {
-    setIsVideoOn(!isVideoOn)
+    setIsVideoEnabled(!isVideoEnabled)
+    // In a real implementation, this would control the video stream
+    toast.info(isVideoEnabled ? "Video disabled" : "Video enabled")
   }
 
   const toggleAudio = () => {
-    setIsAudioOn(!isAudioOn)
+    setIsAudioEnabled(!isAudioEnabled)
+    // In a real implementation, this would control the audio stream
+    toast.info(isAudioEnabled ? "Audio muted" : "Audio unmuted")
+  }
+
+  const handleEndCall = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+    }
+
+    // Stop media streams
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream
+      stream.getTracks().forEach((track) => track.stop())
+    }
+
+    onSessionEnd()
+    toast.success("Session ended successfully!")
+  }
+
+  const formatTime = (ms: number) => {
+    const minutes = Math.floor(ms / 60000)
+    const seconds = Math.floor((ms % 60000) / 1000)
+    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
   }
 
   return (
-    <div className="fixed inset-0 bg-black flex flex-col">
-      {/* Header with Timer */}
-      <div className="flex items-center justify-between p-4 bg-black/50 backdrop-blur-sm">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-3 h-3 rounded-full ${
-                isConnected ? "bg-green-400 animate-pulse" : "bg-yellow-400 animate-bounce"
-              }`}
-            />
-            <span className="text-white font-medium">{isConnected ? "Connected with Erigga" : "Connecting..."}</span>
+    <div className="max-w-6xl mx-auto space-y-6">
+      {/* Session Header */}
+      <Card className="bg-gradient-to-r from-red-500/10 to-blue-500/10 border border-red-500/20 backdrop-blur-xl">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Shield className="h-6 w-6 text-red-500" />
+                <span className="text-xl font-bold">Superman Phone Booth Session</span>
+              </div>
+              <Badge variant="secondary" className="bg-green-500/20 text-green-700 border-green-500/30">
+                <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse" />
+                LIVE
+              </Badge>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="text-sm text-gray-600 dark:text-gray-400">Time Remaining</div>
+                <div className="text-2xl font-bold text-red-500">{formatTime(timeRemaining)}</div>
+              </div>
+            </div>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        <CountdownTimer timeRemaining={timeRemaining} totalDuration={sessionDuration} />
-      </div>
+      {/* Video Interface */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Video Area */}
+        <div className="lg:col-span-2">
+          <Card className="overflow-hidden border-0 shadow-2xl bg-black">
+            <CardContent className="p-0 relative aspect-video">
+              {/* User Video */}
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                className={`w-full h-full object-cover ${!isVideoEnabled ? "hidden" : ""}`}
+              />
 
-      {/* Video Area */}
-      <div className="flex-1 relative">
-        {/* Remote Video (Erigga's video) */}
-        <div className="absolute inset-0">
-          {isConnected ? (
-            <div className="w-full h-full bg-gradient-to-br from-blue-900 to-slate-900 flex items-center justify-center">
-              {/* Simulated remote video */}
-              <div className="text-center text-white space-y-4">
-                <div className="w-32 h-32 rounded-full border-4 border-blue-400 overflow-hidden mx-auto">
-                  <img src="/images/hero/erigga1.jpeg" alt="Erigga" className="w-full h-full object-cover" />
+              {/* Video Disabled Overlay */}
+              {!isVideoEnabled && (
+                <div className="absolute inset-0 bg-gray-900 flex items-center justify-center">
+                  <div className="text-center text-white">
+                    <VideoOff className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg">Video is disabled</p>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-bold">Erigga</h3>
-                  <p className="text-blue-300">Live from the studio</p>
-                </div>
-                {/* Simulated audio waves */}
-                <div className="flex items-center justify-center gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="w-1 bg-green-400 rounded-full animate-pulse"
-                      style={{
-                        height: `${Math.random() * 20 + 10}px`,
-                        animationDelay: `${i * 100}ms`,
-                      }}
-                    />
-                  ))}
+              )}
+
+              {/* Erigga's Video Placeholder */}
+              <div className="absolute top-4 right-4 w-48 h-36 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg border-2 border-white/30 flex items-center justify-center">
+                <div className="text-center text-white">
+                  <Users className="h-8 w-8 mx-auto mb-2" />
+                  <p className="text-sm font-medium">Erigga</p>
+                  <div className="w-2 h-2 bg-green-400 rounded-full mx-auto mt-1 animate-pulse" />
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="w-full h-full bg-slate-900 flex items-center justify-center">
-              <div className="text-center text-white space-y-4">
-                <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto" />
-                <p className="text-xl">Connecting to Erigga...</p>
-                <p className="text-slate-400">Please wait while we establish the connection</p>
-              </div>
-            </div>
-          )}
-        </div>
 
-        {/* Local Video (User's video) - Picture in Picture */}
-        <div className="absolute bottom-4 right-4 w-48 h-36 bg-slate-800 rounded-lg border-2 border-slate-600 overflow-hidden">
-          {isVideoOn ? (
-            <div className="w-full h-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center">
-              <div className="text-center text-white">
-                <div className="w-16 h-16 rounded-full bg-slate-600 flex items-center justify-center mx-auto mb-2">
-                  <Video className="h-8 w-8" />
+              {/* Session Info Overlay */}
+              <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="h-4 w-4" />
+                  <span>Session in progress</span>
                 </div>
-                <p className="text-sm">You</p>
               </div>
-            </div>
-          ) : (
-            <div className="w-full h-full bg-slate-900 flex items-center justify-center">
-              <VideoOff className="h-8 w-8 text-slate-400" />
-            </div>
-          )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Controls & Info */}
+        <div className="space-y-6">
+          {/* Call Controls */}
+          <Card className="bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-xl border-slate-700">
+            <CardContent className="p-6">
+              <h3 className="text-lg font-semibold mb-4 text-white">Call Controls</h3>
+
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <Button
+                  onClick={toggleVideo}
+                  variant={isVideoEnabled ? "default" : "destructive"}
+                  className="flex items-center gap-2"
+                >
+                  {isVideoEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
+                  {isVideoEnabled ? "Video On" : "Video Off"}
+                </Button>
+
+                <Button
+                  onClick={toggleAudio}
+                  variant={isAudioEnabled ? "default" : "destructive"}
+                  className="flex items-center gap-2"
+                >
+                  {isAudioEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+                  {isAudioEnabled ? "Mic On" : "Mic Off"}
+                </Button>
+              </div>
+
+              <Button
+                onClick={handleEndCall}
+                variant="destructive"
+                className="w-full flex items-center gap-2 bg-red-600 hover:bg-red-700"
+              >
+                <PhoneOff className="h-4 w-4" />
+                End Session
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Session Guidelines */}
+          <Card className="bg-gradient-to-br from-blue-800/80 to-purple-800/80 backdrop-blur-xl border-blue-700">
+            <CardContent className="p-6">
+              <h3 className="text-lg font-semibold mb-4 text-white">Session Guidelines</h3>
+
+              <div className="space-y-3 text-sm text-blue-100">
+                <div className="flex items-start gap-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
+                  <span>Be respectful and professional</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
+                  <span>Screenshots are allowed</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
+                  <span>Screen recording is prohibited</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0" />
+                  <span>Session will auto-end at 20 minutes</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Connection Status */}
+          <Card className="bg-gradient-to-br from-green-800/80 to-emerald-800/80 backdrop-blur-xl border-green-700">
+            <CardContent className="p-6">
+              <h3 className="text-lg font-semibold mb-4 text-white">Connection Status</h3>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-green-100">Video Quality</span>
+                  <Badge className="bg-green-500/20 text-green-300 border-green-500/30">HD</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-green-100">Audio Quality</span>
+                  <Badge className="bg-green-500/20 text-green-300 border-green-500/30">Clear</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-green-100">Connection</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                    <span className="text-green-300 text-sm">Stable</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
-
-      {/* Controls */}
-      <div
-        className={`absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent transition-all duration-300 ${
-          showControls ? "translate-y-0 opacity-100" : "translate-y-full opacity-0"
-        }`}
-        onMouseEnter={() => setShowControls(true)}
-      >
-        <div className="flex items-center justify-center gap-4">
-          {/* Audio Toggle */}
-          <Button
-            onClick={toggleAudio}
-            size="lg"
-            variant={isAudioOn ? "default" : "destructive"}
-            className="rounded-full w-14 h-14"
-          >
-            {isAudioOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
-          </Button>
-
-          {/* Video Toggle */}
-          <Button
-            onClick={toggleVideo}
-            size="lg"
-            variant={isVideoOn ? "default" : "destructive"}
-            className="rounded-full w-14 h-14"
-          >
-            {isVideoOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
-          </Button>
-
-          {/* End Call */}
-          <Button
-            onClick={handleEndSession}
-            size="lg"
-            variant="destructive"
-            className="rounded-full w-16 h-16 bg-red-600 hover:bg-red-700"
-          >
-            <PhoneOff className="h-8 w-8" />
-          </Button>
-
-          {/* Settings */}
-          <Button
-            size="lg"
-            variant="outline"
-            className="rounded-full w-14 h-14 bg-white/10 border-white/20 text-white hover:bg-white/20"
-          >
-            <Settings className="h-6 w-6" />
-          </Button>
-
-          {/* Fullscreen */}
-          <Button
-            size="lg"
-            variant="outline"
-            className="rounded-full w-14 h-14 bg-white/10 border-white/20 text-white hover:bg-white/20"
-          >
-            <Maximize className="h-6 w-6" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Show controls on mouse move */}
-      <div
-        className="absolute inset-0 z-10"
-        onMouseMove={() => setShowControls(true)}
-        onMouseLeave={() => {
-          setTimeout(() => setShowControls(false), 3000)
-        }}
-      />
     </div>
   )
 }

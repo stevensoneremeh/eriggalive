@@ -1,45 +1,84 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase-utils"
+import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const { session_id } = await request.json()
+    const body = await request.json()
+    const { userId, paymentReference } = body
 
-    if (!session_id) {
-      return NextResponse.json({ success: false, message: "Session ID is required" }, { status: 400 })
+    if (!userId || !paymentReference) {
+      return NextResponse.json({ success: false, message: "Missing required fields" }, { status: 400 })
+    }
+
+    const supabase = await createClient()
+
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ success: false, message: "Authentication required" }, { status: 401 })
+    }
+
+    // Verify payment exists and is completed
+    const { data: paymentData, error: paymentError } = await supabase
+      .from("meet_greet_payments")
+      .select("*")
+      .eq("payment_reference", paymentReference)
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .single()
+
+    if (paymentError || !paymentData) {
+      return NextResponse.json({ success: false, message: "Payment not found or not completed" }, { status: 404 })
     }
 
     // In a real implementation, you would create a Daily.co room here
-    // For demo purposes, we'll create a mock room
-    const roomName = `meet-greet-${session_id}-${Date.now()}`
-    const roomUrl = `https://erigga.daily.co/${roomName}`
+    // For demo purposes, we'll create a mock room URL
+    const roomName = `erigga-meetgreet-${Date.now()}`
+    const mockRoomUrl = `https://erigga.daily.co/${roomName}`
 
-    const supabase = createServerSupabaseClient()
-
-    // Update session with room details
-    const { data, error } = await supabase
+    // Create or update session with room details
+    const { data: sessionData, error: sessionError } = await supabase
       .from("meet_greet_sessions")
-      .update({
-        room_url: roomUrl,
+      .upsert({
+        user_id: user.id,
+        payment_id: paymentData.id,
+        status: "confirmed",
+        scheduled_time: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // 5 minutes from now
+        duration_minutes: 20,
+        room_url: mockRoomUrl,
         room_name: roomName,
-        status: "ready",
       })
-      .eq("id", session_id)
       .select()
       .single()
 
-    if (error) {
-      console.error("Database error:", error)
-      return NextResponse.json({ success: false, message: "Failed to create room" }, { status: 500 })
+    if (sessionError) {
+      console.error("Session creation error:", sessionError)
+      return NextResponse.json({ success: false, message: "Failed to create session" }, { status: 500 })
     }
+
+    // Notify admin about new booking
+    await supabase.from("admin_notifications").insert({
+      type: "meet_greet_booking",
+      title: "New Meet & Greet Session Booked",
+      message: `User ${user.email} has booked a meet & greet session`,
+      data: {
+        sessionId: sessionData.id,
+        userId: user.id,
+        userEmail: user.email,
+        scheduledTime: sessionData.scheduled_time,
+        roomUrl: mockRoomUrl,
+      },
+    })
 
     return NextResponse.json({
       success: true,
-      data: {
-        room_url: roomUrl,
-        room_name: roomName,
-        session: data,
-      },
+      sessionId: sessionData.id,
+      roomUrl: mockRoomUrl,
+      scheduledTime: sessionData.scheduled_time,
     })
   } catch (error) {
     console.error("Room creation error:", error)
