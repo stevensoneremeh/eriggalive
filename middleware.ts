@@ -2,8 +2,10 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
   })
 
   const supabase = createServerClient(
@@ -11,78 +13,92 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
+        get(name: string) {
+          return request.cookies.get(name)?.value
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request,
+        set(name: string, value: string, options: any) {
+          request.cookies.set({
+            name,
+            value,
+            ...options,
           })
-          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+        },
+        remove(name: string, options: any) {
+          request.cookies.set({
+            name,
+            value: "",
+            ...options,
+          })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({
+            name,
+            value: "",
+            ...options,
+          })
         },
       },
     },
   )
 
-  // Refresh session if expired - required for Server Components
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // Protected routes that require authentication
+  const protectedRoutes = ["/dashboard", "/profile", "/vault", "/meet-greet", "/coins", "/community", "/admin"]
+
+  // Admin-only routes
+  const adminRoutes = ["/admin"]
 
   const { pathname } = request.nextUrl
-
-  // Define protected routes
-  const protectedRoutes = [
-    "/dashboard",
-    "/profile",
-    "/community",
-    "/vault",
-    "/meet-greet",
-    "/coins",
-    "/admin",
-    "/chat",
-    "/rooms",
-    "/tickets",
-    "/premium",
-    "/chronicles",
-  ]
-
-  // Define admin routes
-  const adminRoutes = ["/admin"]
 
   // Check if the current path is protected
   const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
 
+  // Check if the current path is admin-only
   const isAdminRoute = adminRoutes.some((route) => pathname.startsWith(route))
 
-  // If it's a protected route and user is not authenticated
-  if (isProtectedRoute && !session) {
+  // Redirect to login if accessing protected route without authentication
+  if (isProtectedRoute && !user) {
     const redirectUrl = new URL("/login", request.url)
     redirectUrl.searchParams.set("redirectTo", pathname)
     return NextResponse.redirect(redirectUrl)
   }
 
-  // If it's an admin route, check for admin privileges
-  if (isAdminRoute && session) {
+  // Check admin access
+  if (isAdminRoute && user) {
     try {
-      const { data: profile } = await supabase.from("profiles").select("tier").eq("id", session.user.id).single()
+      const { data: profile } = await supabase.from("user_profiles").select("tier").eq("id", user.id).single()
 
-      if (!profile || !["admin", "mod"].includes(profile.tier?.toLowerCase())) {
+      if (!profile || profile.tier !== "admin") {
         return NextResponse.redirect(new URL("/dashboard", request.url))
       }
     } catch (error) {
-      console.error("Error checking admin privileges:", error)
+      console.error("Error checking admin access:", error)
       return NextResponse.redirect(new URL("/dashboard", request.url))
     }
   }
 
-  // If user is authenticated and trying to access auth pages, redirect to dashboard
-  if (session && ["/login", "/signup", "/forgot-password", "/reset-password"].includes(pathname)) {
+  // Redirect authenticated users away from auth pages
+  if (user && (pathname === "/login" || pathname === "/signup")) {
     return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
-  return supabaseResponse
+  return response
 }
 
 export const config = {

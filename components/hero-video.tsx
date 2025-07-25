@@ -1,108 +1,110 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Button } from "@/components/ui/button"
 import { Play, Pause, Volume2, VolumeX } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import Image from "next/image"
 
 interface HeroVideoProps {
   src: string
   poster?: string
+  alt?: string
   className?: string
-  autoPlay?: boolean
-  muted?: boolean
-  loop?: boolean
 }
 
-export function HeroVideo({ src, poster, className, autoPlay = true, muted = true, loop = true }: HeroVideoProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const [isPlaying, setIsPlaying] = useState(autoPlay)
-  const [isMuted, setIsMuted] = useState(muted)
+export function HeroVideo({ src, poster, alt = "Hero video", className = "" }: HeroVideoProps) {
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isMuted, setIsMuted] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
 
     const handleLoadStart = () => setIsLoading(true)
-    const handleCanPlay = () => setIsLoading(false)
+    const handleCanPlay = () => {
+      setIsLoading(false)
+      setHasError(false)
+    }
     const handleError = () => {
+      setIsLoading(false)
       setHasError(true)
+    }
+    const handleLoadedData = () => {
       setIsLoading(false)
     }
 
     video.addEventListener("loadstart", handleLoadStart)
     video.addEventListener("canplay", handleCanPlay)
     video.addEventListener("error", handleError)
-
-    // Try to play the video if autoPlay is enabled
-    if (autoPlay) {
-      video.play().catch(() => {
-        setIsPlaying(false)
-      })
-    }
+    video.addEventListener("loadeddata", handleLoadedData)
 
     return () => {
       video.removeEventListener("loadstart", handleLoadStart)
       video.removeEventListener("canplay", handleCanPlay)
       video.removeEventListener("error", handleError)
+      video.removeEventListener("loadeddata", handleLoadedData)
     }
-  }, [autoPlay])
+  }, [])
 
-  const togglePlay = () => {
+  const togglePlay = async () => {
     const video = videoRef.current
-    if (!video) return
+    if (!video || hasError) return
 
-    if (isPlaying) {
-      video.pause()
-      setIsPlaying(false)
-    } else {
-      video
-        .play()
-        .then(() => {
-          setIsPlaying(true)
-        })
-        .catch(() => {
-          setIsPlaying(false)
-        })
+    try {
+      if (isPlaying) {
+        video.pause()
+        setIsPlaying(false)
+      } else {
+        await video.play()
+        setIsPlaying(true)
+      }
+    } catch (error) {
+      console.error("Error playing video:", error)
+      setHasError(true)
     }
   }
 
   const toggleMute = () => {
     const video = videoRef.current
-    if (!video) return
+    if (!video || hasError) return
 
     video.muted = !isMuted
     setIsMuted(!isMuted)
   }
 
-  // If there's an error or no src, show fallback
-  if (hasError || !src) {
+  if (hasError && poster) {
     return (
-      <div className={cn("relative overflow-hidden bg-gradient-to-br from-green-900 to-blue-900", className)}>
-        {poster ? (
-          <img src={poster || "/placeholder.svg"} alt="Hero background" className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <div className="text-center text-white">
-              <h2 className="text-4xl font-bold mb-4">Erigga Live</h2>
-              <p className="text-xl opacity-80">Official Fan Community</p>
-            </div>
+      <div className={`relative overflow-hidden ${className}`}>
+        <Image src={poster || "/placeholder.svg"} alt={alt} fill className="object-cover" priority />
+        <div className="absolute inset-0 bg-black/20" />
+      </div>
+    )
+  }
+
+  if (hasError) {
+    return (
+      <div className={`relative overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20 ${className}`}>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center text-white">
+            <h3 className="text-2xl font-bold mb-2">Welcome to Erigga's World</h3>
+            <p className="text-lg opacity-90">Experience the music, join the community</p>
           </div>
-        )}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className={cn("relative overflow-hidden", className)}>
+    <div className={`relative overflow-hidden ${className}`}>
       <video
         ref={videoRef}
         className="w-full h-full object-cover"
         poster={poster}
         muted={isMuted}
-        loop={loop}
+        loop
         playsInline
         preload="metadata"
       >
@@ -113,37 +115,41 @@ export function HeroVideo({ src, poster, className, autoPlay = true, muted = tru
       {/* Loading overlay */}
       {isLoading && (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+          <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
-      {/* Video controls */}
-      <div className="absolute bottom-4 right-4 flex space-x-2">
-        <Button
-          variant="secondary"
-          size="icon"
-          onClick={togglePlay}
-          className="bg-black/50 hover:bg-black/70 text-white"
-        >
-          {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-        </Button>
-        <Button
-          variant="secondary"
-          size="icon"
-          onClick={toggleMute}
-          className="bg-black/50 hover:bg-black/70 text-white"
-        >
-          {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-        </Button>
-      </div>
-
-      {/* Overlay content can be added here */}
-      <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-        <div className="text-center text-white">
-          <h1 className="text-6xl font-bold mb-4 drop-shadow-lg">Welcome to Erigga Live</h1>
-          <p className="text-xl opacity-90 drop-shadow-md">The Official Fan Community</p>
+      {/* Controls overlay */}
+      <div className="absolute inset-0 bg-black/20 opacity-0 hover:opacity-100 transition-opacity duration-300">
+        <div className="absolute bottom-4 left-4 flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={togglePlay}
+            className="bg-white/20 hover:bg-white/30 text-white border-0"
+          >
+            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={toggleMute}
+            className="bg-white/20 hover:bg-white/30 text-white border-0"
+          >
+            {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </Button>
         </div>
       </div>
+
+      {/* Fallback content overlay */}
+      {!isLoading && !hasError && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-center text-white">
+            <h1 className="text-4xl md:text-6xl font-bold mb-4">Welcome to Erigga's World</h1>
+            <p className="text-xl md:text-2xl opacity-90">Experience the music, join the community</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
