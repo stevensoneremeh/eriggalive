@@ -12,8 +12,26 @@ import { Toaster } from "@/components/ui/toaster"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Erigga Meet & Greet",
-  description: "Official Erigga fan platform",
+  title: "Erigga Live - Official Fan Community",
+  description:
+    "Join the official Erigga fan community. Connect with fans, access exclusive content, and stay updated with the latest from Erigga.",
+  keywords: "Erigga, Nigerian music, hip hop, fan community, exclusive content",
+  authors: [{ name: "Erigga Live Team" }],
+  openGraph: {
+    title: "Erigga Live - Official Fan Community",
+    description:
+      "Join the official Erigga fan community. Connect with fans, access exclusive content, and stay updated with the latest from Erigga.",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Erigga Live - Official Fan Community",
+    description:
+      "Join the official Erigga fan community. Connect with fans, access exclusive content, and stay updated with the latest from Erigga.",
+  },
+  viewport: "width=device-width, initial-scale=1",
+  robots: "index, follow",
     generator: 'v0.dev'
 }
 
