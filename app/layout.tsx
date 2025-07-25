@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   themeColor: "#000000",
   viewport: "width=device-width, initial-scale=1, maximum-scale=1",
-    generator: 'stevensoneremeh'
+    generator: 'v0.dev'
 }
 
 export default function RootLayout({
