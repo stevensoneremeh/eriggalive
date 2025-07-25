@@ -1,49 +1,60 @@
-import { Crown, Star, Shield, Droplet } from "lucide-react"
+"use client"
+
 import { Badge } from "@/components/ui/badge"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Crown, Star, Zap, Flame } from "lucide-react"
 
 interface UserTierBadgeProps {
   tier: string
   size?: "sm" | "md" | "lg"
-  showLabel?: boolean
+  showIcon?: boolean
 }
 
-export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierBadgeProps) {
-  const tierInfo = {
-    grassroot: {
-      label: "Grassroot",
-      icon: Star,
-      color: "bg-gray-500/20 text-gray-500 border-gray-500",
-      tooltip: "Grassroot tier member",
-    },
-    pioneer: {
-      label: "Pioneer",
-      icon: Crown,
-      color: "bg-orange-500/20 text-orange-500 border-orange-500",
-      tooltip: "Pioneer tier member with premium access",
-    },
-    elder: {
-      label: "Elder",
-      icon: Shield,
-      color: "bg-gold-400/20 text-gold-400 border-gold-400",
-      tooltip: "Elder tier member with enhanced premium access",
-    },
-    blood: {
-      label: "Blood",
-      icon: Droplet,
-      color: "bg-red-500/20 text-red-500 border-red-500",
-      tooltip: "Blood tier member with exclusive access",
-    },
+export function UserTierBadge({ tier, size = "md", showIcon = true }: UserTierBadgeProps) {
+  const getTierConfig = (tierName: string) => {
+    const normalizedTier = tierName?.toLowerCase().replace(/[_\s]/g, "")
+
+    switch (normalizedTier) {
+      case "admin":
+        return {
+          label: "Admin",
+          color: "bg-red-500 text-white",
+          icon: Crown,
+        }
+      case "bloodbrotherhood":
+        return {
+          label: "Blood Brotherhood",
+          color: "bg-red-600 text-white",
+          icon: Flame,
+        }
+      case "elder":
+        return {
+          label: "Elder",
+          color: "bg-purple-500 text-white",
+          icon: Crown,
+        }
+      case "pioneer":
+        return {
+          label: "Pioneer",
+          color: "bg-blue-500 text-white",
+          icon: Zap,
+        }
+      case "grassroot":
+      default:
+        return {
+          label: "Grassroot",
+          color: "bg-green-500 text-white",
+          icon: Star,
+        }
+    }
   }
 
-  const tierData = tierInfo[tier as keyof typeof tierInfo] || tierInfo.grassroot
-
-  const IconComponent = tierData.icon
+  const config = getTierConfig(tier)
+  const Icon = config.icon
 
   const sizeClasses = {
-    sm: "text-xs py-0.5 px-1.5",
-    md: "text-sm py-1 px-2",
-    lg: "text-base py-1.5 px-3",
+    sm: "text-xs px-2 py-1",
+    md: "text-sm px-3 py-1",
+    lg: "text-base px-4 py-2",
   }
 
   const iconSizes = {
@@ -53,18 +64,9 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
   }
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Badge variant="outline" className={`${tierData.color} ${sizeClasses[size]} font-medium`}>
-            <IconComponent className={`${iconSizes[size]} ${showLabel ? "mr-1" : ""}`} />
-            {showLabel && tierData.label}
-          </Badge>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{tierData.tooltip}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Badge className={`${config.color} ${sizeClasses[size]} font-medium`}>
+      {showIcon && <Icon className={`${iconSizes[size]} mr-1`} />}
+      {config.label}
+    </Badge>
   )
 }
