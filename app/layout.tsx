@@ -1,12 +1,12 @@
-import type React from "react";
-import type { Metadata } from "next";
-import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
-import { AuthProvider } from "@/contexts/auth-context";
-import { Toaster } from "@/components/ui/sonner";
-import { SessionRefresh } from "@/components/session-refresh";
-import { MainNavigation } from "@/components/navigation/main-navigation";
-import { inter } from "@/lib/fonts";
+import type React from "react"
+import type { Metadata } from "next"
+import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
+import { AuthProvider } from "@/contexts/auth-context"
+import { Toaster } from "@/components/ui/sonner"
+import { SessionRefresh } from "@/components/session-refresh"
+import { MainNavigation } from "@/components/navigation/main-navigation"
+import { inter } from "@/lib/fonts"
 
 export const metadata: Metadata = {
   title: "Erigga Live - Official Fan Platform",
@@ -15,12 +15,12 @@ export const metadata: Metadata = {
   themeColor: "#000000",
   viewport: "width=device-width, initial-scale=1, maximum-scale=1",
   generator: "eriggalive.com",
-};
+}
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
@@ -35,5 +35,5 @@ export default function RootLayout({
         </ThemeProvider>
       </body>
     </html>
-  );
+  )
 }
