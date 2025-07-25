@@ -4,6 +4,7 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import type { User } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
 
 interface UserProfile {
   id: string
@@ -42,6 +43,7 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<void>
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>
   refreshProfile: () => Promise<void>
+  uploadAvatar: (file: File) => Promise<string | null>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -110,6 +112,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error("Error fetching profile:", error)
+        // If profile doesn't exist, create one
+        if (error.code === "PGRST116") {
+          await createUserProfile(userId)
+        }
         return
       }
 
@@ -119,6 +125,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error("Error in fetchUserProfile:", error)
+    }
+  }
+
+  const createUserProfile = async (userId: string) => {
+    try {
+      console.log("Creating user profile for:", userId)
+      const { data: authUser } = await supabase.auth.getUser()
+
+      if (!authUser.user) return
+
+      const profileData = {
+        auth_user_id: userId,
+        username: authUser.user.user_metadata?.username || authUser.user.email?.split("@")[0] || "user",
+        full_name: authUser.user.user_metadata?.full_name || "",
+        email: authUser.user.email || "",
+        tier: authUser.user.user_metadata?.tier || "grassroot",
+        coins_balance: 100, // Welcome bonus
+        level: 1,
+        points: 0,
+        reputation_score: 0,
+        role: "user",
+        is_active: true,
+        is_verified: false,
+        is_banned: false,
+        last_seen: new Date().toISOString(),
+      }
+
+      const { data, error } = await supabase.from("users").insert(profileData).select().single()
+
+      if (error) {
+        console.error("Error creating profile:", error)
+        return
+      }
+
+      console.log("User profile created:", data?.username)
+      if (data) {
+        setProfile(data)
+      }
+    } catch (error) {
+      console.error("Error in createUserProfile:", error)
     }
   }
 
@@ -133,13 +179,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error("Sign in error:", error)
+        toast.error(error.message || "Failed to sign in")
         return { error }
       }
 
       console.log("Sign in successful")
+      toast.success("Welcome back!")
       return { error: null }
     } catch (error) {
       console.error("Sign in error:", error)
+      toast.error("An unexpected error occurred")
       return { error }
     } finally {
       setLoading(false)
@@ -168,13 +217,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error("Sign up error:", error)
+        toast.error(error.message || "Failed to create account")
         return { error }
       }
 
       console.log("Sign up successful")
+      toast.success("Account created successfully!")
       return { error: null }
     } catch (error) {
       console.error("Sign up error:", error)
+      toast.error("An unexpected error occurred")
       return { error }
     } finally {
       setLoading(false)
@@ -191,8 +243,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null)
       setProfile(null)
       console.log("Sign out successful")
+      toast.success("Signed out successfully")
     } catch (error) {
       console.error("Sign out error:", error)
+      toast.error("Failed to sign out")
       throw error
     } finally {
       setLoading(false)
@@ -208,8 +262,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error
       console.log("Password reset email sent")
-    } catch (error) {
+      toast.success("Password reset email sent!")
+    } catch (error: any) {
       console.error("Reset password error:", error)
+      toast.error(error.message || "Failed to send reset email")
       throw error
     }
   }
@@ -225,9 +281,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setProfile({ ...profile, ...updates })
       console.log("Profile updated successfully")
-    } catch (error) {
+      toast.success("Profile updated successfully!")
+    } catch (error: any) {
       console.error("Update profile error:", error)
+      toast.error(error.message || "Failed to update profile")
       throw error
+    }
+  }
+
+  const uploadAvatar = async (file: File): Promise<string | null> => {
+    if (!user) return null
+
+    try {
+      console.log("Uploading avatar:", file.name)
+
+      // Delete old avatar if exists
+      if (profile?.avatar_url) {
+        const oldPath = profile.avatar_url.split("/").pop()
+        if (oldPath && !oldPath.includes("placeholder")) {
+          await supabase.storage.from("avatars").remove([`${user.id}/${oldPath}`])
+        }
+      }
+
+      const fileExt = file.name.split(".").pop()
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`
+      const filePath = `${user.id}/${fileName}`
+
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file)
+
+      if (uploadError) {
+        console.error("Upload error:", uploadError)
+        toast.error("Failed to upload avatar")
+        return null
+      }
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("avatars").getPublicUrl(filePath)
+
+      // Update profile with new avatar URL
+      await updateProfile({ avatar_url: publicUrl })
+
+      console.log("Avatar uploaded successfully")
+      toast.success("Avatar updated successfully!")
+      return publicUrl
+    } catch (error: any) {
+      console.error("Upload avatar error:", error)
+      toast.error("Failed to upload avatar")
+      return null
     }
   }
 
@@ -249,6 +350,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     resetPassword,
     updateProfile,
     refreshProfile,
+    uploadAvatar,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

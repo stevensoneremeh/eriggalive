@@ -202,6 +202,27 @@ function createMockServerClient() {
         })
       },
     },
+    storage: {
+      from: (bucket: string) => ({
+        upload: (path: string, file: File) => {
+          console.log("Mock server storage upload called with:", { bucket, path, file: file.name })
+          return Promise.resolve({
+            data: { path: `mock/${path}` },
+            error: null,
+          })
+        },
+        getPublicUrl: (path: string) => {
+          console.log("Mock server getPublicUrl called with:", path)
+          return {
+            data: { publicUrl: `/placeholder.jpg` },
+          }
+        },
+        remove: (paths: string[]) => {
+          console.log("Mock server storage remove called with:", paths)
+          return Promise.resolve({ data: null, error: null })
+        },
+      }),
+    },
     rpc: (functionName: string, params?: any) => {
       console.log("Mock server RPC called with:", { functionName, params })
       return Promise.resolve({ data: true, error: null })

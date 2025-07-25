@@ -7,38 +7,94 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { CreditCard, Shield, Clock, X } from "lucide-react"
+import { Calendar } from "@/components/ui/calendar"
+import { CreditCard, CalendarIcon, Shield, CheckCircle, X, Zap } from "lucide-react"
 import { toast } from "sonner"
+import { useAuth } from "@/contexts/auth-context"
 
 interface PaymentModalProps {
   isOpen: boolean
   onClose: () => void
-  onSuccess: (paymentData: any) => void
-  amount: number
-  userEmail: string
+  sessionType: {
+    id: string
+    name: string
+    description: string
+    duration: number
+    price: number
+    icon: any
+    color: string
+    features: string[]
+  }
+  onSuccess: (sessionData: any) => void
 }
 
-export function PaymentModal({ isOpen, onClose, onSuccess, amount, userEmail }: PaymentModalProps) {
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<"card" | "bank">("card")
-  const [formData, setFormData] = useState({
-    email: userEmail,
+const TIME_SLOTS = [
+  "09:00",
+  "09:30",
+  "10:00",
+  "10:30",
+  "11:00",
+  "11:30",
+  "12:00",
+  "12:30",
+  "13:00",
+  "13:30",
+  "14:00",
+  "14:30",
+  "15:00",
+  "15:30",
+  "16:00",
+  "16:30",
+  "17:00",
+  "17:30",
+  "18:00",
+  "18:30",
+  "19:00",
+  "19:30",
+  "20:00",
+  "20:30",
+]
+
+export function PaymentModal({ isOpen, onClose, sessionType, onSuccess }: PaymentModalProps) {
+  const { profile } = useAuth()
+  const [step, setStep] = useState(1) // 1: Schedule, 2: Payment, 3: Processing, 4: Success
+  const [selectedDate, setSelectedDate] = useState<Date>()
+  const [selectedTime, setSelectedTime] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [paymentData, setPaymentData] = useState({
+    email: profile?.email || "",
     phone: "",
-    preferredTime: "",
-    specialRequests: "",
+    name: profile?.full_name || "",
   })
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+  const Icon = sessionType.icon
+
+  const handleScheduleNext = () => {
+    if (!selectedDate || !selectedTime) {
+      toast.error("Please select both date and time")
+      return
+    }
+
+    // Check if selected date is in the future
+    const selectedDateTime = new Date(selectedDate)
+    selectedDateTime.setHours(Number.parseInt(selectedTime.split(":")[0]), Number.parseInt(selectedTime.split(":")[1]))
+
+    if (selectedDateTime <= new Date()) {
+      toast.error("Please select a future date and time")
+      return
+    }
+
+    setStep(2)
   }
 
   const handlePayment = async () => {
-    if (!formData.email || !formData.phone) {
+    if (!paymentData.email || !paymentData.phone || !paymentData.name) {
       toast.error("Please fill in all required fields")
       return
     }
 
-    setIsProcessing(true)
+    setLoading(true)
+    setStep(3)
 
     try {
       // Initialize payment with Paystack
@@ -48,161 +104,318 @@ export function PaymentModal({ isOpen, onClose, onSuccess, amount, userEmail }: 
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email: formData.email,
-          amount: amount * 100, // Convert to kobo
-          phone: formData.phone,
-          preferredTime: formData.preferredTime,
-          specialRequests: formData.specialRequests,
+          email: paymentData.email,
+          amount: sessionType.price,
+          session_type: sessionType.id,
+          scheduled_at: new Date(selectedDate!).toISOString(),
+          scheduled_time: selectedTime,
+          duration_minutes: sessionType.duration,
+          user_data: {
+            name: paymentData.name,
+            phone: paymentData.phone,
+          },
         }),
       })
 
       const data = await response.json()
 
-      if (data.success) {
-        // For demo purposes, simulate successful payment
-        // In production, this would redirect to Paystack
-        setTimeout(() => {
-          const mockPaymentData = {
-            reference: `ref_${Date.now()}`,
-            status: "success",
-            amount: amount,
-            email: formData.email,
-            phone: formData.phone,
-            preferredTime: formData.preferredTime,
-            specialRequests: formData.specialRequests,
-          }
-
-          onSuccess(mockPaymentData)
-          toast.success("Payment successful! Your session has been booked.")
-          setIsProcessing(false)
-        }, 2000)
-      } else {
-        throw new Error(data.message || "Payment initialization failed")
+      if (!response.ok) {
+        throw new Error(data.error || "Payment initialization failed")
       }
-    } catch (error) {
+
+      // Redirect to Paystack payment page
+      if (data.authorization_url) {
+        window.location.href = data.authorization_url
+      } else {
+        // Mock success for demo
+        setTimeout(() => {
+          setStep(4)
+          setTimeout(() => {
+            onSuccess({
+              session_id: data.session_id || "mock-session-id",
+              reference: data.reference || "mock-reference",
+            })
+          }, 2000)
+        }, 2000)
+      }
+    } catch (error: any) {
       console.error("Payment error:", error)
-      toast.error("Payment failed. Please try again.")
-      setIsProcessing(false)
+      toast.error(error.message || "Payment failed")
+      setStep(2)
+    } finally {
+      setLoading(false)
     }
+  }
+
+  const formatPrice = (price: number) => {
+    return `₦${(price / 100).toLocaleString()}`
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md mx-auto bg-white dark:bg-slate-800 border-0 shadow-2xl">
+      <DialogContent className="max-w-2xl bg-gradient-to-br from-slate-900 to-slate-800 border-slate-700 text-white">
         <DialogHeader>
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl font-bold flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-blue-500" />
-              Book Your Session
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+              <div className={`p-2 rounded-full bg-gradient-to-r ${sessionType.color}`}>
+                <Icon className="h-6 w-6 text-white" />
+              </div>
+              Book {sessionType.name}
             </DialogTitle>
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={onClose} className="text-white hover:bg-white/10">
               <X className="h-4 w-4" />
             </Button>
           </div>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Session Summary */}
-          <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border border-blue-200 dark:border-blue-800">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-medium">Meet & Greet Session</span>
-                <span className="font-bold text-blue-600">₦{amount.toLocaleString()}</span>
+        {/* Progress Indicator */}
+        <div className="flex items-center justify-center space-x-4 mb-6">
+          {[1, 2, 3, 4].map((stepNumber) => (
+            <div key={stepNumber} className="flex items-center">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step >= stepNumber
+                    ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white"
+                    : "bg-slate-700 text-slate-400"
+                }`}
+              >
+                {step > stepNumber ? <CheckCircle className="h-4 w-4" /> : stepNumber}
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                <Clock className="h-4 w-4" />
-                20 minutes exclusive video call
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Contact Information */}
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="email">Email Address *</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange("email", e.target.value)}
-                placeholder="your@email.com"
-                className="mt-1"
-              />
+              {stepNumber < 4 && (
+                <div
+                  className={`w-12 h-0.5 ${
+                    step > stepNumber ? "bg-gradient-to-r from-blue-500 to-purple-500" : "bg-slate-700"
+                  }`}
+                />
+              )}
             </div>
-
-            <div>
-              <Label htmlFor="phone">Phone Number *</Label>
-              <Input
-                id="phone"
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => handleInputChange("phone", e.target.value)}
-                placeholder="+234 xxx xxx xxxx"
-                className="mt-1"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="preferredTime">Preferred Time (Optional)</Label>
-              <Input
-                id="preferredTime"
-                type="text"
-                value={formData.preferredTime}
-                onChange={(e) => handleInputChange("preferredTime", e.target.value)}
-                placeholder="e.g., Weekends, Evening"
-                className="mt-1"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="specialRequests">Special Requests (Optional)</Label>
-              <Input
-                id="specialRequests"
-                type="text"
-                value={formData.specialRequests}
-                onChange={(e) => handleInputChange("specialRequests", e.target.value)}
-                placeholder="Any special topics or requests"
-                className="mt-1"
-              />
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Security Notice */}
-          <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-            <Shield className="h-5 w-5 text-green-600 mt-0.5" />
-            <div className="text-sm">
-              <div className="font-medium text-green-800 dark:text-green-400">Secure Payment</div>
-              <div className="text-green-700 dark:text-green-300">
-                Your payment is processed securely through Paystack
-              </div>
-            </div>
-          </div>
-
-          {/* Payment Button */}
-          <Button
-            onClick={handlePayment}
-            disabled={isProcessing}
-            className="w-full h-12 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold shadow-lg"
-          >
-            {isProcessing ? (
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Processing Payment...
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Pay ₦{amount.toLocaleString()}
-              </div>
-            )}
-          </Button>
-
-          <p className="text-xs text-center text-gray-500 dark:text-gray-400">
-            By proceeding, you agree to our terms and conditions. Sessions are non-refundable once confirmed.
-          </p>
+          ))}
         </div>
+
+        {/* Step 1: Schedule */}
+        {step === 1 && (
+          <div className="space-y-6">
+            <Card className="bg-slate-800/50 border-slate-700">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-lg text-white">{sessionType.name}</h3>
+                    <p className="text-slate-300 text-sm">{sessionType.description}</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-yellow-400">{formatPrice(sessionType.price)}</div>
+                    <div className="text-slate-400 text-sm">{sessionType.duration} minutes</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <Label className="text-white mb-3 block">Select Date</Label>
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  disabled={(date) => date < new Date() || date < new Date("1900-01-01")}
+                  className="rounded-md border border-slate-700 bg-slate-800/50"
+                />
+              </div>
+
+              <div>
+                <Label className="text-white mb-3 block">Select Time</Label>
+                <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto">
+                  {TIME_SLOTS.map((time) => (
+                    <Button
+                      key={time}
+                      variant={selectedTime === time ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedTime(time)}
+                      className={
+                        selectedTime === time
+                          ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white"
+                          : "border-slate-600 text-slate-300 hover:bg-slate-700"
+                      }
+                    >
+                      {time}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <Button variant="outline" onClick={onClose} className="border-slate-600 text-slate-300 bg-transparent">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleScheduleNext}
+                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+              >
+                <CalendarIcon className="h-4 w-4 mr-2" />
+                Continue to Payment
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Payment */}
+        {step === 2 && (
+          <div className="space-y-6">
+            <Card className="bg-slate-800/50 border-slate-700">
+              <CardContent className="p-4">
+                <h3 className="font-semibold text-white mb-3">Session Summary</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-300">Session Type:</span>
+                    <span className="text-white">{sessionType.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-300">Date:</span>
+                    <span className="text-white">{selectedDate?.toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-300">Time:</span>
+                    <span className="text-white">{selectedTime}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-300">Duration:</span>
+                    <span className="text-white">{sessionType.duration} minutes</span>
+                  </div>
+                  <Separator className="bg-slate-700" />
+                  <div className="flex justify-between font-semibold">
+                    <span className="text-white">Total:</span>
+                    <span className="text-yellow-400 text-lg">{formatPrice(sessionType.price)}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="space-y-4">
+              <h3 className="font-semibold text-white">Payment Information</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="name" className="text-white">
+                    Full Name *
+                  </Label>
+                  <Input
+                    id="name"
+                    value={paymentData.name}
+                    onChange={(e) => setPaymentData((prev) => ({ ...prev, name: e.target.value }))}
+                    className="bg-slate-800/50 border-slate-600 text-white"
+                    placeholder="Enter your full name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email" className="text-white">
+                    Email Address *
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={paymentData.email}
+                    onChange={(e) => setPaymentData((prev) => ({ ...prev, email: e.target.value }))}
+                    className="bg-slate-800/50 border-slate-600 text-white"
+                    placeholder="Enter your email"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="phone" className="text-white">
+                  Phone Number *
+                </Label>
+                <Input
+                  id="phone"
+                  value={paymentData.phone}
+                  onChange={(e) => setPaymentData((prev) => ({ ...prev, phone: e.target.value }))}
+                  className="bg-slate-800/50 border-slate-600 text-white"
+                  placeholder="Enter your phone number"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={() => setStep(1)} className="border-slate-600 text-slate-300">
+                Back
+              </Button>
+              <Button
+                onClick={handlePayment}
+                disabled={loading}
+                className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600"
+              >
+                <CreditCard className="h-4 w-4 mr-2" />
+                Pay {formatPrice(sessionType.price)}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Processing */}
+        {step === 3 && (
+          <div className="text-center py-12">
+            <div className="mb-6">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+              <h3 className="text-xl font-semibold text-white mb-2">Processing Payment</h3>
+              <p className="text-slate-300">Please wait while we process your payment...</p>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+              <div className="flex items-center justify-center gap-2 text-yellow-400">
+                <Shield className="h-4 w-4" />
+                <span className="text-sm">Secured by Paystack</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Success */}
+        {step === 4 && (
+          <div className="text-center py-12">
+            <div className="mb-6">
+              <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="h-8 w-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-semibold text-white mb-2">Payment Successful!</h3>
+              <p className="text-slate-300 mb-4">Your Meet & Greet session has been booked successfully.</p>
+
+              <Card className="bg-slate-800/50 border-slate-700 text-left max-w-md mx-auto">
+                <CardContent className="p-4">
+                  <h4 className="font-semibold text-white mb-3">Session Details</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-300">Session:</span>
+                      <span className="text-white">{sessionType.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-300">Date & Time:</span>
+                      <span className="text-white">
+                        {selectedDate?.toLocaleDateString()} at {selectedTime}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-300">Duration:</span>
+                      <span className="text-white">{sessionType.duration} minutes</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-sm text-slate-400">
+                You will receive a confirmation email with your session details and join link.
+              </p>
+              <Button
+                onClick={onClose}
+                className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600"
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                Awesome!
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

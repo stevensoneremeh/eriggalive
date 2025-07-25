@@ -102,6 +102,13 @@ function createMockClient() {
         console.log("Mock resetPasswordForEmail called with:", { email, options })
         return Promise.resolve({ error: null })
       },
+      updateUser: (attributes: any) => {
+        console.log("Mock updateUser called with:", attributes)
+        return Promise.resolve({
+          data: { user: { ...mockUser, ...attributes } },
+          error: null,
+        })
+      },
       onAuthStateChange: (callback: any) => {
         console.log("Mock onAuthStateChange called")
         // Simulate initial state
@@ -277,6 +284,10 @@ function createMockClient() {
           return {
             data: { publicUrl: `/placeholder.jpg` },
           }
+        },
+        remove: (paths: string[]) => {
+          console.log("Mock storage remove called with:", paths)
+          return Promise.resolve({ data: null, error: null })
         },
       }),
     },
