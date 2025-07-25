@@ -2,209 +2,148 @@
 
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Volume2, VolumeX, Play, Pause } from "lucide-react"
-import Image from "next/image"
+import { Play, Pause, Volume2, VolumeX } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface HeroVideoProps {
   src: string
-  fallbackImage?: string
+  poster?: string
   className?: string
+  autoPlay?: boolean
+  muted?: boolean
+  loop?: boolean
 }
 
-export function HeroVideo({ src, fallbackImage, className = "" }: HeroVideoProps) {
-  const [isMuted, setIsMuted] = useState(true)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [hasError, setHasError] = useState(false)
-  const [showFallback, setShowFallback] = useState(false)
+export function HeroVideo({ src, poster, className, autoPlay = true, muted = true, loop = true }: HeroVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [isPlaying, setIsPlaying] = useState(autoPlay)
+  const [isMuted, setIsMuted] = useState(muted)
+  const [isLoading, setIsLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
 
-  // Initialize video on mount
   useEffect(() => {
     const video = videoRef.current
-    if (!video || !src) {
-      setShowFallback(true)
-      return
-    }
+    if (!video) return
 
-    // Set up event listeners
-    const handleLoadedData = () => {
-      console.log("✅ Video loaded successfully")
-      setIsLoaded(true)
-      setShowFallback(false)
-      // Try to play the video automatically
-      playVideo()
-    }
-
-    const handlePlay = () => {
-      setIsPlaying(true)
-      setShowFallback(false)
-    }
-
-    const handlePause = () => setIsPlaying(false)
-
-    const handleError = (e: any) => {
-      console.error("❌ Video failed to load:", e)
+    const handleLoadStart = () => setIsLoading(true)
+    const handleCanPlay = () => setIsLoading(false)
+    const handleError = () => {
       setHasError(true)
-      setShowFallback(true)
+      setIsLoading(false)
     }
 
-    const handleLoadStart = () => {
-      console.log("🔄 Video loading started")
-      setShowFallback(false)
-    }
-
-    video.addEventListener("loadeddata", handleLoadedData)
     video.addEventListener("loadstart", handleLoadStart)
-    video.addEventListener("play", handlePlay)
-    video.addEventListener("pause", handlePause)
+    video.addEventListener("canplay", handleCanPlay)
     video.addEventListener("error", handleError)
 
-    // Preload the video
-    video.load()
-
-    // If video fails to load within 5 seconds, show fallback
-    const timeout = setTimeout(() => {
-      if (!isLoaded && !hasError) {
-        console.warn("⚠️ Video load timeout - showing fallback")
-        setShowFallback(true)
-      }
-    }, 5000)
+    // Try to play the video if autoPlay is enabled
+    if (autoPlay) {
+      video.play().catch(() => {
+        setIsPlaying(false)
+      })
+    }
 
     return () => {
-      video.removeEventListener("loadeddata", handleLoadedData)
       video.removeEventListener("loadstart", handleLoadStart)
-      video.removeEventListener("play", handlePlay)
-      video.removeEventListener("pause", handlePause)
+      video.removeEventListener("canplay", handleCanPlay)
       video.removeEventListener("error", handleError)
-      clearTimeout(timeout)
     }
-  }, [src, isLoaded, hasError])
+  }, [autoPlay])
 
-  // Function to safely attempt to play the video
-  const playVideo = () => {
-    if (!videoRef.current) return
+  const togglePlay = () => {
+    const video = videoRef.current
+    if (!video) return
 
-    // Always mute before attempting to play (to avoid autoplay restrictions)
-    videoRef.current.muted = true
-    setIsMuted(true)
-
-    // Attempt to play with error handling
-    const playPromise = videoRef.current.play()
-
-    if (playPromise !== undefined) {
-      playPromise
+    if (isPlaying) {
+      video.pause()
+      setIsPlaying(false)
+    } else {
+      video
+        .play()
         .then(() => {
-          console.log("✅ Video playing")
           setIsPlaying(true)
-          setShowFallback(false)
         })
-        .catch((err) => {
-          console.error("❌ Video play failed:", err)
+        .catch(() => {
           setIsPlaying(false)
-          setShowFallback(true)
         })
     }
   }
 
   const toggleMute = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = !isMuted
-      setIsMuted(!isMuted)
-    }
+    const video = videoRef.current
+    if (!video) return
+
+    video.muted = !isMuted
+    setIsMuted(!isMuted)
   }
 
-  const togglePlay = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause()
-      } else {
-        playVideo()
-      }
-    }
-  }
-
-  // If there's an error or we should show fallback and we have a fallback image, show it
-  if ((hasError || showFallback) && fallbackImage) {
+  // If there's an error or no src, show fallback
+  if (hasError || !src) {
     return (
-      <div className={`relative ${className}`}>
-        <Image
-          src={fallbackImage || "/placeholder.svg"}
-          alt="Hero fallback image"
-          fill
-          priority
-          className="object-cover"
-          sizes="100vw"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
+      <div className={cn("relative overflow-hidden bg-gradient-to-br from-green-900 to-blue-900", className)}>
+        {poster ? (
+          <img src={poster || "/placeholder.svg"} alt="Hero background" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="text-center text-white">
+              <h2 className="text-4xl font-bold mb-4">Erigga Live</h2>
+              <p className="text-xl opacity-80">Official Fan Community</p>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
 
   return (
-    <div className={`relative ${className}`}>
-      {/* Video Element */}
+    <div className={cn("relative overflow-hidden", className)}>
       <video
         ref={videoRef}
-        playsInline
+        className="w-full h-full object-cover"
+        poster={poster}
         muted={isMuted}
-        loop
-        className="absolute inset-0 w-full h-full object-cover"
-        style={{
-          filter: "brightness(0.8) contrast(1.1) saturate(1.1)",
-        }}
-        poster={fallbackImage}
+        loop={loop}
+        playsInline
         preload="metadata"
       >
         <source src={src} type="video/mp4" />
-        <source src={src.replace(".mp4", ".webm")} type="video/webm" />
         Your browser does not support the video tag.
       </video>
 
-      {/* Video Controls */}
-      {!showFallback && !hasError && (
-        <div className="absolute top-4 right-4 flex gap-2 z-10">
-          {/* Quality Badge */}
-          <div className="bg-black/50 rounded-full px-3 py-1 text-xs text-white/80 backdrop-blur-sm border border-white/10">
-            {isLoaded ? "HD" : "LOADING..."}
-          </div>
-
-          {/* Play/Pause Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="bg-black/50 hover:bg-black/70 text-white border border-white/20 backdrop-blur-sm"
-            onClick={togglePlay}
-            disabled={!isLoaded}
-          >
-            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-          </Button>
-
-          {/* Mute/Unmute Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="bg-black/50 hover:bg-black/70 text-white border border-white/20 backdrop-blur-sm"
-            onClick={toggleMute}
-            disabled={!isLoaded}
-          >
-            {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-          </Button>
+      {/* Loading overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
         </div>
       )}
 
-      {/* Loading State */}
-      {!isLoaded && !hasError && !showFallback && (
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
-          <div className="text-white text-lg flex items-center gap-2">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-            Loading video...
-          </div>
-        </div>
-      )}
+      {/* Video controls */}
+      <div className="absolute bottom-4 right-4 flex space-x-2">
+        <Button
+          variant="secondary"
+          size="icon"
+          onClick={togglePlay}
+          className="bg-black/50 hover:bg-black/70 text-white"
+        >
+          {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+        </Button>
+        <Button
+          variant="secondary"
+          size="icon"
+          onClick={toggleMute}
+          className="bg-black/50 hover:bg-black/70 text-white"
+        >
+          {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+        </Button>
+      </div>
 
-      {/* Gradient Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40 pointer-events-none" />
+      {/* Overlay content can be added here */}
+      <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+        <div className="text-center text-white">
+          <h1 className="text-6xl font-bold mb-4 drop-shadow-lg">Welcome to Erigga Live</h1>
+          <p className="text-xl opacity-90 drop-shadow-md">The Official Fan Community</p>
+        </div>
+      </div>
     </div>
   )
 }

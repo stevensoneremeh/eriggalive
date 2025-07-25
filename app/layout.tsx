@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
+import { RadioProvider } from "@/contexts/radio-context"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 import { SessionRefresh } from "@/components/session-refresh"
@@ -45,11 +46,13 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
-            <SessionRefresh />
-            <MainNavigation />
-            <main className="min-h-screen">{children}</main>
-            <FloatingRadioPlayer />
-            <Toaster />
+            <RadioProvider>
+              <SessionRefresh />
+              <MainNavigation />
+              <main className="min-h-screen">{children}</main>
+              <FloatingRadioPlayer />
+              <Toaster />
+            </RadioProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>
