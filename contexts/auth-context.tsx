@@ -1,11 +1,11 @@
 "use client"
 
 import type React from "react"
-
 import { createContext, useContext, useEffect, useState } from "react"
 import type { User, Session } from "@supabase/supabase-js"
-import { supabase } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 interface AuthContextType {
   user: User | null
@@ -24,20 +24,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+  const supabase = createClient()
 
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession()
-      if (error) {
-        console.error("Error getting session:", error)
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession()
+
+        if (error) {
+          console.error("Error getting session:", error)
+        }
+
+        setSession(session)
+        setUser(session?.user ?? null)
+      } catch (error) {
+        console.error("Error in getInitialSession:", error)
+      } finally {
+        setLoading(false)
       }
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
     }
 
     getInitialSession()
@@ -57,13 +65,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const redirectTo = localStorage.getItem("redirectAfterAuth") || "/dashboard"
         localStorage.removeItem("redirectAfterAuth")
         router.push(redirectTo)
+        toast.success("Welcome back!")
       } else if (event === "SIGNED_OUT") {
         router.push("/")
+        toast.success("Signed out successfully")
       }
     })
 
     return () => subscription.unsubscribe()
-  }, [router])
+  }, [router, supabase.auth])
 
   const signUp = async (email: string, password: string) => {
     try {
@@ -78,12 +88,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error("Signup error:", error)
+        toast.error(error.message || "Failed to create account")
         return { error }
       }
 
+      toast.success("Account created successfully! Please check your email to verify your account.")
       return { error: null }
     } catch (error) {
       console.error("Signup error:", error)
+      toast.error("An unexpected error occurred")
       return { error }
     } finally {
       setLoading(false)
@@ -100,12 +113,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error("Signin error:", error)
+        toast.error(error.message || "Failed to sign in")
         return { error }
       }
 
       return { error: null }
     } catch (error) {
       console.error("Signin error:", error)
+      toast.error("An unexpected error occurred")
       return { error }
     } finally {
       setLoading(false)
@@ -118,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { error } = await supabase.auth.signOut()
       if (error) {
         console.error("Signout error:", error)
+        toast.error("Failed to sign out")
         throw error
       }
     } catch (error) {
@@ -136,12 +152,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error("Reset password error:", error)
+        toast.error(error.message || "Failed to send reset email")
         return { error }
       }
 
+      toast.success("Password reset email sent!")
       return { error: null }
     } catch (error) {
       console.error("Reset password error:", error)
+      toast.error("An unexpected error occurred")
       return { error }
     }
   }

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -10,9 +10,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Eye, EyeOff } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
+import { useAuth } from "@/contexts/auth-context"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -21,9 +21,17 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
-  const { signIn } = useAuth()
+  const { signIn, user, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user && !loading) {
+      const redirectTo = searchParams.get("redirectTo") || "/dashboard"
+      router.push(redirectTo)
+    }
+  }, [user, loading, router, searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,22 +43,26 @@ export default function LoginPage() {
 
       if (error) {
         setError(error.message || "Failed to sign in")
-        return
       }
-
-      // Store redirect URL if provided
-      const redirectTo = searchParams.get("redirectTo")
-      if (redirectTo) {
-        localStorage.setItem("redirectAfterAuth", redirectTo)
-      }
-
-      // The AuthProvider will handle the redirect
     } catch (error) {
-      console.error("Login error:", error)
       setError("An unexpected error occurred")
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
+  // Don't render if user is already authenticated
+  if (user) {
+    return null
   }
 
   return (
@@ -63,8 +75,8 @@ export default function LoginPage() {
           <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
           <CardDescription>Sign in to your account to continue</CardDescription>
         </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
@@ -108,9 +120,7 @@ export default function LoginPage() {
                 </Button>
               </div>
             </div>
-          </CardContent>
 
-          <CardFooter className="flex flex-col space-y-4">
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <>
@@ -121,23 +131,19 @@ export default function LoginPage() {
                 "Sign In"
               )}
             </Button>
-
-            <div className="text-center space-y-2">
-              <Link
-                href="/forgot-password"
-                className="text-sm text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
-              >
-                Forgot your password?
-              </Link>
-              <p className="text-sm text-muted-foreground">
-                Don't have an account?{" "}
-                <Link href="/signup" className="text-primary hover:underline underline-offset-4">
-                  Sign up
-                </Link>
-              </p>
-            </div>
-          </CardFooter>
-        </form>
+          </form>
+        </CardContent>
+        <CardFooter className="flex flex-col space-y-2 text-center text-sm">
+          <Link href="/forgot-password" className="text-primary hover:underline">
+            Forgot your password?
+          </Link>
+          <div className="text-muted-foreground">
+            Don't have an account?{" "}
+            <Link href="/signup" className="text-primary hover:underline">
+              Sign up
+            </Link>
+          </div>
+        </CardFooter>
       </Card>
     </div>
   )
