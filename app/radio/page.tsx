@@ -1,271 +1,225 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Radio, Music, Heart, Zap, Target, Eye, Briefcase, MapPin } from "lucide-react"
-import { useRadio } from "@/contexts/radio-context"
-import { cn } from "@/lib/utils"
-
-interface Mood {
-  id: string
-  name: string
-  icon: React.ComponentType<{ className?: string }>
-  description: string
-  color: string
-  spotifyUrl: string
-  embedUrl: string
-}
-
-const MOODS: Mood[] = [
-  {
-    id: "hustle",
-    name: "Hustle",
-    icon: Briefcase,
-    description: "Grind mode activated - motivation tracks",
-    color: "from-green-500 to-emerald-600",
-    spotifyUrl: "https://open.spotify.com/playlist/37i9dQZF1DZ06evO1P96bA?si=Zx4F2QfyR-y3IAtlP_Do2g",
-    embedUrl: "https://open.spotify.com/embed/playlist/37i9dQZF1DZ06evO1P96bA?utm_source=generator&theme=0",
-  },
-  {
-    id: "street",
-    name: "Street",
-    icon: MapPin,
-    description: "Raw street anthems and hood classics",
-    color: "from-red-500 to-orange-600",
-    spotifyUrl: "https://open.spotify.com/playlist/37i9dQZF1DZ06evO1P96bA?si=Zx4F2QfyR-y3IAtlP_Do2g",
-    embedUrl: "https://open.spotify.com/embed/playlist/37i9dQZF1DZ06evO1P96bA?utm_source=generator&theme=0",
-  },
-  {
-    id: "love",
-    name: "Love",
-    icon: Heart,
-    description: "Smooth vibes for the heart",
-    color: "from-pink-500 to-rose-600",
-    spotifyUrl: "https://open.spotify.com/playlist/37i9dQZF1DZ06evO1P96bA?si=Zx4F2QfyR-y3IAtlP_Do2g",
-    embedUrl: "https://open.spotify.com/embed/playlist/37i9dQZF1DZ06evO1P96bA?utm_source=generator&theme=0",
-  },
-  {
-    id: "pain",
-    name: "Pain",
-    icon: Target,
-    description: "Deep cuts that hit different",
-    color: "from-purple-500 to-indigo-600",
-    spotifyUrl: "https://open.spotify.com/playlist/37i9dQZF1DZ06evO1P96bA?si=Zx4F2QfyR-y3IAtlP_Do2g",
-    embedUrl: "https://open.spotify.com/embed/playlist/37i9dQZF1DZ06evO1P96bA?utm_source=generator&theme=0",
-  },
-  {
-    id: "victory",
-    name: "Victory",
-    icon: Zap,
-    description: "Celebration anthems and winning tracks",
-    color: "from-yellow-500 to-amber-600",
-    spotifyUrl: "https://open.spotify.com/playlist/37i9dQZF1DZ06evO1P96bA?si=Zx4F2QfyR-y3IAtlP_Do2g",
-    embedUrl: "https://open.spotify.com/embed/playlist/37i9dQZF1DZ06evO1P96bA?utm_source=generator&theme=0",
-  },
-  {
-    id: "reality",
-    name: "Reality",
-    icon: Eye,
-    description: "Truth talks and conscious rap",
-    color: "from-blue-500 to-cyan-600",
-    spotifyUrl: "https://open.spotify.com/playlist/37i9dQZF1DZ06evO1P96bA?si=Zx4F2QfyR-y3IAtlP_Do2g",
-    embedUrl: "https://open.spotify.com/embed/playlist/37i9dQZF1DZ06evO1P96bA?utm_source=generator&theme=0",
-  },
-]
+import { Slider } from "@/components/ui/slider"
+import { Play, Pause, Volume2, VolumeX, Radio, Music, Headphones, Heart, Share2, Download } from "lucide-react"
 
 export default function RadioPage() {
-  const { currentMood, setCurrentMood, isPlaying, setIsPlaying } = useRadio()
-  const [selectedMood, setSelectedMood] = useState<Mood | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [volume, setVolume] = useState([75])
+  const [isMuted, setIsMuted] = useState(false)
+  const [currentTrack, setCurrentTrack] = useState({
+    title: "Paper Boi",
+    artist: "Erigga",
+    album: "The Erigma II",
+    duration: "3:45",
+    currentTime: "1:23",
+  })
+  const audioRef = useRef<HTMLAudioElement>(null)
 
-  useEffect(() => {
-    if (currentMood) {
-      const mood = MOODS.find((m) => m.id === currentMood)
-      setSelectedMood(mood || null)
-    }
-  }, [currentMood])
+  const togglePlay = () => {
+    setIsPlaying(!isPlaying)
+    // In a real implementation, you would control actual audio playback here
+  }
 
-  const handleMoodSelect = (mood: Mood) => {
-    setSelectedMood(mood)
-    setCurrentMood(mood.id)
-    setIsPlaying(true)
+  const toggleMute = () => {
+    setIsMuted(!isMuted)
+  }
+
+  const handleVolumeChange = (value: number[]) => {
+    setVolume(value)
+    setIsMuted(value[0] === 0)
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <Radio className="h-12 w-12 text-green-500" />
-              <h1 className="text-5xl font-black bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-                ERIGGA RADIO
-              </h1>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-800">
+      {/* Animated Background */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-20 left-10 w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
+        <div className="absolute top-40 right-20 w-1 h-1 bg-pink-400 rounded-full animate-ping" />
+        <div className="absolute bottom-32 left-1/4 w-3 h-3 bg-blue-400 rounded-full animate-bounce" />
+        <div className="absolute top-1/2 right-1/3 w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
+      </div>
+
+      <div className="container mx-auto px-4 py-8 relative z-10">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="p-3 bg-purple-600/20 rounded-full">
+              <Radio className="h-8 w-8 text-purple-400" />
             </div>
-            <h2 className="text-2xl font-bold text-green-500 mb-2">🎧 Pick Your Mood – Erigga Radio</h2>
-            <p className="text-gray-400 text-lg">
-              Street sounds for every feeling. Choose your vibe and let the music speak.
-            </p>
-            <Badge variant="secondary" className="mt-4 bg-red-600 text-white animate-pulse px-4 py-2">
-              🔴 LIVE NOW
-            </Badge>
+            <h1 className="text-4xl md:text-6xl font-bold text-white">Erigga Radio</h1>
+            <div className="p-3 bg-purple-600/20 rounded-full">
+              <Music className="h-8 w-8 text-purple-400" />
+            </div>
           </div>
+          <p className="text-xl text-slate-300">24/7 Non-stop hits from the Paper Boi himself</p>
+        </div>
 
-          {/* Mood Selector */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-12">
-            {MOODS.map((mood) => {
-              const Icon = mood.icon
-              const isSelected = selectedMood?.id === mood.id
+        {/* Main Radio Player */}
+        <div className="max-w-4xl mx-auto">
+          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+            <CardContent className="p-8">
+              {/* Now Playing Display */}
+              <div className="text-center mb-8">
+                <div className="relative w-64 h-64 mx-auto mb-6">
+                  {/* Album Art */}
+                  <div className="w-full h-full rounded-full bg-gradient-to-br from-purple-600 to-pink-600 p-1">
+                    <div className="w-full h-full rounded-full bg-slate-800 flex items-center justify-center overflow-hidden">
+                      <img
+                        src="/images/hero/erigga1.jpeg"
+                        alt="Now Playing"
+                        className="w-full h-full object-cover rounded-full"
+                      />
+                    </div>
+                  </div>
 
-              return (
-                <Card
-                  key={mood.id}
-                  className={cn(
-                    "relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-105 border-2",
-                    isSelected
-                      ? "border-green-500 bg-green-500/10 shadow-lg shadow-green-500/20"
-                      : "border-gray-800 bg-gray-900/50 hover:border-gray-600",
+                  {/* Spinning Animation */}
+                  {isPlaying && (
+                    <div className="absolute inset-0 rounded-full border-4 border-purple-400/30 animate-spin" />
                   )}
-                  onClick={() => handleMoodSelect(mood)}
-                >
-                  <CardContent className="p-6 text-center">
+
+                  {/* Live Indicator */}
+                  <div className="absolute -top-2 -right-2">
+                    <Badge className="bg-red-600 text-white animate-pulse">LIVE</Badge>
+                  </div>
+                </div>
+
+                {/* Track Info */}
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-bold text-white">{currentTrack.title}</h2>
+                  <p className="text-lg text-purple-400">{currentTrack.artist}</p>
+                  <p className="text-sm text-slate-400">{currentTrack.album}</p>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="mt-6 space-y-2">
+                  <div className="w-full bg-slate-700 rounded-full h-2">
                     <div
-                      className={cn(
-                        "w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center",
-                        isSelected ? "bg-green-500" : "bg-gray-800",
-                      )}
-                    >
-                      <Icon className={cn("h-8 w-8", isSelected ? "text-black" : "text-white")} />
-                    </div>
-
-                    <h3 className={cn("text-xl font-bold mb-2", isSelected ? "text-green-500" : "text-white")}>
-                      {mood.name.toUpperCase()}
-                    </h3>
-
-                    <p className="text-gray-400 text-sm">{mood.description}</p>
-
-                    {isSelected && (
-                      <div className="mt-4">
-                        <Badge className="bg-green-500 text-black font-bold">NOW PLAYING</Badge>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-
-          {/* Spotify Player */}
-          {selectedMood && (
-            <Card className="bg-gray-900/80 border-green-500/30 backdrop-blur-sm">
-              <CardHeader className="text-center">
-                <div className="flex items-center justify-center gap-3 mb-2">
-                  <div
-                    className={cn(
-                      "w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-br",
-                      selectedMood.color,
-                    )}
-                  >
-                    <selectedMood.icon className="h-6 w-6 text-white" />
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: "35%" }}
+                    />
                   </div>
-                  <div>
-                    <CardTitle className="text-2xl font-bold text-green-500">
-                      {selectedMood.name.toUpperCase()} MODE
-                    </CardTitle>
-                    <CardDescription className="text-gray-400">{selectedMood.description}</CardDescription>
+                  <div className="flex justify-between text-sm text-slate-400">
+                    <span>{currentTrack.currentTime}</span>
+                    <span>{currentTrack.duration}</span>
                   </div>
                 </div>
-              </CardHeader>
+              </div>
 
+              {/* Controls */}
+              <div className="flex items-center justify-center gap-6 mb-8">
+                {/* Previous */}
+                <Button variant="ghost" size="lg" className="text-slate-400 hover:text-white">
+                  <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+                  </svg>
+                </Button>
+
+                {/* Play/Pause */}
+                <Button
+                  onClick={togglePlay}
+                  size="lg"
+                  className="w-16 h-16 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                >
+                  {isPlaying ? <Pause className="h-8 w-8" /> : <Play className="h-8 w-8 ml-1" />}
+                </Button>
+
+                {/* Next */}
+                <Button variant="ghost" size="lg" className="text-slate-400 hover:text-white">
+                  <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+                  </svg>
+                </Button>
+              </div>
+
+              {/* Volume Control */}
+              <div className="flex items-center gap-4 mb-8">
+                <Button onClick={toggleMute} variant="ghost" size="sm" className="text-slate-400 hover:text-white">
+                  {isMuted || volume[0] === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+                </Button>
+
+                <div className="flex-1 max-w-xs">
+                  <Slider value={volume} onValueChange={handleVolumeChange} max={100} step={1} className="w-full" />
+                </div>
+
+                <span className="text-sm text-slate-400 w-8">{volume[0]}</span>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-center gap-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-600 text-slate-300 hover:text-white bg-transparent"
+                >
+                  <Heart className="h-4 w-4 mr-2" />
+                  Like
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-600 text-slate-300 hover:text-white bg-transparent"
+                >
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-600 text-slate-300 hover:text-white bg-transparent"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Station Info */}
+          <div className="mt-8 grid md:grid-cols-2 gap-6">
+            <Card className="bg-slate-800/30 border-slate-700 backdrop-blur-sm">
               <CardContent className="p-6">
-                <div className="relative w-full h-96 rounded-lg overflow-hidden bg-black">
-                  <iframe
-                    src={selectedMood.embedUrl}
-                    width="100%"
-                    height="100%"
-                    frameBorder="0"
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                    loading="lazy"
-                    className="rounded-lg"
-                    title={`Erigga Radio - ${selectedMood.name} Mood`}
-                  />
+                <div className="flex items-center gap-3 mb-4">
+                  <Headphones className="h-6 w-6 text-purple-400" />
+                  <h3 className="text-xl font-bold text-white">Now On Air</h3>
                 </div>
-
-                <div className="mt-6 flex items-center justify-center gap-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-green-500 text-green-500 hover:bg-green-500 hover:text-black bg-transparent"
-                    onClick={() => window.open(selectedMood.spotifyUrl, "_blank")}
-                  >
-                    <Music className="h-4 w-4 mr-2" />
-                    Open in Spotify
-                  </Button>
-
-                  <div className="flex items-center gap-2 text-sm text-gray-400">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                    Streaming live from the streets
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Info Cards */}
-          <div className="grid md:grid-cols-2 gap-6 mt-12">
-            <Card className="bg-gray-900/50 border-gray-800">
-              <CardHeader>
-                <CardTitle className="text-green-500">About Erigga Radio</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-300 mb-4">
-                  Experience the raw, unfiltered sound of Nigerian street hop. From Warri to the world, Erigga Radio
-                  brings you authentic vibes for every mood and moment.
-                </p>
-                <div className="space-y-2 text-sm text-gray-400">
-                  <div>🎵 Curated playlists for every emotion</div>
-                  <div>🔥 Fresh tracks updated weekly</div>
-                  <div>🌍 Streaming worldwide, 24/7</div>
-                  <div>💯 100% authentic street sound</div>
+                <div className="space-y-2 text-slate-300">
+                  <p>🎵 The Erigma II - Full Album</p>
+                  <p>🎤 Exclusive freestyles and unreleased tracks</p>
+                  <p>📻 24/7 continuous streaming</p>
+                  <p>🔥 Latest hits and fan favorites</p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-gray-900/50 border-gray-800">
-              <CardHeader>
-                <CardTitle className="text-green-500">How It Works</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 text-gray-300">
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 bg-green-500 text-black rounded-full flex items-center justify-center text-sm font-bold">
-                      1
-                    </div>
-                    <div>
-                      <div className="font-semibold">Pick Your Mood</div>
-                      <div className="text-sm text-gray-400">Choose from 6 carefully curated vibes</div>
-                    </div>
+            <Card className="bg-slate-800/30 border-slate-700 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <Radio className="h-6 w-6 text-purple-400" />
+                  <h3 className="text-xl font-bold text-white">Station Stats</h3>
+                </div>
+                <div className="space-y-2 text-slate-300">
+                  <div className="flex justify-between">
+                    <span>Listeners:</span>
+                    <span className="text-purple-400 font-semibold">2,847</span>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 bg-green-500 text-black rounded-full flex items-center justify-center text-sm font-bold">
-                      2
-                    </div>
-                    <div>
-                      <div className="font-semibold">Stream Instantly</div>
-                      <div className="text-sm text-gray-400">High-quality Spotify integration</div>
-                    </div>
+                  <div className="flex justify-between">
+                    <span>Quality:</span>
+                    <span className="text-green-400 font-semibold">320kbps</span>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 bg-green-500 text-black rounded-full flex items-center justify-center text-sm font-bold">
-                      3
-                    </div>
-                    <div>
-                      <div className="font-semibold">Vibe Anywhere</div>
-                      <div className="text-sm text-gray-400">Mini-player follows you across the site</div>
-                    </div>
+                  <div className="flex justify-between">
+                    <span>Uptime:</span>
+                    <span className="text-blue-400 font-semibold">99.9%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Genre:</span>
+                    <span className="text-yellow-400 font-semibold">Afrobeats/Rap</span>
                   </div>
                 </div>
               </CardContent>
@@ -273,6 +227,12 @@ export default function RadioPage() {
           </div>
         </div>
       </div>
+
+      {/* Hidden Audio Element */}
+      <audio ref={audioRef} preload="none" className="hidden">
+        <source src="/audio/erigga-radio-stream.mp3" type="audio/mpeg" />
+        Your browser does not support the audio element.
+      </audio>
     </div>
   )
 }

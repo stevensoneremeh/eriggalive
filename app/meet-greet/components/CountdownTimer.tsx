@@ -1,50 +1,70 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Clock } from "lucide-react"
+import { Clock, AlertTriangle } from "lucide-react"
 
 interface CountdownTimerProps {
-  initialTime: number // in seconds
-  onTimeUp: () => void
-  onTimeUpdate: (time: number) => void
+  timeRemaining: number // in seconds
+  totalDuration: number // in seconds
 }
 
-export default function CountdownTimer({ initialTime, onTimeUp, onTimeUpdate }: CountdownTimerProps) {
-  const [timeLeft, setTimeLeft] = useState(initialTime)
-
-  useEffect(() => {
-    if (timeLeft <= 0) {
-      onTimeUp()
-      return
-    }
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        const newTime = prev - 1
-        onTimeUpdate(newTime)
-        return newTime
-      })
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [timeLeft, onTimeUp, onTimeUpdate])
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
-  }
+export function CountdownTimer({ timeRemaining, totalDuration }: CountdownTimerProps) {
+  const minutes = Math.floor(timeRemaining / 60)
+  const seconds = timeRemaining % 60
+  const percentage = (timeRemaining / totalDuration) * 100
 
   const getTimerColor = () => {
-    if (timeLeft <= 60) return "text-red-500" // Last minute
-    if (timeLeft <= 300) return "text-yellow-500" // Last 5 minutes
-    return "text-green-500"
+    if (percentage > 50) return "text-green-400"
+    if (percentage > 25) return "text-yellow-400"
+    return "text-red-400"
+  }
+
+  const getBackgroundColor = () => {
+    if (percentage > 50) return "bg-green-400"
+    if (percentage > 25) return "bg-yellow-400"
+    return "bg-red-400"
   }
 
   return (
-    <div className="bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 flex items-center gap-2">
-      <Clock className={`w-4 h-4 ${getTimerColor()}`} />
-      <span className={`font-mono text-lg font-bold ${getTimerColor()}`}>{formatTime(timeLeft)}</span>
+    <div className="flex items-center gap-3">
+      {/* Progress Ring */}
+      <div className="relative w-12 h-12">
+        <svg className="w-12 h-12 transform -rotate-90" viewBox="0 0 36 36">
+          <path
+            className="text-slate-700"
+            stroke="currentColor"
+            strokeWidth="3"
+            fill="none"
+            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+          />
+          <path
+            className={getTimerColor()}
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            fill="none"
+            strokeDasharray={`${percentage}, 100`}
+            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Clock className={`h-4 w-4 ${getTimerColor()}`} />
+        </div>
+      </div>
+
+      {/* Time Display */}
+      <div className="text-right">
+        <div className={`text-2xl font-mono font-bold ${getTimerColor()}`}>
+          {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+        </div>
+        <div className="text-xs text-slate-400">Time Remaining</div>
+      </div>
+
+      {/* Warning Icon for last 2 minutes */}
+      {timeRemaining <= 120 && (
+        <AlertTriangle
+          className={`h-5 w-5 animate-pulse ${timeRemaining <= 60 ? "text-red-400" : "text-yellow-400"}`}
+        />
+      )}
     </div>
   )
 }

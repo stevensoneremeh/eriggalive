@@ -1,176 +1,224 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { PhoneOff, Mic, MicOff, Video, VideoOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import CountdownTimer from "./CountdownTimer"
+import { CountdownTimer } from "./CountdownTimer"
+import { Video, VideoOff, Mic, MicOff, PhoneOff, Settings, Maximize } from "lucide-react"
 
 interface VideoCallInterfaceProps {
-  sessionData: any
-  onCallEnd: () => void
+  onSessionEnd: () => void
+  sessionDuration: number // in seconds
 }
 
-export default function VideoCallInterface({ sessionData, onCallEnd }: VideoCallInterfaceProps) {
+export function VideoCallInterface({ onSessionEnd, sessionDuration }: VideoCallInterfaceProps) {
+  const [timeRemaining, setTimeRemaining] = useState(sessionDuration)
+  const [isVideoOn, setIsVideoOn] = useState(true)
+  const [isAudioOn, setIsAudioOn] = useState(true)
   const [isConnected, setIsConnected] = useState(false)
-  const [isMuted, setIsMuted] = useState(false)
-  const [isVideoOff, setIsVideoOff] = useState(false)
-  const [timeRemaining, setTimeRemaining] = useState(20 * 60) // 20 minutes in seconds
+  const [showControls, setShowControls] = useState(true)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const remoteVideoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
-    // Initialize Daily.co call
-    initializeCall()
+    // Simulate connection after 3 seconds
+    const connectTimer = setTimeout(() => {
+      setIsConnected(true)
+    }, 3000)
+
+    // Start the session timer
+    const timer = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          handleEndSession()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    // Auto-hide controls after 5 seconds
+    const controlsTimer = setTimeout(() => {
+      setShowControls(false)
+    }, 5000)
 
     return () => {
-      // Cleanup call when component unmounts
-      endCall()
+      clearTimeout(connectTimer)
+      clearInterval(timer)
+      clearTimeout(controlsTimer)
     }
   }, [])
 
-  const initializeCall = async () => {
-    try {
-      // In a real implementation, you would initialize Daily.co here
-      // For now, we'll simulate the connection
-      setTimeout(() => {
-        setIsConnected(true)
-      }, 2000)
-    } catch (error) {
-      console.error("Failed to initialize call:", error)
-    }
-  }
+  const handleEndSession = () => {
+    // Show thank you message with fadeout
+    const thankYouDiv = document.createElement("div")
+    thankYouDiv.className = "fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in"
+    thankYouDiv.innerHTML = `
+      <div class="text-center text-white space-y-4">
+        <h2 class="text-4xl font-bold">Thank You!</h2>
+        <p class="text-xl">Your session with Erigga has ended.</p>
+        <p class="text-lg opacity-75">We hope you enjoyed your exclusive meet & greet!</p>
+      </div>
+    `
+    document.body.appendChild(thankYouDiv)
 
-  const endCall = async () => {
-    try {
-      // Update session status
-      await fetch("/api/meet-greet/update-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: sessionData.id,
-          status: "completed",
-          endedAt: new Date().toISOString(),
-        }),
-      })
-    } catch (error) {
-      console.error("Failed to update session:", error)
-    }
-
-    onCallEnd()
-  }
-
-  const toggleMute = () => {
-    setIsMuted(!isMuted)
-    // In real implementation, mute/unmute the actual call
-  }
-
-  const toggleVideo = () => {
-    setIsVideoOff(!isVideoOff)
-    // In real implementation, turn video on/off
-  }
-
-  const handleTimeUp = () => {
-    // Show thank you message and end call
     setTimeout(() => {
-      endCall()
+      document.body.removeChild(thankYouDiv)
+      onSessionEnd()
     }, 3000)
   }
 
-  if (timeRemaining <= 0) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-900 to-slate-900 flex items-center justify-center">
-        <Card className="bg-slate-800/90 border-slate-700 text-center p-8 max-w-md">
-          <CardContent>
-            <div className="text-6xl mb-4">🙏</div>
-            <h2 className="text-2xl font-bold text-white mb-4">Thank You!</h2>
-            <p className="text-gray-300 mb-6">
-              Your Meet & Greet session with Erigga has ended. Thank you for your time!
-            </p>
-            <Button onClick={endCall} className="bg-blue-600 hover:bg-blue-700">
-              Return to Platform
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  const toggleVideo = () => {
+    setIsVideoOn(!isVideoOn)
+  }
+
+  const toggleAudio = () => {
+    setIsAudioOn(!isAudioOn)
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Video Container */}
-      <div className="relative h-screen">
-        {/* Main Video Area */}
-        <div className="absolute inset-0 bg-gradient-to-b from-gray-900 to-black">
+    <div className="fixed inset-0 bg-black flex flex-col">
+      {/* Header with Timer */}
+      <div className="flex items-center justify-between p-4 bg-black/50 backdrop-blur-sm">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-3 h-3 rounded-full ${
+                isConnected ? "bg-green-400 animate-pulse" : "bg-yellow-400 animate-bounce"
+              }`}
+            />
+            <span className="text-white font-medium">{isConnected ? "Connected with Erigga" : "Connecting..."}</span>
+          </div>
+        </div>
+
+        <CountdownTimer timeRemaining={timeRemaining} totalDuration={sessionDuration} />
+      </div>
+
+      {/* Video Area */}
+      <div className="flex-1 relative">
+        {/* Remote Video (Erigga's video) */}
+        <div className="absolute inset-0">
           {isConnected ? (
-            <div className="w-full h-full flex items-center justify-center">
-              {/* Placeholder for Daily.co video */}
-              <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-red-500 to-blue-600 mx-auto mb-4 flex items-center justify-center">
-                    <span className="text-2xl font-bold">ERIGGA</span>
-                  </div>
-                  <p className="text-gray-300">Connected to Meet & Greet</p>
+            <div className="w-full h-full bg-gradient-to-br from-blue-900 to-slate-900 flex items-center justify-center">
+              {/* Simulated remote video */}
+              <div className="text-center text-white space-y-4">
+                <div className="w-32 h-32 rounded-full border-4 border-blue-400 overflow-hidden mx-auto">
+                  <img src="/images/hero/erigga1.jpeg" alt="Erigga" className="w-full h-full object-cover" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-bold">Erigga</h3>
+                  <p className="text-blue-300">Live from the studio</p>
+                </div>
+                {/* Simulated audio waves */}
+                <div className="flex items-center justify-center gap-1">
+                  {[...Array(5)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="w-1 bg-green-400 rounded-full animate-pulse"
+                      style={{
+                        height: `${Math.random() * 20 + 10}px`,
+                        animationDelay: `${i * 100}ms`,
+                      }}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="text-center">
-                <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-                <p className="text-gray-300">Connecting to Erigga...</p>
+            <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+              <div className="text-center text-white space-y-4">
+                <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-xl">Connecting to Erigga...</p>
+                <p className="text-slate-400">Please wait while we establish the connection</p>
               </div>
             </div>
           )}
         </div>
 
-        {/* Timer Overlay */}
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2">
-          <CountdownTimer initialTime={timeRemaining} onTimeUp={handleTimeUp} onTimeUpdate={setTimeRemaining} />
-        </div>
-
-        {/* Controls */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
-          <div className="flex items-center gap-4 bg-black/50 backdrop-blur-sm rounded-full px-6 py-4">
-            <Button
-              onClick={toggleMute}
-              variant={isMuted ? "destructive" : "secondary"}
-              size="lg"
-              className="rounded-full w-12 h-12"
-            >
-              {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-            </Button>
-
-            <Button
-              onClick={toggleVideo}
-              variant={isVideoOff ? "destructive" : "secondary"}
-              size="lg"
-              className="rounded-full w-12 h-12"
-            >
-              {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
-            </Button>
-
-            <Button
-              onClick={endCall}
-              variant="destructive"
-              size="lg"
-              className="rounded-full w-12 h-12 bg-red-600 hover:bg-red-700"
-            >
-              <PhoneOff className="w-5 h-5" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Session Info */}
-        <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-lg p-3">
-          <div className="text-sm text-gray-300">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span>Live Session</span>
+        {/* Local Video (User's video) - Picture in Picture */}
+        <div className="absolute bottom-4 right-4 w-48 h-36 bg-slate-800 rounded-lg border-2 border-slate-600 overflow-hidden">
+          {isVideoOn ? (
+            <div className="w-full h-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center">
+              <div className="text-center text-white">
+                <div className="w-16 h-16 rounded-full bg-slate-600 flex items-center justify-center mx-auto mb-2">
+                  <Video className="h-8 w-8" />
+                </div>
+                <p className="text-sm">You</p>
+              </div>
             </div>
-            <div>with Erigga</div>
-          </div>
+          ) : (
+            <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+              <VideoOff className="h-8 w-8 text-slate-400" />
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Controls */}
+      <div
+        className={`absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent transition-all duration-300 ${
+          showControls ? "translate-y-0 opacity-100" : "translate-y-full opacity-0"
+        }`}
+        onMouseEnter={() => setShowControls(true)}
+      >
+        <div className="flex items-center justify-center gap-4">
+          {/* Audio Toggle */}
+          <Button
+            onClick={toggleAudio}
+            size="lg"
+            variant={isAudioOn ? "default" : "destructive"}
+            className="rounded-full w-14 h-14"
+          >
+            {isAudioOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
+          </Button>
+
+          {/* Video Toggle */}
+          <Button
+            onClick={toggleVideo}
+            size="lg"
+            variant={isVideoOn ? "default" : "destructive"}
+            className="rounded-full w-14 h-14"
+          >
+            {isVideoOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
+          </Button>
+
+          {/* End Call */}
+          <Button
+            onClick={handleEndSession}
+            size="lg"
+            variant="destructive"
+            className="rounded-full w-16 h-16 bg-red-600 hover:bg-red-700"
+          >
+            <PhoneOff className="h-8 w-8" />
+          </Button>
+
+          {/* Settings */}
+          <Button
+            size="lg"
+            variant="outline"
+            className="rounded-full w-14 h-14 bg-white/10 border-white/20 text-white hover:bg-white/20"
+          >
+            <Settings className="h-6 w-6" />
+          </Button>
+
+          {/* Fullscreen */}
+          <Button
+            size="lg"
+            variant="outline"
+            className="rounded-full w-14 h-14 bg-white/10 border-white/20 text-white hover:bg-white/20"
+          >
+            <Maximize className="h-6 w-6" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Show controls on mouse move */}
+      <div
+        className="absolute inset-0 z-10"
+        onMouseMove={() => setShowControls(true)}
+        onMouseLeave={() => {
+          setTimeout(() => setShowControls(false), 3000)
+        }}
+      />
     </div>
   )
 }

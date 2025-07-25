@@ -1,26 +1,48 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createServerSupabaseClient } from "@/lib/supabase-utils"
 
 export async function POST(request: NextRequest) {
   try {
-    const { sessionId, status, endedAt } = await request.json()
-    const supabase = createClient()
+    const { session_id, status, duration_used } = await request.json()
 
-    const updateData: any = { session_status: status }
-    if (endedAt) {
-      updateData.ended_at = endedAt
+    if (!session_id || !status) {
+      return NextResponse.json({ success: false, message: "Session ID and status are required" }, { status: 400 })
     }
 
-    const { error } = await supabase.from("meet_greet_sessions").update(updateData).eq("id", sessionId)
+    const supabase = createServerSupabaseClient()
+
+    const updateData: any = {
+      status,
+      updated_at: new Date().toISOString(),
+    }
+
+    if (status === "active") {
+      updateData.started_at = new Date().toISOString()
+    } else if (status === "completed") {
+      updateData.ended_at = new Date().toISOString()
+      if (duration_used) {
+        updateData.actual_duration = duration_used
+      }
+    }
+
+    const { data, error } = await supabase
+      .from("meet_greet_sessions")
+      .update(updateData)
+      .eq("id", session_id)
+      .select()
+      .single()
 
     if (error) {
-      console.error("Session update error:", error)
-      return NextResponse.json({ success: false, error: "Failed to update session" }, { status: 500 })
+      console.error("Database error:", error)
+      return NextResponse.json({ success: false, message: "Failed to update session" }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({
+      success: true,
+      data,
+    })
   } catch (error) {
     console.error("Session update error:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ success: false, message: "Internal server error" }, { status: 500 })
   }
 }

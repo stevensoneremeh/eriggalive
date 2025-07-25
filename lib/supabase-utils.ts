@@ -20,7 +20,7 @@ export const isServerPreviewMode = () => {
   )
 }
 
-// Create a mock client for preview mode - DEFINE BEFORE USING
+// Create a mock client for preview mode
 const createMockClient = () => {
   return {
     auth: {
@@ -41,14 +41,14 @@ const createMockClient = () => {
       select: (columns?: string) => ({
         eq: (column: string, value: any) => ({
           single: () => {
-            if (table === "user_profiles" && column === "user_id") {
+            if (table === "users" && column === "auth_user_id") {
               return Promise.resolve({
                 data: {
                   id: 1,
-                  user_id: value,
+                  auth_user_id: value,
                   username: "mockuser",
                   tier: "grassroot",
-                  coins: 500,
+                  coins_balance: 500,
                 },
                 error: null,
               })
@@ -85,21 +85,21 @@ const createMockClient = () => {
   } as any
 }
 
-// Create a mock server client for preview mode - DEFINE BEFORE USING
+// Create a mock server client for preview mode
 export const createMockServerClient = () => {
   return {
     from: (table: string) => ({
       select: (query?: string) => ({
         eq: (column: string, value: any) => ({
           single: () => {
-            if (table === "user_profiles" && column === "user_id") {
+            if (table === "users" && column === "auth_user_id") {
               return Promise.resolve({
                 data: {
                   id: 1,
-                  user_id: value,
+                  auth_user_id: value,
                   username: "mockuser",
                   tier: "grassroot",
-                  coins: 500,
+                  coins_balance: 500,
                 },
                 error: null,
               })
@@ -198,7 +198,7 @@ export const createClient = () => {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Missing Supabase environment variables")
+    console.warn("Missing Supabase environment variables, using mock client")
     return createMockClient()
   }
 
@@ -217,7 +217,7 @@ export function createServerSupabaseClient() {
   const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseKey) {
-    console.error("Missing Supabase environment variables for server client")
+    console.warn("Missing Supabase environment variables for server client, using mock client")
     return createMockServerClient()
   }
 
@@ -241,7 +241,7 @@ export function createAdminSupabaseClient() {
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!supabaseUrl || !supabaseKey) {
-    console.error("Missing Supabase environment variables for admin client")
+    console.warn("Missing Supabase environment variables for admin client, using mock client")
     return createMockServerClient()
   }
 

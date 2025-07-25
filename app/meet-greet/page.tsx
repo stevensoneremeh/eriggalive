@@ -1,231 +1,309 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Phone, Clock, Star, Shield, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { useAuth } from "@/contexts/auth-context"
-import PaymentModal from "./components/PaymentModal"
-import VideoCallInterface from "./components/VideoCallInterface"
+import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import { PaymentModal } from "./components/PaymentModal"
+import { VideoCallInterface } from "./components/VideoCallInterface"
+import { Phone, Video, Clock, Star, Sun, Moon, Zap } from "lucide-react"
 
 export default function MeetGreetPage() {
-  const { profile, isAuthenticated } = useAuth()
   const [isDarkMode, setIsDarkMode] = useState(true)
-  const [showPayment, setShowPayment] = useState(false)
-  const [showVideoCall, setShowVideoCall] = useState(false)
-  const [sessionData, setSessionData] = useState(null)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentSuccess, setPaymentSuccess] = useState(false)
+  const [sessionActive, setSessionActive] = useState(false)
   const [isAnimating, setIsAnimating] = useState(false)
 
   useEffect(() => {
-    // Check if user has a valid session from URL params
-    const urlParams = new URLSearchParams(window.location.search)
-    const transactionRef = urlParams.get("transaction_reference")
+    // Add pulsing animation to the booth
+    const interval = setInterval(() => {
+      setIsAnimating(true)
+      setTimeout(() => setIsAnimating(false), 1000)
+    }, 3000)
 
-    if (transactionRef) {
-      verifyPaymentAndStartCall(transactionRef)
-    }
+    return () => clearInterval(interval)
   }, [])
 
-  const verifyPaymentAndStartCall = async (transactionRef: string) => {
-    try {
-      const response = await fetch("/api/meet-greet/verify-payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transaction_reference: transactionRef }),
-      })
-
-      const data = await response.json()
-      if (data.success && data.session) {
-        setSessionData(data.session)
-        setShowVideoCall(true)
-      }
-    } catch (error) {
-      console.error("Payment verification failed:", error)
-    }
-  }
-
-  const handlePaymentSuccess = (sessionData: any) => {
-    setShowPayment(false)
-    setSessionData(sessionData)
-    setShowVideoCall(true)
-  }
-
-  const handleCallEnd = () => {
-    setShowVideoCall(false)
-    setSessionData(null)
-  }
-
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode)
-  }
-
-  const handleBookCall = () => {
-    if (!isAuthenticated) {
-      window.location.href = "/login"
-      return
-    }
-
-    setIsAnimating(true)
+  const handlePaymentSuccess = () => {
+    setPaymentSuccess(true)
+    setShowPaymentModal(false)
+    // Auto-start session after payment
     setTimeout(() => {
-      setShowPayment(true)
-      setIsAnimating(false)
-    }, 500)
+      setSessionActive(true)
+    }, 2000)
   }
 
-  if (showVideoCall && sessionData) {
-    return <VideoCallInterface sessionData={sessionData} onCallEnd={handleCallEnd} />
+  const handleSessionEnd = () => {
+    setSessionActive(false)
+    setPaymentSuccess(false)
+  }
+
+  if (sessionActive) {
+    return (
+      <VideoCallInterface
+        onSessionEnd={handleSessionEnd}
+        sessionDuration={20 * 60} // 20 minutes in seconds
+      />
+    )
   }
 
   return (
     <div
-      className={`min-h-screen transition-all duration-1000 ${
+      className={`min-h-screen transition-all duration-500 ${
         isDarkMode
-          ? "bg-gradient-to-b from-slate-900 via-blue-900 to-slate-900"
-          : "bg-gradient-to-b from-blue-100 via-white to-blue-50"
+          ? "bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800"
+          : "bg-gradient-to-br from-blue-50 via-white to-blue-100"
       }`}
     >
-      {/* Animated Background Effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-2 h-2 bg-blue-400 rounded-full animate-pulse opacity-60"></div>
-        <div className="absolute top-40 right-20 w-1 h-1 bg-red-400 rounded-full animate-ping opacity-40"></div>
-        <div className="absolute bottom-32 left-1/4 w-3 h-3 bg-yellow-400 rounded-full animate-bounce opacity-50"></div>
-      </div>
-
       {/* Theme Toggle */}
-      <button
-        onClick={toggleTheme}
-        className="fixed top-4 right-4 z-50 p-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-      >
-        {isDarkMode ? "☀️" : "🌙"}
-      </button>
-
-      <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-screen">
-        <div className="relative max-w-4xl w-full">
-          {/* Superman Phone Booth */}
-          <div
-            className={`relative mx-auto transition-all duration-1000 ${
-              isAnimating ? "scale-105 rotate-1" : "scale-100"
-            }`}
-          >
-            {/* Booth Structure */}
-            <div
-              className={`relative w-80 h-96 mx-auto rounded-t-lg border-4 ${
-                isDarkMode
-                  ? "border-blue-400 bg-gradient-to-b from-blue-900/80 to-slate-900/90"
-                  : "border-blue-600 bg-gradient-to-b from-blue-50/90 to-white/95"
-              } backdrop-blur-sm shadow-2xl`}
-            >
-              {/* Glass Reflection Effect */}
-              <div className="absolute inset-2 rounded-t-lg bg-gradient-to-br from-white/10 to-transparent pointer-events-none"></div>
-
-              {/* Booth Lighting */}
-              <div
-                className={`absolute -top-2 left-1/2 transform -translate-x-1/2 w-16 h-4 rounded-full ${
-                  isDarkMode ? "bg-yellow-400" : "bg-yellow-300"
-                } animate-pulse shadow-lg`}
-              ></div>
-
-              {/* Erigga's Avatar/Poster */}
-              <div className="absolute top-8 left-1/2 transform -translate-x-1/2">
-                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-red-500 to-blue-600 p-1 shadow-xl">
-                  <div className="w-full h-full rounded-full bg-gray-800 flex items-center justify-center text-white font-bold text-2xl">
-                    ERIGGA
-                  </div>
-                </div>
-              </div>
-
-              {/* Superman Logo */}
-              <div className="absolute top-44 left-1/2 transform -translate-x-1/2">
-                <Shield className="w-8 h-8 text-red-500 animate-pulse" />
-              </div>
-
-              {/* Meet & Greet Info */}
-              <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 text-center px-4">
-                <h3 className={`font-bold text-lg mb-2 ${isDarkMode ? "text-white" : "text-gray-800"}`}>
-                  Meet & Greet
-                </h3>
-                <div className="flex items-center justify-center gap-2 mb-3">
-                  <Clock className="w-4 h-4 text-blue-400" />
-                  <span className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>20 minutes</span>
-                </div>
-                <div className="flex items-center justify-center gap-2 mb-4">
-                  <span className="text-2xl font-bold text-green-500">₦100,000</span>
-                </div>
-              </div>
-
-              {/* Book Call Button */}
-              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
-                <Button
-                  onClick={handleBookCall}
-                  className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-full font-semibold shadow-lg transform hover:scale-105 transition-all duration-300"
-                  disabled={isAnimating}
-                >
-                  <Phone className="w-4 h-4 mr-2" />
-                  {isAnimating ? "Connecting..." : "Book Call"}
-                </Button>
-              </div>
-            </div>
-
-            {/* Booth Base */}
-            <div
-              className={`w-84 h-8 mx-auto rounded-b-lg border-4 border-t-0 ${
-                isDarkMode ? "border-blue-400 bg-slate-800" : "border-blue-600 bg-gray-200"
-              }`}
-            ></div>
-          </div>
-
-          {/* Features Cards */}
-          <div className="grid md:grid-cols-3 gap-6 mt-12">
-            <Card
-              className={`${isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-white/80 border-gray-200"} backdrop-blur-sm`}
-            >
-              <CardContent className="p-6 text-center">
-                <Zap className="w-8 h-8 text-yellow-500 mx-auto mb-3" />
-                <h4 className={`font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-800"}`}>
-                  Instant Connection
-                </h4>
-                <p className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
-                  Direct video call with Erigga in seconds
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card
-              className={`${isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-white/80 border-gray-200"} backdrop-blur-sm`}
-            >
-              <CardContent className="p-6 text-center">
-                <Star className="w-8 h-8 text-blue-500 mx-auto mb-3" />
-                <h4 className={`font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-800"}`}>
-                  Exclusive Access
-                </h4>
-                <p className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
-                  Personal 20-minute session with your favorite artist
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card
-              className={`${isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-white/80 border-gray-200"} backdrop-blur-sm`}
-            >
-              <CardContent className="p-6 text-center">
-                <Shield className="w-8 h-8 text-green-500 mx-auto mb-3" />
-                <h4 className={`font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-800"}`}>Secure Payment</h4>
-                <p className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
-                  Safe and secure payment via Paystack
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+      <div className="absolute top-4 right-4 z-50">
+        <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full p-2">
+          <Sun className="h-4 w-4 text-yellow-400" />
+          <Switch checked={isDarkMode} onCheckedChange={setIsDarkMode} className="data-[state=checked]:bg-blue-600" />
+          <Moon className="h-4 w-4 text-blue-300" />
         </div>
       </div>
 
+      {/* Animated Background Elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div
+          className={`absolute top-20 left-10 w-2 h-2 rounded-full animate-pulse ${
+            isDarkMode ? "bg-blue-400" : "bg-blue-600"
+          }`}
+        />
+        <div
+          className={`absolute top-40 right-20 w-1 h-1 rounded-full animate-ping ${
+            isDarkMode ? "bg-cyan-400" : "bg-cyan-600"
+          }`}
+        />
+        <div
+          className={`absolute bottom-32 left-1/4 w-3 h-3 rounded-full animate-bounce ${
+            isDarkMode ? "bg-purple-400" : "bg-purple-600"
+          }`}
+        />
+      </div>
+
+      <div className="container mx-auto px-4 py-8 relative z-10">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className={`p-3 rounded-full ${isDarkMode ? "bg-blue-600/20" : "bg-blue-100"}`}>
+              <Phone className={`h-8 w-8 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`} />
+            </div>
+            <h1 className={`text-4xl md:text-6xl font-bold ${isDarkMode ? "text-white" : "text-slate-800"}`}>
+              Meet & Greet
+            </h1>
+            <div className={`p-3 rounded-full ${isDarkMode ? "bg-blue-600/20" : "bg-blue-100"}`}>
+              <Video className={`h-8 w-8 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`} />
+            </div>
+          </div>
+          <p className={`text-xl ${isDarkMode ? "text-slate-300" : "text-slate-600"}`}>
+            Step into the booth for an exclusive 20-minute video call with Erigga
+          </p>
+        </div>
+
+        {/* Superman Phone Booth */}
+        <div className="flex justify-center mb-12">
+          <div className="relative">
+            {/* Booth Structure */}
+            <div
+              className={`relative w-80 h-96 mx-auto transition-all duration-500 ${
+                isAnimating ? "scale-105" : "scale-100"
+              }`}
+            >
+              {/* Glass Panels with Reflections */}
+              <div
+                className={`absolute inset-0 rounded-t-lg border-4 ${
+                  isDarkMode
+                    ? "border-blue-400 bg-gradient-to-br from-blue-900/30 to-slate-900/50"
+                    : "border-blue-600 bg-gradient-to-br from-blue-100/50 to-white/30"
+                } backdrop-blur-sm`}
+              >
+                {/* Glass Reflection Effect */}
+                <div
+                  className={`absolute top-4 left-4 w-16 h-32 rounded-lg opacity-30 ${
+                    isDarkMode ? "bg-white" : "bg-blue-200"
+                  } transform rotate-12`}
+                />
+                <div
+                  className={`absolute top-8 right-6 w-8 h-20 rounded-lg opacity-20 ${
+                    isDarkMode ? "bg-cyan-300" : "bg-blue-300"
+                  } transform -rotate-6`}
+                />
+              </div>
+
+              {/* Animated Lighting */}
+              <div
+                className={`absolute -inset-2 rounded-t-lg opacity-50 animate-pulse ${
+                  isDarkMode
+                    ? "bg-gradient-to-r from-blue-500/20 via-cyan-400/20 to-blue-500/20"
+                    : "bg-gradient-to-r from-blue-300/30 via-cyan-200/30 to-blue-300/30"
+                }`}
+              />
+
+              {/* Booth Interior */}
+              <div className="absolute inset-4 flex flex-col items-center justify-center space-y-4">
+                {/* Erigga's Avatar/Poster */}
+                <div
+                  className={`w-24 h-24 rounded-full border-4 ${
+                    isDarkMode ? "border-blue-400" : "border-blue-600"
+                  } overflow-hidden`}
+                >
+                  <img src="/images/hero/erigga1.jpeg" alt="Erigga" className="w-full h-full object-cover" />
+                </div>
+
+                {/* Status Indicator */}
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-3 h-3 rounded-full animate-pulse ${
+                      paymentSuccess ? "bg-green-400" : "bg-yellow-400"
+                    }`}
+                  />
+                  <span className={`text-sm font-medium ${isDarkMode ? "text-white" : "text-slate-800"}`}>
+                    {paymentSuccess ? "Ready to Connect" : "Waiting for Payment"}
+                  </span>
+                </div>
+
+                {/* Connection Animation */}
+                {paymentSuccess && (
+                  <div className="flex space-x-1">
+                    <div
+                      className={`w-2 h-2 rounded-full animate-bounce ${isDarkMode ? "bg-green-400" : "bg-green-600"}`}
+                      style={{ animationDelay: "0ms" }}
+                    />
+                    <div
+                      className={`w-2 h-2 rounded-full animate-bounce ${isDarkMode ? "bg-green-400" : "bg-green-600"}`}
+                      style={{ animationDelay: "150ms" }}
+                    />
+                    <div
+                      className={`w-2 h-2 rounded-full animate-bounce ${isDarkMode ? "bg-green-400" : "bg-green-600"}`}
+                      style={{ animationDelay: "300ms" }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Booth Base */}
+              <div
+                className={`absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-32 h-8 rounded-full ${
+                  isDarkMode
+                    ? "bg-gradient-to-r from-slate-700 to-slate-600"
+                    : "bg-gradient-to-r from-slate-300 to-slate-400"
+                } shadow-lg`}
+              />
+
+              {/* Power Lines */}
+              <div
+                className={`absolute -top-8 left-1/2 transform -translate-x-1/2 w-1 h-8 ${
+                  isDarkMode ? "bg-yellow-400" : "bg-yellow-600"
+                }`}
+              />
+              <div
+                className={`absolute -top-12 left-1/2 transform -translate-x-1/2 w-8 h-1 ${
+                  isDarkMode ? "bg-yellow-400" : "bg-yellow-600"
+                }`}
+              />
+            </div>
+
+            {/* Electrical Effects */}
+            <div className="absolute -top-16 left-1/2 transform -translate-x-1/2">
+              <Zap className={`h-6 w-6 animate-pulse ${isDarkMode ? "text-yellow-400" : "text-yellow-600"}`} />
+            </div>
+          </div>
+        </div>
+
+        {/* Information Card */}
+        <div className="max-w-2xl mx-auto mb-8">
+          <Card
+            className={`${
+              isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-white/70 border-slate-200"
+            } backdrop-blur-sm`}
+          >
+            <CardContent className="p-6">
+              <div className="text-center space-y-4">
+                <div className="flex items-center justify-center gap-2">
+                  <Clock className={`h-5 w-5 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`} />
+                  <span className={`text-lg font-semibold ${isDarkMode ? "text-white" : "text-slate-800"}`}>
+                    20 Minutes Exclusive Session
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-center gap-4">
+                  <Badge variant="secondary" className="text-lg px-4 py-2">
+                    ₦100,000
+                  </Badge>
+                  <div className="flex items-center gap-1">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                    ))}
+                  </div>
+                </div>
+
+                <div className={`text-sm ${isDarkMode ? "text-slate-300" : "text-slate-600"} space-y-2`}>
+                  <p>✓ Direct video call with Erigga</p>
+                  <p>✓ 20-minute guaranteed session</p>
+                  <p>✓ High-quality video and audio</p>
+                  <p>✓ Secure payment via Paystack</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Action Button */}
+        <div className="text-center">
+          {!paymentSuccess ? (
+            <Button
+              onClick={() => setShowPaymentModal(true)}
+              size="lg"
+              className={`px-8 py-4 text-lg font-semibold transition-all duration-300 ${
+                isDarkMode
+                  ? "bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+                  : "bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
+              } text-white shadow-lg hover:shadow-xl transform hover:scale-105`}
+            >
+              <Phone className="mr-2 h-5 w-5" />
+              Book Your Call - ₦100,000
+            </Button>
+          ) : (
+            <Button
+              onClick={() => setSessionActive(true)}
+              size="lg"
+              className="px-8 py-4 text-lg font-semibold bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+            >
+              <Video className="mr-2 h-5 w-5" />
+              Enter the Booth
+            </Button>
+          )}
+        </div>
+
+        {/* Payment Success Message */}
+        {paymentSuccess && (
+          <div className="text-center mt-6">
+            <div
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${
+                isDarkMode
+                  ? "bg-green-900/30 text-green-400 border border-green-700"
+                  : "bg-green-100 text-green-700 border border-green-300"
+              }`}
+            >
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              Payment successful! You can now enter the booth.
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Payment Modal */}
-      {showPayment && (
+      {showPaymentModal && (
         <PaymentModal
-          onClose={() => setShowPayment(false)}
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
           onSuccess={handlePaymentSuccess}
+          amount={100000}
           isDarkMode={isDarkMode}
-          userProfile={profile}
         />
       )}
     </div>

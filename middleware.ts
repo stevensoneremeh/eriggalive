@@ -8,81 +8,92 @@ export async function middleware(request: NextRequest) {
     },
   })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
-        },
-        set(name: string, value: string, options) {
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-        },
-        remove(name: string, options) {
-          request.cookies.set({
-            name,
-            value: "",
-            ...options,
-          })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({
-            name,
-            value: "",
-            ...options,
-          })
-        },
-      },
-    },
-  )
+  // Check if Supabase environment variables are available
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  // Refresh session if expired
-  await supabase.auth.getSession()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const { pathname } = request.nextUrl
-
-  // Protected routes that require authentication
-  const protectedRoutes = ["/dashboard", "/chat", "/coins", "/settings", "/profile", "/rooms/freebies"]
-
-  // Auth routes that should redirect if already logged in
-  const authRoutes = ["/login", "/signup"]
-
-  // Check if current path is protected
-  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
-  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
-
-  // Redirect unauthenticated users from protected routes to login
-  if (isProtectedRoute && !user) {
-    const redirectUrl = new URL("/login", request.url)
-    redirectUrl.searchParams.set("redirect", pathname)
-    return NextResponse.redirect(redirectUrl)
+  // If environment variables are missing, skip Supabase middleware
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn("Supabase environment variables not found, skipping auth middleware")
+    return response
   }
 
-  // Redirect authenticated users from auth routes to dashboard
-  if (isAuthRoute && user) {
-    return NextResponse.redirect(new URL("/dashboard", request.url))
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      get(name: string) {
+        return request.cookies.get(name)?.value
+      },
+      set(name: string, value: string, options) {
+        request.cookies.set({
+          name,
+          value,
+          ...options,
+        })
+        response = NextResponse.next({
+          request: {
+            headers: request.headers,
+          },
+        })
+        response.cookies.set({
+          name,
+          value,
+          ...options,
+        })
+      },
+      remove(name: string, options) {
+        request.cookies.set({
+          name,
+          value: "",
+          ...options,
+        })
+        response = NextResponse.next({
+          request: {
+            headers: request.headers,
+          },
+        })
+        response.cookies.set({
+          name,
+          value: "",
+          ...options,
+        })
+      },
+    },
+  })
+
+  try {
+    // Refresh session if expired
+    await supabase.auth.getSession()
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    const { pathname } = request.nextUrl
+
+    // Protected routes that require authentication
+    const protectedRoutes = ["/dashboard", "/chat", "/coins", "/settings", "/profile", "/rooms/freebies"]
+
+    // Auth routes that should redirect if already logged in
+    const authRoutes = ["/login", "/signup"]
+
+    // Check if current path is protected
+    const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
+    const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
+
+    // Redirect unauthenticated users from protected routes to login
+    if (isProtectedRoute && !user) {
+      const redirectUrl = new URL("/login", request.url)
+      redirectUrl.searchParams.set("redirect", pathname)
+      return NextResponse.redirect(redirectUrl)
+    }
+
+    // Redirect authenticated users from auth routes to dashboard
+    if (isAuthRoute && user) {
+      return NextResponse.redirect(new URL("/dashboard", request.url))
+    }
+  } catch (error) {
+    console.error("Middleware error:", error)
+    // Continue without authentication if there's an error
   }
 
   return response
