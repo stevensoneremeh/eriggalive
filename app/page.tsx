@@ -5,11 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Play, Users, Star, Video, MessageCircle, Coins, Crown, Radio, Archive } from "lucide-react"
+import { Play, Users, Star, Video, MessageCircle, Coins, Crown, Radio, Archive, LayoutDashboard } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { HeroVideoCarousel } from "@/components/hero-video-carousel"
-import { LayoutDashboard } from "@/components/layout-dashboard" // Declared the LayoutDashboard variable
 
 const featuredContent = [
   {
