@@ -1,10 +1,10 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, useCallback } from "react"
 import type { User, Session } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { toast } from "sonner"
 
 interface UserProfile {
@@ -34,7 +34,7 @@ interface AuthContextType {
   profile: UserProfile | null
   loading: boolean
   isAuthenticated: boolean
-  signUp: (email: string, password: string) => Promise<{ error: any }>
+  signUp: (email: string, password: string, username?: string) => Promise<{ error: any }>
   signIn: (email: string, password: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error: any }>
@@ -49,26 +49,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isInitialized, setIsInitialized] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
   const supabase = createClient()
 
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
+  const fetchUserProfile = useCallback(
+    async (userId: string) => {
+      try {
+        const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
 
-      if (error) {
-        console.error("Error fetching user profile:", error)
+        if (error) {
+          console.error("Error fetching user profile:", error)
+          return null
+        }
+
+        return data as UserProfile
+      } catch (error) {
+        console.error("Error in fetchUserProfile:", error)
         return null
       }
+    },
+    [supabase],
+  )
 
-      return data as UserProfile
-    } catch (error) {
-      console.error("Error in fetchUserProfile:", error)
-      return null
-    }
-  }
-
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (!user?.id) return
 
     try {
@@ -77,26 +82,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Error refreshing profile:", error)
     }
-  }
+  }, [user?.id, fetchUserProfile])
 
-  const refreshSession = async () => {
+  const refreshSession = useCallback(async () => {
     try {
       const { data, error } = await supabase.auth.refreshSession()
       if (error) {
         console.error("Error refreshing session:", error)
-      } else if (data.session) {
+        return
+      }
+
+      if (data.session) {
         setSession(data.session)
         setUser(data.session.user)
-        await refreshProfile()
+        const profileData = await fetchUserProfile(data.session.user.id)
+        setProfile(profileData)
       }
     } catch (error) {
       console.error("Error in refreshSession:", error)
     }
-  }
+  }, [supabase.auth, fetchUserProfile])
 
+  // Initialize auth state
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
+    let mounted = true
+
+    const initializeAuth = async () => {
       try {
         const {
           data: { session },
@@ -107,27 +118,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error("Error getting session:", error)
         }
 
-        setSession(session)
-        setUser(session?.user ?? null)
+        if (mounted) {
+          setSession(session)
+          setUser(session?.user ?? null)
 
-        if (session?.user) {
-          const profileData = await fetchUserProfile(session.user.id)
-          setProfile(profileData)
+          if (session?.user) {
+            const profileData = await fetchUserProfile(session.user.id)
+            setProfile(profileData)
+          }
+
+          setLoading(false)
+          setIsInitialized(true)
         }
       } catch (error) {
-        console.error("Error in getInitialSession:", error)
-      } finally {
-        setLoading(false)
+        console.error("Error in initializeAuth:", error)
+        if (mounted) {
+          setLoading(false)
+          setIsInitialized(true)
+        }
       }
     }
 
-    getInitialSession()
+    initializeAuth()
 
-    // Listen for auth changes
+    return () => {
+      mounted = false
+    }
+  }, [fetchUserProfile, supabase.auth])
+
+  // Listen for auth changes
+  useEffect(() => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state changed:", event, session?.user?.email)
+
       setSession(session)
       setUser(session?.user ?? null)
 
@@ -138,25 +163,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null)
       }
 
-      setLoading(false)
+      // Handle navigation based on auth events
+      if (event === "SIGNED_IN" && session && isInitialized) {
+        // Don't redirect if already on a protected page
+        const protectedRoutes = ["/dashboard", "/community", "/vault", "/coins", "/profile"]
+        const isOnProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
 
-      // Handle redirects based on auth state
-      if (event === "SIGNED_IN" && session) {
-        // Get the intended redirect URL from localStorage or default to dashboard
-        const redirectTo = localStorage.getItem("redirectAfterAuth") || "/dashboard"
-        localStorage.removeItem("redirectAfterAuth")
-        router.push(redirectTo)
+        if (!isOnProtectedRoute) {
+          const redirectTo = localStorage.getItem("redirectAfterAuth") || "/dashboard"
+          localStorage.removeItem("redirectAfterAuth")
+          router.push(redirectTo)
+        }
         toast.success("Welcome back!")
-      } else if (event === "SIGNED_OUT") {
-        router.push("/")
+      } else if (event === "SIGNED_OUT" && isInitialized) {
+        // Only redirect to home if on a protected route
+        const protectedRoutes = ["/dashboard", "/community", "/vault", "/coins", "/profile", "/admin"]
+        const isOnProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
+
+        if (isOnProtectedRoute) {
+          router.push("/")
+        }
         toast.success("Signed out successfully")
       }
     })
 
     return () => subscription.unsubscribe()
-  }, [router, supabase.auth])
+  }, [router, pathname, fetchUserProfile, isInitialized, supabase.auth])
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, username?: string) => {
     try {
       setLoading(true)
       const { data, error } = await supabase.auth.signUp({
@@ -164,6 +198,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/dashboard`,
+          data: {
+            username: username || email.split("@")[0],
+          },
         },
       })
 
@@ -173,7 +210,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error }
       }
 
-      toast.success("Account created successfully! Please check your email to verify your account.")
+      if (data.user && !data.session) {
+        toast.success("Account created! Please check your email to verify your account.")
+      } else {
+        toast.success("Account created successfully!")
+      }
+
       return { error: null }
     } catch (error) {
       console.error("Signup error:", error)
@@ -251,7 +293,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     profile,
     loading,
-    isAuthenticated: !!user,
+    isAuthenticated: !!user && !!session,
     signUp,
     signIn,
     signOut,

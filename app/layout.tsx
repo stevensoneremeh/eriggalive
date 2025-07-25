@@ -6,6 +6,8 @@ import { AuthProvider } from "@/contexts/auth-context"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 import { SessionRefresh } from "@/components/session-refresh"
+import { MainNavigation } from "@/components/navigation/main-navigation"
+import { FloatingRadioPlayer } from "@/components/floating-radio-player"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -44,7 +46,9 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
             <SessionRefresh />
-            {children}
+            <MainNavigation />
+            <main className="min-h-screen">{children}</main>
+            <FloatingRadioPlayer />
             <Toaster />
           </AuthProvider>
         </ThemeProvider>

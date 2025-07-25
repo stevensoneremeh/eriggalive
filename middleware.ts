@@ -19,6 +19,9 @@ const protectedRoutes = [
 // Define auth routes that should redirect if already authenticated
 const authRoutes = ["/login", "/signup"]
 
+// Define public routes that don't require authentication
+const publicRoutes = ["/", "/about", "/contact"]
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: {
@@ -91,6 +94,12 @@ export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
     const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
     const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
+    const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(route))
+
+    // Allow access to public routes regardless of auth status
+    if (isPublicRoute && !isProtectedRoute) {
+      return response
+    }
 
     // If user is not authenticated and trying to access protected route
     if (!session && isProtectedRoute) {
@@ -104,6 +113,29 @@ export async function middleware(request: NextRequest) {
       const redirectTo = request.nextUrl.searchParams.get("redirectTo")
       const destination = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/dashboard"
       return NextResponse.redirect(new URL(destination, request.url))
+    }
+
+    // For authenticated users accessing protected routes, ensure session is valid
+    if (session && isProtectedRoute) {
+      try {
+        // Verify the session is still valid
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser()
+
+        if (userError || !user) {
+          // Session is invalid, redirect to login
+          const redirectUrl = new URL("/login", request.url)
+          redirectUrl.searchParams.set("redirectTo", pathname)
+          return NextResponse.redirect(redirectUrl)
+        }
+      } catch (error) {
+        console.error("Error verifying user session:", error)
+        const redirectUrl = new URL("/login", request.url)
+        redirectUrl.searchParams.set("redirectTo", pathname)
+        return NextResponse.redirect(redirectUrl)
+      }
     }
 
     return response
