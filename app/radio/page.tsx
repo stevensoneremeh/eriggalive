@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -132,26 +131,28 @@ export default function RadioPage() {
                   )}
                   onClick={() => handleMoodSelect(mood)}
                 >
-                  <div
-                    className={cn(
-                      "w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center",
-                      isSelected ? "bg-green-500" : "bg-gray-800",
-                    )}
-                  >
-                    <Icon className={cn("h-8 w-8", isSelected ? "text-black" : "text-white")} />
-                  </div>
-
-                  <h3 className={cn("text-xl font-bold mb-2", isSelected ? "text-green-500" : "text-white")}>
-                    {mood.name.toUpperCase()}
-                  </h3>
-
-                  <p className="text-gray-400 text-sm">{mood.description}</p>
-
-                  {isSelected && (
-                    <div className="mt-4">
-                      <Badge className="bg-green-500 text-black font-bold">NOW PLAYING</Badge>
+                  <CardContent className="p-6 text-center">
+                    <div
+                      className={cn(
+                        "w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center",
+                        isSelected ? "bg-green-500" : "bg-gray-800",
+                      )}
+                    >
+                      <Icon className={cn("h-8 w-8", isSelected ? "text-black" : "text-white")} />
                     </div>
-                  )}
+
+                    <h3 className={cn("text-xl font-bold mb-2", isSelected ? "text-green-500" : "text-white")}>
+                      {mood.name.toUpperCase()}
+                    </h3>
+
+                    <p className="text-gray-400 text-sm">{mood.description}</p>
+
+                    {isSelected && (
+                      <div className="mt-4">
+                        <Badge className="bg-green-500 text-black font-bold">NOW PLAYING</Badge>
+                      </div>
+                    )}
+                  </CardContent>
                 </Card>
               )
             })}
