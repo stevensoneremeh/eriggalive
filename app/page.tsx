@@ -2,16 +2,14 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useTheme } from "@/contexts/theme-context"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Music, Video, Newspaper, Users, ShoppingBag, Calendar } from "lucide-react"
+import { Music, Video, Users, ShoppingBag, Calendar, Newspaper } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SafeHeroVideoCarousel } from "@/components/safe-hero-video-carousel"
-import { getOptimizedVideoSources } from "@/utils/video-utils"
 import EriggaRadio from "@/components/erigga-radio"
-import Navigation from "@/components/navigation"
+import { Navigation } from "@/components/navigation"
 
 const featuredContent = [
   {
@@ -75,20 +73,8 @@ const communityStats = [
 ]
 
 export default function HomePage() {
-  const { theme } = useTheme()
   const { user, loading } = useAuth()
-  const [currentSlide, setCurrentSlide] = useState(0)
   const [mounted, setMounted] = useState(false)
-  const videoSources = getOptimizedVideoSources()
-  const primaryVideoUrl = videoSources[0]?.src || "/videos/erigga-hero-video.mp4"
-
-  // Hero images
-  const heroImages = [
-    "/images/hero/erigga1.jpeg",
-    "/images/hero/erigga2.jpeg",
-    "/images/hero/erigga3.jpeg",
-    "/images/hero/erigga4.jpeg",
-  ]
 
   // Features data
   const features = [
@@ -97,42 +83,42 @@ export default function HomePage() {
       description: "Access Erigga's complete discography, music videos, and exclusive content.",
       icon: Music,
       href: "/vault",
-      color: "from-brand-lime to-brand-teal dark:from-white dark:to-harkonnen-gray",
+      color: "from-orange-400 to-red-500",
     },
     {
       title: "Erigga Chronicles",
       description: "Follow Erigga's journey through animated stories and documentaries.",
       icon: Video,
       href: "/chronicles",
-      color: "from-brand-teal to-brand-lime-dark dark:from-harkonnen-gray dark:to-white",
+      color: "from-blue-400 to-purple-500",
     },
     {
       title: "Community",
       description: "Connect with other fans, share content, and participate in discussions.",
       icon: Users,
       href: "/community",
-      color: "from-brand-lime-dark to-brand-teal-light dark:from-white dark:to-harkonnen-light-gray",
+      color: "from-green-400 to-blue-500",
     },
     {
       title: "Merch Store",
       description: "Shop exclusive Erigga merchandise and limited edition items.",
       icon: ShoppingBag,
       href: "/merch",
-      color: "from-brand-teal-light to-brand-lime dark:from-harkonnen-light-gray dark:to-white",
+      color: "from-purple-400 to-pink-500",
     },
     {
       title: "Events & Tickets",
       description: "Get early access to concert tickets and exclusive events.",
       icon: Calendar,
       href: "/tickets",
-      color: "from-brand-lime to-brand-teal-dark dark:from-white dark:to-harkonnen-dark-gray",
+      color: "from-yellow-400 to-orange-500",
     },
     {
       title: "Premium Tiers",
       description: "Upgrade your experience with exclusive perks and content.",
       icon: Newspaper,
       href: "/premium",
-      color: "from-brand-teal-dark to-brand-lime-light dark:from-harkonnen-dark-gray dark:to-white",
+      color: "from-indigo-400 to-purple-500",
     },
   ]
 
@@ -162,8 +148,8 @@ export default function HomePage() {
       price: "Free",
       description: "Basic access to the platform",
       features: ["Community access", "Public content", "Event announcements", "Basic profile"],
-      color: "border-grassroot-primary dark:border-grassroot-primary",
-      bgColor: "bg-grassroot-secondary/20 dark:bg-grassroot-secondary",
+      color: "border-green-500",
+      bgColor: "bg-green-50 dark:bg-green-900/20",
       href: "/signup",
     },
     {
@@ -178,8 +164,8 @@ export default function HomePage() {
         "Discounted merch",
         "Pioneer badge",
       ],
-      color: "border-pioneer-primary dark:border-pioneer-primary",
-      bgColor: "bg-pioneer-secondary/20 dark:bg-pioneer-secondary",
+      color: "border-blue-500",
+      bgColor: "bg-blue-50 dark:bg-blue-900/20",
       href: "/premium",
       popular: true,
     },
@@ -196,8 +182,8 @@ export default function HomePage() {
         "Monthly Erigga coins",
         "Elder badge",
       ],
-      color: "border-elder-primary dark:border-elder-primary",
-      bgColor: "bg-elder-secondary/20 dark:bg-elder-secondary",
+      color: "border-purple-500",
+      bgColor: "bg-purple-50 dark:bg-purple-900/20",
       href: "/premium",
     },
     {
@@ -213,71 +199,34 @@ export default function HomePage() {
         "Blood Brotherhood badge",
         "Voting rights on new content",
       ],
-      color: "border-blood-primary dark:border-blood-primary",
-      bgColor: "bg-blood-secondary/20 dark:bg-blood-secondary",
+      color: "border-red-500",
+      bgColor: "bg-red-50 dark:bg-red-900/20",
       href: "/premium",
     },
   ]
 
-  // Auto-advance carousel
   useEffect(() => {
     setMounted(true)
-    const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % heroImages.length)
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [heroImages.length])
+  }, [])
 
   if (!mounted) {
-    return null
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="animate-pulse">
+          <div className="h-screen bg-muted" />
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
+
       <main>
-        <SafeHeroVideoCarousel images={heroImages} videoUrl={primaryVideoUrl} />
         {/* Hero Section */}
-        <section className="relative h-[80vh] w-full">
-          <div className="absolute inset-0 flex items-center justify-center z-10">
-            <div className="text-center max-w-3xl px-4">
-              <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 drop-shadow-lg">
-                Welcome to the Official Erigga Platform
-              </h1>
-              <p className="text-xl md:text-2xl text-white/90 mb-8 drop-shadow-md">
-                Join the community and get exclusive access to music, videos, and events
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/signup" className="inline-block">
-                  <div
-                    className={cn(
-                      "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
-                      "transform hover:scale-105 hover:shadow-xl",
-                      theme === "dark"
-                        ? "bg-white text-harkonnen-black hover:bg-gray-200"
-                        : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
-                    )}
-                  >
-                    Join Now
-                  </div>
-                </Link>
-                <Link href="/vault" className="inline-block">
-                  <div
-                    className={cn(
-                      "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
-                      "transform hover:scale-105 hover:shadow-xl",
-                      theme === "dark"
-                        ? "bg-transparent border-2 border-white text-white hover:bg-white/10"
-                        : "bg-brand-teal text-white hover:bg-brand-teal-dark",
-                    )}
-                  >
-                    Explore Content
-                  </div>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </section>
+        <SafeHeroVideoCarousel />
 
         {/* Rest of the home page content */}
         <section className="py-12 px-4 bg-gray-50 dark:bg-gray-900">
@@ -334,12 +283,7 @@ export default function HomePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {features.map((feature, index) => (
                 <Link key={index} href={feature.href}>
-                  <Card
-                    className={cn(
-                      "h-full transition-all duration-300 hover:scale-105 overflow-hidden",
-                      theme === "dark" ? "harkonnen-card" : "border border-gray-200",
-                    )}
-                  >
+                  <Card className="h-full transition-all duration-300 hover:scale-105 overflow-hidden border border-gray-200 dark:border-gray-800">
                     <CardContent className="p-6 flex flex-col h-full">
                       <div
                         className={cn(
@@ -347,11 +291,11 @@ export default function HomePage() {
                           feature.color,
                         )}
                       >
-                        <feature.icon className={cn("h-6 w-6", theme === "dark" ? "text-black" : "text-white")} />
+                        <feature.icon className="h-6 w-6 text-white" />
                       </div>
                       <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
                       <p className="text-muted-foreground flex-grow">{feature.description}</p>
-                      <div className="mt-4 flex items-center text-sm font-medium text-brand-teal dark:text-white">
+                      <div className="mt-4 flex items-center text-sm font-medium text-primary">
                         Learn more
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -383,10 +327,7 @@ export default function HomePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {testimonials.map((testimonial, index) => (
-                <Card
-                  key={index}
-                  className={cn("h-full", theme === "dark" ? "harkonnen-card" : "border border-gray-200")}
-                >
+                <Card key={index} className="h-full border border-gray-200 dark:border-gray-800">
                   <CardContent className="p-6 flex flex-col h-full">
                     <div className="mb-4">
                       {[...Array(5)].map((_, i) => (
@@ -427,7 +368,7 @@ export default function HomePage() {
                 <div key={index} className="relative">
                   {plan.popular && (
                     <div className="absolute -top-4 left-0 right-0 flex justify-center">
-                      <span className="bg-brand-lime text-brand-teal dark:bg-white dark:text-black px-3 py-1 rounded-full text-sm font-medium">
+                      <span className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm font-medium">
                         Most Popular
                       </span>
                     </div>
@@ -437,7 +378,6 @@ export default function HomePage() {
                       "h-full border-2 transition-all duration-300",
                       plan.color,
                       plan.popular ? "transform scale-105" : "",
-                      theme === "dark" ? "harkonnen-card" : "",
                     )}
                   >
                     <CardContent className={cn("p-6", plan.bgColor)}>
@@ -456,30 +396,13 @@ export default function HomePage() {
                               stroke="currentColor"
                               viewBox="0 0 24 24"
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M5 13l4 4L19 7"
-                              ></path>
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                             </svg>
                             <span>{feature}</span>
                           </li>
                         ))}
                       </ul>
-                      <Button
-                        className={cn(
-                          "w-full",
-                          plan.name === "Grassroot"
-                            ? "bg-grassroot-primary text-white hover:bg-opacity-90"
-                            : plan.name === "Pioneer"
-                              ? "bg-pioneer-primary text-white hover:bg-opacity-90"
-                              : plan.name === "Elder"
-                                ? "bg-elder-primary text-white hover:bg-opacity-90"
-                                : "bg-blood-primary text-white hover:bg-opacity-90",
-                        )}
-                        asChild
-                      >
+                      <Button className="w-full" asChild>
                         <Link href={plan.href}>{plan.name === "Grassroot" ? "Sign Up Free" : "Subscribe Now"}</Link>
                       </Button>
                     </CardContent>
@@ -491,28 +414,19 @@ export default function HomePage() {
         </section>
 
         {/* CTA Section */}
-        <section className="py-20 bg-brand-teal dark:bg-harkonnen-black text-white">
+        <section className="py-20 bg-primary text-primary-foreground">
           <div className="container mx-auto px-4 text-center">
             <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Join the Movement?</h2>
-            <p className="text-lg max-w-2xl mx-auto mb-8 text-white/80">
+            <p className="text-lg max-w-2xl mx-auto mb-8 opacity-90">
               Get access to exclusive content, connect with other fans, and be part of Erigga's journey.
             </p>
-            <Link href="/signup" className="inline-block">
-              <div
-                className={cn(
-                  "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
-                  "transform hover:scale-105 hover:shadow-xl",
-                  theme === "dark"
-                    ? "bg-white text-harkonnen-black hover:bg-gray-200"
-                    : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
-                )}
-              >
-                Join Now
-              </div>
-            </Link>
+            <Button size="lg" variant="secondary" asChild>
+              <Link href="/signup">Join Now</Link>
+            </Button>
           </div>
         </section>
       </main>
+
       <EriggaRadio />
     </div>
   )

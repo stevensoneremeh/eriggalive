@@ -54,7 +54,16 @@ export function Navigation() {
   }
 
   if (!mounted) {
-    return null
+    return (
+      <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-4">
+          <div className="flex h-16 items-center justify-between">
+            <div className="h-8 w-32 bg-muted animate-pulse rounded" />
+            <div className="h-8 w-8 bg-muted animate-pulse rounded-full" />
+          </div>
+        </div>
+      </nav>
+    )
   }
 
   return (
@@ -94,7 +103,7 @@ export function Navigation() {
             ) : user && profile ? (
               <div className="flex items-center space-x-3">
                 {/* Coin Balance */}
-                <CoinBalance balance={profile.coins_balance} />
+                <CoinBalance balance={profile.coins_balance || 0} />
 
                 {/* User Menu */}
                 <DropdownMenu>
@@ -184,20 +193,18 @@ export function Navigation() {
                   ))}
 
                   {!user && (
-                    <>
-                      <div className="border-t pt-4 space-y-2">
-                        <Button variant="outline" className="w-full bg-transparent" asChild>
-                          <Link href="/login" onClick={() => setIsOpen(false)}>
-                            Sign in
-                          </Link>
-                        </Button>
-                        <Button className="w-full" asChild>
-                          <Link href="/signup" onClick={() => setIsOpen(false)}>
-                            Sign up
-                          </Link>
-                        </Button>
-                      </div>
-                    </>
+                    <div className="border-t pt-4 space-y-2">
+                      <Button variant="outline" className="w-full bg-transparent" asChild>
+                        <Link href="/login" onClick={() => setIsOpen(false)}>
+                          Sign in
+                        </Link>
+                      </Button>
+                      <Button className="w-full" asChild>
+                        <Link href="/signup" onClick={() => setIsOpen(false)}>
+                          Sign up
+                        </Link>
+                      </Button>
+                    </div>
                   )}
                 </div>
               </SheetContent>

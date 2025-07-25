@@ -21,7 +21,7 @@ const radioStations: RadioStation[] = [
   {
     id: "erigga-live",
     name: "Erigga Live Radio",
-    url: "https://stream.zeno.fm/your-stream-url", // Replace with actual stream URL
+    url: "https://stream.zeno.fm/your-stream-url",
     genre: "Hip Hop",
     description: "24/7 Erigga hits and Nigerian hip hop",
     image: "/images/radio-man.gif",
@@ -29,14 +29,14 @@ const radioStations: RadioStation[] = [
   {
     id: "naija-hits",
     name: "Naija Hits",
-    url: "https://stream.zeno.fm/naija-hits", // Replace with actual stream URL
+    url: "https://stream.zeno.fm/naija-hits",
     genre: "Afrobeats",
     description: "Latest Nigerian hits",
     image: "/placeholder.jpg",
   },
 ]
 
-export function EriggaRadio() {
+export default function EriggaRadio() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [volume, setVolume] = useState([70])
@@ -146,14 +146,12 @@ export function EriggaRadio() {
           } bg-background/95 backdrop-blur-sm border shadow-lg`}
         >
           {isMinimized ? (
-            /* Minimized View */
             <div className="p-4 flex items-center justify-center">
               <Button variant="ghost" size="icon" onClick={() => setIsMinimized(false)} className="h-8 w-8">
                 <Radio className="h-4 w-4" />
               </Button>
             </div>
           ) : (
-            /* Expanded View */
             <div className="p-4 space-y-4">
               {/* Header */}
               <div className="flex items-center justify-between">
