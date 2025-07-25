@@ -2,24 +2,39 @@
 
 import { useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
+import { createClient } from "@/lib/supabase/client"
 
 export function SessionRefresh() {
-  const { refreshSession } = useAuth()
+  const { isAuthenticated, refreshProfile } = useAuth()
+  const supabase = createClient()
 
   useEffect(() => {
-    // Refresh session on mount
-    refreshSession()
+    if (!isAuthenticated) return
 
-    // Set up periodic session refresh (every 30 minutes)
+    // Set up an interval to refresh the session every 10 minutes
     const interval = setInterval(
-      () => {
-        refreshSession()
+      async () => {
+        try {
+          // Refresh the session
+          const { error } = await supabase.auth.refreshSession()
+          if (error) {
+            console.error("Error refreshing session:", error)
+          } else {
+            // If session refresh was successful, also refresh the user profile
+            await refreshProfile()
+          }
+        } catch (err) {
+          console.error("Error in session refresh:", err)
+        }
       },
-      30 * 60 * 1000,
-    )
+      10 * 60 * 1000,
+    ) // 10 minutes
 
     return () => clearInterval(interval)
-  }, [refreshSession])
+  }, [isAuthenticated, refreshProfile, supabase])
 
+  // This component doesn't render anything
   return null
 }
+
+export default SessionRefresh

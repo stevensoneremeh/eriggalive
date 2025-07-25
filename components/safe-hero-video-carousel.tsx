@@ -1,265 +1,259 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import Image from "next/image"
-import { ChevronLeft, ChevronRight } from "lucide-react"
-import { cn } from "@/lib/utils"
 
-interface SafeHeroVideoCarouselProps {
-  images: string[]
-  videoUrl?: string
-  autoScrollInterval?: number
-  className?: string
+interface MediaItem {
+  id: number
+  type: "video" | "image"
+  src: string
+  title: string
+  description: string
+  category: string
 }
 
-export function SafeHeroVideoCarousel({
-  images,
-  videoUrl,
-  autoScrollInterval = 5000,
-  className,
-}: SafeHeroVideoCarouselProps) {
+const mediaItems: MediaItem[] = [
+  {
+    id: 1,
+    type: "image",
+    src: "/images/hero/erigga1.jpeg",
+    title: "Welcome to Erigga Live",
+    description: "Join the official fan community and connect with fellow fans worldwide",
+    category: "Community",
+  },
+  {
+    id: 2,
+    type: "image",
+    src: "/images/hero/erigga2.jpeg",
+    title: "Exclusive Content",
+    description: "Access behind-the-scenes content, unreleased tracks, and exclusive interviews",
+    category: "Exclusive",
+  },
+  {
+    id: 3,
+    type: "image",
+    src: "/images/hero/erigga3.jpeg",
+    title: "Live Events",
+    description: "Get priority access to concerts, meet & greets, and virtual events",
+    category: "Events",
+  },
+  {
+    id: 4,
+    type: "image",
+    src: "/images/hero/erigga4.jpeg",
+    title: "Fan Community",
+    description: "Connect with other fans, share your thoughts, and be part of the movement",
+    category: "Social",
+  },
+]
+
+export function SafeHeroVideoCarousel() {
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [isTransitioning, setIsTransitioning] = useState(false)
-  const [videoEnded, setVideoEnded] = useState(false)
-  const [videoError, setVideoError] = useState(false)
-  const [videoLoaded, setVideoLoaded] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isMuted, setIsMuted] = useState(true)
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Ensure we have images to work with
-  const safeImages = images && images.length > 0 ? images : ["/placeholder.svg"]
-  const totalSlides = safeImages.length + (videoUrl ? 1 : 0)
+  const currentItem = mediaItems[currentIndex]
 
-  // Handle video loading and events
+  // Auto-advance slides
   useEffect(() => {
-    if (!videoUrl) return
-
-    const video = videoRef.current
-    if (!video) return
-
-    const handleVideoEnd = () => {
-      console.log("✅ Video ended, moving to images")
-      setVideoEnded(true)
-      setCurrentIndex(1) // Move to first image
+    if (isAutoPlaying) {
+      intervalRef.current = setInterval(() => {
+        setCurrentIndex((prev) => (prev + 1) % mediaItems.length)
+      }, 5000)
     }
-
-    const handleError = (e: any) => {
-      console.error("❌ Video error:", e)
-      setVideoError(true)
-      setCurrentIndex(1) // Move to first image on error
-    }
-
-    const handleCanPlay = () => {
-      console.log("✅ Video can play")
-      setVideoLoaded(true)
-      playVideo()
-    }
-
-    // Set up event listeners with error handling
-    try {
-      video.addEventListener("ended", handleVideoEnd)
-      video.addEventListener("error", handleError)
-      video.addEventListener("canplay", handleCanPlay)
-    } catch (err) {
-      console.error("❌ Error setting up video event listeners:", err)
-      setVideoError(true)
-    }
-
-    // Set a timeout to check if video is playing
-    const timeout = setTimeout(() => {
-      if (video.paused && !videoEnded && !videoLoaded) {
-        console.log("⚠️ Video still paused after timeout, showing images instead")
-        setVideoError(true)
-        setCurrentIndex(1)
-      }
-    }, 3000)
 
     return () => {
-      try {
-        clearTimeout(timeout)
-        video.removeEventListener("ended", handleVideoEnd)
-        video.removeEventListener("error", handleError)
-        video.removeEventListener("canplay", handleCanPlay)
-      } catch (err) {
-        console.error("❌ Error cleaning up video event listeners:", err)
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
       }
     }
-  }, [videoEnded, videoLoaded, videoUrl])
+  }, [isAutoPlaying])
 
-  // Function to safely attempt to play the video
-  const playVideo = () => {
-    if (!videoRef.current) return
+  // Handle video play/pause
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || currentItem.type !== "video") return
 
-    // Always mute before attempting to play (to avoid autoplay restrictions)
-    videoRef.current.muted = true
+    if (isPlaying) {
+      video.play().catch(console.error)
+    } else {
+      video.pause()
+    }
+  }, [isPlaying, currentItem.type])
 
-    // Attempt to play with error handling
-    videoRef.current
-      .play()
-      .then(() => {
-        console.log("✅ Video playing")
-      })
-      .catch((err) => {
-        console.error("❌ Video play failed:", err)
-        setVideoError(true)
-        setCurrentIndex(1)
-      })
+  // Handle video mute/unmute
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    video.muted = isMuted
+  }, [isMuted])
+
+  const goToSlide = (index: number) => {
+    setCurrentIndex(index)
+    setIsAutoPlaying(false)
+    // Resume auto-play after 10 seconds
+    setTimeout(() => setIsAutoPlaying(true), 10000)
   }
 
-  // Auto scroll functionality - only for image slides
-  useEffect(() => {
-    // Don't auto-scroll if on video slide (index 0) and video hasn't ended
-    if (currentIndex === 0 && !videoEnded && !videoError && videoUrl) return
-
-    const interval = setInterval(() => {
-      goToNext()
-    }, autoScrollInterval)
-
-    return () => clearInterval(interval)
-  }, [currentIndex, autoScrollInterval, videoEnded, videoError, videoUrl])
-
   const goToPrevious = () => {
-    if (isTransitioning) return
-    setIsTransitioning(true)
-
-    // Skip video slide if it has ended or had an error
-    if (currentIndex === 1 && (videoEnded || videoError)) {
-      setCurrentIndex(totalSlides - 1)
-    } else {
-      setCurrentIndex((prevIndex) => (prevIndex === 0 ? totalSlides - 1 : prevIndex - 1))
-    }
-
-    setTimeout(() => setIsTransitioning(false), 500)
+    setCurrentIndex((prev) => (prev - 1 + mediaItems.length) % mediaItems.length)
+    setIsAutoPlaying(false)
+    setTimeout(() => setIsAutoPlaying(true), 10000)
   }
 
   const goToNext = () => {
-    if (isTransitioning) return
-    setIsTransitioning(true)
-    setCurrentIndex((prevIndex) => (prevIndex === totalSlides - 1 ? (videoEnded || videoError ? 1 : 0) : prevIndex + 1))
-    setTimeout(() => setIsTransitioning(false), 500)
+    setCurrentIndex((prev) => (prev + 1) % mediaItems.length)
+    setIsAutoPlaying(false)
+    setTimeout(() => setIsAutoPlaying(true), 10000)
   }
 
-  const goToSlide = (index: number) => {
-    if (isTransitioning) return
-
-    // Skip video slide if it has ended or had an error
-    if (index === 0 && (videoEnded || videoError)) {
-      return
+  const togglePlayPause = () => {
+    if (currentItem.type === "video") {
+      setIsPlaying(!isPlaying)
     }
+  }
 
-    setIsTransitioning(true)
-    setCurrentIndex(index)
-    setTimeout(() => setIsTransitioning(false), 500)
+  const toggleMute = () => {
+    setIsMuted(!isMuted)
   }
 
   return (
-    <div className={cn("absolute inset-0 w-full h-full", className)}>
-      {/* Video Slide - only render if videoUrl exists */}
-      {videoUrl && (
-        <div
-          className={cn(
-            "absolute inset-0 w-full h-full transition-opacity duration-1000",
-            currentIndex === 0 ? "opacity-100 z-10" : "opacity-0 z-0",
-          )}
-        >
+    <section className="relative h-screen w-full overflow-hidden">
+      {/* Media Container */}
+      <div className="absolute inset-0">
+        {currentItem.type === "video" ? (
           <video
             ref={videoRef}
-            playsInline
-            muted
+            className="h-full w-full object-cover"
+            src={currentItem.src}
+            muted={isMuted}
             loop
-            className="absolute inset-0 w-full h-full object-cover"
-            poster={safeImages[0]}
-          >
-            <source src={videoUrl} type="video/mp4" />
-            <source src={videoUrl} type="video/webm" />
-            Your browser does not support the video tag.
-          </video>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
-        </div>
-      )}
+            playsInline
+            onLoadedData={() => {
+              if (isPlaying) {
+                videoRef.current?.play().catch(console.error)
+              }
+            }}
+          />
+        ) : (
+          <div className="relative h-full w-full">
+            <Image
+              src={currentItem.src || "/placeholder.svg"}
+              alt={currentItem.title}
+              fill
+              className="object-cover"
+              priority={currentIndex === 0}
+              sizes="100vw"
+            />
+          </div>
+        )}
+      </div>
 
-      {/* Image Slides */}
-      {safeImages.map((image, index) => {
-        // Adjust index for image slides
-        const slideIndex = videoUrl ? index + 1 : index
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/40" />
 
-        return (
-          <div
-            key={index}
-            className={cn(
-              "absolute inset-0 w-full h-full transition-opacity duration-1000",
-              currentIndex === slideIndex ? "opacity-100 z-10" : "opacity-0 z-0",
-            )}
-          >
-            <div className="relative w-full h-full">
-              <Image
-                src={image || "/placeholder.svg"}
-                alt={`Hero image ${index + 1}`}
-                fill
-                priority={index === 0}
-                className="object-cover object-center"
-                sizes="100vw"
-                quality={90}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
+      {/* Content */}
+      <div className="relative z-10 flex h-full items-center justify-center">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto text-center text-white">
+            <Badge variant="secondary" className="mb-4 bg-white/20 text-white border-white/30">
+              {currentItem.category}
+            </Badge>
+            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">{currentItem.title}</h1>
+            <p className="text-lg md:text-xl lg:text-2xl mb-8 text-white/90 max-w-2xl mx-auto">
+              {currentItem.description}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button size="lg" className="bg-white text-black hover:bg-white/90">
+                Join Community
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-white text-white hover:bg-white hover:text-black bg-transparent"
+              >
+                Explore Content
+              </Button>
             </div>
           </div>
-        )
-      })}
+        </div>
+      </div>
 
-      {/* Navigation arrows - only show if we have multiple slides */}
-      {totalSlides > 1 && (
-        <>
-          <button
-            onClick={goToPrevious}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full backdrop-blur-sm transition-all"
-            aria-label="Previous slide"
+      {/* Navigation Controls */}
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 z-20">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={goToPrevious}
+          className="h-12 w-12 rounded-full bg-black/20 text-white hover:bg-black/40 backdrop-blur-sm"
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </Button>
+      </div>
+
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={goToNext}
+          className="h-12 w-12 rounded-full bg-black/20 text-white hover:bg-black/40 backdrop-blur-sm"
+        >
+          <ChevronRight className="h-6 w-6" />
+        </Button>
+      </div>
+
+      {/* Video Controls */}
+      {currentItem.type === "video" && (
+        <div className="absolute bottom-20 left-4 z-20 flex gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={togglePlayPause}
+            className="h-10 w-10 rounded-full bg-black/20 text-white hover:bg-black/40 backdrop-blur-sm"
           >
-            <ChevronLeft className="h-6 w-6" />
-          </button>
-          <button
-            onClick={goToNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full backdrop-blur-sm transition-all"
-            aria-label="Next slide"
+            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleMute}
+            className="h-10 w-10 rounded-full bg-black/20 text-white hover:bg-black/40 backdrop-blur-sm"
           >
-            <ChevronRight className="h-6 w-6" />
-          </button>
-        </>
-      )}
-
-      {/* Indicators - only show if we have multiple slides */}
-      {totalSlides > 1 && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex space-x-2">
-          {/* Video indicator */}
-          {videoUrl && !videoEnded && !videoError && (
-            <button
-              onClick={() => goToSlide(0)}
-              className={cn(
-                "transition-all rounded-full flex items-center justify-center",
-                currentIndex === 0 ? "bg-white w-8 h-2" : "bg-white/50 hover:bg-white/80 w-2 h-2",
-              )}
-              aria-label="Video slide"
-            >
-              {currentIndex === 0 && <div className="w-1/2 h-full bg-orange-500 animate-pulse rounded-full" />}
-            </button>
-          )}
-
-          {/* Image indicators */}
-          {safeImages.map((_, index) => {
-            const slideIndex = videoUrl ? index + 1 : index
-            return (
-              <button
-                key={index}
-                onClick={() => goToSlide(slideIndex)}
-                className={cn(
-                  "w-2 h-2 rounded-full transition-all",
-                  currentIndex === slideIndex ? "bg-white w-6" : "bg-white/50 hover:bg-white/80",
-                )}
-                aria-label={`Go to image ${index + 1}`}
-              />
-            )
-          })}
+            {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </Button>
         </div>
       )}
-    </div>
+
+      {/* Slide Indicators */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20">
+        <div className="flex gap-2">
+          {mediaItems.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => goToSlide(index)}
+              className={`h-2 w-8 rounded-full transition-all duration-300 ${
+                index === currentIndex ? "bg-white" : "bg-white/40 hover:bg-white/60"
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20 z-20">
+        <div
+          className="h-full bg-white transition-all duration-300 ease-linear"
+          style={{
+            width: `${((currentIndex + 1) / mediaItems.length) * 100}%`,
+          }}
+        />
+      </div>
+    </section>
   )
 }

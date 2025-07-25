@@ -7,14 +7,39 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
+interface UserProfile {
+  id: number
+  auth_user_id: string
+  username: string
+  full_name?: string
+  email: string
+  tier: string
+  coins_balance: number
+  avatar_url?: string
+  level: number
+  points: number
+  reputation_score: number
+  role: string
+  is_active: boolean
+  is_verified: boolean
+  is_banned: boolean
+  last_seen?: string
+  created_at: string
+  updated_at: string
+}
+
 interface AuthContextType {
   user: User | null
   session: Session | null
+  profile: UserProfile | null
   loading: boolean
+  isAuthenticated: boolean
   signUp: (email: string, password: string) => Promise<{ error: any }>
   signIn: (email: string, password: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error: any }>
+  refreshSession: () => Promise<void>
+  refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -22,9 +47,52 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const supabase = createClient()
+
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
+
+      if (error) {
+        console.error("Error fetching user profile:", error)
+        return null
+      }
+
+      return data as UserProfile
+    } catch (error) {
+      console.error("Error in fetchUserProfile:", error)
+      return null
+    }
+  }
+
+  const refreshProfile = async () => {
+    if (!user?.id) return
+
+    try {
+      const profileData = await fetchUserProfile(user.id)
+      setProfile(profileData)
+    } catch (error) {
+      console.error("Error refreshing profile:", error)
+    }
+  }
+
+  const refreshSession = async () => {
+    try {
+      const { data, error } = await supabase.auth.refreshSession()
+      if (error) {
+        console.error("Error refreshing session:", error)
+      } else if (data.session) {
+        setSession(data.session)
+        setUser(data.session.user)
+        await refreshProfile()
+      }
+    } catch (error) {
+      console.error("Error in refreshSession:", error)
+    }
+  }
 
   useEffect(() => {
     // Get initial session
@@ -41,6 +109,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setSession(session)
         setUser(session?.user ?? null)
+
+        if (session?.user) {
+          const profileData = await fetchUserProfile(session.user.id)
+          setProfile(profileData)
+        }
       } catch (error) {
         console.error("Error in getInitialSession:", error)
       } finally {
@@ -57,6 +130,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Auth state changed:", event, session?.user?.email)
       setSession(session)
       setUser(session?.user ?? null)
+
+      if (session?.user) {
+        const profileData = await fetchUserProfile(session.user.id)
+        setProfile(profileData)
+      } else {
+        setProfile(null)
+      }
+
       setLoading(false)
 
       // Handle redirects based on auth state
@@ -168,11 +249,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = {
     user,
     session,
+    profile,
     loading,
+    isAuthenticated: !!user,
     signUp,
     signIn,
     signOut,
     resetPassword,
+    refreshSession,
+    refreshProfile,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
