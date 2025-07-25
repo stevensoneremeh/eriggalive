@@ -1,18 +1,15 @@
 "use client"
 
+import { useTheme } from "next-themes"
 import Image from "next/image"
 import { useEffect, useState } from "react"
-import { useTheme } from "next-themes"
-import { cn } from "@/lib/utils"
 
 interface DynamicLogoProps {
-  width?: number
-  height?: number
   className?: string
 }
 
-export function DynamicLogo({ width = 120, height = 32, className }: DynamicLogoProps) {
-  const { resolvedTheme } = useTheme()
+export function DynamicLogo({ className = "h-10 md:h-12 lg:h-14 w-auto" }: DynamicLogoProps) {
+  const { theme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -20,27 +17,19 @@ export function DynamicLogo({ width = 120, height = 32, className }: DynamicLogo
   }, [])
 
   if (!mounted) {
-    return <div className={cn("bg-muted animate-pulse rounded", className)} style={{ width, height }} />
+    return <div className={`${className} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} />
   }
 
-  const logoSrc = resolvedTheme === "dark" ? "/images/loggotrans-dark.png" : "/images/loggotrans-light.png"
+  const isDark = resolvedTheme === "dark"
 
   return (
     <Image
-      src={logoSrc || "/placeholder.svg"}
-      alt="Erigga"
-      width={width}
-      height={height}
-      className={cn("object-contain", className)}
+      src={isDark ? "/images/loggotrans-dark.png" : "/images/loggotrans-light.png"}
+      alt="Erigga Live"
+      width={120}
+      height={48}
+      className={className}
       priority
-      onError={(e) => {
-        console.error("Logo failed to load:", e)
-        // Fallback to text logo
-        e.currentTarget.style.display = "none"
-        if (e.currentTarget.nextSibling) {
-          e.currentTarget.nextSibling.style.display = "block"
-        }
-      }}
     />
   )
 }
