@@ -59,22 +59,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Protected routes that require authentication
-  const protectedRoutes = [
-    "/dashboard",
-    "/profile",
-    "/vault",
-    "/meet-greet",
-    "/coins",
-    "/community",
-    "/admin",
-    "/chat",
-    "/rooms",
-    "/tickets",
-    "/premium",
-    "/chronicles",
-    "/radio",
-    "/merch",
-  ]
+  const protectedRoutes = ["/dashboard", "/profile", "/vault", "/meet-greet", "/coins", "/community", "/admin"]
 
   // Admin-only routes
   const adminRoutes = ["/admin"]
@@ -94,12 +79,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
-  // Check admin access for admin routes
+  // Check admin access
   if (isAdminRoute && user) {
     try {
-      const { data: profile } = await supabase.from("users").select("tier").eq("auth_user_id", user.id).single()
+      const { data: profile } = await supabase.from("user_profiles").select("tier").eq("id", user.id).single()
 
-      if (!profile || !["admin", "mod"].includes(profile.tier?.toLowerCase())) {
+      if (!profile || profile.tier !== "admin") {
         return NextResponse.redirect(new URL("/dashboard", request.url))
       }
     } catch (error) {
@@ -110,8 +95,7 @@ export async function middleware(request: NextRequest) {
 
   // Redirect authenticated users away from auth pages
   if (user && (pathname === "/login" || pathname === "/signup")) {
-    const redirectTo = request.nextUrl.searchParams.get("redirectTo")
-    return NextResponse.redirect(new URL(redirectTo || "/dashboard", request.url))
+    return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
   return response
