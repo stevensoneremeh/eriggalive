@@ -36,7 +36,7 @@ const radioStations: RadioStation[] = [
   },
 ]
 
-export function EriggaRadio() {
+export default function EriggaRadio() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [volume, setVolume] = useState([70])

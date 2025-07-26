@@ -1,252 +1,197 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import { Play, Pause, Volume2, VolumeX, Radio, Minimize2 } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
-import Image from "next/image"
+import {
+  Play,
+  Pause,
+  X,
+  Minimize2,
+  Maximize2,
+  Volume2,
+  Radio,
+  Heart,
+  Zap,
+  Target,
+  Eye,
+  Briefcase,
+  MapPin,
+} from "lucide-react"
+import { useRadio } from "@/contexts/radio-context"
+import { cn } from "@/lib/utils"
 
-interface RadioStation {
-  id: string
-  name: string
-  url: string
-  genre: string
-  description: string
-  image: string
+const MOOD_ICONS = {
+  hustle: Briefcase,
+  street: MapPin,
+  love: Heart,
+  pain: Target,
+  victory: Zap,
+  reality: Eye,
 }
 
-const radioStations: RadioStation[] = [
-  {
-    id: "erigga-live",
-    name: "Erigga Live Radio",
-    url: "https://stream.zeno.fm/your-stream-url",
-    genre: "Hip Hop",
-    description: "24/7 Erigga hits and Nigerian hip hop",
-    image: "/images/radio-man.gif",
-  },
-  {
-    id: "naija-hits",
-    name: "Naija Hits",
-    url: "https://stream.zeno.fm/naija-hits",
-    genre: "Afrobeats",
-    description: "Latest Nigerian hits",
-    image: "/placeholder.jpg",
-  },
-]
+const MOOD_COLORS = {
+  hustle: "from-green-500 to-emerald-600",
+  street: "from-red-500 to-orange-600",
+  love: "from-pink-500 to-rose-600",
+  pain: "from-purple-500 to-indigo-600",
+  victory: "from-yellow-500 to-amber-600",
+  reality: "from-blue-500 to-cyan-600",
+}
+
+const MOOD_EMBEDS = {
+  hustle: "https://open.spotify.com/embed/playlist/37i9dQZF1DZ06evO1P96bA?utm_source=generator&theme=0",
+  street: "https://open.spotify.com/embed/playlist/37i9dQZF1DZ06evO1P96bA?utm_source=generator&theme=0",
+  love: "https://open.spotify.com/embed/playlist/37i9dQZF1DZ06evO1P96bA?utm_source=generator&theme=0",
+  pain: "https://open.spotify.com/embed/playlist/37i9dQZF1DZ06evO1P96bA?utm_source=generator&theme=0",
+  victory: "https://open.spotify.com/embed/playlist/37i9dQZF1DZ06evO1P96bA?utm_source=generator&theme=0",
+  reality: "https://open.spotify.com/embed/playlist/37i9dQZF1DZ06evO1P96bA?utm_source=generator&theme=0",
+}
 
 export function FloatingRadioPlayer() {
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [isMuted, setIsMuted] = useState(false)
-  const [volume, setVolume] = useState([70])
-  const [currentStation, setCurrentStation] = useState(radioStations[0])
-  const [isMinimized, setIsMinimized] = useState(true)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const audioRef = useRef<HTMLAudioElement>(null)
+  const { currentMood, isPlaying, setIsPlaying, isMinimized, setIsMinimized, setCurrentMood } = useRadio()
 
+  const [isVisible, setIsVisible] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [position, setPosition] = useState({ x: 20, y: 20 })
+
+  // Show player when music is playing
   useEffect(() => {
-    const audio = audioRef.current
-    if (!audio) return
+    setIsVisible(currentMood !== null && isPlaying)
+  }, [currentMood, isPlaying])
 
-    audio.volume = volume[0] / 100
+  // Don't render if not visible
+  if (!isVisible || !currentMood) return null
 
-    const handleLoadStart = () => setIsLoading(true)
-    const handleCanPlay = () => {
-      setIsLoading(false)
-      setError(null)
-    }
-    const handleError = () => {
-      setIsLoading(false)
-      setError("Failed to load radio stream")
-      setIsPlaying(false)
-    }
+  const MoodIcon = MOOD_ICONS[currentMood as keyof typeof MOOD_ICONS] || Radio
+  const moodColor = MOOD_COLORS[currentMood as keyof typeof MOOD_COLORS] || "from-green-500 to-emerald-600"
+  const embedUrl = MOOD_EMBEDS[currentMood as keyof typeof MOOD_EMBEDS]
 
-    audio.addEventListener("loadstart", handleLoadStart)
-    audio.addEventListener("canplay", handleCanPlay)
-    audio.addEventListener("error", handleError)
-
-    return () => {
-      audio.removeEventListener("loadstart", handleLoadStart)
-      audio.removeEventListener("canplay", handleCanPlay)
-      audio.removeEventListener("error", handleError)
-    }
-  }, [volume])
-
-  const togglePlay = async () => {
-    const audio = audioRef.current
-    if (!audio) return
-
-    try {
-      if (isPlaying) {
-        audio.pause()
-        setIsPlaying(false)
-      } else {
-        setIsLoading(true)
-        await audio.play()
-        setIsPlaying(true)
-        setIsLoading(false)
-      }
-    } catch (err) {
-      console.error("Error playing audio:", err)
-      setError("Failed to play radio stream")
-      setIsPlaying(false)
-      setIsLoading(false)
-    }
+  const handleClose = () => {
+    setIsPlaying(false)
+    setCurrentMood(null)
+    setIsVisible(false)
   }
 
-  const toggleMute = () => {
-    const audio = audioRef.current
-    if (!audio) return
-
-    audio.muted = !isMuted
-    setIsMuted(!isMuted)
-  }
-
-  const handleVolumeChange = (newVolume: number[]) => {
-    setVolume(newVolume)
-    const audio = audioRef.current
-    if (audio) {
-      audio.volume = newVolume[0] / 100
-    }
-  }
-
-  const changeStation = (station: RadioStation) => {
-    const audio = audioRef.current
-    if (!audio) return
-
-    const wasPlaying = isPlaying
-
-    if (isPlaying) {
-      audio.pause()
-      setIsPlaying(false)
-    }
-
-    setCurrentStation(station)
-    audio.src = station.url
-
-    if (wasPlaying) {
-      setTimeout(() => {
-        togglePlay()
-      }, 500)
-    }
+  const handleMinimize = () => {
+    setIsMinimized(!isMinimized)
   }
 
   return (
-    <>
-      {/* Audio Element */}
-      <audio ref={audioRef} src={currentStation.url} preload="none" crossOrigin="anonymous" />
-
-      {/* Floating Radio Widget */}
-      <div className="fixed bottom-4 right-4 z-50">
-        <Card
-          className={`transition-all duration-300 ${
-            isMinimized ? "w-16 h-16" : "w-80 h-auto"
-          } bg-background/95 backdrop-blur-sm border shadow-lg`}
-        >
-          {isMinimized ? (
-            <div className="p-4 flex items-center justify-center">
-              <Button variant="ghost" size="icon" onClick={() => setIsMinimized(false)} className="h-8 w-8">
-                <Radio className="h-4 w-4" />
-              </Button>
+    <div
+      className={cn(
+        "fixed z-50 transition-all duration-300 ease-in-out",
+        isMinimized ? "bottom-4 right-4" : "bottom-4 right-4",
+        isDragging ? "cursor-grabbing" : "cursor-grab",
+      )}
+      style={{
+        transform: `translate(${position.x}px, ${position.y}px)`,
+      }}
+    >
+      <Card
+        className={cn(
+          "bg-black/95 backdrop-blur-md border-green-500/30 shadow-2xl transition-all duration-300",
+          isMinimized ? "w-16 h-16" : "w-80 h-auto",
+        )}
+      >
+        {isMinimized ? (
+          // Minimized View
+          <CardContent className="p-0 w-full h-full flex items-center justify-center relative">
+            <div
+              className={cn("w-full h-full rounded-lg bg-gradient-to-br flex items-center justify-center", moodColor)}
+            >
+              <MoodIcon className="h-8 w-8 text-white" />
             </div>
-          ) : (
-            <div className="p-4 space-y-4">
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Radio className="h-4 w-4 text-primary" />
-                  <span className="font-semibold text-sm">Erigga Radio</span>
+
+            {/* Expand Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute -top-2 -right-2 h-6 w-6 bg-green-500 hover:bg-green-600 text-black rounded-full"
+              onClick={handleMinimize}
+            >
+              <Maximize2 className="h-3 w-3" />
+            </Button>
+
+            {/* Playing Indicator */}
+            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+          </CardContent>
+        ) : (
+          // Expanded View
+          <CardContent className="p-4">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div
+                  className={cn("w-8 h-8 rounded-full bg-gradient-to-br flex items-center justify-center", moodColor)}
+                >
+                  <MoodIcon className="h-4 w-4 text-white" />
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => setIsMinimized(true)} className="h-6 w-6">
+                <div>
+                  <h3 className="text-white font-bold text-sm">{currentMood.toUpperCase()} MODE</h3>
+                  <Badge className="bg-green-500 text-black text-xs">LIVE</Badge>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-gray-400 hover:text-white"
+                  onClick={handleMinimize}
+                >
                   <Minimize2 className="h-3 w-3" />
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-gray-400 hover:text-red-500"
+                  onClick={handleClose}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
               </div>
+            </div>
 
-              {/* Current Station */}
-              <div className="flex items-center gap-3">
-                <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-muted">
-                  <Image
-                    src={currentStation.image || "/placeholder.svg"}
-                    alt={currentStation.name}
-                    fill
-                    className="object-cover"
-                    unoptimized={currentStation.image.endsWith(".gif")}
-                  />
-                  {isPlaying && (
-                    <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm truncate">{currentStation.name}</h3>
-                  <p className="text-xs text-muted-foreground truncate">{currentStation.description}</p>
-                  <Badge variant="secondary" className="text-xs mt-1">
-                    {currentStation.genre}
-                  </Badge>
-                </div>
-              </div>
+            {/* Spotify Embed */}
+            <div className="w-full h-32 rounded-lg overflow-hidden bg-gray-900 mb-4">
+              <iframe
+                src={embedUrl}
+                width="100%"
+                height="100%"
+                frameBorder="0"
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                loading="lazy"
+                className="rounded-lg"
+                title={`Erigga Radio - ${currentMood} Mood`}
+              />
+            </div>
 
-              {/* Controls */}
+            {/* Controls */}
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
-                  onClick={togglePlay}
-                  disabled={isLoading}
-                  className="h-8 w-8 bg-transparent"
+                  className="h-8 w-8 text-green-500 hover:bg-green-500/20"
+                  onClick={() => setIsPlaying(!isPlaying)}
                 >
-                  {isLoading ? (
-                    <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  ) : isPlaying ? (
-                    <Pause className="h-3 w-3" />
-                  ) : (
-                    <Play className="h-3 w-3" />
-                  )}
+                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                 </Button>
-
-                <Button variant="ghost" size="icon" onClick={toggleMute} className="h-8 w-8">
-                  {isMuted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-white">
+                  <Volume2 className="h-4 w-4" />
                 </Button>
-
-                <div className="flex-1 px-2">
-                  <Slider value={volume} onValueChange={handleVolumeChange} max={100} step={1} className="w-full" />
-                </div>
               </div>
 
-              {/* Station List */}
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">Stations</p>
-                {radioStations.map((station) => (
-                  <button
-                    key={station.id}
-                    onClick={() => changeStation(station)}
-                    className={`w-full text-left p-2 rounded-md text-xs transition-colors ${
-                      currentStation.id === station.id ? "bg-primary/10 text-primary" : "hover:bg-muted"
-                    }`}
-                  >
-                    <div className="font-medium">{station.name}</div>
-                    <div className="text-muted-foreground">{station.genre}</div>
-                  </button>
-                ))}
+              <div className="flex items-center gap-1 text-xs text-gray-400">
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                Erigga Radio
               </div>
-
-              {/* Error Message */}
-              {error && <div className="text-xs text-destructive bg-destructive/10 p-2 rounded-md">{error}</div>}
-
-              {/* Live Indicator */}
-              {isPlaying && !error && (
-                <div className="flex items-center gap-2 text-xs text-primary">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                  <span>LIVE</span>
-                </div>
-              )}
             </div>
-          )}
-        </Card>
-      </div>
-    </>
+          </CardContent>
+        )}
+      </Card>
+    </div>
   )
 }

@@ -55,7 +55,6 @@ export function SafeHeroVideoCarousel() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
   const [isAutoPlaying, setIsAutoPlaying] = useState(true)
-  const [isTransitioning, setIsTransitioning] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -63,7 +62,7 @@ export function SafeHeroVideoCarousel() {
 
   // Auto-advance slides
   useEffect(() => {
-    if (isAutoPlaying && !isTransitioning) {
+    if (isAutoPlaying) {
       intervalRef.current = setInterval(() => {
         setCurrentIndex((prev) => (prev + 1) % mediaItems.length)
       }, 5000)
@@ -74,7 +73,7 @@ export function SafeHeroVideoCarousel() {
         clearInterval(intervalRef.current)
       }
     }
-  }, [isAutoPlaying, isTransitioning])
+  }, [isAutoPlaying])
 
   // Handle video play/pause
   useEffect(() => {
@@ -82,10 +81,7 @@ export function SafeHeroVideoCarousel() {
     if (!video || currentItem.type !== "video") return
 
     if (isPlaying) {
-      video.play().catch((error) => {
-        console.error("Video play failed:", error)
-        setIsPlaying(false)
-      })
+      video.play().catch(console.error)
     } else {
       video.pause()
     }
@@ -99,43 +95,22 @@ export function SafeHeroVideoCarousel() {
   }, [isMuted])
 
   const goToSlide = (index: number) => {
-    if (isTransitioning) return
-
-    setIsTransitioning(true)
     setCurrentIndex(index)
     setIsAutoPlaying(false)
-
-    setTimeout(() => {
-      setIsTransitioning(false)
-      // Resume auto-play after 10 seconds
-      setTimeout(() => setIsAutoPlaying(true), 10000)
-    }, 500)
+    // Resume auto-play after 10 seconds
+    setTimeout(() => setIsAutoPlaying(true), 10000)
   }
 
   const goToPrevious = () => {
-    if (isTransitioning) return
-
-    setIsTransitioning(true)
     setCurrentIndex((prev) => (prev - 1 + mediaItems.length) % mediaItems.length)
     setIsAutoPlaying(false)
-
-    setTimeout(() => {
-      setIsTransitioning(false)
-      setTimeout(() => setIsAutoPlaying(true), 10000)
-    }, 500)
+    setTimeout(() => setIsAutoPlaying(true), 10000)
   }
 
   const goToNext = () => {
-    if (isTransitioning) return
-
-    setIsTransitioning(true)
     setCurrentIndex((prev) => (prev + 1) % mediaItems.length)
     setIsAutoPlaying(false)
-
-    setTimeout(() => {
-      setIsTransitioning(false)
-      setTimeout(() => setIsAutoPlaying(true), 10000)
-    }, 500)
+    setTimeout(() => setIsAutoPlaying(true), 10000)
   }
 
   const togglePlayPause = () => {
@@ -160,15 +135,10 @@ export function SafeHeroVideoCarousel() {
             muted={isMuted}
             loop
             playsInline
-            poster="/images/hero/erigga1.jpeg"
             onLoadedData={() => {
               if (isPlaying) {
                 videoRef.current?.play().catch(console.error)
               }
-            }}
-            onError={(e) => {
-              console.error("Video error:", e)
-              setIsPlaying(false)
             }}
           />
         ) : (
@@ -177,10 +147,9 @@ export function SafeHeroVideoCarousel() {
               src={currentItem.src || "/placeholder.svg"}
               alt={currentItem.title}
               fill
-              className="object-cover transition-opacity duration-500"
+              className="object-cover"
               priority={currentIndex === 0}
               sizes="100vw"
-              quality={90}
             />
           </div>
         )}
@@ -222,8 +191,7 @@ export function SafeHeroVideoCarousel() {
           variant="ghost"
           size="icon"
           onClick={goToPrevious}
-          disabled={isTransitioning}
-          className="h-12 w-12 rounded-full bg-black/20 text-white hover:bg-black/40 backdrop-blur-sm disabled:opacity-50"
+          className="h-12 w-12 rounded-full bg-black/20 text-white hover:bg-black/40 backdrop-blur-sm"
         >
           <ChevronLeft className="h-6 w-6" />
         </Button>
@@ -234,8 +202,7 @@ export function SafeHeroVideoCarousel() {
           variant="ghost"
           size="icon"
           onClick={goToNext}
-          disabled={isTransitioning}
-          className="h-12 w-12 rounded-full bg-black/20 text-white hover:bg-black/40 backdrop-blur-sm disabled:opacity-50"
+          className="h-12 w-12 rounded-full bg-black/20 text-white hover:bg-black/40 backdrop-blur-sm"
         >
           <ChevronRight className="h-6 w-6" />
         </Button>
@@ -270,8 +237,7 @@ export function SafeHeroVideoCarousel() {
             <button
               key={index}
               onClick={() => goToSlide(index)}
-              disabled={isTransitioning}
-              className={`h-2 w-8 rounded-full transition-all duration-300 disabled:opacity-50 ${
+              className={`h-2 w-8 rounded-full transition-all duration-300 ${
                 index === currentIndex ? "bg-white" : "bg-white/40 hover:bg-white/60"
               }`}
             />
