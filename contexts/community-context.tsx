@@ -3,7 +3,8 @@
 import type React from "react"
 import { createContext, useContext, useReducer, useCallback, useEffect } from "react"
 import type { CommunityPost, CommunityCategory } from "@/types/database"
-import { createClientSupabase } from "@/lib/supabase/client"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/database"
 import { useAuth } from "./auth-context"
 
 /* -------------------------------------------------------------------------- */
@@ -121,41 +122,22 @@ const CommunityContext = createContext<CommunityContextType | undefined>(undefin
 export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(communityReducer, initialState)
   const { user, profile } = useAuth()
-  const supabase = createClientSupabase()
+  const supabase = createClientComponentClient<Database>()
 
   /* ------------------------- Category Loading ---------------------------- */
 
   const loadCategories = useCallback(async () => {
     try {
-      const res = await fetch("/api/community/categories")
-      if (!res.ok) {
-        const errorText = await res.text()
-        throw new Error(errorText || "Failed to fetch categories")
+      const { data, error } = await supabase.from("community_categories").select("*")
+      if (error) {
+        console.error("Error fetching categories:", error)
+      } else {
+        dispatch({ type: "SET_CATEGORIES", payload: data || [] })
       }
-      const data = await res.json()
-      dispatch({ type: "SET_CATEGORIES", payload: data.categories || [] })
-    } catch (err) {
-      console.error("Error loading categories:", err)
-      // Set fallback categories
-      dispatch({
-        type: "SET_CATEGORIES",
-        payload: [
-          {
-            id: 1,
-            name: "General Discussion",
-            slug: "general",
-            description: "General discussions",
-            icon: "💬",
-            color: "#3B82F6",
-            display_order: 1,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ] as CommunityCategory[],
-      })
+    } catch (error) {
+      console.error("Error fetching categories:", error)
     }
-  }, [])
+  }, [supabase])
 
   /* --------------------------- Posts Loading ---------------------------- */
 
