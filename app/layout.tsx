@@ -6,6 +6,7 @@ import { AuthProvider } from "@/contexts/auth-context"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 import { SessionRefresh } from "@/components/session-refresh"
+import { UnifiedNavigation } from "@/components/navigation/unified-navigation"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -30,7 +31,7 @@ export const metadata: Metadata = {
   },
   viewport: "width=device-width, initial-scale=1",
   robots: "index, follow",
-    generator: 'v0.dev'
+  generator: "v0.dev",
 }
 
 export default function RootLayout({
@@ -44,7 +45,8 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
             <SessionRefresh />
-            {children}
+            <UnifiedNavigation />
+            <main className="pt-16 pb-20 md:pb-0">{children}</main>
             <Toaster />
           </AuthProvider>
         </ThemeProvider>

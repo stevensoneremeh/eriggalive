@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, useRef } from "react"
 import type { User, Session } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -51,6 +51,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const supabase = createClient()
+
+  // Flag to prevent repeated welcome toast
+  const hasShownWelcomeToast = useRef(false)
 
   const fetchUserProfile = async (userId: string) => {
     try {
@@ -113,6 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           const profileData = await fetchUserProfile(session.user.id)
           setProfile(profileData)
+          // Mark that we've already processed the initial session
+          hasShownWelcomeToast.current = true
         }
       } catch (error) {
         console.error("Error in getInitialSession:", error)
@@ -141,13 +146,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
 
       // Handle redirects based on auth state
-      if (event === "SIGNED_IN" && session) {
-        // Get the intended redirect URL from localStorage or default to dashboard
+      if (event === "SIGNED_IN" && session && !hasShownWelcomeToast.current) {
+        // Only show welcome toast for actual sign-in events, not initial session loads
+        hasShownWelcomeToast.current = true
         const redirectTo = localStorage.getItem("redirectAfterAuth") || "/dashboard"
         localStorage.removeItem("redirectAfterAuth")
         router.push(redirectTo)
         toast.success("Welcome back!")
       } else if (event === "SIGNED_OUT") {
+        // Reset the flag when user signs out
+        hasShownWelcomeToast.current = false
         router.push("/")
         toast.success("Signed out successfully")
       }
