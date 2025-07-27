@@ -55,12 +55,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const hasShownWelcomeToast = useRef(false)
   const initializationComplete = useRef(false)
 
-  // Initialize supabase client
+  // Initialize supabase client once
   const supabase = createClient()
 
   const createUserProfile = useCallback(
     async (authUser: User, username: string) => {
       try {
+        if (!supabase) {
+          console.error("Supabase client not available")
+          return null
+        }
+
         const { data, error } = await supabase
           .from("users")
           .insert({
@@ -109,8 +114,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return null
         }
 
-        // Update last seen
-        await supabase.from("users").update({ last_seen_at: new Date().toISOString() }).eq("auth_user_id", userId)
+        // Update last seen in a separate try-catch to avoid blocking profile fetch
+        try {
+          await supabase.from("users").update({ last_seen_at: new Date().toISOString() }).eq("auth_user_id", userId)
+        } catch (updateError) {
+          console.warn("Could not update last_seen_at:", updateError)
+          // Don't throw here, just log the warning
+        }
 
         return data as UserProfile
       } catch (error) {
@@ -252,7 +262,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true)
 
       // Check if username is already taken
-      const { data: existingUser } = await supabase.from("users").select("username").eq("username", username).single()
+      const { data: existingUser, error: checkError } = await supabase
+        .from("users")
+        .select("username")
+        .eq("username", username)
+        .single()
+
+      if (checkError && checkError.code !== "PGRST116") {
+        // PGRST116 is "not found" which is what we want
+        console.error("Error checking username:", checkError)
+        return { error: checkError }
+      }
 
       if (existingUser) {
         return { error: { message: "Username is already taken" } }
