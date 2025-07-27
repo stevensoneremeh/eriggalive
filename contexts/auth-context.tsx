@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState, useRef } from "react"
+import { createContext, useContext, useEffect, useState, useRef, useCallback } from "react"
 import type { User, Session } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -51,32 +51,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const hasShownWelcomeToast = useRef(false)
+  const initializationComplete = useRef(false)
 
   // Initialize supabase client
   const supabase = createClient()
 
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      if (!supabase) {
-        console.error("Supabase client not initialized")
+  const fetchUserProfile = useCallback(
+    async (userId: string) => {
+      try {
+        if (!supabase) {
+          console.error("Supabase client not initialized")
+          return null
+        }
+
+        const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
+
+        if (error) {
+          console.error("Error fetching user profile:", error)
+          return null
+        }
+
+        return data as UserProfile
+      } catch (error) {
+        console.error("Error in fetchUserProfile:", error)
         return null
       }
+    },
+    [supabase],
+  )
 
-      const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
-
-      if (error) {
-        console.error("Error fetching user profile:", error)
-        return null
-      }
-
-      return data as UserProfile
-    } catch (error) {
-      console.error("Error in fetchUserProfile:", error)
-      return null
-    }
-  }
-
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (!user?.id) return
 
     try {
@@ -85,9 +89,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Error refreshing profile:", error)
     }
-  }
+  }, [user?.id, fetchUserProfile])
 
-  const refreshSession = async () => {
+  const refreshSession = useCallback(async () => {
     try {
       if (!supabase?.auth) {
         console.error("Supabase auth not available")
@@ -100,12 +104,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (data.session) {
         setSession(data.session)
         setUser(data.session.user)
-        await refreshProfile()
+        if (data.session.user) {
+          const profileData = await fetchUserProfile(data.session.user.id)
+          setProfile(profileData)
+        }
       }
     } catch (error) {
       console.error("Error in refreshSession:", error)
     }
-  }
+  }, [supabase, fetchUserProfile])
 
   useEffect(() => {
     if (!supabase?.auth) {
@@ -132,12 +139,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           const profileData = await fetchUserProfile(session.user.id)
           setProfile(profileData)
-          hasShownWelcomeToast.current = true
         }
       } catch (error) {
         console.error("Error in getInitialSession:", error)
       } finally {
         setLoading(false)
+        initializationComplete.current = true
       }
     }
 
@@ -148,6 +155,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state changed:", event, session?.user?.email)
+
+      // Don't process events during initial load
+      if (!initializationComplete.current) {
+        return
+      }
+
       setSession(session)
       setUser(session?.user ?? null)
 
@@ -160,22 +173,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setLoading(false)
 
-      // Handle redirects based on auth state
+      // Handle redirects based on auth state with improved logic
       if (event === "SIGNED_IN" && session && !hasShownWelcomeToast.current) {
         hasShownWelcomeToast.current = true
-        const redirectTo = localStorage.getItem("redirectAfterAuth") || "/dashboard"
-        localStorage.removeItem("redirectAfterAuth")
-        router.push(redirectTo)
+        const redirectTo = sessionStorage.getItem("redirectAfterAuth") || "/dashboard"
+        sessionStorage.removeItem("redirectAfterAuth")
+
+        // Only redirect if not already on the target page
+        if (window.location.pathname !== redirectTo) {
+          router.push(redirectTo)
+        }
+
         toast.success("Welcome back!")
       } else if (event === "SIGNED_OUT") {
         hasShownWelcomeToast.current = false
-        router.push("/")
+        // Only redirect to home if user is on a protected page
+        const currentPath = window.location.pathname
+        const protectedPaths = [
+          "/dashboard",
+          "/community",
+          "/vault",
+          "/coins",
+          "/profile",
+          "/meet-greet",
+          "/admin",
+          "/premium",
+        ]
+
+        if (protectedPaths.some((path) => currentPath.startsWith(path))) {
+          router.push("/")
+        }
+
         toast.success("Signed out successfully")
       }
     })
 
     return () => subscription.unsubscribe()
-  }, [router])
+  }, [router, fetchUserProfile])
 
   const signUp = async (email: string, password: string) => {
     try {

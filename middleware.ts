@@ -4,11 +4,9 @@ import { NextResponse, type NextRequest } from "next/server"
 // Define protected routes that require authentication
 const protectedRoutes = [
   "/dashboard",
-  "/community",
   "/vault",
   "/coins",
   "/merch",
-  "/radio",
   "/profile",
   "/meet-greet",
   "/admin",
@@ -18,6 +16,9 @@ const protectedRoutes = [
 
 // Define auth routes that should redirect if already authenticated
 const authRoutes = ["/login", "/signup"]
+
+// Define public routes that don't require authentication but benefit from it
+const publicRoutes = ["/", "/community", "/radio"]
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -91,6 +92,7 @@ export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
     const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
     const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
+    const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(route))
 
     // If user is not authenticated and trying to access protected route
     if (!session && isProtectedRoute) {
@@ -104,6 +106,11 @@ export async function middleware(request: NextRequest) {
       const redirectTo = request.nextUrl.searchParams.get("redirectTo")
       const destination = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/dashboard"
       return NextResponse.redirect(new URL(destination, request.url))
+    }
+
+    // For public routes, allow access regardless of auth status
+    if (isPublicRoute) {
+      return response
     }
 
     return response

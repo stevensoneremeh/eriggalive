@@ -48,7 +48,7 @@ export default function RootLayout({
             <AuthProvider>
               <SessionRefresh />
               <UnifiedNavigation />
-              <main className="pt-16 pb-20 md:pb-0">{children}</main>
+              <main className="pt-16 pb-20 md:pb-0 min-h-screen">{children}</main>
               <Toaster />
             </AuthProvider>
           </ThemeProvider>
