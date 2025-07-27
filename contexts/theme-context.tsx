@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { createContext, useContext, useEffect, useState } from "react"
 import { useTheme as useNextTheme } from "next-themes"
 
@@ -9,6 +8,7 @@ interface ThemeContextType {
   theme: string | undefined
   setTheme: (theme: string) => void
   resolvedTheme: string | undefined
+  isLoading: boolean
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
@@ -29,9 +29,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setMounted(true)
   }, [])
 
-  if (!mounted) {
-    return <>{children}</>
+  const value = {
+    theme,
+    setTheme,
+    resolvedTheme,
+    isLoading: !mounted,
   }
 
-  return <ThemeContext.Provider value={{ theme, setTheme, resolvedTheme }}>{children}</ThemeContext.Provider>
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
