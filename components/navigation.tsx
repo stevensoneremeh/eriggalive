@@ -22,6 +22,7 @@ import { useTheme } from "next-themes"
 
 const navigationItems = [
   { name: "Home", href: "/" },
+  { name: "Mission", href: "/mission" },
   { name: "Community", href: "/community" },
   { name: "Vault", href: "/vault" },
   { name: "Radio", href: "/radio" },
