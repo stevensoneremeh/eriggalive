@@ -26,11 +26,11 @@ import {
   FlameIcon as Fire,
   Eye,
   MoreHorizontal,
+  User,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
-import { User } from "lucide-react" // Import User icon
 import { useRouter } from "next/navigation"
 
 interface Post {
@@ -70,9 +70,30 @@ const mockCategories: Category[] = [
     color: "bg-blue-500",
     post_count: 24,
   },
-  { id: "music", name: "Music", description: "Music discussions", icon: "🎵", color: "bg-purple-500", post_count: 18 },
-  { id: "events", name: "Events", description: "Upcoming events", icon: "📅", color: "bg-green-500", post_count: 8 },
-  { id: "freebies", name: "Freebies", description: "Free content", icon: "🎁", color: "bg-orange-500", post_count: 12 },
+  {
+    id: "music",
+    name: "Music",
+    description: "Music discussions",
+    icon: "🎵",
+    color: "bg-purple-500",
+    post_count: 18,
+  },
+  {
+    id: "events",
+    name: "Events",
+    description: "Upcoming events",
+    icon: "📅",
+    color: "bg-green-500",
+    post_count: 8,
+  },
+  {
+    id: "freebies",
+    name: "Freebies",
+    description: "Free content",
+    icon: "🎁",
+    color: "bg-orange-500",
+    post_count: 12,
+  },
   {
     id: "bars",
     name: "Bars & Lyrics",
@@ -144,7 +165,7 @@ const mockPosts: Post[] = [
 ]
 
 export default function CommunityPage() {
-  const { isAuthenticated, profile, isLoading } = useAuth()
+  const { isAuthenticated, profile, loading: isLoading } = useAuth()
   const router = useRouter()
   const [posts, setPosts] = useState<Post[]>([])
   const [userPosts, setUserPosts] = useState<Post[]>([])
@@ -422,7 +443,7 @@ export default function CommunityPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-8 pt-24">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
@@ -436,7 +457,7 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="container mx-auto px-4 py-8 pt-24 max-w-7xl">
         {/* Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-full text-sm font-medium mb-4">
