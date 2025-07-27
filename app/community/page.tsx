@@ -26,11 +26,11 @@ import {
   FlameIcon as Fire,
   Eye,
   MoreHorizontal,
-  User,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
+import { User } from "lucide-react" // Import User icon
 import { useRouter } from "next/navigation"
 
 interface Post {
@@ -70,30 +70,9 @@ const mockCategories: Category[] = [
     color: "bg-blue-500",
     post_count: 24,
   },
-  {
-    id: "music",
-    name: "Music",
-    description: "Music discussions",
-    icon: "🎵",
-    color: "bg-purple-500",
-    post_count: 18,
-  },
-  {
-    id: "events",
-    name: "Events",
-    description: "Upcoming events",
-    icon: "📅",
-    color: "bg-green-500",
-    post_count: 8,
-  },
-  {
-    id: "freebies",
-    name: "Freebies",
-    description: "Free content",
-    icon: "🎁",
-    color: "bg-orange-500",
-    post_count: 12,
-  },
+  { id: "music", name: "Music", description: "Music discussions", icon: "🎵", color: "bg-purple-500", post_count: 18 },
+  { id: "events", name: "Events", description: "Upcoming events", icon: "📅", color: "bg-green-500", post_count: 8 },
+  { id: "freebies", name: "Freebies", description: "Free content", icon: "🎁", color: "bg-orange-500", post_count: 12 },
   {
     id: "bars",
     name: "Bars & Lyrics",
@@ -165,7 +144,7 @@ const mockPosts: Post[] = [
 ]
 
 export default function CommunityPage() {
-  const { isAuthenticated, profile, loading: isLoading } = useAuth()
+  const { isAuthenticated, profile, isLoading } = useAuth()
   const router = useRouter()
   const [posts, setPosts] = useState<Post[]>([])
   const [userPosts, setUserPosts] = useState<Post[]>([])
@@ -191,7 +170,6 @@ export default function CommunityPage() {
   const loadPosts = async () => {
     try {
       setLoading(true)
-
       // Try to load from database first
       const { data: postsData, error: postsError } = await supabase
         .from("community_posts")
@@ -353,6 +331,7 @@ export default function CommunityPage() {
 
       setPosts((prev) => [newPost, ...prev])
       setUserPosts((prev) => [newPost, ...prev])
+
       setNewPostTitle("")
       setNewPostContent("")
       toast.success("Post created successfully!")
@@ -442,8 +421,8 @@ export default function CommunityPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-        <div className="container mx-auto px-4 py-8 pt-24">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 pt-24">
+        <div className="container mx-auto px-4 py-8">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
@@ -456,8 +435,8 @@ export default function CommunityPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-4 py-8 pt-24 max-w-7xl">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 pt-24">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-full text-sm font-medium mb-4">
@@ -485,6 +464,7 @@ export default function CommunityPage() {
               </div>
             </CardContent>
           </Card>
+
           <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -496,6 +476,7 @@ export default function CommunityPage() {
               </div>
             </CardContent>
           </Card>
+
           <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -507,6 +488,7 @@ export default function CommunityPage() {
               </div>
             </CardContent>
           </Card>
+
           <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -733,7 +715,6 @@ export default function CommunityPage() {
                                   {post.views_count}
                                 </div>
                               </div>
-
                               <div className="mb-4">
                                 <h3 className="text-xl font-bold mb-3 group-hover:text-primary transition-colors">
                                   {post.title}
@@ -742,7 +723,6 @@ export default function CommunityPage() {
                                   {post.content}
                                 </p>
                               </div>
-
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-6">
                                   <Button
@@ -798,7 +778,6 @@ export default function CommunityPage() {
                         </CardTitle>
                       </CardHeader>
                     </Card>
-
                     {userPosts.length === 0 ? (
                       <Card className="backdrop-blur-sm bg-white/80 dark:bg-slate-800/80 border-0 shadow-xl">
                         <CardContent className="p-12 text-center">
@@ -853,7 +832,6 @@ export default function CommunityPage() {
                                     {post.views_count}
                                   </div>
                                 </div>
-
                                 <div className="mb-4">
                                   <h3 className="text-xl font-bold mb-3 group-hover:text-primary transition-colors">
                                     {post.title}
@@ -862,7 +840,6 @@ export default function CommunityPage() {
                                     {post.content}
                                   </p>
                                 </div>
-
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center space-x-6">
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
