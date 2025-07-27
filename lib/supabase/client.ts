@@ -50,6 +50,72 @@ function createMockClient() {
     user: mockUser,
   }
 
+  const mockProfile = {
+    id: 1,
+    auth_user_id: "mock-user-id",
+    username: "testuser",
+    display_name: "Test User",
+    full_name: "Test User",
+    email: "test@example.com",
+    subscription_tier: "general",
+    coins_balance: 1000,
+    avatar_url: null,
+    bio: null,
+    location: null,
+    website: null,
+    total_posts: 0,
+    total_votes_received: 0,
+    total_comments: 0,
+    is_verified: false,
+    is_active: true,
+    last_seen_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+
+  // Create a chainable query builder mock
+  const createQueryBuilder = (tableName: string) => {
+    const queryBuilder = {
+      select: (columns = "*") => ({
+        ...queryBuilder,
+        eq: (column: string, value: any) => ({
+          ...queryBuilder,
+          single: async () => ({
+            data: tableName === "users" ? mockProfile : null,
+            error: null,
+          }),
+        }),
+      }),
+      insert: (data: any) => ({
+        ...queryBuilder,
+        select: (columns?: string) => ({
+          ...queryBuilder,
+          single: async () => ({
+            data: { ...mockProfile, ...data },
+            error: null,
+          }),
+        }),
+      }),
+      update: (data: any) => ({
+        ...queryBuilder,
+        eq: (column: string, value: any) => ({
+          ...queryBuilder,
+          single: async () => ({
+            data: { ...mockProfile, ...data },
+            error: null,
+          }),
+        }),
+      }),
+      delete: () => ({
+        ...queryBuilder,
+        eq: (column: string, value: any) => ({
+          ...queryBuilder,
+        }),
+      }),
+    }
+    return queryBuilder
+  }
+
   return {
     auth: {
       getSession: async () => ({
@@ -94,34 +160,7 @@ function createMockClient() {
         }
       },
     },
-    from: (table: string) => ({
-      select: (columns: string) => ({
-        eq: (column: string, value: any) => ({
-          single: async () => ({
-            data: {
-              id: 1,
-              auth_user_id: "mock-user-id",
-              username: "testuser",
-              full_name: "Test User",
-              email: "test@example.com",
-              tier: "free",
-              coins_balance: 100,
-              avatar_url: null,
-              level: 1,
-              points: 0,
-              reputation_score: 0,
-              role: "user",
-              is_active: true,
-              is_verified: false,
-              is_banned: false,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            error: null,
-          }),
-        }),
-      }),
-    }),
+    from: (table: string) => createQueryBuilder(table),
   }
 }
 
