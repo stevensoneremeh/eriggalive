@@ -1,19 +1,20 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+
+import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { DynamicLogo } from "@/components/dynamic-logo"
 import { useAuth } from "@/contexts/auth-context"
-import { Eye, EyeOff, Loader2, Check, X } from "lucide-react"
+import { DynamicLogo } from "@/components/dynamic-logo"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
 
-export default function SignupPage() {
+export default function SignUpPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -22,42 +23,49 @@ export default function SignupPage() {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
-  const { signUp, user, loading } = useAuth()
+  const { signUp } = useAuth()
   const router = useRouter()
 
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (user && !loading) {
-      router.push("/dashboard")
+  const validatePassword = (password: string) => {
+    if (password.length < 8) {
+      return "Password must be at least 8 characters long"
     }
-  }, [user, loading, router])
-
-  // Password validation
-  const passwordRequirements = [
-    { label: "At least 8 characters", test: (pwd: string) => pwd.length >= 8 },
-    { label: "Contains uppercase letter", test: (pwd: string) => /[A-Z]/.test(pwd) },
-    { label: "Contains lowercase letter", test: (pwd: string) => /[a-z]/.test(pwd) },
-    { label: "Contains number", test: (pwd: string) => /\d/.test(pwd) },
-  ]
-
-  const isPasswordValid = passwordRequirements.every((req) => req.test(password))
-  const doPasswordsMatch = password === confirmPassword && password.length > 0
+    if (!/(?=.*[a-z])/.test(password)) {
+      return "Password must contain at least one lowercase letter"
+    }
+    if (!/(?=.*[A-Z])/.test(password)) {
+      return "Password must contain at least one uppercase letter"
+    }
+    if (!/(?=.*\d)/.test(password)) {
+      return "Password must contain at least one number"
+    }
+    return null
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
-
-    if (!isPasswordValid) {
-      setError("Please meet all password requirements")
-      return
-    }
-
-    if (!doPasswordsMatch) {
-      setError("Passwords do not match")
-      return
-    }
-
     setIsLoading(true)
+
+    // Validation
+    if (!email || !password || !confirmPassword) {
+      setError("Please fill in all fields")
+      setIsLoading(false)
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match")
+      setIsLoading(false)
+      return
+    }
+
+    const passwordError = validatePassword(password)
+    if (passwordError) {
+      setError(passwordError)
+      setIsLoading(false)
+      return
+    }
 
     try {
       const { error } = await signUp(email, password)
@@ -65,28 +73,14 @@ export default function SignupPage() {
       if (error) {
         setError(error.message || "Failed to create account")
       } else {
-        // Success is handled by the auth context
-        router.push("/login")
+        // Redirect to success page or login
+        router.push("/signup/success")
       }
     } catch (error) {
       setError("An unexpected error occurred")
     } finally {
       setIsLoading(false)
     }
-  }
-
-  // Show loading state while checking authentication
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    )
-  }
-
-  // Don't render if user is already authenticated
-  if (user) {
-    return null
   }
 
   return (
@@ -96,8 +90,10 @@ export default function SignupPage() {
           <div className="flex justify-center mb-4">
             <DynamicLogo className="h-12 w-auto" />
           </div>
-          <CardTitle className="text-2xl font-bold">Create account</CardTitle>
-          <CardDescription>Join the Erigga Live community</CardDescription>
+          <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
+          <CardDescription>
+            Join the Erigga Live community and get exclusive access to content, events, and more.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -143,22 +139,9 @@ export default function SignupPage() {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
-
-              {/* Password Requirements */}
-              {password && (
-                <div className="space-y-1 text-xs">
-                  {passwordRequirements.map((req, index) => (
-                    <div key={index} className="flex items-center space-x-2">
-                      {req.test(password) ? (
-                        <Check className="h-3 w-3 text-green-500" />
-                      ) : (
-                        <X className="h-3 w-3 text-red-500" />
-                      )}
-                      <span className={req.test(password) ? "text-green-600" : "text-red-600"}>{req.label}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <p className="text-xs text-muted-foreground">
+                Password must be at least 8 characters with uppercase, lowercase, and number
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -184,30 +167,13 @@ export default function SignupPage() {
                   {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
-
-              {/* Password Match Indicator */}
-              {confirmPassword && (
-                <div className="flex items-center space-x-2 text-xs">
-                  {doPasswordsMatch ? (
-                    <>
-                      <Check className="h-3 w-3 text-green-500" />
-                      <span className="text-green-600">Passwords match</span>
-                    </>
-                  ) : (
-                    <>
-                      <X className="h-3 w-3 text-red-500" />
-                      <span className="text-red-600">Passwords do not match</span>
-                    </>
-                  )}
-                </div>
-              )}
             </div>
 
-            <Button type="submit" className="w-full" disabled={isLoading || !isPasswordValid || !doPasswordsMatch}>
+            <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating account...
+                  Creating Account...
                 </>
               ) : (
                 "Create Account"
@@ -215,11 +181,21 @@ export default function SignupPage() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="text-center text-sm">
-          <div className="text-muted-foreground">
+        <CardFooter className="flex flex-col space-y-4">
+          <div className="text-sm text-center text-muted-foreground">
             Already have an account?{" "}
             <Link href="/login" className="text-primary hover:underline">
               Sign in
+            </Link>
+          </div>
+          <div className="text-xs text-center text-muted-foreground">
+            By creating an account, you agree to our{" "}
+            <Link href="/terms" className="text-primary hover:underline">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="text-primary hover:underline">
+              Privacy Policy
             </Link>
           </div>
         </CardFooter>

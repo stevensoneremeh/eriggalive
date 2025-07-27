@@ -50,13 +50,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const supabase = createClient()
-
-  // Flag to prevent repeated welcome toast
   const hasShownWelcomeToast = useRef(false)
+
+  // Initialize supabase client
+  const supabase = createClient()
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      if (!supabase) {
+        console.error("Supabase client not initialized")
+        return null
+      }
+
       const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
 
       if (error) {
@@ -84,6 +89,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSession = async () => {
     try {
+      if (!supabase?.auth) {
+        console.error("Supabase auth not available")
+        return
+      }
+
       const { data, error } = await supabase.auth.refreshSession()
       if (error) {
         console.error("Error refreshing session:", error)
@@ -98,6 +108,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    if (!supabase?.auth) {
+      console.error("Supabase auth not available")
+      setLoading(false)
+      return
+    }
+
     // Get initial session
     const getInitialSession = async () => {
       try {
@@ -116,7 +132,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           const profileData = await fetchUserProfile(session.user.id)
           setProfile(profileData)
-          // Mark that we've already processed the initial session
           hasShownWelcomeToast.current = true
         }
       } catch (error) {
@@ -147,14 +162,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Handle redirects based on auth state
       if (event === "SIGNED_IN" && session && !hasShownWelcomeToast.current) {
-        // Only show welcome toast for actual sign-in events, not initial session loads
         hasShownWelcomeToast.current = true
         const redirectTo = localStorage.getItem("redirectAfterAuth") || "/dashboard"
         localStorage.removeItem("redirectAfterAuth")
         router.push(redirectTo)
         toast.success("Welcome back!")
       } else if (event === "SIGNED_OUT") {
-        // Reset the flag when user signs out
         hasShownWelcomeToast.current = false
         router.push("/")
         toast.success("Signed out successfully")
@@ -162,10 +175,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     return () => subscription.unsubscribe()
-  }, [router, supabase.auth])
+  }, [router])
 
   const signUp = async (email: string, password: string) => {
     try {
+      if (!supabase?.auth) {
+        throw new Error("Authentication not available")
+      }
+
       setLoading(true)
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -194,6 +211,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
+      if (!supabase?.auth) {
+        throw new Error("Authentication not available")
+      }
+
       setLoading(true)
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -218,6 +239,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      if (!supabase?.auth) {
+        throw new Error("Authentication not available")
+      }
+
       setLoading(true)
       const { error } = await supabase.auth.signOut()
       if (error) {
@@ -235,6 +260,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resetPassword = async (email: string) => {
     try {
+      if (!supabase?.auth) {
+        throw new Error("Authentication not available")
+      }
+
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       })

@@ -1,42 +1,43 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
-import { Crown, Star, Zap, Flame } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Crown, Star, Gem, Shield } from "lucide-react"
 
 interface UserTierBadgeProps {
   tier: string
-  size?: "sm" | "md" | "lg"
   className?: string
 }
 
-export function UserTierBadge({ tier, size = "md", className }: UserTierBadgeProps) {
+export function UserTierBadge({ tier, className }: UserTierBadgeProps) {
   const getTierConfig = (tier: string) => {
     switch (tier.toLowerCase()) {
-      case "blood":
+      case "premium":
         return {
-          label: "Blood",
-          icon: Flame,
-          className: "bg-red-600 text-white hover:bg-red-700",
-        }
-      case "elder":
-        return {
-          label: "Elder",
           icon: Crown,
-          className: "bg-purple-600 text-white hover:bg-purple-700",
+          label: "Premium",
+          variant: "default" as const,
+          className: "bg-yellow-500 text-yellow-50 hover:bg-yellow-600",
         }
-      case "pioneer":
+      case "vip":
         return {
-          label: "Pioneer",
-          icon: Star,
-          className: "bg-blue-600 text-white hover:bg-blue-700",
+          icon: Gem,
+          label: "VIP",
+          variant: "default" as const,
+          className: "bg-purple-500 text-purple-50 hover:bg-purple-600",
         }
-      case "grassroot":
+      case "legend":
+        return {
+          icon: Shield,
+          label: "Legend",
+          variant: "default" as const,
+          className: "bg-red-500 text-red-50 hover:bg-red-600",
+        }
       default:
         return {
-          label: "Grassroot",
-          icon: Zap,
-          className: "bg-green-600 text-white hover:bg-green-700",
+          icon: Star,
+          label: "Free",
+          variant: "secondary" as const,
+          className: "",
         }
     }
   }
@@ -44,21 +45,9 @@ export function UserTierBadge({ tier, size = "md", className }: UserTierBadgePro
   const config = getTierConfig(tier)
   const Icon = config.icon
 
-  const sizeClasses = {
-    sm: "text-xs px-1.5 py-0.5",
-    md: "text-xs px-2 py-1",
-    lg: "text-sm px-3 py-1.5",
-  }
-
-  const iconSizes = {
-    sm: "h-3 w-3",
-    md: "h-3 w-3",
-    lg: "h-4 w-4",
-  }
-
   return (
-    <Badge className={cn(config.className, sizeClasses[size], "flex items-center space-x-1", className)}>
-      <Icon className={iconSizes[size]} />
+    <Badge variant={config.variant} className={`flex items-center space-x-1 ${config.className} ${className}`}>
+      <Icon className="h-3 w-3" />
       <span>{config.label}</span>
     </Badge>
   )

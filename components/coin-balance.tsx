@@ -1,31 +1,27 @@
 "use client"
 
 import { Coins } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
+import { useAuth } from "@/contexts/auth-context"
 
-interface CoinBalanceProps {
-  coins: number
-  size?: "sm" | "md" | "lg"
-  className?: string
-}
+export function CoinBalance() {
+  const { profile, loading } = useAuth()
 
-export function CoinBalance({ coins, size = "md", className }: CoinBalanceProps) {
-  const sizeClasses = {
-    sm: "text-xs",
-    md: "text-sm",
-    lg: "text-base",
+  if (loading) {
+    return (
+      <Badge variant="secondary" className="flex items-center space-x-1">
+        <Coins className="h-3 w-3" />
+        <span>...</span>
+      </Badge>
+    )
   }
 
-  const iconSizes = {
-    sm: "h-3 w-3",
-    md: "h-4 w-4",
-    lg: "h-5 w-5",
-  }
+  const balance = profile?.coins_balance || 0
 
   return (
-    <div className={cn("flex items-center space-x-1 text-amber-600", sizeClasses[size], className)}>
-      <Coins className={cn("text-amber-500", iconSizes[size])} />
-      <span className="font-semibold">{coins.toLocaleString()}</span>
-    </div>
+    <Badge variant="secondary" className="flex items-center space-x-1">
+      <Coins className="h-3 w-3 text-yellow-500" />
+      <span>{balance.toLocaleString()}</span>
+    </Badge>
   )
 }
