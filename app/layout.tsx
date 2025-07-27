@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
+import { ThemeProvider as NextThemeProvider } from "next-themes"
 import { ThemeProvider } from "@/contexts/theme-context"
 import { Toaster } from "@/components/ui/sonner"
 import { SessionRefresh } from "@/components/session-refresh"
@@ -42,6 +43,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
+        <NextThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <ThemeProvider>
             <AuthProvider>
               <SessionRefresh />
@@ -50,6 +52,7 @@ export default function RootLayout({
               <Toaster />
             </AuthProvider>
           </ThemeProvider>
+        </NextThemeProvider>
       </body>
     </html>
   )
