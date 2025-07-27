@@ -58,24 +58,21 @@ export default function MissionPage() {
         animate="visible"
       >
         {/* Header Section */}
-        <motion.div 
-          className="text-center mb-16"
-          variants={itemVariants}
-        >
+        <motion.div className="text-center mb-16" variants={itemVariants}>
           <motion.div
             className="inline-block mb-6"
             whileHover={{ scale: 1.05 }}
             transition={{ type: "spring", stiffness: 300 }}
           >
-            <Badge 
-              variant="outline" 
+            <Badge
+              variant="outline"
               className="text-brand-lime border-brand-lime/50 bg-brand-lime/10 px-6 py-2 text-lg font-street uppercase tracking-wider"
             >
               Our Mission
             </Badge>
           </motion.div>
-          
-          <motion.h1 
+
+          <motion.h1
             className="text-6xl md:text-8xl font-street font-black text-white mb-8 leading-tight"
             variants={textVariants}
           >
@@ -86,49 +83,55 @@ export default function MissionPage() {
         </motion.div>
 
         {/* Main Content */}
-        <motion.div 
-          className="max-w-4xl mx-auto"
-          variants={itemVariants}
-        >
+        <motion.div className="max-w-4xl mx-auto" variants={itemVariants}>
           <Card className="bg-black/40 border-gray-800/50 backdrop-blur-sm">
             <CardContent className="p-8 md:p-12">
-              <motion.div 
+              <motion.div
                 className="space-y-8 text-gray-100"
                 variants={containerVariants}
               >
-                <motion.p 
+                <motion.p
                   className="text-xl md:text-2xl font-bold text-brand-lime leading-relaxed"
                   variants={textVariants}
                 >
                   This platform isn't built for profit — it's built for purpose.
                 </motion.p>
 
-                <motion.p 
+                <motion.p
                   className="text-lg md:text-xl leading-relaxed"
                   variants={textVariants}
                 >
-                  Erigga believes in giving more than he takes. This isn't just a fan hub; 
-                  it's a <span className="text-brand-lime font-bold">street-powered engine for growth</span>.
+                  Erigga believes in giving more than he takes. This isn't just a
+                  fan hub; it's a{" "}
+                  <span className="text-brand-lime font-bold">
+                    street-powered engine for growth
+                  </span>
+                  .
                 </motion.p>
 
-                <motion.p 
+                <motion.p
                   className="text-lg md:text-xl leading-relaxed"
                   variants={textVariants}
                 >
-                  Every naira, every stream, and every coin earned here goes beyond fame — 
-                  it flows into the heart of the community. From grassroots education to 
-                  real street impact, this movement is about 
-                  <span className="text-brand-lime font-bold"> raising minds, not margins</span>.
+                  Every naira, every stream, and every coin earned here goes beyond
+                  fame — it flows into the heart of the community. From grassroots
+                  education to real street impact, this movement is about{" "}
+                  <span className="text-brand-lime font-bold">
+                    raising minds, not margins
+                  </span>
+                  .
                 </motion.p>
 
-                <motion.div 
+                <motion.div
                   className="bg-gradient-to-r from-brand-teal/20 to-brand-lime/20 p-6 rounded-lg border border-brand-lime/30"
                   variants={itemVariants}
                 >
                   <p className="text-lg md:text-xl font-bold text-center leading-relaxed">
-                    Whether you're a <span className="text-brand-lime">Street Rep</span>, 
-                    <span className="text-brand-lime"> Warri Elite</span>, or 
-                    <span className="text-brand-lime"> Erigma Circle</span> — know this:
+                    Whether you're a{" "}
+                    <span className="text-brand-lime">Street Rep</span>,
+                    <span className="text-brand-lime"> Warri Elite</span>, or
+                    <span className="text-brand-lime"> Erigma Circle</span> — know
+                    this:
                   </p>
                   <p className="text-2xl md:text-3xl font-street font-black text-center mt-4 text-white">
                     You're part of something bigger.
@@ -136,22 +139,22 @@ export default function MissionPage() {
                 </motion.div>
 
                 {/* Core Values */}
-                <motion.div 
+                <motion.div
                   className="grid md:grid-cols-3 gap-6 mt-12"
                   variants={containerVariants}
                 >
                   {[
                     { title: "Purpose", subtitle: "over paper", icon: "🎯" },
                     { title: "Streets", subtitle: "over stunts", icon: "🏙️" },
-                    { title: "Loyalty", subtitle: "over likes", icon: "🤝" }
+                    { title: "Loyalty", subtitle: "over likes", icon: "🤝" },
                   ].map((value, index) => (
                     <motion.div
                       key={index}
                       className="text-center p-6 bg-black/30 rounded-lg border border-gray-800/50 hover:border-brand-lime/50 transition-all duration-300"
                       variants={itemVariants}
-                      whileHover={{ 
+                      whileHover={{
                         scale: 1.05,
-                        boxShadow: "0 0 30px rgba(212, 237, 58, 0.2)"
+                        boxShadow: "0 0 30px rgba(212, 237, 58, 0.2)",
                       }}
                     >
                       <div className="text-4xl mb-4">{value.icon}</div>
@@ -168,10 +171,7 @@ export default function MissionPage() {
         </motion.div>
 
         {/* Bottom CTA */}
-        <motion.div 
-          className="text-center mt-16"
-          variants={itemVariants}
-        >
+        <motion.div className="text-center mt-16" variants={itemVariants}>
           <motion.div
             className="inline-block"
             whileHover={{ scale: 1.1 }}
@@ -196,25 +196,25 @@ export default function MissionPage() {
         className="absolute top-20 right-10 w-20 h-20 bg-brand-lime/20 rounded-full blur-xl"
         animate={{
           y: [0, -20, 0],
-          opacity: [0.3, 0.6, 0.3]
+          opacity: [0.3, 0.6, 0.3],
         }}
         transition={{
           duration: 4,
           repeat: Number.POSITIVE_INFINITY,
-          ease: "easeInOut"
+          ease: "easeInOut",
         }}
       />
       <motion.div
         className="absolute bottom-20 left-10 w-32 h-32 bg-brand-teal/20 rounded-full blur-xl"
         animate={{
           y: [0, 20, 0],
-          opacity: [0.2, 0.5, 0.2]
+          opacity: [0.2, 0.5, 0.2],
         }}
         transition={{
           duration: 5,
           repeat: Number.POSITIVE_INFINITY,
           ease: "easeInOut",
-          delay: 1
+          delay: 1,
         }}
       />
     </div>
