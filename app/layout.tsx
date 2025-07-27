@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     description:
       "Join the official Erigga fan community. Connect with fans, access exclusive content, and stay updated with the latest from Erigga.",
   },
-  viewport: "width=device-device, initial-scale=1",
+  viewport: "width=device-width, initial-scale=1",
   robots: "index, follow",
   generator: "v0.dev",
 }
