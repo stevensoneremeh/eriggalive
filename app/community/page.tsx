@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,228 +11,393 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Heart, MessageSquare, Share2, Search, Filter, Plus, TrendingUp, Users } from "lucide-react"
-import { useState, useEffect } from "react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Heart,
+  MessageSquare,
+  Share2,
+  Search,
+  Filter,
+  Plus,
+  TrendingUp,
+  Users,
+  Eye,
+  Clock,
+  Pin,
+  Star,
+} from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { formatDistanceToNow } from "date-fns"
 
-// Mock data for demonstration
-const mockPosts = [
-  {
-    id: 1,
-    title: "Thoughts on Erigga's latest track",
-    content:
-      "Just listened to the new single and I'm blown away! The production quality is incredible and the lyrics hit different. What does everyone think?",
-    author: {
-      id: 1,
-      username: "erigga_fan_1",
-      avatar_url: "/placeholder-user.jpg",
-      tier: "pioneer",
-    },
-    category: "music",
-    likes: 24,
-    comments: 8,
-    shares: 3,
-    created_at: "2024-01-15T10:30:00Z",
-    liked_by_user: false,
-  },
-  {
-    id: 2,
-    title: "Concert Experience - Lagos Show",
-    content:
-      "Attended the Lagos concert last night and it was absolutely incredible! The energy was unmatched. Erigga really knows how to connect with the crowd.",
-    author: {
-      id: 2,
-      username: "lagos_vibes",
-      avatar_url: "/placeholder-user.jpg",
-      tier: "elder",
-    },
-    category: "events",
-    likes: 45,
-    comments: 12,
-    shares: 7,
-    created_at: "2024-01-14T15:45:00Z",
-    liked_by_user: true,
-  },
-  {
-    id: 3,
-    title: "Favorite Erigga lyrics of all time",
-    content:
-      "What are your favorite Erigga lyrics? Mine has to be from 'The Erigma' - so much depth and meaning. Let's share our favorites!",
-    author: {
-      id: 3,
-      username: "lyric_lover",
-      avatar_url: "/placeholder-user.jpg",
-      tier: "grassroot",
-    },
-    category: "discussion",
-    likes: 18,
-    comments: 23,
-    shares: 5,
-    created_at: "2024-01-13T09:20:00Z",
-    liked_by_user: false,
-  },
-]
+interface CommunityPost {
+  id: number
+  user_id: number
+  category_id: number
+  content: string
+  media_url?: string
+  media_type?: string
+  hashtags?: string[]
+  vote_count: number
+  comment_count: number
+  view_count: number
+  is_pinned: boolean
+  is_featured: boolean
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  user: {
+    id: number
+    username: string
+    display_name?: string
+    avatar_url?: string
+    subscription_tier: string
+    is_verified: boolean
+  }
+  category: {
+    id: number
+    name: string
+    slug: string
+    icon?: string
+    color?: string
+  }
+  has_voted?: boolean
+  user_vote_type?: "up" | "down" | null
+}
 
-const mockCategories = [
-  { id: "all", name: "All Posts", count: 156 },
-  { id: "music", name: "Music", count: 89 },
-  { id: "events", name: "Events", count: 34 },
-  { id: "discussion", name: "Discussion", count: 67 },
-  { id: "news", name: "News", count: 23 },
-  { id: "fan-art", name: "Fan Art", count: 12 },
-]
+interface CommunityCategory {
+  id: number
+  name: string
+  slug: string
+  description?: string
+  icon?: string
+  color?: string
+  is_active: boolean
+  post_count?: number
+}
 
 export default function CommunityPage() {
-  const { user, profile, isAuthenticated } = useAuth()
-  const [posts, setPosts] = useState(mockPosts)
-  const [categories, setCategories] = useState(mockCategories)
-  const [selectedCategory, setSelectedCategory] = useState("all")
+  const { user, profile, isAuthenticated, loading: authLoading } = useAuth()
+  const [posts, setPosts] = useState<CommunityPost[]>([])
+  const [categories, setCategories] = useState<CommunityCategory[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState("recent")
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newPost, setNewPost] = useState({
-    title: "",
     content: "",
-    category: "discussion",
+    category_id: 1,
+    hashtags: [] as string[],
   })
   const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [activeTab, setActiveTab] = useState("feed")
 
   const supabase = createClient()
 
-  useEffect(() => {
-    const fetchPosts = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("community_posts")
-          .select(`
-            *,
-            users (
-              username,
-              avatar_url,
-              tier
-            )
-          `)
-          .order("created_at", { ascending: false })
+  // Fetch categories
+  const fetchCategories = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("community_categories")
+        .select("*")
+        .eq("is_active", true)
+        .order("name")
 
-        if (error) {
-          console.error("Error fetching posts:", error)
-          // Use mock data as fallback
-          setPosts(mockPosts)
-        } else if (data) {
-          setPosts(data)
-        }
-      } catch (error) {
-        console.error("Error fetching posts:", error)
-        setPosts(mockPosts)
-      } finally {
-        setIsLoading(false)
+      if (error) {
+        console.error("Error fetching categories:", error)
+        // Fallback categories
+        setCategories([
+          { id: 1, name: "General", slug: "general", icon: "💬", color: "#3B82F6", is_active: true },
+          { id: 2, name: "Music", slug: "music", icon: "🎵", color: "#8B5CF6", is_active: true },
+          { id: 3, name: "Events", slug: "events", icon: "📅", color: "#10B981", is_active: true },
+          { id: 4, name: "Fan Art", slug: "fan-art", icon: "🎨", color: "#F59E0B", is_active: true },
+        ])
+      } else {
+        setCategories(data || [])
       }
+    } catch (error) {
+      console.error("Error fetching categories:", error)
     }
-
-    fetchPosts()
   }, [supabase])
 
+  // Fetch posts with user votes
+  const fetchPosts = useCallback(async () => {
+    try {
+      setIsLoading(true)
+
+      let query = supabase
+        .from("community_posts")
+        .select(`
+          *,
+          user:users!community_posts_user_id_fkey (
+            id,
+            username,
+            display_name,
+            avatar_url,
+            subscription_tier,
+            is_verified
+          ),
+          category:community_categories!community_posts_category_id_fkey (
+            id,
+            name,
+            slug,
+            icon,
+            color
+          )
+        `)
+        .eq("is_active", true)
+
+      // Apply category filter
+      if (selectedCategory) {
+        query = query.eq("category_id", selectedCategory)
+      }
+
+      // Apply search filter
+      if (searchQuery.trim()) {
+        query = query.ilike("content", `%${searchQuery.trim()}%`)
+      }
+
+      // Apply sorting
+      switch (sortBy) {
+        case "popular":
+          query = query.order("vote_count", { ascending: false })
+          break
+        case "discussed":
+          query = query.order("comment_count", { ascending: false })
+          break
+        case "recent":
+        default:
+          query = query.order("created_at", { ascending: false })
+          break
+      }
+
+      const { data: postsData, error } = await query.limit(50)
+
+      if (error) {
+        console.error("Error fetching posts:", error)
+        toast.error("Failed to load posts")
+        return
+      }
+
+      // If user is authenticated, fetch their votes
+      let postsWithVotes = postsData || []
+      if (isAuthenticated && profile && postsData) {
+        const postIds = postsData.map((post) => post.id)
+        const { data: votesData } = await supabase
+          .from("community_post_votes")
+          .select("post_id, vote_type")
+          .eq("user_id", profile.id)
+          .in("post_id", postIds)
+
+        const userVotes = new Map(votesData?.map((vote) => [vote.post_id, vote.vote_type]) || [])
+
+        postsWithVotes = postsData.map((post) => ({
+          ...post,
+          has_voted: userVotes.has(post.id),
+          user_vote_type: userVotes.get(post.id) || null,
+        }))
+      }
+
+      setPosts(postsWithVotes)
+    } catch (error) {
+      console.error("Error fetching posts:", error)
+      toast.error("Failed to load posts")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [supabase, selectedCategory, searchQuery, sortBy, isAuthenticated, profile])
+
+  // Create new post
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !profile) {
       toast.error("Please sign in to create a post")
       return
     }
 
-    if (!newPost.title.trim() || !newPost.content.trim()) {
-      toast.error("Please fill in all fields")
+    if (!newPost.content.trim()) {
+      toast.error("Please enter some content")
       return
     }
 
+    setIsSubmitting(true)
+
     try {
+      // Extract hashtags from content
+      const hashtagMatches = newPost.content.match(/#\w+/g)
+      const hashtags = hashtagMatches ? hashtagMatches.map((tag) => tag.slice(1)) : []
+
       const { data, error } = await supabase
         .from("community_posts")
-        .insert([
-          {
-            title: newPost.title,
-            content: newPost.content,
-            category: newPost.category,
-            user_id: user?.id,
-          },
-        ])
-        .select()
+        .insert({
+          user_id: profile.id,
+          category_id: newPost.category_id,
+          content: newPost.content.trim(),
+          hashtags: hashtags,
+          vote_count: 0,
+          comment_count: 0,
+          view_count: 0,
+          is_pinned: false,
+          is_featured: false,
+          is_active: true,
+        })
+        .select(`
+          *,
+          user:users!community_posts_user_id_fkey (
+            id,
+            username,
+            display_name,
+            avatar_url,
+            subscription_tier,
+            is_verified
+          ),
+          category:community_categories!community_posts_category_id_fkey (
+            id,
+            name,
+            slug,
+            icon,
+            color
+          )
+        `)
+        .single()
 
       if (error) {
         console.error("Error creating post:", error)
         toast.error("Failed to create post")
-      } else {
-        toast.success("Post created successfully!")
-        setNewPost({ title: "", content: "", category: "discussion" })
-        setIsCreateDialogOpen(false)
-        // Refresh posts
-        window.location.reload()
+        return
       }
+
+      // Update user's total posts count
+      await supabase
+        .from("users")
+        .update({ total_posts: (profile.total_posts || 0) + 1 })
+        .eq("id", profile.id)
+
+      // Add new post to the beginning of the list
+      setPosts((prevPosts) => [{ ...data, has_voted: false, user_vote_type: null }, ...prevPosts])
+
+      // Reset form
+      setNewPost({ content: "", category_id: 1, hashtags: [] })
+      setIsCreateDialogOpen(false)
+      setActiveTab("feed")
+
+      toast.success("Post created successfully!")
     } catch (error) {
       console.error("Error creating post:", error)
       toast.error("Failed to create post")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
-  const handleLikePost = async (postId: number) => {
-    if (!isAuthenticated) {
-      toast.error("Please sign in to like posts")
+  // Handle voting
+  const handleVote = async (postId: number, voteType: "up" | "down") => {
+    if (!isAuthenticated || !profile) {
+      toast.error("Please sign in to vote")
       return
     }
 
-    // Update UI immediately for better UX
-    setPosts((prevPosts) =>
-      prevPosts.map((post) =>
-        post.id === postId
-          ? {
-              ...post,
-              likes: post.liked_by_user ? post.likes - 1 : post.likes + 1,
-              liked_by_user: !post.liked_by_user,
-            }
-          : post,
-      ),
-    )
+    try {
+      const post = posts.find((p) => p.id === postId)
+      if (!post) return
 
-    // Here you would typically make an API call to update the like status
-    // For now, we'll just show a toast
-    toast.success("Post liked!")
-  }
+      // Check if user already voted
+      const { data: existingVote } = await supabase
+        .from("community_post_votes")
+        .select("vote_type")
+        .eq("post_id", postId)
+        .eq("user_id", profile.id)
+        .single()
 
-  const filteredPosts = posts.filter((post) => {
-    const matchesCategory = selectedCategory === "all" || post.category === selectedCategory
-    const matchesSearch =
-      post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      post.content.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesSearch
-  })
+      let newVoteCount = post.vote_count
+      let hasVoted = false
+      let userVoteType: "up" | "down" | null = null
 
-  const sortedPosts = filteredPosts.sort((a, b) => {
-    switch (sortBy) {
-      case "popular":
-        return b.likes - a.likes
-      case "discussed":
-        return b.comments - a.comments
-      case "recent":
-      default:
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      if (existingVote) {
+        if (existingVote.vote_type === voteType) {
+          // Remove vote
+          await supabase.from("community_post_votes").delete().eq("post_id", postId).eq("user_id", profile.id)
+
+          newVoteCount = existingVote.vote_type === "up" ? post.vote_count - 1 : post.vote_count + 1
+          hasVoted = false
+          userVoteType = null
+        } else {
+          // Change vote
+          await supabase
+            .from("community_post_votes")
+            .update({ vote_type: voteType })
+            .eq("post_id", postId)
+            .eq("user_id", profile.id)
+
+          newVoteCount = voteType === "up" ? post.vote_count + 2 : post.vote_count - 2
+          hasVoted = true
+          userVoteType = voteType
+        }
+      } else {
+        // Add new vote
+        await supabase.from("community_post_votes").insert({
+          post_id: postId,
+          user_id: profile.id,
+          vote_type: voteType,
+        })
+
+        newVoteCount = voteType === "up" ? post.vote_count + 1 : post.vote_count - 1
+        hasVoted = true
+        userVoteType = voteType
+      }
+
+      // Update post vote count
+      await supabase.from("community_posts").update({ vote_count: newVoteCount }).eq("id", postId)
+
+      // Update local state
+      setPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p.id === postId ? { ...p, vote_count: newVoteCount, has_voted: hasVoted, user_vote_type: userVoteType } : p,
+        ),
+      )
+
+      // Award coins to post author if upvoted
+      if (voteType === "up" && !existingVote) {
+        const { data: postAuthor } = await supabase
+          .from("users")
+          .select("coins_balance, total_votes_received")
+          .eq("id", post.user_id)
+          .single()
+
+        if (postAuthor) {
+          await supabase
+            .from("users")
+            .update({
+              coins_balance: postAuthor.coins_balance + 10,
+              total_votes_received: postAuthor.total_votes_received + 1,
+            })
+            .eq("id", post.user_id)
+
+          // Create coin transaction record
+          await supabase.from("coin_transactions").insert({
+            user_id: post.user_id,
+            transaction_type: "reward",
+            amount: 10,
+            balance_after: postAuthor.coins_balance + 10,
+            description: "Received upvote on post",
+            reference_id: postId.toString(),
+            status: "completed",
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Error voting:", error)
+      toast.error("Failed to vote")
     }
-  })
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
   }
 
+  // Get tier color
   const getTierColor = (tier: string) => {
-    switch (tier) {
-      case "blood_brotherhood":
+    switch (tier?.toLowerCase()) {
+      case "blood":
         return "bg-red-500"
       case "elder":
         return "bg-purple-500"
@@ -241,9 +405,62 @@ export default function CommunityPage() {
         return "bg-blue-500"
       case "grassroot":
         return "bg-green-500"
+      case "general":
       default:
         return "bg-gray-500"
     }
+  }
+
+  // Get tier display name
+  const getTierDisplayName = (tier: string) => {
+    switch (tier?.toLowerCase()) {
+      case "blood":
+        return "Blood"
+      case "elder":
+        return "Elder"
+      case "pioneer":
+        return "Pioneer"
+      case "grassroot":
+        return "Grassroot"
+      case "general":
+      default:
+        return "General"
+    }
+  }
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    try {
+      return formatDistanceToNow(new Date(dateString), { addSuffix: true })
+    } catch {
+      return "Recently"
+    }
+  }
+
+  // Filter posts for "My Posts" tab
+  const userPosts = posts.filter((post) => post.user_id === profile?.id)
+
+  useEffect(() => {
+    fetchCategories()
+  }, [fetchCategories])
+
+  useEffect(() => {
+    if (!authLoading) {
+      fetchPosts()
+    }
+  }, [fetchPosts, authLoading])
+
+  if (authLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -268,30 +485,23 @@ export default function CommunityPage() {
               </DialogHeader>
               <form onSubmit={handleCreatePost} className="space-y-4">
                 <div>
-                  <Label htmlFor="title">Title</Label>
-                  <Input
-                    id="title"
-                    value={newPost.title}
-                    onChange={(e) => setNewPost((prev) => ({ ...prev, title: e.target.value }))}
-                    placeholder="Enter post title..."
-                    required
-                  />
-                </div>
-                <div>
                   <Label htmlFor="category">Category</Label>
                   <Select
-                    value={newPost.category}
-                    onValueChange={(value) => setNewPost((prev) => ({ ...prev, category: value }))}
+                    value={newPost.category_id.toString()}
+                    onValueChange={(value) => setNewPost((prev) => ({ ...prev, category_id: Number.parseInt(value) }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="music">Music</SelectItem>
-                      <SelectItem value="events">Events</SelectItem>
-                      <SelectItem value="discussion">Discussion</SelectItem>
-                      <SelectItem value="news">News</SelectItem>
-                      <SelectItem value="fan-art">Fan Art</SelectItem>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            {category.icon && <span>{category.icon}</span>}
+                            {category.name}
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -301,16 +511,21 @@ export default function CommunityPage() {
                     id="content"
                     value={newPost.content}
                     onChange={(e) => setNewPost((prev) => ({ ...prev, content: e.target.value }))}
-                    placeholder="What's on your mind?"
+                    placeholder="What's on your mind? Use #hashtags to categorize your post..."
                     rows={4}
                     required
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Tip: Use #hashtags to make your post discoverable
+                  </p>
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit">Create Post</Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Creating..." : "Create Post"}
+                  </Button>
                 </div>
               </form>
             </DialogContent>
@@ -329,6 +544,19 @@ export default function CommunityPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className={`w-full flex items-center justify-between p-2 rounded-lg transition-colors ${
+                  selectedCategory === null
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <span className="text-sm font-medium">All Posts</span>
+                <Badge variant="secondary" className="text-xs">
+                  {posts.length}
+                </Badge>
+              </button>
               {categories.map((category) => (
                 <button
                   key={category.id}
@@ -339,9 +567,12 @@ export default function CommunityPage() {
                       : "hover:bg-slate-100 dark:hover:bg-slate-800"
                   }`}
                 >
-                  <span className="text-sm font-medium">{category.name}</span>
+                  <div className="flex items-center gap-2">
+                    {category.icon && <span>{category.icon}</span>}
+                    <span className="text-sm font-medium">{category.name}</span>
+                  </div>
                   <Badge variant="secondary" className="text-xs">
-                    {category.count}
+                    {posts.filter((p) => p.category_id === category.id).length}
                   </Badge>
                 </button>
               ))}
@@ -359,23 +590,23 @@ export default function CommunityPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm">Total Members</span>
+                  <span className="text-sm">Total Posts</span>
                 </div>
-                <span className="font-semibold">2,456</span>
+                <span className="font-semibold">{posts.length}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <MessageSquare className="h-4 w-4 text-green-500" />
-                  <span className="text-sm">Posts Today</span>
+                  <span className="text-sm">Active Users</span>
                 </div>
-                <span className="font-semibold">23</span>
+                <span className="font-semibold">{new Set(posts.map((p) => p.user_id)).size}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Heart className="h-4 w-4 text-red-500" />
-                  <span className="text-sm">Likes Today</span>
+                  <span className="text-sm">Total Votes</span>
                 </div>
-                <span className="font-semibold">186</span>
+                <span className="font-semibold">{posts.reduce((sum, p) => sum + p.vote_count, 0)}</span>
               </div>
             </CardContent>
           </Card>
@@ -383,95 +614,234 @@ export default function CommunityPage() {
 
         {/* Main Content */}
         <div className="lg:col-span-3">
-          {/* Search and Sort */}
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search posts..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full md:w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="recent">Most Recent</SelectItem>
-                <SelectItem value="popular">Most Popular</SelectItem>
-                <SelectItem value="discussed">Most Discussed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="feed" className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Feed
+              </TabsTrigger>
+              {isAuthenticated && (
+                <TabsTrigger value="my-posts" className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  My Posts ({userPosts.length})
+                </TabsTrigger>
+              )}
+            </TabsList>
 
-          {/* Posts */}
-          <div className="space-y-6">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p className="text-muted-foreground">Loading posts...</p>
+            <TabsContent value="feed" className="space-y-6">
+              {/* Search and Sort */}
+              <div className="flex flex-col md:flex-row gap-4 mb-6">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search posts..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-full md:w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="recent">Most Recent</SelectItem>
+                    <SelectItem value="popular">Most Popular</SelectItem>
+                    <SelectItem value="discussed">Most Discussed</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            ) : sortedPosts.length === 0 ? (
-              <div className="text-center py-12">
-                <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No posts found</h3>
-                <p className="text-muted-foreground">
-                  {searchQuery ? "Try adjusting your search terms" : "Be the first to start a discussion!"}
-                </p>
-              </div>
-            ) : (
-              sortedPosts.map((post) => (
-                <Card key={post.id} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-start gap-4">
-                      <Avatar className="h-10 w-10 ring-2 ring-white/20">
-                        <AvatarImage src={post.author.avatar_url || "/placeholder.svg"} />
-                        <AvatarFallback className={`${getTierColor(post.author.tier)} text-white`}>
-                          {post.author.username.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="font-semibold">{post.author.username}</span>
-                          <Badge variant="secondary" className="text-xs">
-                            {post.author.tier}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">{formatDate(post.created_at)}</span>
-                        </div>
-                        <h3 className="text-lg font-semibold mb-2">{post.title}</h3>
-                        <p className="text-muted-foreground mb-4 line-clamp-3">{post.content}</p>
-                        <div className="flex items-center gap-4">
-                          <button
-                            onClick={() => handleLikePost(post.id)}
-                            className={`flex items-center gap-2 px-3 py-1 rounded-full transition-colors ${
-                              post.liked_by_user
-                                ? "bg-red-50 text-red-600 dark:bg-red-900/20"
-                                : "hover:bg-slate-100 dark:hover:bg-slate-800"
-                            }`}
-                          >
-                            <Heart className={`h-4 w-4 ${post.liked_by_user ? "fill-current" : ""}`} />
-                            <span className="text-sm">{post.likes}</span>
-                          </button>
-                          <button className="flex items-center gap-2 px-3 py-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                            <MessageSquare className="h-4 w-4" />
-                            <span className="text-sm">{post.comments}</span>
-                          </button>
-                          <button className="flex items-center gap-2 px-3 py-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                            <Share2 className="h-4 w-4" />
-                            <span className="text-sm">{post.shares}</span>
-                          </button>
-                        </div>
-                      </div>
+
+              {/* Posts */}
+              <div className="space-y-6">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading posts...</p>
                     </div>
-                  </CardContent>
-                </Card>
-              ))
+                  </div>
+                ) : posts.length === 0 ? (
+                  <div className="text-center py-12">
+                    <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No posts found</h3>
+                    <p className="text-muted-foreground mb-4">
+                      {searchQuery || selectedCategory
+                        ? "Try adjusting your search or filters"
+                        : "Be the first to start a discussion!"}
+                    </p>
+                    {isAuthenticated && (
+                      <Button onClick={() => setIsCreateDialogOpen(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create First Post
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  posts.map((post) => (
+                    <Card key={post.id} className="hover:shadow-lg transition-shadow">
+                      <CardContent className="p-6">
+                        {post.is_pinned && (
+                          <div className="flex items-center gap-2 mb-3 text-orange-600 dark:text-orange-400">
+                            <Pin className="h-4 w-4" />
+                            <span className="text-sm font-medium">Pinned Post</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-start gap-4">
+                          <Avatar className="h-10 w-10 ring-2 ring-white/20">
+                            <AvatarImage src={post.user.avatar_url || "/placeholder.svg"} />
+                            <AvatarFallback className={`${getTierColor(post.user.subscription_tier)} text-white`}>
+                              {post.user.username.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="font-semibold">{post.user.display_name || post.user.username}</span>
+                              {post.user.is_verified && <Star className="h-4 w-4 text-yellow-500 fill-current" />}
+                              <Badge variant="secondary" className="text-xs">
+                                {getTierDisplayName(post.user.subscription_tier)}
+                              </Badge>
+                              <Badge
+                                variant="outline"
+                                className="text-xs"
+                                style={{
+                                  borderColor: post.category.color,
+                                  color: post.category.color,
+                                }}
+                              >
+                                {post.category.icon} {post.category.name}
+                              </Badge>
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Clock className="h-3 w-3" />
+                                {formatDate(post.created_at)}
+                              </div>
+                            </div>
+
+                            <p className="text-muted-foreground mb-4 whitespace-pre-wrap">{post.content}</p>
+
+                            {post.hashtags && post.hashtags.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mb-4">
+                                {post.hashtags.map((hashtag, index) => (
+                                  <Badge key={index} variant="secondary" className="text-xs">
+                                    #{hashtag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleVote(post.id, "up")}
+                                    className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${
+                                      post.user_vote_type === "up"
+                                        ? "bg-green-50 text-green-600 dark:bg-green-900/20"
+                                        : "hover:bg-slate-100 dark:hover:bg-slate-800"
+                                    }`}
+                                    disabled={!isAuthenticated}
+                                  >
+                                    <Heart
+                                      className={`h-4 w-4 ${post.user_vote_type === "up" ? "fill-current" : ""}`}
+                                    />
+                                  </button>
+                                  <span className="text-sm font-medium">{post.vote_count}</span>
+                                </div>
+
+                                <button className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                  <MessageSquare className="h-4 w-4" />
+                                  <span className="text-sm">{post.comment_count}</span>
+                                </button>
+
+                                <button className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                  <Share2 className="h-4 w-4" />
+                                </button>
+                              </div>
+
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Eye className="h-3 w-3" />
+                                {post.view_count}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </TabsContent>
+
+            {isAuthenticated && (
+              <TabsContent value="my-posts" className="space-y-6">
+                <div className="space-y-6">
+                  {userPosts.length === 0 ? (
+                    <div className="text-center py-12">
+                      <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">No posts yet</h3>
+                      <p className="text-muted-foreground mb-4">
+                        You haven't created any posts yet. Start sharing with the community!
+                      </p>
+                      <Button onClick={() => setIsCreateDialogOpen(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Your First Post
+                      </Button>
+                    </div>
+                  ) : (
+                    userPosts.map((post) => (
+                      <Card key={post.id} className="hover:shadow-lg transition-shadow">
+                        <CardContent className="p-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <Badge
+                              variant="outline"
+                              className="text-xs"
+                              style={{
+                                borderColor: post.category.color,
+                                color: post.category.color,
+                              }}
+                            >
+                              {post.category.icon} {post.category.name}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">{formatDate(post.created_at)}</span>
+                          </div>
+
+                          <p className="text-muted-foreground mb-4 whitespace-pre-wrap">{post.content}</p>
+
+                          {post.hashtags && post.hashtags.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-4">
+                              {post.hashtags.map((hashtag, index) => (
+                                <Badge key={index} variant="secondary" className="text-xs">
+                                  #{hashtag}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Heart className="h-4 w-4" />
+                                {post.vote_count}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <MessageSquare className="h-4 w-4" />
+                                {post.comment_count}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Eye className="h-4 w-4" />
+                                {post.view_count}
+                              </span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </TabsContent>
             )}
-          </div>
+          </Tabs>
         </div>
       </div>
     </div>

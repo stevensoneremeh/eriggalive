@@ -11,19 +11,21 @@ interface UserProfile {
   id: number
   auth_user_id: string
   username: string
+  display_name?: string
   full_name?: string
   email: string
-  tier: string
+  subscription_tier: string
   coins_balance: number
   avatar_url?: string
-  level: number
-  points: number
-  reputation_score: number
-  role: string
-  is_active: boolean
+  bio?: string
+  location?: string
+  website?: string
+  total_posts: number
+  total_votes_received: number
+  total_comments: number
   is_verified: boolean
-  is_banned: boolean
-  last_seen?: string
+  is_active: boolean
+  last_seen_at?: string
   created_at: string
   updated_at: string
 }
@@ -34,7 +36,7 @@ interface AuthContextType {
   profile: UserProfile | null
   loading: boolean
   isAuthenticated: boolean
-  signUp: (email: string, password: string) => Promise<{ error: any }>
+  signUp: (email: string, password: string, username: string) => Promise<{ error: any }>
   signIn: (email: string, password: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error: any }>
@@ -56,6 +58,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Initialize supabase client
   const supabase = createClient()
 
+  const createUserProfile = useCallback(
+    async (authUser: User, username: string) => {
+      try {
+        const { data, error } = await supabase
+          .from("users")
+          .insert({
+            auth_user_id: authUser.id,
+            username: username,
+            display_name: username,
+            email: authUser.email || "",
+            subscription_tier: "general",
+            coins_balance: 1000, // Starting coins
+            total_posts: 0,
+            total_votes_received: 0,
+            total_comments: 0,
+            is_verified: false,
+            is_active: true,
+            last_seen_at: new Date().toISOString(),
+          })
+          .select()
+          .single()
+
+        if (error) {
+          console.error("Error creating user profile:", error)
+          return null
+        }
+
+        return data as UserProfile
+      } catch (error) {
+        console.error("Error in createUserProfile:", error)
+        return null
+      }
+    },
+    [supabase],
+  )
+
   const fetchUserProfile = useCallback(
     async (userId: string) => {
       try {
@@ -70,6 +108,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error("Error fetching user profile:", error)
           return null
         }
+
+        // Update last seen
+        await supabase.from("users").update({ last_seen_at: new Date().toISOString() }).eq("auth_user_id", userId)
 
         return data as UserProfile
       } catch (error) {
@@ -189,16 +230,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         hasShownWelcomeToast.current = false
         // Only redirect to home if user is on a protected page
         const currentPath = window.location.pathname
-        const protectedPaths = [
-          "/dashboard",
-          "/community",
-          "/vault",
-          "/coins",
-          "/profile",
-          "/meet-greet",
-          "/admin",
-          "/premium",
-        ]
+        const protectedPaths = ["/dashboard", "/vault", "/coins", "/profile", "/meet-greet", "/admin", "/premium"]
 
         if (protectedPaths.some((path) => currentPath.startsWith(path))) {
           router.push("/")
@@ -211,18 +243,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [router, fetchUserProfile])
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, username: string) => {
     try {
       if (!supabase?.auth) {
         throw new Error("Authentication not available")
       }
 
       setLoading(true)
+
+      // Check if username is already taken
+      const { data: existingUser } = await supabase.from("users").select("username").eq("username", username).single()
+
+      if (existingUser) {
+        return { error: { message: "Username is already taken" } }
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/dashboard`,
+          data: {
+            username: username,
+          },
         },
       })
 
@@ -230,6 +273,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error("Signup error:", error)
         toast.error(error.message || "Failed to create account")
         return { error }
+      }
+
+      if (data.user) {
+        // Create user profile
+        const profileData = await createUserProfile(data.user, username)
+        if (profileData) {
+          setProfile(profileData)
+        }
       }
 
       toast.success("Account created successfully! Please check your email to verify your account.")
