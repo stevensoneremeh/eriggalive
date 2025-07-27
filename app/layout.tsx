@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
-import { ThemeProvider } from "@/components/theme-provider"
+import { ThemeProvider } from "@/contexts/theme-context"
 import { Toaster } from "@/components/ui/sonner"
 import { SessionRefresh } from "@/components/session-refresh"
 import { UnifiedNavigation } from "@/components/navigation/unified-navigation"
@@ -42,7 +42,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider>
           <AuthProvider>
             <SessionRefresh />
             <UnifiedNavigation />
