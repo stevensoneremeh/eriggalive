@@ -43,13 +43,26 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <NextThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <NextThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange={false}
+          storageKey="erigga-theme"
+        >
           <ThemeProvider>
             <AuthProvider>
               <SessionRefresh />
               <UnifiedNavigation />
-              <main className="pt-16 pb-20 md:pb-0 min-h-screen">{children}</main>
-              <Toaster />
+              <main className="pt-16 pb-20 md:pb-0 min-h-screen bg-background text-foreground transition-colors duration-300">
+                {children}
+              </main>
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  className: "bg-background border-border text-foreground",
+                }}
+              />
             </AuthProvider>
           </ThemeProvider>
         </NextThemeProvider>

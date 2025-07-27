@@ -1,297 +1,356 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Target, Heart, Users, Building, ArrowRight, Shield, Handshake, MessageSquare, Rocket } from "lucide-react"
-import Link from "next/link"
 import Image from "next/image"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Target, Users, Heart, Music, Mic, Star, ArrowRight, Quote, Play, Award, Globe, Zap } from "lucide-react"
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.2,
-    },
+const missionPoints = [
+  {
+    icon: Music,
+    title: "Authentic Street Music",
+    description: "Delivering raw, unfiltered music that speaks to the streets and resonates with real experiences.",
   },
-}
+  {
+    icon: Users,
+    title: "Community Building",
+    description: "Creating a platform where fans connect, share experiences, and build lasting relationships.",
+  },
+  {
+    icon: Heart,
+    title: "Cultural Impact",
+    description: "Preserving and promoting Nigerian street culture through music and storytelling.",
+  },
+  {
+    icon: Globe,
+    title: "Global Reach",
+    description: "Taking Nigerian street music to the world while staying true to our roots.",
+  },
+]
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.6,
-      ease: "easeOut",
-    },
-  },
-}
+const achievements = [
+  { number: "500K+", label: "Active Fans" },
+  { number: "50+", label: "Hit Songs" },
+  { number: "10+", label: "Years Active" },
+  { number: "100+", label: "Collaborations" },
+]
 
-const heroImageVariants = {
-  hidden: { opacity: 0, scale: 0.8 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: {
-      duration: 0.8,
-      ease: "easeOut",
-    },
+const coreValues = [
+  {
+    title: "Authenticity",
+    description: "We stay true to our roots and never compromise on our street credibility.",
+    icon: Star,
   },
-}
+  {
+    title: "Unity",
+    description: "We bring people together through music, regardless of their background.",
+    icon: Users,
+  },
+  {
+    title: "Excellence",
+    description: "We strive for the highest quality in everything we create and deliver.",
+    icon: Award,
+  },
+  {
+    title: "Innovation",
+    description: "We constantly evolve and push boundaries while respecting tradition.",
+    icon: Zap,
+  },
+]
 
 export default function MissionPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-black text-white overflow-hidden">
-      {/* Hero Background with Images */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="grid grid-cols-2 md:grid-cols-4 h-full">
-          <div className="relative">
-            <Image src="/images/hero/erigga1.jpeg" alt="Erigga" fill className="object-cover" priority />
-          </div>
-          <div className="relative">
-            <Image src="/images/hero/erigga2.jpeg" alt="Erigga" fill className="object-cover" />
-          </div>
-          <div className="relative">
-            <Image src="/images/hero/erigga3.jpeg" alt="Erigga" fill className="object-cover" />
-          </div>
-          <div className="relative">
-            <Image src="/images/hero/erigga4.jpeg" alt="Erigga" fill className="object-cover" />
-          </div>
-        </div>
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-slate-800/80 to-black/90" />
-      </div>
-
-      <motion.div
-        className="relative z-10 container mx-auto px-4 py-12 md:py-20"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        {/* Hero Section */}
-        <motion.div className="text-center mb-16 md:mb-24" variants={itemVariants}>
-          <motion.div className="inline-block mb-6" variants={heroImageVariants}>
-            <Badge className="bg-brand-lime text-black font-bold text-lg px-6 py-2 mb-4">ERIGGA PAPERBOI</Badge>
-          </motion.div>
-
-          <motion.h1
-            className="text-4xl md:text-6xl lg:text-8xl font-black mb-6 bg-gradient-to-r from-brand-lime via-brand-teal to-white bg-clip-text text-transparent leading-tight"
-            variants={itemVariants}
-          >
-            Purpose Over Hype
-          </motion.h1>
-
-          <motion.p
-            className="text-xl md:text-2xl text-slate-300 max-w-3xl mx-auto leading-relaxed"
-            variants={itemVariants}
-          >
-            A movement for the real ones.
-          </motion.p>
-        </motion.div>
-
-        {/* Main Mission Content */}
-        <motion.div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16" variants={itemVariants}>
-          {/* No Be Everybody Go Understand Section */}
-          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-            <CardContent className="p-8">
-              <h2 className="text-2xl md:text-3xl font-bold text-brand-lime mb-6">No Be Everybody Go Understand</h2>
-              <div className="space-y-4 text-slate-300 leading-relaxed">
-                <p>
-                  The music industry don turn rat race. Same cycle, same lies — sign contract, lose your soul, make
-                  small money, and fade. But not me. I no dey here to please anybody wey no dey from where I from.
-                </p>
-                <p>I dey here to shake table, build something real for the people wey truly dey believe.</p>
-                <p>
-                  This platform na for those wey sabi say Erigga na more than music — na message, na movement, na
-                  survival. Everything you see here — the music, the videos, the talks — na straight from my head, no
-                  manager wey go filter my voice.
-                </p>
-                <p className="text-brand-teal font-semibold">
-                  This na for my true fans — those wey dey with me from "Motivation" to "Problem Nor Dey Finish" — and
-                  still believe say we fit build street empire, from Warri to the world.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Real Impact Section */}
-          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-            <CardContent className="p-8">
-              <h2 className="text-2xl md:text-3xl font-bold text-brand-teal mb-6">Real Impact. No Gimmicks.</h2>
-              <div className="space-y-4 text-slate-300 leading-relaxed">
-                <p>
-                  I believe say music fit inspire, not just entertain. And now, we go use this platform to give back.
-                  Every merch wey you buy, every coin wey you spend go help us support families, boys and girls for the
-                  hood wey need help.
-                </p>
-                <p className="text-brand-lime font-semibold">
-                  We go show everything — full transparency. From school packs for kids, to food drives and community
-                  upgrades. Together, we go run am.
+    <div className="min-h-screen bg-background">
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-background via-muted/20 to-background">
+        <div className="absolute inset-0 bg-grid-pattern opacity-5" />
+        <div className="container mx-auto px-4 py-20">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <motion.div
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8 }}
+              className="space-y-8"
+            >
+              <div className="space-y-4">
+                <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0">
+                  <Target className="h-3 w-3 mr-1" />
+                  Our Mission
+                </Badge>
+                <h1 className="text-4xl md:text-6xl font-bold leading-tight">
+                  <span className="text-gradient">Erigga's</span>
+                  <br />
+                  <span className="text-foreground">Mission</span>
+                </h1>
+                <p className="text-xl text-muted-foreground leading-relaxed">
+                  To create authentic street music that connects with the people, builds community, and preserves the
+                  culture of Nigerian street life.
                 </p>
               </div>
 
-              <div className="mt-6 grid grid-cols-2 gap-4">
-                <div className="text-center p-4 bg-slate-700/50 rounded-lg">
-                  <Heart className="h-8 w-8 text-red-500 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">100%</div>
-                  <div className="text-sm text-slate-400">Transparency</div>
-                </div>
-                <div className="text-center p-4 bg-slate-700/50 rounded-lg">
-                  <Users className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-white">Community</div>
-                  <div className="text-sm text-slate-400">First</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Code of the Street Members */}
-        <motion.div className="mb-16" variants={itemVariants}>
-          <Card className="bg-gradient-to-r from-slate-800/80 to-slate-900/80 border-brand-lime/30 backdrop-blur-sm">
-            <CardContent className="p-8 md:p-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-center text-brand-lime mb-8">
-                Code of the Street Members
-              </h2>
-              <p className="text-xl text-center text-slate-300 mb-8">If you wan join, just know say:</p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <motion.div
-                  className="flex items-start space-x-4 p-4 bg-slate-700/30 rounded-lg"
-                  whileHover={{ scale: 1.02 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <Target className="h-8 w-8 text-brand-lime flex-shrink-0 mt-1" />
-                  <div>
-                    <h3 className="font-bold text-white mb-2">Purpose over hype</h3>
-                    <p className="text-slate-300 text-sm">we dey for long term, not trend.</p>
-                  </div>
-                </motion.div>
-
-                <motion.div
-                  className="flex items-start space-x-4 p-4 bg-slate-700/30 rounded-lg"
-                  whileHover={{ scale: 1.02 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <Handshake className="h-8 w-8 text-brand-teal flex-shrink-0 mt-1" />
-                  <div>
-                    <h3 className="font-bold text-white mb-2">Trust</h3>
-                    <p className="text-slate-300 text-sm">what happens in here, stays in here.</p>
-                  </div>
-                </motion.div>
-
-                <motion.div
-                  className="flex items-start space-x-4 p-4 bg-slate-700/30 rounded-lg"
-                  whileHover={{ scale: 1.02 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <MessageSquare className="h-8 w-8 text-yellow-500 flex-shrink-0 mt-1" />
-                  <div>
-                    <h3 className="font-bold text-white mb-2">Real talk only</h3>
-                    <p className="text-slate-300 text-sm">no fake love, no pretense.</p>
-                  </div>
-                </motion.div>
-
-                <motion.div
-                  className="flex items-start space-x-4 p-4 bg-slate-700/30 rounded-lg"
-                  whileHover={{ scale: 1.02 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <Rocket className="h-8 w-8 text-purple-500 flex-shrink-0 mt-1" />
-                  <div>
-                    <h3 className="font-bold text-white mb-2">Support</h3>
-                    <p className="text-slate-300 text-sm">we lift each other.</p>
-                  </div>
-                </motion.div>
-
-                <motion.div
-                  className="flex items-start space-x-4 p-4 bg-slate-700/30 rounded-lg md:col-span-2 lg:col-span-1"
-                  whileHover={{ scale: 1.02 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <Building className="h-8 w-8 text-orange-500 flex-shrink-0 mt-1" />
-                  <div>
-                    <h3 className="font-bold text-white mb-2">Build</h3>
-                    <p className="text-slate-300 text-sm">this na brick by brick, not clout.</p>
-                  </div>
-                </motion.div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Featured Images Gallery */}
-        <motion.div className="mb-16" variants={itemVariants}>
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-white mb-8">The Movement</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { src: "/images/hero/erigga2.jpeg", title: "Street Credibility" },
-              { src: "/images/hero/erigga3.jpeg", title: "Authentic Voice" },
-              { src: "/images/hero/erigga4.jpeg", title: "Community Impact" },
-            ].map((image, index) => (
-              <motion.div
-                key={index}
-                className="relative group cursor-pointer"
-                whileHover={{ scale: 1.05 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="relative h-64 md:h-80 rounded-lg overflow-hidden">
-                  <Image
-                    src={image.src || "/placeholder.svg"}
-                    alt={image.title}
-                    fill
-                    className="object-cover transition-transform duration-300 group-hover:scale-110"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                  <div className="absolute bottom-4 left-4 right-4">
-                    <h3 className="text-white font-bold text-lg">{image.title}</h3>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Call to Action */}
-        <motion.div className="text-center" variants={itemVariants}>
-          <Card className="bg-gradient-to-r from-brand-lime/20 to-brand-teal/20 border-brand-lime/50 backdrop-blur-sm">
-            <CardContent className="p-8 md:p-12">
-              <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
-                If this message enter your body — you already part of the mission.
-              </h2>
-              <p className="text-xl text-slate-300 mb-8">Let's get it.</p>
-              <div className="text-right">
-                <p className="text-brand-lime font-bold text-lg">— Erigga Paperboi</p>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
+              <div className="flex flex-col sm:flex-row gap-4">
                 <Link href="/community">
                   <Button
                     size="lg"
-                    className="bg-brand-lime text-black hover:bg-brand-lime/90 font-bold px-8 py-3 text-lg"
+                    className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
                   >
-                    Join Community
-                    <ArrowRight className="ml-2 h-5 w-5" />
+                    Join the Movement
+                    <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
                 <Link href="/vault">
                   <Button
                     size="lg"
                     variant="outline"
-                    className="border-brand-teal text-brand-teal hover:bg-brand-teal hover:text-black font-bold px-8 py-3 text-lg bg-transparent"
+                    className="border-primary text-primary hover:bg-primary hover:text-primary-foreground bg-transparent"
                   >
-                    Explore Vault
-                    <Shield className="ml-2 h-5 w-5" />
+                    <Play className="mr-2 h-4 w-4" />
+                    Explore Music
                   </Button>
                 </Link>
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </motion.div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="relative"
+            >
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div className="relative overflow-hidden rounded-2xl shadow-2xl">
+                    <Image
+                      src="/images/hero/erigga1.jpeg"
+                      alt="Erigga performing"
+                      width={300}
+                      height={400}
+                      className="object-cover w-full h-64 hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                  <div className="relative overflow-hidden rounded-2xl shadow-2xl">
+                    <Image
+                      src="/images/hero/erigga3.jpeg"
+                      alt="Erigga in studio"
+                      width={300}
+                      height={300}
+                      className="object-cover w-full h-48 hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-4 pt-8">
+                  <div className="relative overflow-hidden rounded-2xl shadow-2xl">
+                    <Image
+                      src="/images/hero/erigga2.jpeg"
+                      alt="Erigga with fans"
+                      width={300}
+                      height={300}
+                      className="object-cover w-full h-48 hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                  <div className="relative overflow-hidden rounded-2xl shadow-2xl">
+                    <Image
+                      src="/images/hero/erigga4.jpeg"
+                      alt="Erigga lifestyle"
+                      width={300}
+                      height={400}
+                      className="object-cover w-full h-64 hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Mission Statement */}
+      <section className="py-20 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+            className="max-w-4xl mx-auto text-center space-y-8"
+          >
+            <Quote className="h-12 w-12 text-primary mx-auto" />
+            <blockquote className="text-2xl md:text-3xl font-medium leading-relaxed text-foreground">
+              "My mission is to be the voice of the streets, to tell our stories through music, and to create a
+              community where everyone feels heard and valued. Music is not just entertainment—it's a movement, it's
+              culture, it's life."
+            </blockquote>
+            <div className="flex items-center justify-center space-x-4">
+              <div className="h-12 w-12 rounded-full bg-gradient-to-r from-orange-500 to-red-500 flex items-center justify-center">
+                <Mic className="h-6 w-6 text-white" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-lg">Erigga</p>
+                <p className="text-muted-foreground">Paper Boi</p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Mission Points */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+            className="text-center space-y-4 mb-16"
+          >
+            <h2 className="text-3xl md:text-4xl font-bold">What Drives Us</h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Our mission is built on four core pillars that guide everything we do
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {missionPoints.map((point, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 50 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: index * 0.1 }}
+                viewport={{ once: true }}
+              >
+                <Card className="h-full hover:shadow-lg transition-all duration-300 border-border/50 hover:border-primary/50">
+                  <CardContent className="p-6 text-center space-y-4">
+                    <div className="h-16 w-16 rounded-full bg-gradient-to-r from-orange-500 to-red-500 flex items-center justify-center mx-auto">
+                      <point.icon className="h-8 w-8 text-white" />
+                    </div>
+                    <h3 className="text-xl font-semibold">{point.title}</h3>
+                    <p className="text-muted-foreground leading-relaxed">{point.description}</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Achievements */}
+      <section className="py-20 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+            className="text-center space-y-4 mb-16"
+          >
+            <h2 className="text-3xl md:text-4xl font-bold">Our Impact</h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Numbers that tell the story of our journey and community
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+            {achievements.map((achievement, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, scale: 0.8 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.8, delay: index * 0.1 }}
+                viewport={{ once: true }}
+                className="text-center space-y-2"
+              >
+                <div className="text-4xl md:text-5xl font-bold text-gradient">{achievement.number}</div>
+                <div className="text-muted-foreground font-medium">{achievement.label}</div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Core Values */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+            className="text-center space-y-4 mb-16"
+          >
+            <h2 className="text-3xl md:text-4xl font-bold">Our Core Values</h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              The principles that guide our music, community, and everything we stand for
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            {coreValues.map((value, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, x: index % 2 === 0 ? -50 : 50 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.8, delay: index * 0.2 }}
+                viewport={{ once: true }}
+              >
+                <Card className="h-full hover:shadow-lg transition-all duration-300 border-border/50 hover:border-primary/50">
+                  <CardContent className="p-8 space-y-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="h-12 w-12 rounded-full bg-gradient-to-r from-orange-500 to-red-500 flex items-center justify-center">
+                        <value.icon className="h-6 w-6 text-white" />
+                      </div>
+                      <h3 className="text-2xl font-semibold">{value.title}</h3>
+                    </div>
+                    <p className="text-muted-foreground leading-relaxed text-lg">{value.description}</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Call to Action */}
+      <section className="py-20 bg-gradient-to-r from-orange-500/10 via-red-500/10 to-pink-500/10">
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+            className="text-center space-y-8 max-w-4xl mx-auto"
+          >
+            <h2 className="text-3xl md:text-4xl font-bold">Ready to Join the Movement?</h2>
+            <p className="text-xl text-muted-foreground leading-relaxed">
+              Be part of something bigger. Connect with fellow fans, access exclusive content, and experience the
+              authentic street culture that Erigga represents.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href="/signup">
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-8"
+                >
+                  Join the Community
+                  <Users className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+              <Link href="/premium">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="border-primary text-primary hover:bg-primary hover:text-primary-foreground px-8 bg-transparent"
+                >
+                  Explore Premium
+                  <Star className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+      </section>
     </div>
   )
 }
