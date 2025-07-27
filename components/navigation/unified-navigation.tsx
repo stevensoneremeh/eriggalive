@@ -116,7 +116,7 @@ export function UnifiedNavigation() {
 
   const pathname = usePathname()
   const router = useRouter()
-  const { user, profile, signOut, isAuthenticated, isLoading } = useAuth()
+  const { user, profile, signOut, isAuthenticated, loading } = useAuth()
   const { theme, setTheme, resolvedTheme, isLoading: themeLoading } = useTheme()
 
   // Screen size detection
@@ -219,7 +219,7 @@ export function UnifiedNavigation() {
         {/* Top Header for Mobile */}
         <header
           className={cn(
-            "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+            "fixed top-0 left-0 right-0 z-50 transition-all duration-300 md:hidden",
             isScrolled ? "bg-background/95 backdrop-blur-md shadow-lg" : "bg-background/80 backdrop-blur-sm",
           )}
         >
@@ -259,7 +259,7 @@ export function UnifiedNavigation() {
         </header>
 
         {/* Bottom Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-t border-border/50">
+        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-t border-border/50 md:hidden">
           <div className="flex items-center justify-around py-2 px-2">
             {getMobileItems().map((item) => {
               const Icon = item.icon
@@ -310,7 +310,7 @@ export function UnifiedNavigation() {
   return (
     <header
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 hidden md:block",
         isScrolled ? "bg-background/95 backdrop-blur-md shadow-lg" : "bg-background/80 backdrop-blur-sm",
       )}
     >
@@ -389,13 +389,13 @@ export function UnifiedNavigation() {
             </div>
 
             {/* User Actions */}
-            {!isLoading && (
+            {!loading && (
               <>
                 {isAuthenticated && profile ? (
                   <>
                     <div className="hidden md:flex items-center space-x-2">
-                      <CoinBalance coins={profile.coins} size="sm" />
-                      <UserTierBadge tier={profile.tier} />
+                      <CoinBalance coins={profile.coins_balance || 0} size="sm" />
+                      <UserTierBadge tier={profile.tier || "grassroot"} />
                     </div>
                     <Link href="/dashboard">
                       <Button variant="outline" size="sm" className="hidden md:flex bg-transparent">
@@ -477,11 +477,11 @@ export function UnifiedNavigation() {
               <div className="flex-1">
                 <p className="font-semibold text-sm">{profile.username || "User"}</p>
                 <p className="text-xs text-muted-foreground">{profile.email}</p>
-                <UserTierBadge tier={profile.tier} size="sm" className="mt-1" />
+                <UserTierBadge tier={profile.tier || "grassroot"} size="sm" className="mt-1" />
               </div>
             </div>
             <div className="bg-background/50 rounded-lg p-2">
-              <CoinBalance coins={profile.coins} size="sm" />
+              <CoinBalance coins={profile.coins_balance || 0} size="sm" />
             </div>
           </div>
         )}

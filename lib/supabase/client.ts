@@ -1,16 +1,14 @@
-import { createBrowserClient } from "@supabase/ssr"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Database } from "@/types/database"
 
-let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null
+let supabaseClient: ReturnType<typeof createClientComponentClient<Database>> | null = null
 
 export function createClient() {
   if (supabaseClient) return supabaseClient
 
   const isBrowser = typeof window !== "undefined"
   const isPreviewMode =
-    isBrowser &&
-    (window.location.hostname.includes("vusercontent.net") ||
-     window.location.hostname.includes("v0.dev"))
+    isBrowser && (window.location.hostname.includes("vusercontent.net") || window.location.hostname.includes("v0.dev"))
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -20,14 +18,7 @@ export function createClient() {
     return createMockClient()
   }
 
-  supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      flowType: "pkce",
-    },
-  })
+  supabaseClient = createClientComponentClient<Database>()
 
   return supabaseClient
 }

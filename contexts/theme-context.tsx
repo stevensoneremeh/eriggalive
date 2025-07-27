@@ -23,17 +23,17 @@ export function useTheme() {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { theme, setTheme, resolvedTheme } = useNextTheme()
-  const [mounted, setMounted] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    setMounted(true)
+    setIsLoading(false)
   }, [])
 
   const value = {
     theme,
     setTheme,
     resolvedTheme,
-    isLoading: !mounted,
+    isLoading,
   }
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
