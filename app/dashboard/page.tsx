@@ -74,7 +74,6 @@ export default function DashboardPage() {
   })
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [loadingStats, setLoadingStats] = useState(true)
-
   const supabase = createClient()
 
   // Redirect if not authenticated
@@ -89,7 +88,6 @@ export default function DashboardPage() {
 
     try {
       setLoadingStats(true)
-
       // Try to load real stats from database
       const [postsResult, commentsResult] = await Promise.allSettled([
         supabase.from("community_posts").select("id, vote_count").eq("user_id", profile.id).eq("is_deleted", false),
@@ -581,7 +579,6 @@ export default function DashboardPage() {
                           </p>
                         </div>
                       </div>
-
                       <div className="flex items-center gap-4 p-4 rounded-lg border-2 border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
                         <div className="h-12 w-12 rounded-full bg-blue-500 flex items-center justify-center">
                           <Heart className="h-6 w-6 text-white" />
@@ -591,7 +588,6 @@ export default function DashboardPage() {
                           <p className="text-sm text-blue-600 dark:text-blue-300">Received your first like on a post</p>
                         </div>
                       </div>
-
                       <div className="flex items-center gap-4 p-4 rounded-lg border-2 border-gray-200 bg-gray-50 dark:bg-gray-800/50 dark:border-gray-700 opacity-50">
                         <div className="h-12 w-12 rounded-full bg-gray-400 flex items-center justify-center">
                           <Users className="h-6 w-6 text-white" />
@@ -601,7 +597,6 @@ export default function DashboardPage() {
                           <p className="text-sm text-gray-500 dark:text-gray-500">Get 100 likes on posts</p>
                         </div>
                       </div>
-
                       <div className="flex items-center gap-4 p-4 rounded-lg border-2 border-gray-200 bg-gray-50 dark:bg-gray-800/50 dark:border-gray-700 opacity-50">
                         <div className="h-12 w-12 rounded-full bg-gray-400 flex items-center justify-center">
                           <Flame className="h-6 w-6 text-white" />
@@ -638,7 +633,6 @@ export default function DashboardPage() {
                           Configure
                         </Button>
                       </div>
-
                       <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-700/50 dark:to-slate-600/50">
                         <div className="flex items-center gap-3">
                           <Eye className="h-5 w-5 text-green-500" />
@@ -651,7 +645,6 @@ export default function DashboardPage() {
                           Manage
                         </Button>
                       </div>
-
                       <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-700/50 dark:to-slate-600/50">
                         <div className="flex items-center gap-3">
                           <Settings className="h-5 w-5 text-purple-500" />
