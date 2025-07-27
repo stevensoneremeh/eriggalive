@@ -43,7 +43,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <NextThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <ThemeProvider>
             <AuthProvider>
               <SessionRefresh />
@@ -52,7 +51,6 @@ export default function RootLayout({
               <Toaster />
             </AuthProvider>
           </ThemeProvider>
-        </NextThemeProvider>
       </body>
     </html>
   )
