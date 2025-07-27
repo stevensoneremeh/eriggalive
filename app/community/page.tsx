@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { UserTierBadge } from "@/components/user-tier-badge"
 import {
   Heart,
   MessageSquare,
@@ -271,10 +272,12 @@ export default function CommunityPage() {
       }
 
       // Update user's total posts count
-      await supabase
-        .from("users")
-        .update({ total_posts: (profile.total_posts || 0) + 1 })
-        .eq("id", profile.id)
+      if (profile.total_posts !== undefined) {
+        await supabase
+          .from("users")
+          .update({ total_posts: (profile.total_posts || 0) + 1 })
+          .eq("id", profile.id)
+      }
 
       // Add new post to the beginning of the list
       setPosts((prevPosts) => [{ ...data, has_voted: false, user_vote_type: null }, ...prevPosts])
@@ -371,8 +374,8 @@ export default function CommunityPage() {
           await supabase
             .from("users")
             .update({
-              coins_balance: postAuthor.coins_balance + 10,
-              total_votes_received: postAuthor.total_votes_received + 1,
+              coins_balance: (postAuthor.coins_balance || 0) + 10,
+              total_votes_received: (postAuthor.total_votes_received || 0) + 1,
             })
             .eq("id", post.user_id)
 
@@ -381,7 +384,7 @@ export default function CommunityPage() {
             user_id: post.user_id,
             transaction_type: "reward",
             amount: 10,
-            balance_after: postAuthor.coins_balance + 10,
+            balance_after: (postAuthor.coins_balance || 0) + 10,
             description: "Received upvote on post",
             reference_id: postId.toString(),
             status: "completed",
@@ -398,6 +401,7 @@ export default function CommunityPage() {
   const getTierColor = (tier: string) => {
     switch (tier?.toLowerCase()) {
       case "blood":
+      case "blood_brotherhood":
         return "bg-red-500"
       case "elder":
         return "bg-purple-500"
@@ -415,6 +419,7 @@ export default function CommunityPage() {
   const getTierDisplayName = (tier: string) => {
     switch (tier?.toLowerCase()) {
       case "blood":
+      case "blood_brotherhood":
         return "Blood"
       case "elder":
         return "Elder"
@@ -699,9 +704,7 @@ export default function CommunityPage() {
                             <div className="flex items-center gap-2 mb-2">
                               <span className="font-semibold">{post.user.display_name || post.user.username}</span>
                               {post.user.is_verified && <Star className="h-4 w-4 text-yellow-500 fill-current" />}
-                              <Badge variant="secondary" className="text-xs">
-                                {getTierDisplayName(post.user.subscription_tier)}
-                              </Badge>
+                              <UserTierBadge tier={post.user.subscription_tier} size="sm" />
                               <Badge
                                 variant="outline"
                                 className="text-xs"
