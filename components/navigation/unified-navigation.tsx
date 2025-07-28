@@ -59,30 +59,8 @@ export function UnifiedNavigation() {
 
   return (
     <>
-      <DesktopNavigation
-        isOpen={isOpen}
-        setIsOpen={setIsOpen}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        pathname={pathname}
-        user={user}
-        profile={profile}
-        signOut={handleSignOut}
-        theme={theme}
-        toggleTheme={toggleTheme}
-      />
-      <MobileNavigation
-        isOpen={isOpen}
-        setIsOpen={setIsOpen}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        pathname={pathname}
-        user={user}
-        profile={profile}
-        signOut={handleSignOut}
-        theme={theme}
-        toggleTheme={toggleTheme}
-      />
+      <DesktopNavigation />
+      <MobileNavigation />
     </>
   )
 }

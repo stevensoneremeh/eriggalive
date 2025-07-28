@@ -1,16 +1,14 @@
 "use client"
 
 import { useTheme } from "next-themes"
-import Image from "next/image"
 import { useEffect, useState } from "react"
+import Image from "next/image"
 
 interface DynamicLogoProps {
   className?: string
-  width?: number
-  height?: number
 }
 
-export function DynamicLogo({ className = "h-8 w-auto", width = 120, height = 32 }: DynamicLogoProps) {
+export function DynamicLogo({ className = "h-8 w-auto" }: DynamicLogoProps) {
   const { theme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
@@ -19,7 +17,7 @@ export function DynamicLogo({ className = "h-8 w-auto", width = 120, height = 32
   }, [])
 
   if (!mounted) {
-    return <div className={`${className} bg-muted animate-pulse rounded`} />
+    return <div className={`${className} bg-slate-200 dark:bg-slate-700 animate-pulse rounded`} />
   }
 
   const isDark = resolvedTheme === "dark"
@@ -29,12 +27,14 @@ export function DynamicLogo({ className = "h-8 w-auto", width = 120, height = 32
     <Image
       src={logoSrc || "/placeholder.svg"}
       alt="Erigga"
-      width={width}
-      height={height}
+      width={120}
+      height={40}
       className={className}
       priority
-      style={{
-        objectFit: "contain",
+      onError={(e) => {
+        // Fallback to placeholder if logo fails to load
+        const target = e.target as HTMLImageElement
+        target.src = "/placeholder-logo.svg"
       }}
     />
   )

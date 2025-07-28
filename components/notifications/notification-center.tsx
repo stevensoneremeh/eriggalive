@@ -43,13 +43,13 @@ export function NotificationCenter() {
   const supabase = createClientComponentClient<Database>()
 
   const loadNotifications = useCallback(async () => {
-    if (!user || !profile) return
+    if (!user || !profile?.auth_user_id) return
 
     try {
       const { data, error } = await supabase
         .from("notifications")
         .select("*")
-        .eq("user_id", profile.id)
+        .eq("user_id", profile.auth_user_id)
         .order("created_at", { ascending: false })
         .limit(50)
 
@@ -62,7 +62,7 @@ export function NotificationCenter() {
     } finally {
       setLoading(false)
     }
-  }, [user, profile, supabase])
+  }, [user, profile?.auth_user_id, supabase])
 
   useEffect(() => {
     loadNotifications()
@@ -70,17 +70,17 @@ export function NotificationCenter() {
 
   // Real-time notifications
   useEffect(() => {
-    if (!user || !profile) return
+    if (!user || !profile?.auth_user_id) return
 
     const channel = supabase
-      .channel(`notifications:${profile.id}`)
+      .channel(`notifications:${profile.auth_user_id}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "notifications",
-          filter: `user_id=eq.${profile.id}`,
+          filter: `user_id=eq.${profile.auth_user_id}`,
         },
         (payload) => {
           const newNotification = payload.new as Notification
@@ -109,9 +109,11 @@ export function NotificationCenter() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user, profile, supabase, toast])
+  }, [user, profile?.auth_user_id, supabase, toast])
 
   const markAsRead = async (notificationId: number) => {
+    if (!profile?.auth_user_id) return
+
     try {
       const { error } = await supabase.from("notifications").update({ is_read: true }).eq("id", notificationId)
 
@@ -125,13 +127,13 @@ export function NotificationCenter() {
   }
 
   const markAllAsRead = async () => {
-    if (!profile) return
+    if (!profile?.auth_user_id) return
 
     try {
       const { error } = await supabase
         .from("notifications")
         .update({ is_read: true })
-        .eq("user_id", profile.id)
+        .eq("user_id", profile.auth_user_id)
         .eq("is_read", false)
 
       if (error) throw error
