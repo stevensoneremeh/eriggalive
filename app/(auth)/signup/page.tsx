@@ -66,7 +66,6 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
-
   const { signUp } = useAuth()
   const router = useRouter()
 
@@ -206,7 +205,9 @@ export default function SignUpPage() {
     <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl w-full space-y-8">
         <div className="text-center">
-          <h1 className="font-street text-4xl text-gradient mb-2">JOIN THE MOVEMENT</h1>
+          <h1 className="font-bold text-4xl bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent mb-2">
+            JOIN THE MOVEMENT
+          </h1>
           <p className="text-muted-foreground">Create your Erigga fan account and choose your tier!</p>
         </div>
         <Card className="bg-card/50 border-orange-500/20 shadow-xl">

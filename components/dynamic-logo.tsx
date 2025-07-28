@@ -6,9 +6,11 @@ import { useEffect, useState } from "react"
 
 interface DynamicLogoProps {
   className?: string
+  width?: number
+  height?: number
 }
 
-export function DynamicLogo({ className = "h-8 w-auto" }: DynamicLogoProps) {
+export function DynamicLogo({ className = "h-8 w-auto", width = 120, height = 32 }: DynamicLogoProps) {
   const { theme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
@@ -26,11 +28,14 @@ export function DynamicLogo({ className = "h-8 w-auto" }: DynamicLogoProps) {
   return (
     <Image
       src={logoSrc || "/placeholder.svg"}
-      alt="Erigga Live"
-      width={120}
-      height={32}
+      alt="Erigga"
+      width={width}
+      height={height}
       className={className}
       priority
+      style={{
+        objectFit: "contain",
+      }}
     />
   )
 }

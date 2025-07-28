@@ -30,13 +30,19 @@ interface UserProfile {
   updated_at: string
 }
 
+interface SignUpData {
+  username: string
+  full_name: string
+  tier: string
+}
+
 interface AuthContextType {
   user: User | null
   session: Session | null
   profile: UserProfile | null
   loading: boolean
   isAuthenticated: boolean
-  signUp: (email: string, password: string, username: string) => Promise<{ error: any }>
+  signUp: (email: string, password: string, userData: SignUpData) => Promise<{ error: any }>
   signIn: (email: string, password: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error: any }>
@@ -59,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
 
   const createUserProfile = useCallback(
-    async (authUser: User, username: string) => {
+    async (authUser: User, userData: SignUpData) => {
       try {
         if (!supabase) {
           console.error("Supabase client not available")
@@ -72,11 +78,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return {
             id: 1,
             auth_user_id: authUser.id,
-            username: username,
-            display_name: username,
+            username: userData.username,
+            display_name: userData.username,
+            full_name: userData.full_name,
             email: authUser.email || "",
-            subscription_tier: "general",
-            coins_balance: 1000,
+            subscription_tier: userData.tier,
+            coins_balance: userData.tier === "grassroot" ? 100 : userData.tier === "pioneer" ? 500 : 1000,
             total_posts: 0,
             total_votes_received: 0,
             total_comments: 0,
@@ -92,11 +99,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .from("users")
           .insert({
             auth_user_id: authUser.id,
-            username: username,
-            display_name: username,
+            username: userData.username,
+            display_name: userData.username,
+            full_name: userData.full_name,
             email: authUser.email || "",
-            subscription_tier: "general",
-            coins_balance: 1000, // Starting coins
+            subscription_tier: userData.tier,
+            coins_balance: userData.tier === "grassroot" ? 100 : userData.tier === "pioneer" ? 500 : 1000,
             total_posts: 0,
             total_votes_received: 0,
             total_comments: 0,
@@ -301,7 +309,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [router, fetchUserProfile])
 
-  const signUp = async (email: string, password: string, username: string) => {
+  const signUp = async (email: string, password: string, userData: SignUpData) => {
     try {
       if (!supabase?.auth) {
         throw new Error("Authentication not available")
@@ -315,7 +323,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const { data: existingUser, error: checkError } = await supabase
             .from("users")
             .select("username")
-            .eq("username", username)
+            .eq("username", userData.username)
             .single()
 
           if (checkError && checkError.code !== "PGRST116") {
@@ -339,7 +347,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         options: {
           emailRedirectTo: `${window.location.origin}/dashboard`,
           data: {
-            username: username,
+            username: userData.username,
+            full_name: userData.full_name,
+            tier: userData.tier,
           },
         },
       })
@@ -352,7 +362,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (data.user) {
         // Create user profile
-        const profileData = await createUserProfile(data.user, username)
+        const profileData = await createUserProfile(data.user, userData)
         if (profileData) {
           setProfile(profileData)
         }
@@ -448,7 +458,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     profile,
     loading,
-    isAuthenticated: !!user,
+    isAuthenticated: !!user && !!session,
     signUp,
     signIn,
     signOut,
