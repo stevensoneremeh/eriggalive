@@ -1,62 +1,76 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
-import { Crown, Shield, Star, Sprout } from "lucide-react"
+import { Crown } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface UserTierBadgeProps {
   tier: string
-  className?: string
+  size?: "sm" | "md" | "lg"
   showIcon?: boolean
+  className?: string
 }
 
-export function UserTierBadge({ tier, className = "", showIcon = true }: UserTierBadgeProps) {
-  const getTierConfig = (tierValue: string) => {
-    switch (tierValue?.toLowerCase()) {
+export function UserTierBadge({ tier, size = "md", showIcon = true, className }: UserTierBadgeProps) {
+  const getTierConfig = (tierName: string) => {
+    const normalizedTier = tierName?.toLowerCase() || "general"
+
+    switch (normalizedTier) {
+      case "blood":
       case "blood_brotherhood":
         return {
-          label: "Blood Brotherhood",
-          color: "bg-red-600 hover:bg-red-700 text-white",
-          icon: Shield,
+          label: "Blood",
+          color: "bg-red-500 hover:bg-red-600 text-white border-red-500",
+          textColor: "text-red-500",
         }
       case "elder":
         return {
           label: "Elder",
-          color: "bg-purple-600 hover:bg-purple-700 text-white",
-          icon: Crown,
+          color: "bg-purple-500 hover:bg-purple-600 text-white border-purple-500",
+          textColor: "text-purple-500",
         }
       case "pioneer":
         return {
           label: "Pioneer",
-          color: "bg-blue-600 hover:bg-blue-700 text-white",
-          icon: Star,
+          color: "bg-blue-500 hover:bg-blue-600 text-white border-blue-500",
+          textColor: "text-blue-500",
         }
       case "grassroot":
         return {
           label: "Grassroot",
-          color: "bg-green-600 hover:bg-green-700 text-white",
-          icon: Sprout,
+          color: "bg-green-500 hover:bg-green-600 text-white border-green-500",
+          textColor: "text-green-500",
         }
-      case "admin":
-        return {
-          label: "Admin",
-          color: "bg-orange-600 hover:bg-orange-700 text-white",
-          icon: Shield,
-        }
+      case "general":
       default:
         return {
-          label: "Member",
-          color: "bg-gray-600 hover:bg-gray-700 text-white",
-          icon: Sprout,
+          label: "General",
+          color: "bg-gray-500 hover:bg-gray-600 text-white border-gray-500",
+          textColor: "text-gray-500",
         }
     }
   }
 
   const config = getTierConfig(tier)
-  const Icon = config.icon
+
+  const sizeClasses = {
+    sm: "text-xs px-1.5 py-0.5",
+    md: "text-sm px-2 py-1",
+    lg: "text-base px-3 py-1.5",
+  }
+
+  const iconSizes = {
+    sm: "h-3 w-3",
+    md: "h-4 w-4",
+    lg: "h-5 w-5",
+  }
 
   return (
-    <Badge className={`${config.color} ${className}`}>
-      {showIcon && <Icon className="h-3 w-3 mr-1" />}
+    <Badge
+      variant="secondary"
+      className={cn(config.color, sizeClasses[size], "font-medium inline-flex items-center gap-1", className)}
+    >
+      {showIcon && <Crown className={iconSizes[size]} />}
       {config.label}
     </Badge>
   )

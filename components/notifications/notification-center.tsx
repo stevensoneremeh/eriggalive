@@ -1,126 +1,76 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
+import { Bell, Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Bell,
-  BellRing,
-  Heart,
-  MessageSquare,
-  UserPlus,
-  AtSign,
-  Trophy,
-  Coins,
-  BookMarkedIcon as MarkAsRead,
-  Trash2,
-} from "lucide-react"
-import { formatDistanceToNow } from "date-fns"
+import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/contexts/auth-context"
-import { useToast } from "@/components/ui/use-toast"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import type { Database } from "@/types/database"
+import { createClient } from "@/lib/supabase/client"
+import { formatDistanceToNow } from "date-fns"
 
 interface Notification {
-  id: number
-  type: string
+  id: string
+  user_id: string
   title: string
   message: string
-  data: any
+  type: string
   is_read: boolean
   created_at: string
+  data?: any
 }
 
 export function NotificationCenter() {
+  const { profile, isAuthenticated } = useAuth()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const { user, profile } = useAuth()
-  const { toast } = useToast()
-  const supabase = createClientComponentClient<Database>()
+  const [isLoading, setIsLoading] = useState(false)
 
-  const loadNotifications = useCallback(async () => {
-    if (!user || !profile?.auth_user_id) return
+  const supabase = createClient()
 
+  const fetchNotifications = async () => {
+    if (!isAuthenticated || !profile?.auth_user_id) return
+
+    setIsLoading(true)
     try {
       const { data, error } = await supabase
         .from("notifications")
         .select("*")
         .eq("user_id", profile.auth_user_id)
         .order("created_at", { ascending: false })
-        .limit(50)
+        .limit(20)
 
-      if (error) throw error
+      if (error) {
+        console.error("Error loading notifications:", error)
+        return
+      }
 
       setNotifications(data || [])
       setUnreadCount(data?.filter((n) => !n.is_read).length || 0)
     } catch (error) {
       console.error("Error loading notifications:", error)
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
-  }, [user, profile?.auth_user_id, supabase])
+  }
 
-  useEffect(() => {
-    loadNotifications()
-  }, [loadNotifications])
-
-  // Real-time notifications
-  useEffect(() => {
-    if (!user || !profile?.auth_user_id) return
-
-    const channel = supabase
-      .channel(`notifications:${profile.auth_user_id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${profile.auth_user_id}`,
-        },
-        (payload) => {
-          const newNotification = payload.new as Notification
-          setNotifications((prev) => [newNotification, ...prev])
-          setUnreadCount((prev) => prev + 1)
-
-          // Show toast for new notification
-          toast({
-            title: newNotification.title,
-            description: newNotification.message,
-            duration: 5000,
-          })
-
-          // Browser notification if permission granted
-          if (Notification.permission === "granted") {
-            new Notification(newNotification.title, {
-              body: newNotification.message,
-              icon: "/icons/icon-192x192.png",
-              badge: "/icons/icon-72x72.png",
-            })
-          }
-        },
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [user, profile?.auth_user_id, supabase, toast])
-
-  const markAsRead = async (notificationId: number) => {
+  const markAsRead = async (notificationId: string) => {
     if (!profile?.auth_user_id) return
 
     try {
-      const { error } = await supabase.from("notifications").update({ is_read: true }).eq("id", notificationId)
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("id", notificationId)
+        .eq("user_id", profile.auth_user_id)
 
-      if (error) throw error
-
-      setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n)))
-      setUnreadCount((prev) => Math.max(0, prev - 1))
+      if (!error) {
+        setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n)))
+        setUnreadCount((prev) => Math.max(0, prev - 1))
+      }
     } catch (error) {
       console.error("Error marking notification as read:", error)
     }
@@ -136,26 +86,32 @@ export function NotificationCenter() {
         .eq("user_id", profile.auth_user_id)
         .eq("is_read", false)
 
-      if (error) throw error
-
-      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
-      setUnreadCount(0)
+      if (!error) {
+        setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
+        setUnreadCount(0)
+      }
     } catch (error) {
       console.error("Error marking all notifications as read:", error)
     }
   }
 
-  const deleteNotification = async (notificationId: number) => {
+  const deleteNotification = async (notificationId: string) => {
+    if (!profile?.auth_user_id) return
+
     try {
-      const { error } = await supabase.from("notifications").delete().eq("id", notificationId)
+      const { error } = await supabase
+        .from("notifications")
+        .delete()
+        .eq("id", notificationId)
+        .eq("user_id", profile.auth_user_id)
 
-      if (error) throw error
-
-      setNotifications((prev) => prev.filter((n) => n.id !== notificationId))
-      setUnreadCount((prev) => {
-        const notification = notifications.find((n) => n.id === notificationId)
-        return notification && !notification.is_read ? prev - 1 : prev
-      })
+      if (!error) {
+        setNotifications((prev) => prev.filter((n) => n.id !== notificationId))
+        setUnreadCount((prev) => {
+          const notification = notifications.find((n) => n.id === notificationId)
+          return notification && !notification.is_read ? Math.max(0, prev - 1) : prev
+        })
+      }
     } catch (error) {
       console.error("Error deleting notification:", error)
     }
@@ -163,139 +119,148 @@ export function NotificationCenter() {
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
-      case "vote":
-        return <Heart className="h-4 w-4 text-red-500" />
+      case "like":
+        return "❤️"
       case "comment":
-        return <MessageSquare className="h-4 w-4 text-blue-500" />
+        return "💬"
       case "follow":
-        return <UserPlus className="h-4 w-4 text-green-500" />
+        return "👥"
       case "mention":
-        return <AtSign className="h-4 w-4 text-purple-500" />
-      case "achievement":
-        return <Trophy className="h-4 w-4 text-yellow-500" />
+        return "📢"
       case "system":
-        return <Bell className="h-4 w-4 text-gray-500" />
+        return "🔔"
       default:
-        return <Bell className="h-4 w-4 text-gray-500" />
+        return "📬"
     }
   }
 
-  if (!user) return null
+  useEffect(() => {
+    if (isAuthenticated && profile?.auth_user_id) {
+      fetchNotifications()
+    }
+  }, [isAuthenticated, profile?.auth_user_id])
+
+  useEffect(() => {
+    if (!isAuthenticated || !profile?.auth_user_id) return
+
+    // Set up real-time subscription for notifications
+    const channel = supabase
+      .channel("notifications")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${profile.auth_user_id}`,
+        },
+        (payload) => {
+          setNotifications((prev) => [payload.new as Notification, ...prev])
+          setUnreadCount((prev) => prev + 1)
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [isAuthenticated, profile?.auth_user_id, supabase])
+
+  if (!isAuthenticated) return null
 
   return (
-    <div className="relative">
-      <Button variant="ghost" size="icon" onClick={() => setIsOpen(!isOpen)} className="relative">
-        {unreadCount > 0 ? <BellRing className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
-        {unreadCount > 0 && (
-          <Badge
-            variant="destructive"
-            className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
-          >
-            {unreadCount > 99 ? "99+" : unreadCount}
-          </Badge>
-        )}
-      </Button>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="sm" className="relative h-9 w-9 p-0">
+          <Bell className="h-4 w-4" />
+          {unreadCount > 0 && (
+            <Badge
+              variant="destructive"
+              className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
+            >
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </Badge>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="end">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="font-semibold">Notifications</h3>
+          {unreadCount > 0 && (
+            <Button variant="ghost" size="sm" onClick={markAllAsRead} className="text-xs">
+              Mark all read
+            </Button>
+          )}
+        </div>
 
-      {isOpen && (
-        <Card className="absolute right-0 top-12 w-96 max-h-[600px] shadow-xl border-0 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl z-50">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Notifications</CardTitle>
-              <div className="flex items-center gap-2">
-                {unreadCount > 0 && (
-                  <Button variant="ghost" size="sm" onClick={markAllAsRead} className="text-xs">
-                    <MarkAsRead className="h-3 w-3 mr-1" />
-                    Mark all read
-                  </Button>
-                )}
-                <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="h-8 w-8">
-                  ×
-                </Button>
-              </div>
+        <ScrollArea className="h-80">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
             </div>
-          </CardHeader>
+          ) : notifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Bell className="h-8 w-8 text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">No notifications yet</p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`p-4 hover:bg-accent/50 transition-colors ${!notification.is_read ? "bg-accent/20" : ""}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-3 flex-1">
+                      <span className="text-lg">{getNotificationIcon(notification.type)}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium leading-tight">{notification.title}</p>
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{notification.message}</p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {formatDistanceToNow(new Date(notification.created_at), {
+                            addSuffix: true,
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {!notification.is_read && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => markAsRead(notification.id)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteNotification(notification.id)}
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
 
-          <CardContent className="p-0">
-            <ScrollArea className="h-[500px]">
-              {loading ? (
-                <div className="p-4 space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="flex items-start space-x-3 animate-pulse">
-                      <div className="h-10 w-10 bg-slate-200 dark:bg-slate-700 rounded-full" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4" />
-                        <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : notifications.length === 0 ? (
-                <div className="p-8 text-center">
-                  <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No notifications yet</p>
-                  <p className="text-sm text-muted-foreground mt-1">We'll notify you when something happens</p>
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${
-                        !notification.is_read ? "bg-blue-50/50 dark:bg-blue-900/20" : ""
-                      }`}
-                    >
-                      <div className="flex items-start space-x-3">
-                        <div className="flex-shrink-0 mt-1">{getNotificationIcon(notification.type)}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                                {notification.title}
-                              </p>
-                              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">{notification.message}</p>
-                              <p className="text-xs text-muted-foreground mt-2">
-                                {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-1 ml-2">
-                              {!notification.is_read && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => markAsRead(notification.id)}
-                                  className="h-6 w-6"
-                                >
-                                  <MarkAsRead className="h-3 w-3" />
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => deleteNotification(notification.id)}
-                                className="h-6 w-6 text-red-500 hover:text-red-600"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                          {notification.data?.coins && (
-                            <div className="flex items-center gap-1 mt-2">
-                              <Coins className="h-4 w-4 text-yellow-500" />
-                              <span className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-                                +{notification.data.coins} coins
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+        {notifications.length > 0 && (
+          <>
+            <Separator />
+            <div className="p-2">
+              <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setIsOpen(false)}>
+                View all notifications
+              </Button>
+            </div>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
   )
 }

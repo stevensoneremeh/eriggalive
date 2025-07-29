@@ -1,6 +1,4 @@
 "use client"
-
-import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import { DesktopNavigation } from "./desktop-navigation"
 import { MobileNavigation } from "./mobile-navigation"
@@ -20,42 +18,9 @@ const NAVIGATION_ITEMS = [
 ]
 
 export function UnifiedNavigation() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
   const { user, profile, signOut } = useAuth()
   const { theme, setTheme } = useTheme()
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-    } catch (err) {
-      console.error("signOut error:", err)
-    }
-  }
-
-  const toggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark")
-  }
-
-  if (!mounted) {
-    return (
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between px-4">
-          <div className="h-8 w-32 bg-muted animate-pulse rounded" />
-          <div className="flex items-center space-x-2">
-            <div className="h-10 w-10 bg-muted animate-pulse rounded-full" />
-            <div className="h-10 w-10 bg-muted animate-pulse rounded-full" />
-          </div>
-        </div>
-      </header>
-    )
-  }
 
   return (
     <>

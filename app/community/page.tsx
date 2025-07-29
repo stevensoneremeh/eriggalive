@@ -100,11 +100,7 @@ export default function CommunityPage() {
   // Fetch categories
   const fetchCategories = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("community_categories")
-        .select("*")
-        .eq("is_active", true)
-        .order("name")
+      const { data, error } = await supabase.from("community_categories").select("*").eq("is_active", true)
 
       if (error) {
         console.error("Error fetching categories:", error)
@@ -120,6 +116,13 @@ export default function CommunityPage() {
       }
     } catch (error) {
       console.error("Error fetching categories:", error)
+      // Fallback categories
+      setCategories([
+        { id: 1, name: "General", slug: "general", icon: "💬", color: "#3B82F6", is_active: true },
+        { id: 2, name: "Music", slug: "music", icon: "🎵", color: "#8B5CF6", is_active: true },
+        { id: 3, name: "Events", slug: "events", icon: "📅", color: "#10B981", is_active: true },
+        { id: 4, name: "Fan Art", slug: "fan-art", icon: "🎨", color: "#F59E0B", is_active: true },
+      ])
     }
   }, [supabase])
 
@@ -412,24 +415,6 @@ export default function CommunityPage() {
       case "general":
       default:
         return "bg-gray-500"
-    }
-  }
-
-  // Get tier display name
-  const getTierDisplayName = (tier: string) => {
-    switch (tier?.toLowerCase()) {
-      case "blood":
-      case "blood_brotherhood":
-        return "Blood"
-      case "elder":
-        return "Elder"
-      case "pioneer":
-        return "Pioneer"
-      case "grassroot":
-        return "Grassroot"
-      case "general":
-      default:
-        return "General"
     }
   }
 
