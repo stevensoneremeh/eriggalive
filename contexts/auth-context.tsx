@@ -2,15 +2,15 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState, useCallback } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useRouter } from "next/navigation"
-import type { User } from "@supabase/supabase-js"
+import type { User as SupabaseUser } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 
 type UserProfile = Database["public"]["Tables"]["users"]["Row"]
 
 interface AuthContextType {
-  user: User | null
+  user: SupabaseUser | null
   profile: UserProfile | null
   loading: boolean
   isAuthenticated: boolean
@@ -19,17 +19,17 @@ interface AuthContextType {
   signOut: () => Promise<void>
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ error?: string }>
   refreshSession: () => Promise<void>
-  updateCoins: (amount: number) => Promise<void>
+  refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<SupabaseUser | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = createClientComponentClient<Database>()
 
   const fetchUserProfile = useCallback(
     async (userId: string) => {
@@ -49,6 +49,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     [supabase],
   )
+
+  const refreshProfile = useCallback(async () => {
+    if (!user) return
+
+    const userProfile = await fetchUserProfile(user.id)
+    setProfile(userProfile)
+  }, [user, fetchUserProfile])
 
   const refreshSession = useCallback(async () => {
     try {
@@ -70,31 +77,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Error in refreshSession:", error)
     }
   }, [supabase, fetchUserProfile])
-
-  const updateCoins = useCallback(
-    async (amount: number) => {
-      if (!user || !profile) return
-
-      try {
-        const newBalance = (profile.coins_balance || 0) + amount
-        const { data, error } = await supabase
-          .from("users")
-          .update({ coins_balance: newBalance })
-          .eq("auth_user_id", user.id)
-          .select()
-          .single()
-
-        if (error) {
-          console.error("Error updating coins:", error)
-        } else {
-          setProfile(data)
-        }
-      } catch (error) {
-        console.error("Error in updateCoins:", error)
-      }
-    },
-    [user, profile, supabase],
-  )
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -138,6 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null)
       } else if (event === "TOKEN_REFRESHED" && session?.user) {
         setUser(session.user)
+        // Optionally refresh profile on token refresh
         const userProfile = await fetchUserProfile(session.user.id)
         setProfile(userProfile)
       }
@@ -169,6 +152,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(data.user)
         const userProfile = await fetchUserProfile(data.user.id)
         setProfile(userProfile)
+
+        // Update last login
+        if (userProfile) {
+          await supabase
+            .from("users")
+            .update({
+              last_login: new Date().toISOString(),
+              login_count: (userProfile.login_count || 0) + 1,
+            })
+            .eq("auth_user_id", data.user.id)
+        }
       }
 
       return {}
@@ -183,12 +177,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            full_name: userData.full_name,
-            username: userData.username,
-          },
-        },
       })
 
       if (error) {
@@ -202,9 +190,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: data.user.email!,
           username: userData.username,
           full_name: userData.full_name,
-          display_name: userData.full_name,
-          subscription_tier: userData.tier || "grassroot",
-          coins_balance: userData.tier === "grassroot" ? 100 : userData.tier === "pioneer" ? 500 : 1000,
+          tier: userData.tier || "grassroot",
+          coins: userData.tier === "grassroot" ? 100 : userData.tier === "pioneer" ? 500 : 1000,
           is_verified: false,
           is_active: true,
           created_at: new Date().toISOString(),
@@ -216,6 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { error: "Failed to create user profile" }
         }
 
+        // Fetch the created profile
         const userProfile = await fetchUserProfile(data.user.id)
         setUser(data.user)
         setProfile(userProfile)
@@ -251,22 +239,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("users")
         .update({
           ...updates,
           updated_at: new Date().toISOString(),
         })
         .eq("auth_user_id", user.id)
-        .select()
-        .single()
 
       if (error) {
         console.error("Error updating profile:", error)
         return { error: error.message }
       }
 
-      setProfile(data)
+      // Update local state
+      setProfile((prev) => (prev ? { ...prev, ...updates } : null))
       return {}
     } catch (error) {
       console.error("Error in updateProfile:", error)
@@ -284,7 +271,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
     updateProfile,
     refreshSession,
-    updateCoins,
+    refreshProfile,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
