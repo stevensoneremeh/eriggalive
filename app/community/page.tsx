@@ -1,511 +1,466 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { AuthGuard } from "@/components/auth-guard"
 import { useAuth } from "@/contexts/auth-context"
-import { createClient } from "@/lib/supabase/client"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Users, MessageSquare, Heart, Share2, Plus, TrendingUp, Clock } from "lucide-react"
-import { toast } from "sonner"
+import { Separator } from "@/components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Users,
+  MessageSquare,
+  Heart,
+  Share2,
+  Plus,
+  TrendingUp,
+  Clock,
+  Star,
+  Music,
+  Mic,
+  Trophy,
+  FlameIcon as Fire,
+} from "lucide-react"
+import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
+import { useState, useEffect } from "react"
 
-interface CommunityPost {
+interface Post {
   id: number
-  user_id: number
-  category_id: number
-  title?: string
+  title: string
   content: string
-  media_url?: string
-  media_type?: string
-  vote_count: number
-  comment_count: number
-  is_pinned: boolean
-  created_at: string
-  user?: {
+  author: {
     id: number
     username: string
-    full_name?: string
-    avatar_url?: string
-    tier: string
+    display_name: string
+    avatar_url: string | null
+    subscription_tier: string
+    is_verified: boolean
   }
-  category?: {
+  category: {
     id: number
     name: string
     slug: string
   }
-  has_voted?: boolean
+  vote_count: number
+  comment_count: number
+  created_at: string
+  user_vote?: "up" | "down" | null
 }
 
-interface CommunityCategory {
+interface Category {
   id: number
   name: string
   slug: string
-  description?: string
+  description: string
+  post_count: number
   is_active: boolean
 }
 
-export default function CommunityPage() {
-  const { user, profile, isAuthenticated } = useAuth()
-  const [posts, setPosts] = useState<CommunityPost[]>([])
-  const [categories, setCategories] = useState<CommunityCategory[]>([])
-  const [selectedCategory, setSelectedCategory] = useState<string>("all")
-  const [loading, setLoading] = useState(true)
-  const [createPostOpen, setCreatePostOpen] = useState(false)
-  const [newPost, setNewPost] = useState({
-    title: "",
-    content: "",
-    category_id: 1,
-  })
-  const supabase = createClient()
+function CommunityContent() {
+  const { profile } = useAuth()
+  const [posts, setPosts] = useState<Post[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [activeCategory, setActiveCategory] = useState<string>("all")
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Fallback categories in case database query fails
-  const fallbackCategories: CommunityCategory[] = [
-    { id: 1, name: "General", slug: "general", description: "General discussions", is_active: true },
-    { id: 2, name: "Music", slug: "music", description: "Music discussions", is_active: true },
-    { id: 3, name: "Events", slug: "events", description: "Event announcements", is_active: true },
-    { id: 4, name: "Bars", slug: "bars", description: "Share your bars", is_active: true },
-  ]
-
-  // Mock posts for demonstration
-  const mockPosts: CommunityPost[] = [
-    {
-      id: 1,
-      user_id: 1,
-      category_id: 1,
-      title: "Welcome to the Erigga Community!",
-      content:
-        "This is where we connect, share, and grow together. Drop your thoughts and let's build something amazing!",
-      vote_count: 25,
-      comment_count: 8,
-      is_pinned: true,
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-      user: {
-        id: 1,
-        username: "erigga_official",
-        full_name: "Erigga",
-        avatar_url: "/placeholder-user.jpg",
-        tier: "blood_brotherhood",
-      },
-      category: {
+  // Mock data for demo
+  useEffect(() => {
+    const mockCategories: Category[] = [
+      {
         id: 1,
         name: "General",
         slug: "general",
+        description: "General discussions about everything",
+        post_count: 156,
+        is_active: true,
       },
-      has_voted: false,
-    },
-    {
-      id: 2,
-      user_id: 2,
-      category_id: 2,
-      title: "New Track Alert! 🔥",
-      content: "Just dropped some fire bars! What y'all think about the new sound? Let me know in the comments 💯",
-      media_url: "/placeholder.jpg",
-      media_type: "image",
-      vote_count: 42,
-      comment_count: 15,
-      is_pinned: false,
-      created_at: new Date(Date.now() - 7200000).toISOString(),
-      user: {
-        id: 2,
-        username: "warri_boy",
-        full_name: "Warri Boy",
-        avatar_url: "/placeholder-user.jpg",
-        tier: "pioneer",
-      },
-      category: {
+      {
         id: 2,
         name: "Music",
         slug: "music",
+        description: "Share and discuss music",
+        post_count: 89,
+        is_active: true,
       },
-      has_voted: true,
-    },
-    {
-      id: 3,
-      user_id: 3,
-      category_id: 4,
-      content:
-        "Yo, check this bar I just wrote:\n\n'Money dey my pocket, but my mind dey street\nEvery hustle wey I do, na for my people to eat'\n\nWhat you think? 🎤",
-      vote_count: 18,
-      comment_count: 6,
-      is_pinned: false,
-      created_at: new Date(Date.now() - 10800000).toISOString(),
-      user: {
+      {
         id: 3,
-        username: "lyrical_genius",
-        full_name: "Lyrical Genius",
-        avatar_url: "/placeholder-user.jpg",
-        tier: "grassroot",
-      },
-      category: {
-        id: 4,
-        name: "Bars",
+        name: "Bars & Lyrics",
         slug: "bars",
+        description: "Drop your hottest bars",
+        post_count: 234,
+        is_active: true,
       },
-      has_voted: false,
-    },
-  ]
+      {
+        id: 4,
+        name: "News & Updates",
+        slug: "news",
+        description: "Latest news and announcements",
+        post_count: 45,
+        is_active: true,
+      },
+    ]
 
-  useEffect(() => {
-    loadCategories()
-    loadPosts()
-  }, [selectedCategory])
-
-  const loadCategories = async () => {
-    try {
-      // Use fallback categories for now to avoid the .order() error
-      setCategories(fallbackCategories)
-    } catch (error) {
-      console.error("Error fetching categories:", error)
-      setCategories(fallbackCategories)
-    }
-  }
-
-  const loadPosts = async () => {
-    try {
-      setLoading(true)
-      // Use mock posts for demonstration
-      setPosts(mockPosts)
-    } catch (error) {
-      console.error("Error fetching posts:", error)
-      setPosts(mockPosts)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleCreatePost = async () => {
-    if (!isAuthenticated || !newPost.content.trim()) {
-      toast.error("Please sign in and add content to create a post")
-      return
-    }
-
-    try {
-      // Mock post creation
-      const mockNewPost: CommunityPost = {
-        id: Date.now(),
-        user_id: profile?.id || 1,
-        category_id: newPost.category_id,
-        title: newPost.title || undefined,
-        content: newPost.content,
-        vote_count: 0,
-        comment_count: 0,
-        is_pinned: false,
-        created_at: new Date().toISOString(),
-        user: {
-          id: profile?.id || 1,
-          username: profile?.username || "user",
-          full_name: profile?.full_name || profile?.username || "User",
-          avatar_url: profile?.avatar_url || "/placeholder-user.jpg",
-          tier: profile?.tier || "grassroot",
+    const mockPosts: Post[] = [
+      {
+        id: 1,
+        title: "Welcome to the Erigga Mission Community! 🎵",
+        content:
+          "This is where we connect, share, and grow together. Drop your thoughts, share your music, and let's build something amazing!",
+        author: {
+          id: 1,
+          username: "erigga_official",
+          display_name: "Erigga",
+          avatar_url: null,
+          subscription_tier: "vip",
+          is_verified: true,
         },
-        category: categories.find((c) => c.id === newPost.category_id),
-        has_voted: false,
-      }
+        category: {
+          id: 1,
+          name: "General",
+          slug: "general",
+        },
+        vote_count: 45,
+        comment_count: 12,
+        created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+      },
+      {
+        id: 2,
+        title: "New track dropping soon! 🔥",
+        content:
+          "Been working on something special in the studio. Can't wait to share it with y'all. What kind of vibe are you expecting?",
+        author: {
+          id: 1,
+          username: "erigga_official",
+          display_name: "Erigga",
+          avatar_url: null,
+          subscription_tier: "vip",
+          is_verified: true,
+        },
+        category: {
+          id: 2,
+          name: "Music",
+          slug: "music",
+        },
+        vote_count: 78,
+        comment_count: 23,
+        created_at: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
+      },
+      {
+        id: 3,
+        title: "Drop your best bars here! 🎤",
+        content:
+          "Let's see what y'all got! Share your hottest bars and let the community vote. Best bars get featured!",
+        author: {
+          id: 2,
+          username: "community_mod",
+          display_name: "Community Moderator",
+          avatar_url: null,
+          subscription_tier: "premium",
+          is_verified: false,
+        },
+        category: {
+          id: 3,
+          name: "Bars & Lyrics",
+          slug: "bars",
+        },
+        vote_count: 34,
+        comment_count: 67,
+        created_at: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+      },
+      {
+        id: 4,
+        title: "What's your favorite Erigga track?",
+        content:
+          "Been listening to the catalog and wondering what tracks hit different for y'all. Drop your favorites below!",
+        author: {
+          id: 3,
+          username: "musiclover23",
+          display_name: "Music Lover",
+          avatar_url: null,
+          subscription_tier: "general",
+          is_verified: false,
+        },
+        category: {
+          id: 2,
+          name: "Music",
+          slug: "music",
+        },
+        vote_count: 56,
+        comment_count: 89,
+        created_at: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString(),
+      },
+    ]
 
-      setPosts([mockNewPost, ...posts])
-      setNewPost({ title: "", content: "", category_id: 1 })
-      setCreatePostOpen(false)
-      toast.success("Post created successfully!")
-    } catch (error) {
-      console.error("Error creating post:", error)
-      toast.error("Failed to create post")
-    }
-  }
-
-  const handleVote = async (postId: number) => {
-    if (!isAuthenticated) {
-      toast.error("Please sign in to vote")
-      return
-    }
-
-    try {
-      // Mock voting
-      setPosts(
-        posts.map((post) =>
-          post.id === postId
-            ? {
-                ...post,
-                vote_count: post.has_voted ? post.vote_count - 1 : post.vote_count + 1,
-                has_voted: !post.has_voted,
-              }
-            : post,
-        ),
-      )
-
-      toast.success(posts.find((p) => p.id === postId)?.has_voted ? "Vote removed" : "Vote added!")
-    } catch (error) {
-      console.error("Error voting:", error)
-      toast.error("Failed to vote")
-    }
-  }
+    setCategories(mockCategories)
+    setPosts(mockPosts)
+    setIsLoading(false)
+  }, [])
 
   const getTierColor = (tier: string) => {
-    switch (tier) {
-      case "blood_brotherhood":
-        return "bg-red-500"
-      case "elder":
-        return "bg-purple-500"
-      case "pioneer":
-        return "bg-blue-500"
+    switch (tier.toLowerCase()) {
       case "grassroot":
         return "bg-green-500"
+      case "general":
+        return "bg-blue-500"
+      case "premium":
+        return "bg-purple-500"
+      case "vip":
+        return "bg-yellow-500"
       default:
         return "bg-gray-500"
     }
   }
 
-  const filteredPosts =
-    selectedCategory === "all" ? posts : posts.filter((post) => post.category?.slug === selectedCategory)
+  const getTierIcon = (tier: string) => {
+    switch (tier.toLowerCase()) {
+      case "grassroot":
+        return <Users className="w-3 h-3" />
+      case "general":
+        return <Star className="w-3 h-3" />
+      case "premium":
+        return <Trophy className="w-3 h-3" />
+      case "vip":
+        return <Fire className="w-3 h-3" />
+      default:
+        return <Users className="w-3 h-3" />
+    }
+  }
+
+  const filteredPosts = activeCategory === "all" ? posts : posts.filter((post) => post.category.slug === activeCategory)
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-full text-sm font-medium mb-4">
-            <Users className="h-4 w-4" />
-            Community
-          </div>
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent mb-4">
-            Erigga Community
-          </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Connect with fellow fans, share your thoughts, and be part of the movement
-          </p>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Community</h1>
+          <p className="text-gray-600">Connect, share, and engage with the Erigga Mission family</p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-            <CardContent className="p-6 text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-full mb-4">
-                <Users className="h-6 w-6 text-blue-600" />
-              </div>
-              <p className="text-2xl font-bold text-blue-600">2.5K+</p>
-              <p className="text-sm text-muted-foreground">Members</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-            <CardContent className="p-6 text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full mb-4">
-                <MessageSquare className="h-6 w-6 text-green-600" />
-              </div>
-              <p className="text-2xl font-bold text-green-600">1.2K+</p>
-              <p className="text-sm text-muted-foreground">Posts</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-            <CardContent className="p-6 text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-full mb-4">
-                <Heart className="h-6 w-6 text-purple-600" />
-              </div>
-              <p className="text-2xl font-bold text-purple-600">8.5K+</p>
-              <p className="text-sm text-muted-foreground">Likes</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-            <CardContent className="p-6 text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-full mb-4">
-                <TrendingUp className="h-6 w-6 text-orange-600" />
-              </div>
-              <p className="text-2xl font-bold text-orange-600">95%</p>
-              <p className="text-sm text-muted-foreground">Active</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Create Post Button */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-4">
-            <h2 className="text-2xl font-bold">Community Feed</h2>
-            <Badge variant="secondary">{filteredPosts.length} posts</Badge>
-          </div>
-          {isAuthenticated && (
-            <Dialog open={createPostOpen} onOpenChange={setCreatePostOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Post
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Left Sidebar - Categories */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Create Post */}
+            <Card>
+              <CardContent className="p-4">
+                <Button className="w-full" asChild>
+                  <Link href="/community/create">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Post
+                  </Link>
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Create New Post</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Category</label>
-                    <select
-                      value={newPost.category_id}
-                      onChange={(e) => setNewPost({ ...newPost, category_id: Number.parseInt(e.target.value) })}
-                      className="w-full p-2 border rounded-md bg-background"
-                    >
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Title (Optional)</label>
-                    <Input
-                      placeholder="Enter post title..."
-                      value={newPost.title}
-                      onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Content</label>
-                    <Textarea
-                      placeholder="What's on your mind?"
-                      value={newPost.content}
-                      onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
-                      rows={4}
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setCreatePostOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button onClick={handleCreatePost} disabled={!newPost.content.trim()}>
-                      Create Post
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
-
-        {/* Category Filter */}
-        <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="mb-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="all">All</TabsTrigger>
-            {categories.slice(0, 4).map((category) => (
-              <TabsTrigger key={category.slug} value={category.slug}>
-                {category.name}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-
-        {/* Posts Feed */}
-        <div className="space-y-6">
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading posts...</p>
-            </div>
-          ) : filteredPosts.length === 0 ? (
-            <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-              <CardContent className="text-center py-12">
-                <MessageSquare className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No posts yet</h3>
-                <p className="text-muted-foreground mb-4">Be the first to start a conversation in this category!</p>
-                {isAuthenticated && (
-                  <Button onClick={() => setCreatePostOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create First Post
-                  </Button>
-                )}
               </CardContent>
             </Card>
-          ) : (
-            filteredPosts.map((post) => (
-              <Card key={post.id} className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-                <CardContent className="p-6">
-                  {/* Post Header */}
-                  <div className="flex items-start gap-4 mb-4">
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src={post.user?.avatar_url || "/placeholder.svg"} />
-                      <AvatarFallback className={`${getTierColor(post.user?.tier || "grassroot")} text-white`}>
-                        {post.user?.username?.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold">{post.user?.full_name || post.user?.username}</h3>
-                        <Badge variant="secondary" className="text-xs">
-                          {post.user?.tier?.replace("_", " ")}
-                        </Badge>
-                        {post.is_pinned && (
-                          <Badge variant="default" className="text-xs bg-yellow-500">
-                            Pinned
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>{post.category?.name}</span>
-                        <span>•</span>
-                        <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Post Content */}
-                  <div className="mb-4">
-                    {post.title && <h2 className="text-xl font-bold mb-2">{post.title}</h2>}
-                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{post.content}</p>
-                    {post.media_url && (
-                      <div className="mt-4">
-                        {post.media_type === "image" && (
-                          <img
-                            src={post.media_url || "/placeholder.svg"}
-                            alt="Post media"
-                            className="rounded-lg max-w-full h-auto max-h-96 object-cover"
-                          />
-                        )}
-                        {post.media_type === "video" && (
-                          <video controls className="rounded-lg max-w-full h-auto max-h-96">
-                            <source src={post.media_url} type="video/mp4" />
-                          </video>
-                        )}
-                      </div>
-                    )}
-                  </div>
+            {/* Categories */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Categories</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button
+                  variant={activeCategory === "all" ? "default" : "ghost"}
+                  className="w-full justify-start"
+                  onClick={() => setActiveCategory("all")}
+                >
+                  <TrendingUp className="w-4 h-4 mr-2" />
+                  All Posts
+                  <Badge variant="secondary" className="ml-auto">
+                    {posts.length}
+                  </Badge>
+                </Button>
+                {categories.map((category) => (
+                  <Button
+                    key={category.id}
+                    variant={activeCategory === category.slug ? "default" : "ghost"}
+                    className="w-full justify-start"
+                    onClick={() => setActiveCategory(category.slug)}
+                  >
+                    {category.slug === "music" && <Music className="w-4 h-4 mr-2" />}
+                    {category.slug === "bars" && <Mic className="w-4 h-4 mr-2" />}
+                    {category.slug === "general" && <MessageSquare className="w-4 h-4 mr-2" />}
+                    {category.slug === "news" && <Clock className="w-4 h-4 mr-2" />}
+                    {category.name}
+                    <Badge variant="secondary" className="ml-auto">
+                      {posts.filter((p) => p.category.slug === category.slug).length}
+                    </Badge>
+                  </Button>
+                ))}
+              </CardContent>
+            </Card>
 
-                  {/* Post Actions */}
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <div className="flex items-center gap-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleVote(post.id)}
-                        className={`${post.has_voted ? "text-red-500" : "text-muted-foreground"} hover:text-red-500`}
-                      >
-                        <Heart className={`h-4 w-4 mr-1 ${post.has_voted ? "fill-current" : ""}`} />
-                        {post.vote_count}
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-blue-500">
-                        <MessageSquare className="h-4 w-4 mr-1" />
-                        {post.comment_count}
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-green-500">
-                        <Share2 className="h-4 w-4 mr-1" />
-                        Share
-                      </Button>
+            {/* Community Stats */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Community Stats</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Total Members</span>
+                  <span className="font-semibold">2,847</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Posts Today</span>
+                  <span className="font-semibold">23</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Active Now</span>
+                  <span className="font-semibold">156</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Main Content - Posts */}
+          <div className="lg:col-span-3">
+            <div className="space-y-6">
+              {/* Filter Tabs */}
+              <Tabs defaultValue="hot" className="w-full">
+                <TabsList>
+                  <TabsTrigger value="hot">🔥 Hot</TabsTrigger>
+                  <TabsTrigger value="new">🆕 New</TabsTrigger>
+                  <TabsTrigger value="top">⭐ Top</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="hot" className="space-y-4 mt-6">
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
+                  ) : filteredPosts.length === 0 ? (
+                    <Card>
+                      <CardContent className="flex flex-col items-center justify-center py-12">
+                        <MessageSquare className="w-12 h-12 text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-semibold mb-2">No posts yet</h3>
+                        <p className="text-muted-foreground text-center mb-4">
+                          Be the first to start a conversation in this category!
+                        </p>
+                        <Button asChild>
+                          <Link href="/community/create">Create First Post</Link>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    filteredPosts.map((post) => (
+                      <Card key={post.id} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-6">
+                          {/* Post Header */}
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="w-10 h-10">
+                                <AvatarImage src={post.author.avatar_url || ""} alt={post.author.display_name} />
+                                <AvatarFallback>{post.author.display_name.charAt(0).toUpperCase()}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold">{post.author.display_name}</span>
+                                  {post.author.is_verified && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      ✓
+                                    </Badge>
+                                  )}
+                                  <Badge
+                                    className={`${getTierColor(post.author.subscription_tier)} text-white text-xs`}
+                                  >
+                                    {getTierIcon(post.author.subscription_tier)}
+                                    <span className="ml-1 capitalize">{post.author.subscription_tier}</span>
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>@{post.author.username}</span>
+                                  <span>•</span>
+                                  <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
+                                  <span>•</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {post.category.name}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Post Content */}
+                          <div className="mb-4">
+                            <h3 className="text-lg font-semibold mb-2">{post.title}</h3>
+                            <p className="text-gray-700 leading-relaxed">{post.content}</p>
+                          </div>
+
+                          <Separator className="my-4" />
+
+                          {/* Post Actions */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <Button variant="ghost" size="sm" className="gap-2">
+                                <Heart className="w-4 h-4" />
+                                <span>{post.vote_count}</span>
+                              </Button>
+                              <Button variant="ghost" size="sm" className="gap-2" asChild>
+                                <Link href={`/community/posts/${post.id}`}>
+                                  <MessageSquare className="w-4 h-4" />
+                                  <span>{post.comment_count}</span>
+                                </Link>
+                              </Button>
+                              <Button variant="ghost" size="sm" className="gap-2">
+                                <Share2 className="w-4 h-4" />
+                                <span>Share</span>
+                              </Button>
+                            </div>
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href={`/community/posts/${post.id}`}>View Post</Link>
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </TabsContent>
+
+                <TabsContent value="new" className="space-y-4 mt-6">
+                  <Card>
+                    <CardContent className="flex items-center justify-center py-12">
+                      <div className="text-center">
+                        <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold mb-2">Newest Posts</h3>
+                        <p className="text-muted-foreground">Fresh content from the community</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="top" className="space-y-4 mt-6">
+                  <Card>
+                    <CardContent className="flex items-center justify-center py-12">
+                      <div className="text-center">
+                        <Trophy className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold mb-2">Top Posts</h3>
+                        <p className="text-muted-foreground">Most popular content this week</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            </div>
+          </div>
         </div>
       </div>
     </div>
+  )
+}
+
+export default function CommunityPage() {
+  return (
+    <AuthGuard>
+      <CommunityContent />
+    </AuthGuard>
   )
 }

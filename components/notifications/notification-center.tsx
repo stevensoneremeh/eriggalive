@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { useAuth } from "@/contexts/auth-context"
 import { createClient } from "@/lib/supabase/client"
 import { formatDistanceToNow } from "date-fns"
 
@@ -22,8 +21,20 @@ interface Notification {
   data?: any
 }
 
+interface UserProfile {
+  id: number
+  auth_user_id: string
+  username: string
+  display_name: string
+  email: string
+  subscription_tier: string
+  coins_balance: number
+  is_active: boolean
+}
+
 export function NotificationCenter() {
-  const { profile, isAuthenticated } = useAuth()
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
@@ -31,25 +42,99 @@ export function NotificationCenter() {
 
   const supabase = createClient()
 
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        if (session?.user) {
+          setIsAuthenticated(true)
+          // Fetch user profile
+          const { data: userProfile } = await supabase
+            .from("users")
+            .select("*")
+            .eq("auth_user_id", session.user.id)
+            .single()
+
+          if (userProfile) {
+            setProfile(userProfile)
+          }
+        }
+      } catch (error) {
+        console.error("Error checking auth:", error)
+      }
+    }
+
+    checkAuth()
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
+        setIsAuthenticated(true)
+        const { data: userProfile } = await supabase
+          .from("users")
+          .select("*")
+          .eq("auth_user_id", session.user.id)
+          .single()
+
+        if (userProfile) {
+          setProfile(userProfile)
+        }
+      } else if (event === "SIGNED_OUT") {
+        setIsAuthenticated(false)
+        setProfile(null)
+        setNotifications([])
+        setUnreadCount(0)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [supabase])
+
   const fetchNotifications = async () => {
     if (!isAuthenticated || !profile?.auth_user_id) return
 
     setIsLoading(true)
     try {
-      const { data, error } = await supabase
-        .from("notifications")
-        .select("*")
-        .eq("user_id", profile.auth_user_id)
-        .order("created_at", { ascending: false })
-        .limit(20)
+      // Mock notifications for preview/development
+      const mockNotifications: Notification[] = [
+        {
+          id: "1",
+          user_id: profile.auth_user_id,
+          title: "Welcome to Erigga Mission!",
+          message: "Thanks for joining our community. Start exploring and earning coins!",
+          type: "system",
+          is_read: false,
+          created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
+        },
+        {
+          id: "2",
+          user_id: profile.auth_user_id,
+          title: "New Post Liked",
+          message: "Someone liked your post in the General category",
+          type: "like",
+          is_read: false,
+          created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
+        },
+        {
+          id: "3",
+          user_id: profile.auth_user_id,
+          title: "Comment on Your Post",
+          message: "TestUser commented on your post about music",
+          type: "comment",
+          is_read: true,
+          created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
+        },
+      ]
 
-      if (error) {
-        console.error("Error loading notifications:", error)
-        return
-      }
-
-      setNotifications(data || [])
-      setUnreadCount(data?.filter((n) => !n.is_read).length || 0)
+      setNotifications(mockNotifications)
+      setUnreadCount(mockNotifications.filter((n) => !n.is_read).length)
     } catch (error) {
       console.error("Error loading notifications:", error)
     } finally {
@@ -61,16 +146,12 @@ export function NotificationCenter() {
     if (!profile?.auth_user_id) return
 
     try {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ is_read: true })
-        .eq("id", notificationId)
-        .eq("user_id", profile.auth_user_id)
+      // Update local state immediately for better UX
+      setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n)))
+      setUnreadCount((prev) => Math.max(0, prev - 1))
 
-      if (!error) {
-        setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n)))
-        setUnreadCount((prev) => Math.max(0, prev - 1))
-      }
+      // In a real app, this would update the database
+      console.log("Marking notification as read:", notificationId)
     } catch (error) {
       console.error("Error marking notification as read:", error)
     }
@@ -80,16 +161,12 @@ export function NotificationCenter() {
     if (!profile?.auth_user_id) return
 
     try {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ is_read: true })
-        .eq("user_id", profile.auth_user_id)
-        .eq("is_read", false)
+      // Update local state immediately
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
+      setUnreadCount(0)
 
-      if (!error) {
-        setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
-        setUnreadCount(0)
-      }
+      // In a real app, this would update the database
+      console.log("Marking all notifications as read")
     } catch (error) {
       console.error("Error marking all notifications as read:", error)
     }
@@ -99,19 +176,16 @@ export function NotificationCenter() {
     if (!profile?.auth_user_id) return
 
     try {
-      const { error } = await supabase
-        .from("notifications")
-        .delete()
-        .eq("id", notificationId)
-        .eq("user_id", profile.auth_user_id)
+      const notification = notifications.find((n) => n.id === notificationId)
 
-      if (!error) {
-        setNotifications((prev) => prev.filter((n) => n.id !== notificationId))
-        setUnreadCount((prev) => {
-          const notification = notifications.find((n) => n.id === notificationId)
-          return notification && !notification.is_read ? Math.max(0, prev - 1) : prev
-        })
+      // Update local state immediately
+      setNotifications((prev) => prev.filter((n) => n.id !== notificationId))
+      if (notification && !notification.is_read) {
+        setUnreadCount((prev) => Math.max(0, prev - 1))
       }
+
+      // In a real app, this would delete from the database
+      console.log("Deleting notification:", notificationId)
     } catch (error) {
       console.error("Error deleting notification:", error)
     }
@@ -144,25 +218,42 @@ export function NotificationCenter() {
     if (!isAuthenticated || !profile?.auth_user_id) return
 
     // Set up real-time subscription for notifications
-    const channel = supabase
-      .channel("notifications")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${profile.auth_user_id}`,
-        },
-        (payload) => {
-          setNotifications((prev) => [payload.new as Notification, ...prev])
-          setUnreadCount((prev) => prev + 1)
-        },
-      )
-      .subscribe()
+    let channel: any = null
+
+    try {
+      channel = supabase
+        .channel("notifications")
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${profile.auth_user_id}`,
+          },
+          (payload) => {
+            console.log("New notification received:", payload)
+            setNotifications((prev) => [payload.new as Notification, ...prev])
+            setUnreadCount((prev) => prev + 1)
+          },
+        )
+        .subscribe()
+    } catch (error) {
+      console.error("Error setting up realtime subscription:", error)
+    }
 
     return () => {
-      supabase.removeChannel(channel)
+      if (channel) {
+        try {
+          if (supabase.removeChannel) {
+            supabase.removeChannel(channel)
+          } else if (channel.unsubscribe) {
+            channel.unsubscribe()
+          }
+        } catch (error) {
+          console.error("Error cleaning up channel:", error)
+        }
+      }
     }
   }, [isAuthenticated, profile?.auth_user_id, supabase])
 

@@ -1,586 +1,668 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { AuthGuard } from "@/components/auth-guard"
+import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useAuth } from "@/contexts/auth-context"
-import { createClient } from "@/lib/supabase/client"
 import {
   Coins,
-  TrendingUp,
+  CreditCard,
   ArrowUpRight,
   ArrowDownLeft,
-  CreditCard,
-  Wallet,
   Gift,
-  History,
-  Star,
-  Crown,
   Zap,
+  TrendingUp,
+  Wallet,
+  History,
+  Info,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Star,
 } from "lucide-react"
 import { toast } from "sonner"
 
+interface CoinPackage {
+  id: string
+  coins: number
+  price: number
+  bonus: number
+  popular?: boolean
+  savings?: string
+}
+
 interface Transaction {
   id: string
-  type: "earned" | "spent" | "purchased" | "withdrawn"
+  type: "purchase" | "withdrawal" | "earned" | "spent"
   amount: number
-  description: string
-  created_at: string
+  coins: number
   status: "completed" | "pending" | "failed"
+  description: string
+  reference?: string
+  created_at: string
 }
 
-declare global {
-  interface Window {
-    PaystackPop: any
-  }
-}
-
-export default function CoinsPage() {
-  const { user, profile, isLoading, refreshProfile } = useAuth()
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [purchaseAmount, setPurchaseAmount] = useState("")
+function CoinsContent() {
+  const { profile, updateCoins, refreshProfile } = useAuth()
+  const [isLoading, setIsLoading] = useState(false)
+  const [customAmount, setCustomAmount] = useState("")
   const [withdrawAmount, setWithdrawAmount] = useState("")
-  const [loading, setLoading] = useState(false)
-  const supabase = createClient()
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
+  const [selectedPackage, setSelectedPackage] = useState<CoinPackage | null>(null)
 
-  // Mock data for demonstration
-  const mockTransactions: Transaction[] = [
+  // Current coin value in Naira
+  const coinValue = 0.5 // 1 coin = ₦0.50
+
+  const coinPackages: CoinPackage[] = [
     {
-      id: "1",
-      type: "earned",
-      amount: 100,
-      description: "Daily login bonus",
-      created_at: new Date().toISOString(),
-      status: "completed",
+      id: "starter",
+      coins: 100,
+      price: 50,
+      bonus: 0,
     },
     {
-      id: "2",
-      type: "spent",
-      amount: -50,
-      description: "Voted on community post",
-      created_at: new Date(Date.now() - 86400000).toISOString(),
-      status: "completed",
+      id: "basic",
+      coins: 500,
+      price: 200,
+      bonus: 50,
+      savings: "Save ₦50",
     },
     {
-      id: "3",
-      type: "purchased",
-      amount: 1000,
-      description: "Coin purchase - ₦500",
-      created_at: new Date(Date.now() - 172800000).toISOString(),
-      status: "completed",
+      id: "popular",
+      coins: 1000,
+      price: 350,
+      bonus: 150,
+      popular: true,
+      savings: "Save ₦150",
+    },
+    {
+      id: "premium",
+      coins: 2500,
+      price: 800,
+      bonus: 500,
+      savings: "Save ₦450",
+    },
+    {
+      id: "ultimate",
+      coins: 5000,
+      price: 1500,
+      bonus: 1500,
+      savings: "Save ₦1000",
     },
   ]
 
+  // Mock transactions for demo
   useEffect(() => {
-    if (user) {
-      loadTransactions()
-    }
-  }, [user])
-
-  // Load Paystack script
-  useEffect(() => {
-    const script = document.createElement("script")
-    script.src = "https://js.paystack.co/v1/inline.js"
-    script.async = true
-    document.body.appendChild(script)
-
-    return () => {
-      if (document.body.contains(script)) {
-        document.body.removeChild(script)
-      }
-    }
+    const mockTransactions: Transaction[] = [
+      {
+        id: "1",
+        type: "purchase",
+        amount: 350,
+        coins: 1150,
+        status: "completed",
+        description: "Purchased Popular Package",
+        reference: "PAY_123456789",
+        created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+      },
+      {
+        id: "2",
+        type: "earned",
+        amount: 0,
+        coins: 50,
+        status: "completed",
+        description: "Community engagement reward",
+        created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+      },
+      {
+        id: "3",
+        type: "spent",
+        amount: 0,
+        coins: -25,
+        status: "completed",
+        description: "Meet & Greet session booking",
+        created_at: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
+      },
+      {
+        id: "4",
+        type: "withdrawal",
+        amount: 100,
+        coins: -200,
+        status: "pending",
+        description: "Withdrawal to bank account",
+        reference: "WTH_987654321",
+        created_at: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
+      },
+    ]
+    setTransactions(mockTransactions)
   }, [])
 
-  const loadTransactions = async () => {
-    try {
-      // For now, use mock data
-      setTransactions(mockTransactions)
-    } catch (error) {
-      console.error("Error loading transactions:", error)
-      setTransactions(mockTransactions)
-    }
-  }
-
-  const handlePurchase = async (coinAmount?: number) => {
-    const amount = coinAmount || Number.parseInt(purchaseAmount)
-
-    if (!amount || !user) return
-
-    if (amount < 100) {
-      toast.error("Minimum purchase is 100 coins")
+  const handlePaystackPayment = async (packageData: CoinPackage) => {
+    if (!profile?.email) {
+      toast.error("Profile information missing")
       return
     }
 
-    setLoading(true)
+    setIsLoading(true)
+    setSelectedPackage(packageData)
 
     try {
-      // Calculate price (2 coins = ₦1)
-      const price = Math.floor(amount / 2)
-
-      if (!window.PaystackPop) {
-        throw new Error("Paystack not loaded")
-      }
-
-      const handler = window.PaystackPop.setup({
-        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_your_key_here",
-        email: user.email,
-        amount: price * 100, // Convert to kobo
+      // Initialize Paystack payment
+      const handler = (window as any).PaystackPop.setup({
+        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_demo", // Use demo key for preview
+        email: profile.email,
+        amount: packageData.price * 100, // Convert to kobo
         currency: "NGN",
-        ref: `erigga_coins_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        ref: `COIN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         metadata: {
           custom_fields: [
             {
-              display_name: "Coin Amount",
-              variable_name: "coin_amount",
-              value: amount.toString(),
+              display_name: "Coin Package",
+              variable_name: "coin_package",
+              value: packageData.id,
             },
             {
-              display_name: "User ID",
-              variable_name: "user_id",
-              value: user.id,
+              display_name: "Coins",
+              variable_name: "coins",
+              value: packageData.coins + packageData.bonus,
             },
           ],
         },
         callback: async (response: any) => {
+          console.log("Payment successful:", response)
+
+          // Verify payment on server
           try {
-            // Verify payment on server
-            const verifyResponse = await fetch("/api/coins/purchase", {
+            const verifyResponse = await fetch("/api/coins/verify-payment", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${user.id}`,
               },
               body: JSON.stringify({
                 reference: response.reference,
-                amount: price,
-                coins: amount,
+                packageId: packageData.id,
               }),
             })
 
-            if (!verifyResponse.ok) {
-              const errorData = await verifyResponse.json()
-              throw new Error(errorData.error || "Payment verification failed")
+            if (verifyResponse.ok) {
+              const totalCoins = packageData.coins + packageData.bonus
+              updateCoins(totalCoins)
+
+              // Add transaction to history
+              const newTransaction: Transaction = {
+                id: Date.now().toString(),
+                type: "purchase",
+                amount: packageData.price,
+                coins: totalCoins,
+                status: "completed",
+                description: `Purchased ${packageData.id} package`,
+                reference: response.reference,
+                created_at: new Date().toISOString(),
+              }
+              setTransactions((prev) => [newTransaction, ...prev])
+
+              toast.success(`Successfully purchased ${totalCoins} coins!`)
+              setShowPaymentDialog(false)
+            } else {
+              toast.error("Payment verification failed")
             }
-
-            const result = await verifyResponse.json()
-
-            toast.success(`Successfully purchased ${amount.toLocaleString()} Erigga Coins!`)
-            setPurchaseAmount("")
-            loadTransactions()
-            refreshProfile() // Refresh user profile to update coin balance
-          } catch (error: any) {
+          } catch (error) {
             console.error("Payment verification error:", error)
-            toast.error(error.message || "Payment completed but verification failed. Please contact support.")
+            toast.error("Payment verification failed")
           }
         },
         onClose: () => {
-          setLoading(false)
+          console.log("Payment dialog closed")
+          setIsLoading(false)
         },
       })
 
       handler.openIframe()
-    } catch (error: any) {
-      console.error("Payment error:", error)
-      toast.error(error.message || "An error occurred during payment")
-      setLoading(false)
-    }
-  }
-
-  const handleWithdraw = async () => {
-    if (!withdrawAmount || !user || !profile) return
-
-    setLoading(true)
-    try {
-      const amount = Number.parseInt(withdrawAmount)
-      if (amount > (profile.coins || 0)) {
-        toast.error("Insufficient coin balance")
-        return
-      }
-
-      if (amount < 500) {
-        toast.error("Minimum withdrawal is 500 coins")
-        return
-      }
-
-      // Mock withdrawal success
-      toast.success(`Withdrawal request for ${amount} coins submitted!`)
-      setWithdrawAmount("")
-      loadTransactions()
     } catch (error) {
-      toast.error("Withdrawal failed. Please try again.")
+      console.error("Payment initialization error:", error)
+      toast.error("Failed to initialize payment")
+      setIsLoading(false)
+    }
+  }
+
+  const handleCustomPayment = async () => {
+    const amount = Number.parseFloat(customAmount)
+    if (!amount || amount < 10) {
+      toast.error("Minimum purchase amount is ₦10")
+      return
+    }
+
+    const coins = Math.floor(amount / coinValue)
+    const customPackage: CoinPackage = {
+      id: "custom",
+      coins,
+      price: amount,
+      bonus: 0,
+    }
+
+    await handlePaystackPayment(customPackage)
+  }
+
+  const handleWithdrawal = async () => {
+    const coins = Number.parseInt(withdrawAmount)
+    if (!coins || coins < 100) {
+      toast.error("Minimum withdrawal is 100 coins")
+      return
+    }
+
+    if (coins > (profile?.coins_balance || 0)) {
+      toast.error("Insufficient coin balance")
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      // Simulate withdrawal processing
+      const withdrawalFee = Math.ceil(coins * 0.05) // 5% fee
+      const netCoins = coins - withdrawalFee
+      const amount = netCoins * coinValue
+
+      // Update local state
+      updateCoins(-coins)
+
+      // Add transaction
+      const newTransaction: Transaction = {
+        id: Date.now().toString(),
+        type: "withdrawal",
+        amount,
+        coins: -coins,
+        status: "pending",
+        description: `Withdrawal to bank account (Fee: ${withdrawalFee} coins)`,
+        reference: `WTH_${Date.now()}`,
+        created_at: new Date().toISOString(),
+      }
+      setTransactions((prev) => [newTransaction, ...prev])
+
+      toast.success(`Withdrawal request submitted! You'll receive ₦${amount.toFixed(2)} after processing.`)
+      setWithdrawAmount("")
+    } catch (error) {
+      console.error("Withdrawal error:", error)
+      toast.error("Withdrawal failed")
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
-  const getTransactionIcon = (type: string) => {
-    switch (type) {
+  const getTransactionIcon = (transaction: Transaction) => {
+    switch (transaction.type) {
+      case "purchase":
+        return <ArrowDownLeft className="w-4 h-4 text-green-500" />
+      case "withdrawal":
+        return <ArrowUpRight className="w-4 h-4 text-red-500" />
       case "earned":
-        return <ArrowUpRight className="h-4 w-4 text-green-500" />
+        return <Gift className="w-4 h-4 text-blue-500" />
       case "spent":
-        return <ArrowDownLeft className="h-4 w-4 text-red-500" />
-      case "purchased":
-        return <CreditCard className="h-4 w-4 text-blue-500" />
-      case "withdrawn":
-        return <Wallet className="h-4 w-4 text-purple-500" />
+        return <Zap className="w-4 h-4 text-orange-500" />
       default:
-        return <Coins className="h-4 w-4" />
+        return <Coins className="w-4 h-4" />
     }
   }
 
-  const getTransactionColor = (type: string) => {
-    switch (type) {
-      case "earned":
-        return "text-green-600"
-      case "spent":
-        return "text-red-600"
-      case "purchased":
-        return "text-blue-600"
-      case "withdrawn":
-        return "text-purple-600"
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "completed":
+        return <CheckCircle className="w-4 h-4 text-green-500" />
+      case "pending":
+        return <Clock className="w-4 h-4 text-yellow-500" />
+      case "failed":
+        return <XCircle className="w-4 h-4 text-red-500" />
       default:
-        return "text-gray-600"
+        return <Clock className="w-4 h-4" />
     }
   }
 
-  if (isLoading) {
+  if (!profile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading coins...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center py-12">
-            <Coins className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Sign in Required</h2>
-            <p className="text-muted-foreground mb-6">Please sign in to view your coin balance and transactions.</p>
-            <Button asChild>
-              <a href="/login">Sign In</a>
-            </Button>
-          </div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50">
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-4 py-2 rounded-full text-sm font-medium mb-4">
-            <Coins className="h-4 w-4" />
-            Erigga Coins
-          </div>
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent mb-4">
-            Your Coin Wallet
-          </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Earn, spend, and manage your Erigga Coins to unlock exclusive content and features
-          </p>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Erigga Coins</h1>
+          <p className="text-gray-600">Manage your coins, make purchases, and track transactions</p>
         </div>
 
-        {/* Balance Card */}
-        <Card className="mb-8 bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0 shadow-2xl">
-          <CardContent className="p-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-yellow-100 text-lg mb-2">Current Balance</p>
-                <div className="flex items-center gap-3">
-                  <Coins className="h-8 w-8" />
-                  <span className="text-4xl font-bold">{profile?.coins?.toLocaleString() || 0}</span>
-                  <span className="text-xl">Coins</span>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="flex items-center gap-2 text-yellow-100 mb-2">
-                  <TrendingUp className="h-4 w-4" />
-                  <span>This Month</span>
-                </div>
-                <p className="text-2xl font-bold">+{Math.floor(Math.random() * 500 + 200)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-            <CardContent className="p-6 text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full mb-4">
-                <Gift className="h-6 w-6 text-green-600" />
-              </div>
-              <p className="text-2xl font-bold text-green-600">+{Math.floor(Math.random() * 100 + 50)}</p>
-              <p className="text-sm text-muted-foreground">Earned Today</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-            <CardContent className="p-6 text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-full mb-4">
-                <Star className="h-6 w-6 text-blue-600" />
-              </div>
-              <p className="text-2xl font-bold text-blue-600">{Math.floor(Math.random() * 10 + 5)}</p>
-              <p className="text-sm text-muted-foreground">Votes Cast</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-            <CardContent className="p-6 text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-full mb-4">
-                <Crown className="h-6 w-6 text-purple-600" />
-              </div>
-              <p className="text-2xl font-bold text-purple-600">{profile?.tier || "Grassroot"}</p>
-              <p className="text-sm text-muted-foreground">Current Tier</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-            <CardContent className="p-6 text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-full mb-4">
-                <Zap className="h-6 w-6 text-orange-600" />
-              </div>
-              <p className="text-2xl font-bold text-orange-600">{Math.floor(Math.random() * 5 + 1)}</p>
-              <p className="text-sm text-muted-foreground">Streak Days</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Tabs defaultValue="transactions" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="transactions" className="flex items-center gap-2">
-              <History className="h-4 w-4" />
-              Transactions
-            </TabsTrigger>
-            <TabsTrigger value="purchase" className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              Purchase
-            </TabsTrigger>
-            <TabsTrigger value="withdraw" className="flex items-center gap-2">
-              <Wallet className="h-4 w-4" />
-              Withdraw
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="transactions" className="space-y-6">
-            <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <History className="h-5 w-5" />
-                  Recent Transactions
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Balance & Info */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Current Balance */}
+            <Card className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-white">
+                  <Wallet className="w-5 h-5" />
+                  Current Balance
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {transactions.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Coins className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No transactions yet</h3>
-                    <p className="text-muted-foreground">Start earning coins by participating in the community!</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {transactions.map((transaction) => (
-                      <div
-                        key={transaction.id}
-                        className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          {getTransactionIcon(transaction.type)}
-                          <div>
-                            <p className="font-medium">{transaction.description}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {new Date(transaction.created_at).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className={`font-bold ${getTransactionColor(transaction.type)}`}>
-                            {transaction.amount > 0 ? "+" : ""}
-                            {transaction.amount} coins
-                          </p>
-                          <Badge variant={transaction.status === "completed" ? "default" : "secondary"}>
-                            {transaction.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="purchase" className="space-y-6">
-            <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Purchase Coins
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <Alert>
-                  <Coins className="h-4 w-4" />
-                  <AlertDescription>
-                    Purchase Erigga Coins to vote on posts, unlock exclusive content, and support your favorite artists.
-                    Exchange rate: 2 coins = ₦1
-                  </AlertDescription>
-                </Alert>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Card
-                    className="border-2 border-dashed border-gray-300 hover:border-primary cursor-pointer transition-colors"
-                    onClick={() => handlePurchase(500)}
-                  >
-                    <CardContent className="p-6 text-center">
-                      <Coins className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
-                      <p className="font-bold text-lg">500 Coins</p>
-                      <p className="text-muted-foreground">₦250</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card
-                    className="border-2 border-primary bg-primary/5 cursor-pointer"
-                    onClick={() => handlePurchase(1000)}
-                  >
-                    <CardContent className="p-6 text-center">
-                      <div className="relative">
-                        <Coins className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
-                        <Badge className="absolute -top-2 -right-2 bg-green-500">Popular</Badge>
-                      </div>
-                      <p className="font-bold text-lg">1,000 Coins</p>
-                      <p className="text-muted-foreground">₦450</p>
-                      <p className="text-xs text-green-600">Save ₦50!</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card
-                    className="border-2 border-dashed border-gray-300 hover:border-primary cursor-pointer transition-colors"
-                    onClick={() => handlePurchase(2500)}
-                  >
-                    <CardContent className="p-6 text-center">
-                      <Coins className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
-                      <p className="font-bold text-lg">2,500 Coins</p>
-                      <p className="text-muted-foreground">₦1,000</p>
-                      <p className="text-xs text-green-600">Save ₦250!</p>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Custom Amount</label>
-                    <Input
-                      type="number"
-                      placeholder="Enter coin amount (min. 100)"
-                      value={purchaseAmount}
-                      onChange={(e) => setPurchaseAmount(e.target.value)}
-                      min="100"
-                    />
-                    {purchaseAmount && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Cost: ₦{Math.floor(Number.parseInt(purchaseAmount) / 2)}
-                      </p>
-                    )}
-                  </div>
-                  <Button
-                    onClick={() => handlePurchase()}
-                    disabled={loading || !purchaseAmount}
-                    className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
-                  >
-                    {loading ? "Processing..." : "Purchase Coins"}
-                  </Button>
+                <div className="text-4xl font-bold mb-2">{profile.coins_balance.toLocaleString()}</div>
+                <p className="text-yellow-100 text-sm mb-4">
+                  ≈ ₦{(profile.coins_balance * coinValue).toLocaleString()} NGN
+                </p>
+                <div className="flex items-center gap-2 text-yellow-100 text-xs">
+                  <TrendingUp className="w-4 h-4" />
+                  <span>1 coin = ₦{coinValue}</span>
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          <TabsContent value="withdraw" className="space-y-6">
-            <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
+            {/* Coin Info */}
+            <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Wallet className="h-5 w-5" />
-                  Withdraw Coins
+                  <Info className="w-5 h-5" />
+                  How to Use Coins
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <Alert>
-                  <Wallet className="h-4 w-4" />
-                  <AlertDescription>
-                    Convert your Erigga Coins back to cash. Minimum withdrawal is 500 coins (₦250).
-                  </AlertDescription>
-                </Alert>
-
-                <div className="space-y-4">
+              <CardContent className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <CreditCard className="w-4 h-4 text-blue-600" />
+                  </div>
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Withdrawal Amount</label>
-                    <Input
-                      type="number"
-                      placeholder="Enter coin amount (min. 500)"
-                      value={withdrawAmount}
-                      onChange={(e) => setWithdrawAmount(e.target.value)}
-                      min="500"
-                      max={profile?.coins || 0}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Available: {profile?.coins?.toLocaleString() || 0} coins
+                    <p className="text-sm font-medium">Meet & Greet Sessions</p>
+                    <p className="text-xs text-muted-foreground">Book exclusive sessions</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                    <Gift className="w-4 h-4 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Exclusive Merchandise</p>
+                    <p className="text-xs text-muted-foreground">Purchase limited items</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                    <Star className="w-4 h-4 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Premium Content</p>
+                    <p className="text-xs text-muted-foreground">Access exclusive media</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                    <Zap className="w-4 h-4 text-red-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Community Features</p>
+                    <p className="text-xs text-muted-foreground">Boost posts & more</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Earning Tips */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Gift className="w-5 h-5" />
+                  Earn Free Coins
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="text-sm">
+                  <p className="font-medium">• Daily login bonus: 10 coins</p>
+                  <p className="font-medium">• Create posts: 5 coins each</p>
+                  <p className="font-medium">• Receive upvotes: 2 coins each</p>
+                  <p className="font-medium">• Comment engagement: 1 coin each</p>
+                  <p className="font-medium">• Referral bonus: 100 coins</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Column - Purchase & Transactions */}
+          <div className="lg:col-span-2">
+            <Tabs defaultValue="purchase" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="purchase">Purchase Coins</TabsTrigger>
+                <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
+                <TabsTrigger value="history">Transaction History</TabsTrigger>
+              </TabsList>
+
+              {/* Purchase Tab */}
+              <TabsContent value="purchase" className="space-y-6">
+                {/* Coin Packages */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Coin Packages</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Choose a package that suits your needs. Larger packages include bonus coins!
                     </p>
-                  </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {coinPackages.map((pkg) => (
+                        <Card
+                          key={pkg.id}
+                          className={`relative cursor-pointer transition-all hover:shadow-lg ${
+                            pkg.popular ? "ring-2 ring-primary" : ""
+                          }`}
+                          onClick={() => handlePaystackPayment(pkg)}
+                        >
+                          {pkg.popular && (
+                            <Badge className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-primary">
+                              Most Popular
+                            </Badge>
+                          )}
+                          <CardContent className="p-6 text-center">
+                            <div className="text-2xl font-bold mb-2">{pkg.coins.toLocaleString()}</div>
+                            {pkg.bonus > 0 && (
+                              <div className="text-sm text-green-600 font-medium mb-2">+{pkg.bonus} bonus coins</div>
+                            )}
+                            <div className="text-3xl font-bold text-primary mb-2">₦{pkg.price}</div>
+                            {pkg.savings && (
+                              <Badge variant="secondary" className="mb-4">
+                                {pkg.savings}
+                              </Badge>
+                            )}
+                            <Button className="w-full" disabled={isLoading}>
+                              {isLoading && selectedPackage?.id === pkg.id ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              ) : (
+                                <CreditCard className="w-4 h-4 mr-2" />
+                              )}
+                              Buy Now
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
 
-                  <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                    <h4 className="font-medium mb-2">Withdrawal Details</h4>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span>Coins to withdraw:</span>
-                        <span>{withdrawAmount || 0}</span>
+                {/* Custom Amount */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Custom Amount</CardTitle>
+                    <p className="text-sm text-muted-foreground">Purchase any amount of coins (minimum ₦10)</p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex gap-4">
+                      <div className="flex-1">
+                        <Label htmlFor="custom-amount">Amount (NGN)</Label>
+                        <Input
+                          id="custom-amount"
+                          type="number"
+                          placeholder="Enter amount"
+                          value={customAmount}
+                          onChange={(e) => setCustomAmount(e.target.value)}
+                          min="10"
+                        />
                       </div>
-                      <div className="flex justify-between">
-                        <span>Conversion rate:</span>
-                        <span>2 coins = ₦1</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Processing fee:</span>
-                        <span>₦10</span>
-                      </div>
-                      <div className="flex justify-between font-medium border-t pt-1">
-                        <span>You'll receive:</span>
-                        <span>
-                          ₦{withdrawAmount ? Math.max(0, Math.floor(Number.parseInt(withdrawAmount) / 2) - 10) : 0}
-                        </span>
+                      <div className="flex-1">
+                        <Label>Coins You'll Get</Label>
+                        <div className="h-10 px-3 py-2 border rounded-md bg-muted flex items-center">
+                          {customAmount
+                            ? Math.floor(Number.parseFloat(customAmount) / coinValue).toLocaleString()
+                            : "0"}{" "}
+                          coins
+                        </div>
                       </div>
                     </div>
-                  </div>
+                    <Button onClick={handleCustomPayment} disabled={isLoading || !customAmount}>
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Purchase Custom Amount
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-                  <Button
-                    onClick={handleWithdraw}
-                    disabled={loading || !withdrawAmount || Number.parseInt(withdrawAmount) > (profile?.coins || 0)}
-                    className="w-full"
-                    variant="outline"
-                  >
-                    {loading ? "Processing..." : "Request Withdrawal"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              {/* Withdraw Tab */}
+              <TabsContent value="withdraw" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Withdraw Coins</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Convert your coins back to cash (minimum 100 coins, 5% processing fee)
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Alert>
+                      <Info className="h-4 w-4" />
+                      <AlertDescription>
+                        Withdrawals are processed within 24-48 hours. A 5% processing fee applies.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="withdraw-amount">Coins to Withdraw</Label>
+                        <Input
+                          id="withdraw-amount"
+                          type="number"
+                          placeholder="Enter coins"
+                          value={withdrawAmount}
+                          onChange={(e) => setWithdrawAmount(e.target.value)}
+                          min="100"
+                          max={profile.coins_balance}
+                        />
+                      </div>
+                      <div>
+                        <Label>You'll Receive</Label>
+                        <div className="h-10 px-3 py-2 border rounded-md bg-muted flex items-center">
+                          {withdrawAmount
+                            ? `₦${(Number.parseInt(withdrawAmount) * 0.95 * coinValue).toFixed(2)}`
+                            : "₦0.00"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {withdrawAmount && Number.parseInt(withdrawAmount) >= 100 && (
+                      <div className="text-sm text-muted-foreground">
+                        <p>Processing fee: {Math.ceil(Number.parseInt(withdrawAmount) * 0.05)} coins</p>
+                        <p>
+                          Net coins:{" "}
+                          {Number.parseInt(withdrawAmount) - Math.ceil(Number.parseInt(withdrawAmount) * 0.05)} coins
+                        </p>
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={handleWithdrawal}
+                      disabled={isLoading || !withdrawAmount || Number.parseInt(withdrawAmount) < 100}
+                      className="w-full"
+                    >
+                      <ArrowUpRight className="w-4 h-4 mr-2" />
+                      Request Withdrawal
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Transaction History Tab */}
+              <TabsContent value="history" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <History className="w-5 h-5" />
+                      Transaction History
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {transactions.length === 0 ? (
+                      <div className="text-center py-8">
+                        <History className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <p className="text-muted-foreground">No transactions yet</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {transactions.map((transaction) => (
+                          <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg">
+                            <div className="flex items-center gap-3">
+                              {getTransactionIcon(transaction)}
+                              <div>
+                                <p className="font-medium text-sm">{transaction.description}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <p className="text-xs text-muted-foreground">
+                                    {new Date(transaction.created_at).toLocaleDateString()}
+                                  </p>
+                                  {transaction.reference && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {transaction.reference}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`font-semibold ${
+                                    transaction.coins > 0 ? "text-green-600" : "text-red-600"
+                                  }`}
+                                >
+                                  {transaction.coins > 0 ? "+" : ""}
+                                  {transaction.coins} coins
+                                </span>
+                                {getStatusIcon(transaction.status)}
+                              </div>
+                              {transaction.amount > 0 && (
+                                <p className="text-xs text-muted-foreground">₦{transaction.amount.toFixed(2)}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
       </div>
+
+      {/* Load Paystack Script */}
+      <script src="https://js.paystack.co/v1/inline.js"></script>
     </div>
+  )
+}
+
+export default function CoinsPage() {
+  return (
+    <AuthGuard>
+      <CoinsContent />
+    </AuthGuard>
   )
 }

@@ -1,322 +1,393 @@
 "use client"
 
-import { useAuth } from "@/contexts/auth-context"
 import { AuthGuard } from "@/components/auth-guard"
+import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Separator } from "@/components/ui/separator"
 import {
-  Users,
-  Radio,
-  Vault,
   Coins,
-  Calendar,
-  ShoppingBag,
-  Trophy,
-  TrendingUp,
-  Activity,
+  Users,
   MessageSquare,
   Heart,
+  Trophy,
+  Calendar,
+  TrendingUp,
+  Star,
+  Radio,
+  ShoppingBag,
+  Ticket,
+  Crown,
+  Zap,
+  Target,
   Award,
 } from "lucide-react"
 import Link from "next/link"
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
 
-// Mock data for demonstration
-const mockStats = {
-  totalPosts: 45,
-  totalLikes: 234,
-  totalComments: 89,
-  totalShares: 67,
-  level: 5,
-  experience: 2400,
-  nextLevelExp: 3000,
-  streak: 12,
-  achievements: [
-    { id: 1, name: "First Post", description: "Created your first post", icon: "🎉", earned: true },
-    { id: 2, name: "Community Member", description: "Joined the community", icon: "👥", earned: true },
-    { id: 3, name: "Music Lover", description: "Listened to 100 songs", icon: "🎵", earned: true },
-    { id: 4, name: "Conversation Starter", description: "Started 10 discussions", icon: "💬", earned: false },
-    { id: 5, name: "Influencer", description: "Got 500 likes", icon: "⭐", earned: false },
-  ],
-  recentActivity: [
-    { id: 1, type: "post", content: "Shared a new track", time: "2 hours ago" },
-    { id: 2, type: "comment", content: "Commented on Erigga's latest", time: "4 hours ago" },
-    { id: 3, type: "like", content: "Liked 5 posts", time: "6 hours ago" },
-    { id: 4, type: "share", content: "Shared community post", time: "1 day ago" },
-  ],
-}
+function DashboardContent() {
+  const { profile, user } = useAuth()
 
-const quickActions = [
-  { name: "Community", href: "/community", icon: Users, color: "bg-blue-500" },
-  { name: "Radio", href: "/radio", icon: Radio, color: "bg-green-500" },
-  { name: "Vault", href: "/vault", icon: Vault, color: "bg-purple-500" },
-  { name: "Coins", href: "/coins", icon: Coins, color: "bg-yellow-500" },
-  { name: "Meet & Greet", href: "/meet-greet", icon: Calendar, color: "bg-pink-500" },
-  { name: "Merch", href: "/merch", icon: ShoppingBag, color: "bg-indigo-500" },
-]
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
 
-export default function DashboardPage() {
-  const { user, profile, loading } = useAuth()
-  const [stats, setStats] = useState(mockStats)
-  const [isLoading, setIsLoading] = useState(true)
-
-  const supabase = createClient()
-
-  useEffect(() => {
-    const fetchUserStats = async () => {
-      if (!user?.id) {
-        setIsLoading(false)
-        return
-      }
-
-      try {
-        // Fetch user posts count
-        const { count: postsCount } = await supabase
-          .from("community_posts")
-          .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id)
-
-        // Fetch user comments count
-        const { count: commentsCount } = await supabase
-          .from("community_comments")
-          .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id)
-
-        // Update stats with real data
-        setStats((prev) => ({
-          ...prev,
-          totalPosts: postsCount || 0,
-          totalComments: commentsCount || 0,
-        }))
-      } catch (error) {
-        console.error("Error fetching user stats:", error)
-      } finally {
-        setIsLoading(false)
-      }
+  const getTierColor = (tier: string) => {
+    switch (tier.toLowerCase()) {
+      case "grassroot":
+        return "bg-green-500"
+      case "general":
+        return "bg-blue-500"
+      case "premium":
+        return "bg-purple-500"
+      case "vip":
+        return "bg-yellow-500"
+      default:
+        return "bg-gray-500"
     }
+  }
 
-    fetchUserStats()
-  }, [user?.id, supabase])
+  const getTierIcon = (tier: string) => {
+    switch (tier.toLowerCase()) {
+      case "grassroot":
+        return <Users className="w-4 h-4" />
+      case "general":
+        return <Star className="w-4 h-4" />
+      case "premium":
+        return <Crown className="w-4 h-4" />
+      case "vip":
+        return <Trophy className="w-4 h-4" />
+      default:
+        return <Users className="w-4 h-4" />
+    }
+  }
 
-  const experiencePercentage = (stats.experience / stats.nextLevelExp) * 100
+  // Calculate level based on total activity
+  const totalActivity = profile.total_posts + profile.total_comments + profile.total_votes_received
+  const currentLevel = Math.floor(totalActivity / 10) + 1
+  const nextLevelProgress = ((totalActivity % 10) / 10) * 100
+
+  const quickActions = [
+    {
+      title: "Community",
+      description: "Join discussions",
+      icon: <Users className="w-5 h-5" />,
+      href: "/community",
+      color: "bg-blue-500",
+    },
+    {
+      title: "Buy Coins",
+      description: "Purchase more coins",
+      icon: <Coins className="w-5 h-5" />,
+      href: "/coins",
+      color: "bg-yellow-500",
+    },
+    {
+      title: "Radio",
+      description: "Listen to music",
+      icon: <Radio className="w-5 h-5" />,
+      href: "/radio",
+      color: "bg-purple-500",
+    },
+    {
+      title: "Merchandise",
+      description: "Shop exclusive items",
+      icon: <ShoppingBag className="w-5 h-5" />,
+      href: "/merch",
+      color: "bg-green-500",
+    },
+    {
+      title: "Meet & Greet",
+      description: "Book sessions",
+      icon: <Calendar className="w-5 h-5" />,
+      href: "/meet-greet",
+      color: "bg-red-500",
+    },
+    {
+      title: "Tickets",
+      description: "Event tickets",
+      icon: <Ticket className="w-5 h-5" />,
+      href: "/tickets",
+      color: "bg-indigo-500",
+    },
+  ]
+
+  const achievements = [
+    {
+      title: "First Post",
+      description: "Created your first community post",
+      icon: <MessageSquare className="w-4 h-4" />,
+      earned: profile.total_posts > 0,
+    },
+    {
+      title: "Popular Creator",
+      description: "Received 10+ votes on your posts",
+      icon: <Heart className="w-4 h-4" />,
+      earned: profile.total_votes_received >= 10,
+    },
+    {
+      title: "Active Member",
+      description: "Made 5+ comments",
+      icon: <Users className="w-4 h-4" />,
+      earned: profile.total_comments >= 5,
+    },
+    {
+      title: "Coin Collector",
+      description: "Accumulated 1000+ coins",
+      icon: <Coins className="w-4 h-4" />,
+      earned: profile.coins_balance >= 1000,
+    },
+  ]
+
+  const recentActivity = [
+    {
+      type: "post",
+      title: "Created a new post in General",
+      time: "2 hours ago",
+      icon: <MessageSquare className="w-4 h-4 text-blue-500" />,
+    },
+    {
+      type: "coins",
+      title: "Earned 50 coins from community engagement",
+      time: "1 day ago",
+      icon: <Coins className="w-4 h-4 text-yellow-500" />,
+    },
+    {
+      type: "vote",
+      title: "Received 5 upvotes on your post",
+      time: "2 days ago",
+      icon: <Heart className="w-4 h-4 text-red-500" />,
+    },
+  ]
 
   return (
-    <AuthGuard requireAuth>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-            <div className="flex items-center gap-4 mb-4 md:mb-0">
-              <Avatar className="h-16 w-16 ring-4 ring-white/20">
-                <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
-                <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white text-xl">
-                  {profile?.username?.charAt(0).toUpperCase() || "U"}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <h1 className="text-3xl font-bold">
-                  Welcome back, {profile?.full_name || profile?.username || "User"}!
-                </h1>
-                <p className="text-muted-foreground">
-                  {profile?.tier ? (
-                    <Badge variant="secondary" className="mt-1">
-                      {profile.tier.charAt(0).toUpperCase() + profile.tier.slice(1)} Member
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome back, {profile.display_name}!</h1>
+          <p className="text-gray-600">Here's what's happening in your Erigga Mission journey</p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Profile & Stats */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Profile Card */}
+            <Card className="overflow-hidden">
+              <CardHeader className="pb-4">
+                <div className="flex items-center space-x-4">
+                  <Avatar className="w-16 h-16">
+                    <AvatarImage src={profile.avatar_url || ""} alt={profile.display_name} />
+                    <AvatarFallback className="text-lg font-semibold">
+                      {profile.display_name.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-lg">{profile.display_name}</h3>
+                      {profile.is_verified && (
+                        <Badge variant="secondary" className="text-xs">
+                          ✓ Verified
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">@{profile.username}</p>
+                    <Badge className={`${getTierColor(profile.subscription_tier)} text-white text-xs mt-2`}>
+                      {getTierIcon(profile.subscription_tier)}
+                      <span className="ml-1 capitalize">{profile.subscription_tier}</span>
                     </Badge>
-                  ) : (
-                    "Community Member"
-                  )}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-primary">{profile?.coins || 0}</p>
-                <p className="text-sm text-muted-foreground">Coins</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-primary">{stats.level}</p>
-                <p className="text-sm text-muted-foreground">Level</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Level Progress */}
-          <Card className="mb-8 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="h-5 w-5" />
-                Level Progress
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Level {stats.level}</span>
-                  <span>
-                    {stats.experience}/{stats.nextLevelExp} XP
-                  </span>
-                </div>
-                <Progress value={experiencePercentage} className="h-2" />
-                <p className="text-xs text-muted-foreground">
-                  {stats.nextLevelExp - stats.experience} XP to next level
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Posts</p>
-                    <p className="text-2xl font-bold">{stats.totalPosts}</p>
                   </div>
-                  <MessageSquare className="h-8 w-8 text-blue-500" />
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {profile.bio && <p className="text-sm text-gray-600 mb-4">{profile.bio}</p>}
+                {profile.location && <p className="text-xs text-muted-foreground mb-4">📍 {profile.location}</p>}
+
+                {/* Level Progress */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Level {currentLevel}</span>
+                    <span className="text-xs text-muted-foreground">{totalActivity % 10}/10 XP</span>
+                  </div>
+                  <Progress value={nextLevelProgress} className="h-2" />
+                  <p className="text-xs text-muted-foreground">{10 - (totalActivity % 10)} XP to next level</p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Likes</p>
-                    <p className="text-2xl font-bold">{stats.totalLikes}</p>
-                  </div>
-                  <Heart className="h-8 w-8 text-red-500" />
-                </div>
+            {/* Coin Balance */}
+            <Card className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-white">
+                  <Coins className="w-5 h-5" />
+                  Coin Balance
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold mb-2">{profile.coins_balance.toLocaleString()}</div>
+                <p className="text-yellow-100 text-sm mb-4">≈ ₦{(profile.coins_balance * 0.5).toLocaleString()} NGN</p>
+                <Button asChild size="sm" className="bg-white text-orange-600 hover:bg-gray-100">
+                  <Link href="/coins">
+                    <Zap className="w-4 h-4 mr-2" />
+                    Buy More Coins
+                  </Link>
+                </Button>
               </CardContent>
             </Card>
 
-            <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-              <CardContent className="p-6">
+            {/* Activity Stats */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  Activity Stats
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Comments</p>
-                    <p className="text-2xl font-bold">{stats.totalComments}</p>
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-blue-500" />
+                    <span className="text-sm">Posts</span>
                   </div>
-                  <MessageSquare className="h-8 w-8 text-green-500" />
+                  <span className="font-semibold">{profile.total_posts}</span>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Streak</p>
-                    <p className="text-2xl font-bold">{stats.streak}</p>
+                  <div className="flex items-center gap-2">
+                    <Heart className="w-4 h-4 text-red-500" />
+                    <span className="text-sm">Votes Received</span>
                   </div>
-                  <TrendingUp className="h-8 w-8 text-yellow-500" />
+                  <span className="font-semibold">{profile.total_votes_received}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-green-500" />
+                    <span className="text-sm">Comments</span>
+                  </div>
+                  <span className="font-semibold">{profile.total_comments}</span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Total XP</span>
+                  <span className="font-bold text-primary">{totalActivity}</span>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Quick Actions */}
-          <Card className="mb-8 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {quickActions.map((action) => {
-                  const Icon = action.icon
-                  return (
-                    <Link key={action.name} href={action.href}>
-                      <div className="flex flex-col items-center p-4 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer">
-                        <div className={`p-3 rounded-full ${action.color} text-white mb-2`}>
-                          <Icon className="h-6 w-6" />
-                        </div>
-                        <span className="text-sm font-medium text-center">{action.name}</span>
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Tabs for Additional Content */}
-          <Tabs defaultValue="achievements" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="achievements">Achievements</TabsTrigger>
-              <TabsTrigger value="activity">Recent Activity</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="achievements">
-              <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Award className="h-5 w-5" />
-                    Achievements
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {stats.achievements.map((achievement) => (
-                      <div
-                        key={achievement.id}
-                        className={`p-4 rounded-lg border-2 ${
-                          achievement.earned
-                            ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20"
-                            : "border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/20"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">{achievement.icon}</span>
-                          <div>
-                            <h3 className="font-semibold">{achievement.name}</h3>
-                            <p className="text-sm text-muted-foreground">{achievement.description}</p>
+          {/* Right Column - Quick Actions & Activity */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="w-5 h-5" />
+                  Quick Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {quickActions.map((action, index) => (
+                    <Link key={index} href={action.href}>
+                      <Card className="hover:shadow-md transition-shadow cursor-pointer group">
+                        <CardContent className="p-4 text-center">
+                          <div
+                            className={`w-12 h-12 ${action.color} rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform`}
+                          >
+                            <div className="text-white">{action.icon}</div>
                           </div>
-                          {achievement.earned && (
-                            <Badge variant="default" className="ml-auto">
-                              Earned
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                          <h4 className="font-semibold text-sm mb-1">{action.title}</h4>
+                          <p className="text-xs text-muted-foreground">{action.description}</p>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
-            <TabsContent value="activity">
-              <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5" />
-                    Recent Activity
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {stats.recentActivity.map((activity) => (
-                      <div
-                        key={activity.id}
-                        className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800"
-                      >
-                        <div className="h-2 w-2 rounded-full bg-primary" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">{activity.content}</p>
-                          <p className="text-xs text-muted-foreground">{activity.time}</p>
+            {/* Achievements */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Award className="w-5 h-5" />
+                  Achievements
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {achievements.map((achievement, index) => (
+                    <div
+                      key={index}
+                      className={`p-4 rounded-lg border-2 ${
+                        achievement.earned ? "border-green-200 bg-green-50" : "border-gray-200 bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            achievement.earned ? "bg-green-500 text-white" : "bg-gray-300 text-gray-500"
+                          }`}
+                        >
+                          {achievement.icon}
                         </div>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-sm">{achievement.title}</h4>
+                          <p className="text-xs text-muted-foreground">{achievement.description}</p>
+                        </div>
+                        {achievement.earned && (
+                          <Badge variant="secondary" className="bg-green-100 text-green-800">
+                            ✓
+                          </Badge>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Recent Activity */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5" />
+                  Recent Activity
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {recentActivity.map((activity, index) => (
+                    <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+                      <div className="flex-shrink-0">{activity.icon}</div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{activity.title}</p>
+                        <p className="text-xs text-muted-foreground">{activity.time}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" className="w-full mt-4 bg-transparent" asChild>
+                  <Link href="/profile">View Full Activity</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <AuthGuard>
+      <DashboardContent />
     </AuthGuard>
   )
 }
