@@ -1,69 +1,40 @@
 "use client"
 
-import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
 import Image from "next/image"
+import { useTheme } from "@/contexts/theme-context"
 
-interface DynamicLogoProps {
-  className?: string
-}
-
-export function DynamicLogo({ className = "h-8 w-auto" }: DynamicLogoProps) {
-  const { theme, resolvedTheme } = useTheme()
+export function DynamicLogo() {
+  const { theme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
+  // Don't render until mounted to avoid hydration mismatch
   if (!mounted) {
-    // Return a simple fallback during SSR
     return (
-      <div
-        className={`${className} bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center`}
-      >
-        <span className="text-white font-bold text-sm">E</span>
+      <div className="flex items-center space-x-2">
+        <div className="w-8 h-8 bg-muted rounded" />
+        <span className="text-xl font-bold">Erigga Live</span>
       </div>
     )
   }
 
-  const currentTheme = resolvedTheme || theme
+  const logoSrc = theme === "dark" ? "/images/loggotrans-dark.png" : "/images/loggotrans-light.png"
 
   return (
-    <div className={`${className} relative`}>
-      {currentTheme === "dark" ? (
-        <Image
-          src="/images/loggotrans-dark.png"
-          alt="Erigga Live"
-          width={32}
-          height={32}
-          className="object-contain"
-          onError={() => {
-            // Fallback if image fails to load
-            return (
-              <div className="h-8 w-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-sm">E</span>
-              </div>
-            )
-          }}
-        />
-      ) : (
-        <Image
-          src="/images/loggotrans-light.png"
-          alt="Erigga Live"
-          width={32}
-          height={32}
-          className="object-contain"
-          onError={() => {
-            // Fallback if image fails to load
-            return (
-              <div className="h-8 w-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-sm">E</span>
-              </div>
-            )
-          }}
-        />
-      )}
+    <div className="flex items-center space-x-2">
+      <Image
+        src={logoSrc || "/placeholder.svg"}
+        alt="Erigga Live"
+        width={32}
+        height={32}
+        className="w-8 h-8"
+        priority
+      />
+      <span className="text-xl font-bold">Erigga Live</span>
     </div>
   )
 }

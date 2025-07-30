@@ -3,64 +3,49 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
+import { useTheme } from "@/contexts/theme-context"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
+import { DynamicLogo } from "@/components/dynamic-logo"
 import {
   Home,
   Users,
-  MessageCircle,
-  Coins,
-  Crown,
   Radio,
-  Target,
-  BookOpen,
   Archive,
-  Ticket,
+  Gamepad2,
+  Coins,
+  Calendar,
   ShoppingBag,
-  Menu,
+  User,
   Settings,
   LogOut,
-  User,
-  Gamepad2,
+  Menu,
   Sun,
   Moon,
+  Monitor,
 } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
-import { useTheme } from "next-themes"
-import { DynamicLogo } from "@/components/dynamic-logo"
 
 const navigationItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/community", label: "Community", icon: Users },
-  { href: "/chat", label: "Chat", icon: MessageCircle },
-  { href: "/games", label: "Games", icon: Gamepad2 },
   { href: "/radio", label: "Radio", icon: Radio },
   { href: "/vault", label: "Vault", icon: Archive },
-  { href: "/mission", label: "Mission", icon: Target },
-  { href: "/chronicles", label: "Chronicles", icon: BookOpen },
-  { href: "/tickets", label: "Tickets", icon: Ticket },
-  { href: "/premium", label: "Premium", icon: Crown },
-  { href: "/merch", label: "Merch", icon: ShoppingBag },
+  { href: "/games", label: "Games", icon: Gamepad2 },
   { href: "/coins", label: "Coins", icon: Coins },
+  { href: "/meet-greet", label: "Meet & Greet", icon: Calendar },
+  { href: "/merch", label: "Merch", icon: ShoppingBag },
 ]
 
 export function Navigation() {
-  const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
-  const { user, profile, isAuthenticated, signOut } = useAuth()
+  const { user, signOut } = useAuth()
   const { theme, setTheme } = useTheme()
+  const [isOpen, setIsOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
+  // Ensure component is mounted before accessing theme
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -68,233 +53,200 @@ export function Navigation() {
   const handleSignOut = async () => {
     try {
       await signOut()
+      setIsOpen(false)
     } catch (error) {
       console.error("Error signing out:", error)
     }
   }
 
-  if (!mounted) {
-    return null
+  const toggleTheme = () => {
+    if (!mounted) return
+
+    const themes = ["light", "dark", "system"]
+    const currentIndex = themes.indexOf(theme)
+    const nextIndex = (currentIndex + 1) % themes.length
+    setTheme(themes[nextIndex])
   }
 
-  // Don't show navigation on auth pages
-  if (pathname.startsWith("/login") || pathname.startsWith("/signup")) {
-    return null
+  const getThemeIcon = () => {
+    if (!mounted) return Monitor
+
+    switch (theme) {
+      case "light":
+        return Sun
+      case "dark":
+        return Moon
+      default:
+        return Monitor
+    }
   }
+
+  const ThemeIcon = getThemeIcon()
+
+  const NavContent = () => (
+    <>
+      <div className="flex flex-col space-y-2">
+        {navigationItems.map((item) => {
+          const Icon = item.icon
+          const isActive = pathname === item.href
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setIsOpen(false)}
+              className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <Icon className="h-5 w-5" />
+              <span>{item.label}</span>
+            </Link>
+          )
+        })}
+      </div>
+
+      <Separator className="my-4" />
+
+      <div className="flex flex-col space-y-2">
+        <Button variant="ghost" onClick={toggleTheme} className="justify-start px-3 py-2 h-auto">
+          <ThemeIcon className="h-5 w-5 mr-3" />
+          <span>Theme</span>
+        </Button>
+
+        {user ? (
+          <>
+            <Link
+              href="/profile"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center space-x-3 px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <User className="h-5 w-5" />
+              <span>Profile</span>
+            </Link>
+            <Link
+              href="/dashboard"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center space-x-3 px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <Settings className="h-5 w-5" />
+              <span>Dashboard</span>
+            </Link>
+            <Button
+              variant="ghost"
+              onClick={handleSignOut}
+              className="justify-start px-3 py-2 h-auto text-muted-foreground hover:text-foreground"
+            >
+              <LogOut className="h-5 w-5 mr-3" />
+              <span>Sign Out</span>
+            </Button>
+          </>
+        ) : (
+          <>
+            <Link
+              href="/login"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center space-x-3 px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <User className="h-5 w-5" />
+              <span>Sign In</span>
+            </Link>
+            <Link
+              href="/signup"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center space-x-3 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <User className="h-5 w-5" />
+              <span>Sign Up</span>
+            </Link>
+          </>
+        )}
+      </div>
+    </>
+  )
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center">
-        {/* Logo */}
-        <div className="mr-4 flex">
-          <Link href="/" className="flex items-center space-x-2">
-            <DynamicLogo className="h-8 w-8" />
-            <span className="hidden font-bold sm:inline-block">Erigga Live</span>
-          </Link>
-        </div>
+    <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-16 items-center justify-between px-4">
+        <Link href="/" className="flex items-center space-x-2">
+          <DynamicLogo />
+        </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-6 text-sm font-medium flex-1">
-          {navigationItems.map((item) => {
+        <div className="hidden md:flex items-center space-x-6">
+          {navigationItems.slice(0, 5).map((item) => {
             const Icon = item.icon
-            const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
+            const isActive = pathname === item.href
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center space-x-2 transition-colors hover:text-foreground/80 ${
-                  isActive ? "text-foreground" : "text-foreground/60"
+                className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`}
               >
                 <Icon className="h-4 w-4" />
-                <span>{item.label}</span>
+                <span className="text-sm font-medium">{item.label}</span>
               </Link>
             )
           })}
-        </nav>
+        </div>
 
-        {/* Desktop User Menu */}
+        {/* Desktop User Actions */}
         <div className="hidden md:flex items-center space-x-4">
-          {/* Theme Toggle */}
-          <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
-            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="sr-only">Toggle theme</span>
+          <Button variant="ghost" size="icon" onClick={toggleTheme}>
+            <ThemeIcon className="h-4 w-4" />
           </Button>
 
-          {isAuthenticated && profile ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={profile.avatar_url || ""} alt="User" />
-                    <AvatarFallback>{profile.username?.[0]?.toUpperCase() || "U"}</AvatarFallback>
-                  </Avatar>
+          {user ? (
+            <div className="flex items-center space-x-2">
+              <Link href="/profile">
+                <Button variant="ghost" size="sm">
+                  Profile
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{profile.display_name}</p>
-                    <p className="text-xs leading-none text-muted-foreground">@{profile.username}</p>
-                    <div className="flex items-center space-x-2 pt-1">
-                      <Badge variant="secondary" className="text-xs">
-                        {profile.subscription_tier}
-                      </Badge>
-                      <div className="flex items-center space-x-1">
-                        <Coins className="h-3 w-3" />
-                        <span className="text-xs">{profile.coins_balance}</span>
-                      </div>
-                    </div>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/profile">
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Dashboard</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </Link>
+              <Button variant="outline" size="sm" onClick={handleSignOut}>
+                Sign Out
+              </Button>
+            </div>
           ) : (
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" asChild>
-                <Link href="/login">Sign In</Link>
-              </Button>
-              <Button asChild>
-                <Link href="/signup">Sign Up</Link>
-              </Button>
+            <div className="flex items-center space-x-2">
+              <Link href="/login">
+                <Button variant="ghost" size="sm">
+                  Sign In
+                </Button>
+              </Link>
+              <Link href="/signup">
+                <Button size="sm">Sign Up</Button>
+              </Link>
             </div>
           )}
         </div>
 
         {/* Mobile Navigation */}
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button
-              variant="ghost"
-              className="mr-2 px-0 text-base hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 md:hidden"
-            >
-              <Menu className="h-6 w-6" />
-              <span className="sr-only">Toggle Menu</span>
+        <Sheet open={isOpen} onOpenChange={setIsOpen}>
+          <SheetTrigger asChild className="md:hidden">
+            <Button variant="ghost" size="icon">
+              <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="pr-0">
-            <SheetHeader>
-              <SheetTitle>
-                <Link href="/" className="flex items-center space-x-2">
-                  <DynamicLogo className="h-6 w-6" />
-                  <span className="font-bold">Erigga Live</span>
-                </Link>
-              </SheetTitle>
-            </SheetHeader>
-
-            <div className="my-4 h-[calc(100vh-8rem)] pb-10 pl-6">
-              <div className="flex flex-col space-y-3">
-                {navigationItems.map((item) => {
-                  const Icon = item.icon
-                  const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
-
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`flex items-center space-x-2 text-sm font-medium transition-colors hover:text-foreground/80 ${
-                        isActive ? "text-foreground" : "text-foreground/60"
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span>{item.label}</span>
-                    </Link>
-                  )
-                })}
+          <SheetContent side="right" className="w-80">
+            <div className="flex flex-col h-full">
+              <div className="flex items-center space-x-2 mb-6">
+                <DynamicLogo />
               </div>
-
-              <Separator className="my-4" />
-
-              {isAuthenticated && profile ? (
-                <div className="flex flex-col space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={profile.avatar_url || ""} alt="User" />
-                      <AvatarFallback>{profile.username?.[0]?.toUpperCase() || "U"}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium">{profile.display_name}</p>
-                      <p className="text-xs text-muted-foreground">@{profile.username}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="secondary" className="text-xs">
-                      {profile.subscription_tier}
-                    </Badge>
-                    <div className="flex items-center space-x-1">
-                      <Coins className="h-3 w-3" />
-                      <span className="text-xs">{profile.coins_balance}</span>
-                    </div>
-                  </div>
-                  <Link
-                    href="/profile"
-                    className="flex items-center space-x-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-                  >
-                    <User className="h-4 w-4" />
-                    <span>Profile</span>
-                  </Link>
-                  <Link
-                    href="/dashboard"
-                    className="flex items-center space-x-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-                  >
-                    <Settings className="h-4 w-4" />
-                    <span>Dashboard</span>
-                  </Link>
-                  <button
-                    onClick={handleSignOut}
-                    className="flex items-center space-x-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    <span>Log out</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col space-y-3">
-                  <Link href="/login" className="flex items-center space-x-2 text-sm font-medium">
-                    Sign In
-                  </Link>
-                  <Link href="/signup" className="flex items-center space-x-2 text-sm font-medium">
-                    Sign Up
-                  </Link>
-                </div>
-              )}
-
-              <div className="pt-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-                  className="w-full justify-start"
-                >
-                  <Sun className="h-4 w-4 mr-2 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                  <Moon className="absolute h-4 w-4 ml-2 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                  <span className="ml-6">Toggle theme</span>
-                </Button>
+              <div className="flex-1">
+                <NavContent />
               </div>
             </div>
           </SheetContent>
         </Sheet>
       </div>
-    </header>
+    </nav>
   )
 }

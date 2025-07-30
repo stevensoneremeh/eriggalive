@@ -1,13 +1,14 @@
 -- Create ludo_games table
-CREATE TABLE IF NOT EXISTS public.ludo_games (
+CREATE TABLE IF NOT EXISTS ludo_games (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    room_name VARCHAR(100) NOT NULL,
-    host_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    room_name TEXT NOT NULL,
     entry_fee INTEGER NOT NULL DEFAULT 10,
     prize_pool INTEGER NOT NULL DEFAULT 0,
     max_players INTEGER NOT NULL DEFAULT 4,
-    current_players INTEGER NOT NULL DEFAULT 1,
-    status VARCHAR(20) NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'active', 'finished')),
+    current_players INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'active', 'finished')),
+    created_by UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    players UUID[] DEFAULT '{}',
     winner_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     game_state JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -15,46 +16,41 @@ CREATE TABLE IF NOT EXISTS public.ludo_games (
 );
 
 -- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_ludo_games_status ON public.ludo_games(status);
-CREATE INDEX IF NOT EXISTS idx_ludo_games_host_id ON public.ludo_games(host_id);
-CREATE INDEX IF NOT EXISTS idx_ludo_games_created_at ON public.ludo_games(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ludo_games_status ON ludo_games(status);
+CREATE INDEX IF NOT EXISTS idx_ludo_games_created_by ON ludo_games(created_by);
+CREATE INDEX IF NOT EXISTS idx_ludo_games_created_at ON ludo_games(created_at);
 
 -- Enable RLS
-ALTER TABLE public.ludo_games ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ludo_games ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
-CREATE POLICY "Anyone can view active games" ON public.ludo_games
+CREATE POLICY "Users can view all games" ON ludo_games
     FOR SELECT USING (true);
 
-CREATE POLICY "Authenticated users can create games" ON public.ludo_games
-    FOR INSERT WITH CHECK (auth.uid() IS NOT NULL AND host_id = auth.uid());
+CREATE POLICY "Users can create games" ON ludo_games
+    FOR INSERT WITH CHECK (auth.uid() = created_by);
 
-CREATE POLICY "Host can update their games" ON public.ludo_games
-    FOR UPDATE USING (host_id = auth.uid());
-
-CREATE POLICY "Players in game can update game state" ON public.ludo_games
+CREATE POLICY "Players can update their games" ON ludo_games
     FOR UPDATE USING (
-        game_state ? auth.uid()::text OR host_id = auth.uid()
+        auth.uid() = created_by OR 
+        auth.uid() = ANY(players)
     );
 
--- Function to update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
+-- Create function to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_ludo_games_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
--- Trigger to automatically update updated_at
-CREATE TRIGGER update_ludo_games_updated_at 
-    BEFORE UPDATE ON public.ludo_games 
-    FOR EACH ROW 
-    EXECUTE FUNCTION update_updated_at_column();
+-- Create trigger for updated_at
+DROP TRIGGER IF EXISTS update_ludo_games_updated_at ON ludo_games;
+CREATE TRIGGER update_ludo_games_updated_at
+    BEFORE UPDATE ON ludo_games
+    FOR EACH ROW
+    EXECUTE FUNCTION update_ludo_games_updated_at();
 
--- Grant permissions
-GRANT ALL ON public.ludo_games TO authenticated;
-GRANT ALL ON public.ludo_games TO service_role;
-
--- Enable realtime for the table
-ALTER PUBLICATION supabase_realtime ADD TABLE public.ludo_games;
+-- Enable realtime for ludo_games
+ALTER PUBLICATION supabase_realtime ADD TABLE ludo_games;
