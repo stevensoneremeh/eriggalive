@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-import { useTheme as useNextTheme } from "next-themes"
+import { useTheme } from "next-themes"
 
 interface ThemeContextType {
   theme: string | undefined
@@ -15,16 +15,11 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
-  const { theme, setTheme, systemTheme, resolvedTheme } = useNextTheme()
+  const { theme, setTheme, systemTheme, resolvedTheme } = useTheme()
 
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  // Don't render anything until mounted to prevent hydration issues
-  if (!mounted) {
-    return <>{children}</>
-  }
 
   const value: ThemeContextType = {
     theme,
@@ -33,13 +28,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     resolvedTheme,
   }
 
+  // Don't render anything until mounted to prevent hydration issues
+  if (!mounted) {
+    return <>{children}</>
+  }
+
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 
-export function useTheme() {
+export function useThemeContext() {
   const context = useContext(ThemeContext)
   if (context === undefined) {
-    throw new Error("useTheme must be used within a ThemeProvider")
+    throw new Error("useThemeContext must be used within a ThemeProvider")
   }
   return context
 }
