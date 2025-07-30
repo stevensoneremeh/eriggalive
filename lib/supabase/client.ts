@@ -1,4 +1,4 @@
-import { createBrowserClient } from "@supabase/ssr"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
 export function createClient() {
   // Check if we're in a browser environment
@@ -93,20 +93,20 @@ export function createClient() {
     } as any
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co"
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key"
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.warn("Missing Supabase environment variables")
     throw new Error("Missing Supabase environment variables")
   }
 
-  return createBrowserClient(supabaseUrl, supabaseAnonKey)
+  return createSupabaseClient(supabaseUrl, supabaseAnonKey)
 }
 
 // Create a singleton client instance
-const supabase = createClient()
+const supabaseInstance = createClient()
 
 // Export both the function and the instance
-export { supabase }
-export default createClient
+export { supabaseInstance }
+export default supabaseInstance
