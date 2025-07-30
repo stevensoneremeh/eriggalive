@@ -1,453 +1,592 @@
 "use client"
 
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Users,
-  MessageSquare,
-  Heart,
-  Share2,
-  Plus,
-  TrendingUp,
-  Clock,
-  Star,
-  Music,
-  Mic,
-  Trophy,
-  FlameIcon as Fire,
-} from "lucide-react"
-import Link from "next/link"
-import { formatDistanceToNow } from "date-fns"
-import { useState, useEffect } from "react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { Heart, MessageCircle, Share2, Users, TrendingUp, Search, Plus, Filter } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface Post {
   id: number
-  title: string
   content: string
-  author: {
+  vote_count: number
+  comment_count: number
+  created_at: string
+  user: {
     id: number
     username: string
-    display_name: string
-    avatar_url: string | null
-    subscription_tier: string
-    is_verified: boolean
+    full_name: string
+    tier: string
+    avatar_url?: string
   }
   category: {
     id: number
     name: string
     slug: string
   }
-  vote_count: number
-  comment_count: number
-  created_at: string
-  user_vote?: "up" | "down" | null
+  user_has_voted: boolean
 }
 
 interface Category {
   id: number
   name: string
   slug: string
-  description: string
-  post_count: number
+  description?: string
   is_active: boolean
 }
 
-function CommunityPage() {
-  const { profile } = useAuth()
+const TIER_COLORS = {
+  admin: "bg-red-500 text-white",
+  blood: "bg-red-600 text-white",
+  elder: "bg-purple-500 text-white",
+  pioneer: "bg-blue-500 text-white",
+  grassroot: "bg-green-500 text-white",
+}
+
+export default function CommunityPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [activeCategory, setActiveCategory] = useState<string>("all")
-  const [isLoading, setIsLoading] = useState(true)
+  const [newPost, setNewPost] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [posting, setPosting] = useState(false)
+  const [sortOrder, setSortOrder] = useState("newest")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState<number | null>(null)
 
-  // Mock data for demo
+  const { user, profile } = useAuth()
+  const { toast } = useToast()
+  const supabase = createClient()
+
   useEffect(() => {
-    const mockCategories: Category[] = [
-      {
-        id: 1,
-        name: "General",
-        slug: "general",
-        description: "General discussions about everything",
-        post_count: 156,
-        is_active: true,
-      },
-      {
-        id: 2,
-        name: "Music",
-        slug: "music",
-        description: "Share and discuss music",
-        post_count: 89,
-        is_active: true,
-      },
-      {
-        id: 3,
-        name: "Bars & Lyrics",
-        slug: "bars",
-        description: "Drop your hottest bars",
-        post_count: 234,
-        is_active: true,
-      },
-      {
-        id: 4,
-        name: "News & Updates",
-        slug: "news",
-        description: "Latest news and announcements",
-        post_count: 45,
-        is_active: true,
-      },
-    ]
+    loadData()
+  }, [sortOrder, categoryFilter, searchQuery])
 
-    const mockPosts: Post[] = [
-      {
-        id: 1,
-        title: "Welcome to the Erigga Mission Community! 🎵",
-        content:
-          "This is where we connect, share, and grow together. Drop your thoughts, share your music, and let's build something amazing!",
-        author: {
-          id: 1,
-          username: "erigga_official",
-          display_name: "Erigga",
-          avatar_url: null,
-          subscription_tier: "vip",
-          is_verified: true,
-        },
-        category: {
-          id: 1,
-          name: "General",
-          slug: "general",
-        },
-        vote_count: 45,
-        comment_count: 12,
-        created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-      },
-      {
-        id: 2,
-        title: "New track dropping soon! 🔥",
-        content:
-          "Been working on something special in the studio. Can't wait to share it with y'all. What kind of vibe are you expecting?",
-        author: {
-          id: 1,
-          username: "erigga_official",
-          display_name: "Erigga",
-          avatar_url: null,
-          subscription_tier: "vip",
-          is_verified: true,
-        },
-        category: {
-          id: 2,
-          name: "Music",
-          slug: "music",
-        },
-        vote_count: 78,
-        comment_count: 23,
-        created_at: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
-      },
-      {
-        id: 3,
-        title: "Drop your best bars here! 🎤",
-        content:
-          "Let's see what y'all got! Share your hottest bars and let the community vote. Best bars get featured!",
-        author: {
-          id: 2,
-          username: "community_mod",
-          display_name: "Community Moderator",
-          avatar_url: null,
-          subscription_tier: "premium",
-          is_verified: false,
-        },
-        category: {
-          id: 3,
-          name: "Bars & Lyrics",
-          slug: "bars",
-        },
-        vote_count: 34,
-        comment_count: 67,
-        created_at: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
-      },
-      {
-        id: 4,
-        title: "What's your favorite Erigga track?",
-        content:
-          "Been listening to the catalog and wondering what tracks hit different for y'all. Drop your favorites below!",
-        author: {
-          id: 3,
-          username: "musiclover23",
-          display_name: "Music Lover",
-          avatar_url: null,
-          subscription_tier: "general",
-          is_verified: false,
-        },
-        category: {
-          id: 2,
-          name: "Music",
-          slug: "music",
-        },
-        vote_count: 56,
-        comment_count: 89,
-        created_at: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString(),
-      },
-    ]
+  const loadData = async () => {
+    try {
+      setLoading(true)
 
-    setCategories(mockCategories)
-    setPosts(mockPosts)
-    setIsLoading(false)
-  }, [])
+      // Load categories first
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from("community_categories")
+        .select("*")
+        .eq("is_active", true)
+        .order("display_order", { ascending: true })
 
-  const getTierColor = (tier: string) => {
-    switch (tier.toLowerCase()) {
-      case "grassroot":
-        return "bg-green-500"
-      case "general":
-        return "bg-blue-500"
-      case "premium":
-        return "bg-purple-500"
-      case "vip":
-        return "bg-yellow-500"
-      default:
-        return "bg-gray-500"
+      if (categoriesError) {
+        console.error("Categories error:", categoriesError)
+      } else {
+        setCategories(categoriesData || [])
+      }
+
+      // Build posts query
+      let postsQuery = supabase
+        .from("community_posts")
+        .select(`
+          *,
+          user:users!community_posts_user_id_fkey (
+            id, username, full_name, tier, avatar_url
+          ),
+          category:community_categories!community_posts_category_id_fkey (
+            id, name, slug
+          )
+        `)
+        .eq("is_published", true)
+        .eq("is_deleted", false)
+
+      // Apply filters
+      if (categoryFilter) {
+        postsQuery = postsQuery.eq("category_id", categoryFilter)
+      }
+
+      if (searchQuery) {
+        postsQuery = postsQuery.ilike("content", `%${searchQuery}%`)
+      }
+
+      // Apply sorting
+      switch (sortOrder) {
+        case "oldest":
+          postsQuery = postsQuery.order("created_at", { ascending: true })
+          break
+        case "top":
+          postsQuery = postsQuery.order("vote_count", { ascending: false }).order("created_at", { ascending: false })
+          break
+        case "newest":
+        default:
+          postsQuery = postsQuery.order("created_at", { ascending: false })
+          break
+      }
+
+      postsQuery = postsQuery.limit(20)
+
+      const { data: postsData, error: postsError } = await postsQuery
+
+      if (postsError) {
+        console.error("Posts error:", postsError)
+        throw postsError
+      }
+
+      if (postsData) {
+        // Check which posts current user has voted on
+        let userVotes: number[] = []
+        if (profile?.id) {
+          const { data: votesData, error: votesError } = await supabase
+            .from("community_post_votes")
+            .select("post_id")
+            .eq("user_id", profile.id)
+
+          if (!votesError && votesData) {
+            userVotes = votesData.map((v) => v.post_id)
+          }
+        }
+
+        const formattedPosts = postsData.map((post) => ({
+          ...post,
+          user_has_voted: userVotes.includes(post.id),
+        }))
+
+        setPosts(formattedPosts)
+      }
+    } catch (error) {
+      console.error("Error loading data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load community data. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
-  const getTierIcon = (tier: string) => {
-    switch (tier.toLowerCase()) {
-      case "grassroot":
-        return <Users className="w-3 h-3" />
-      case "general":
-        return <Star className="w-3 h-3" />
-      case "premium":
-        return <Trophy className="w-3 h-3" />
-      case "vip":
-        return <Fire className="w-3 h-3" />
-      default:
-        return <Users className="w-3 h-3" />
+  const createPost = async () => {
+    if (!newPost.trim() || !profile || !selectedCategory) {
+      toast({
+        title: "Missing Information",
+        description: "Please select a category and write your post content.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setPosting(true)
+    try {
+      const { data, error } = await supabase
+        .from("community_posts")
+        .insert({
+          user_id: profile.id,
+          category_id: selectedCategory,
+          content: newPost.trim(),
+          is_published: true,
+          is_deleted: false,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      toast({
+        title: "Success!",
+        description: "Your post has been created successfully.",
+      })
+
+      setNewPost("")
+      setSelectedCategory(null)
+      await loadData()
+    } catch (error) {
+      console.error("Error creating post:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create post. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setPosting(false)
     }
   }
 
-  const filteredPosts = activeCategory === "all" ? posts : posts.filter((post) => post.category.slug === activeCategory)
+  const voteOnPost = async (postId: number) => {
+    if (!profile?.id) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to vote on posts.",
+        variant: "destructive",
+      })
+      return
+    }
 
-  if (!profile) {
+    try {
+      // Check if already voted
+      const { data: existingVote, error: voteCheckError } = await supabase
+        .from("community_post_votes")
+        .select("id")
+        .eq("post_id", postId)
+        .eq("user_id", profile.id)
+        .maybeSingle()
+
+      if (voteCheckError && voteCheckError.code !== "PGRST116") {
+        throw voteCheckError
+      }
+
+      if (existingVote) {
+        // Remove vote
+        const { error: deleteError } = await supabase
+          .from("community_post_votes")
+          .delete()
+          .eq("post_id", postId)
+          .eq("user_id", profile.id)
+
+        if (deleteError) throw deleteError
+
+        // Update post vote count
+        const { error: updateError } = await supabase.rpc("decrement_post_votes", { post_id: postId })
+
+        if (updateError) {
+          // Fallback to manual update if RPC doesn't exist
+          await supabase
+            .from("community_posts")
+            .update({ vote_count: supabase.raw("GREATEST(vote_count - 1, 0)") })
+            .eq("id", postId)
+        }
+
+        toast({
+          title: "Vote Removed",
+          description: "Your vote has been removed.",
+        })
+      } else {
+        // Add vote
+        const { error: insertError } = await supabase.from("community_post_votes").insert({
+          post_id: postId,
+          user_id: profile.id,
+        })
+
+        if (insertError) throw insertError
+
+        // Update post vote count
+        const { error: updateError } = await supabase.rpc("increment_post_votes", { post_id: postId })
+
+        if (updateError) {
+          // Fallback to manual update if RPC doesn't exist
+          await supabase
+            .from("community_posts")
+            .update({ vote_count: supabase.raw("vote_count + 1") })
+            .eq("id", postId)
+        }
+
+        toast({
+          title: "Vote Added",
+          description: "Thanks for voting!",
+        })
+      }
+
+      await loadData()
+    } catch (error) {
+      console.error("Error voting:", error)
+      toast({
+        title: "Error",
+        description: "Failed to vote on post. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 p-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600 dark:text-gray-400">Loading community...</p>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
+      <div className="max-w-6xl mx-auto p-4">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Community</h1>
-          <p className="text-gray-600">Connect, share, and engage with the Erigga Mission family</p>
+        <div className="text-center py-8">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+            Erigga Community
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">Connect, share, and engage with fellow fans</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Left Sidebar - Categories */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Create Post */}
-            <Card>
-              <CardContent className="p-4">
-                <Button className="w-full" asChild>
-                  <Link href="/community/create">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Post
-                  </Link>
-                </Button>
+          {/* Sidebar */}
+          <div className="lg:col-span-1">
+            {/* User Info */}
+            {profile && (
+              <Card className="mb-6 border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={profile.avatar_url || "/placeholder.svg"} />
+                      <AvatarFallback>{profile.full_name?.[0] || profile.username?.[0] || "U"}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-semibold">{profile.full_name}</p>
+                      <p className="text-sm text-gray-500">@{profile.username}</p>
+                      <Badge
+                        className={`text-xs ${TIER_COLORS[profile.tier as keyof typeof TIER_COLORS] || "bg-gray-500 text-white"}`}
+                      >
+                        {profile.tier}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+                    <div>
+                      <p className="text-2xl font-bold text-purple-600">{profile.coins || 0}</p>
+                      <p className="text-xs text-gray-500">Coins</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-blue-600">{profile.level || 1}</p>
+                      <p className="text-xs text-gray-500">Level</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Community Stats */}
+            <Card className="mb-6 border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg">
+                  <TrendingUp className="w-5 h-5 mr-2" />
+                  Community Stats
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <Users className="h-4 w-4 text-blue-600 mx-auto mb-1" />
+                      <div className="text-2xl font-bold text-blue-600">12,450</div>
+                      <div className="text-xs text-blue-600">Members</div>
+                    </div>
+                    <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <MessageCircle className="h-4 w-4 text-green-600 mx-auto mb-1" />
+                      <div className="text-2xl font-bold text-green-600">{posts.length}</div>
+                      <div className="text-xs text-green-600">Posts</div>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
             {/* Categories */}
-            <Card>
+            <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="text-lg">Categories</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <Button
-                  variant={activeCategory === "all" ? "default" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => setActiveCategory("all")}
-                >
-                  <TrendingUp className="w-4 h-4 mr-2" />
-                  All Posts
-                  <Badge variant="secondary" className="ml-auto">
-                    {posts.length}
-                  </Badge>
-                </Button>
-                {categories.map((category) => (
-                  <Button
-                    key={category.id}
-                    variant={activeCategory === category.slug ? "default" : "ghost"}
-                    className="w-full justify-start"
-                    onClick={() => setActiveCategory(category.slug)}
+              <CardContent className="p-4 pt-0">
+                <div className="space-y-2">
+                  <div
+                    className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
+                      categoryFilter === null
+                        ? "bg-blue-100 dark:bg-blue-900/50"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }`}
+                    onClick={() => setCategoryFilter(null)}
                   >
-                    {category.slug === "music" && <Music className="w-4 h-4 mr-2" />}
-                    {category.slug === "bars" && <Mic className="w-4 h-4 mr-2" />}
-                    {category.slug === "general" && <MessageSquare className="w-4 h-4 mr-2" />}
-                    {category.slug === "news" && <Clock className="w-4 h-4 mr-2" />}
-                    {category.name}
-                    <Badge variant="secondary" className="ml-auto">
-                      {posts.filter((p) => p.category.slug === category.slug).length}
-                    </Badge>
-                  </Button>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Community Stats */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Community Stats</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Total Members</span>
-                  <span className="font-semibold">2,847</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Posts Today</span>
-                  <span className="font-semibold">23</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Active Now</span>
-                  <span className="font-semibold">156</span>
+                    <span className="text-sm font-medium">All Categories</span>
+                  </div>
+                  {categories.map((category) => (
+                    <div
+                      key={category.id}
+                      className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
+                        categoryFilter === category.id
+                          ? "bg-blue-100 dark:bg-blue-900/50"
+                          : "hover:bg-gray-100 dark:hover:bg-gray-700"
+                      }`}
+                      onClick={() => setCategoryFilter(category.id)}
+                    >
+                      <span className="text-sm font-medium">{category.name}</span>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Main Content - Posts */}
+          {/* Main Content */}
           <div className="lg:col-span-3">
+            {/* Search and Filter Controls */}
+            <Card className="mb-6 border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+              <CardContent className="p-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                  <div className="flex items-center space-x-2 flex-1">
+                    <Search className="h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search posts..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="border-0 bg-gray-50 dark:bg-gray-700"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Filter className="h-4 w-4 text-gray-400" />
+                    <Select value={sortOrder} onValueChange={setSortOrder}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="newest">Newest</SelectItem>
+                        <SelectItem value="oldest">Oldest</SelectItem>
+                        <SelectItem value="top">Top Voted</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Create Post */}
+            {profile && (
+              <Card className="mb-6 border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-lg">
+                    <Plus className="w-5 h-5 mr-2" />
+                    Share your thoughts
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    placeholder="What's on your mind?"
+                    value={newPost}
+                    onChange={(e) => setNewPost(e.target.value)}
+                    className="mb-4 border-0 bg-gray-50 dark:bg-gray-700"
+                    rows={3}
+                  />
+                  <div className="flex items-center justify-between">
+                    <Select
+                      value={selectedCategory?.toString() || ""}
+                      onValueChange={(value) => setSelectedCategory(Number(value))}
+                    >
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category.id} value={category.id.toString()}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      onClick={createPost}
+                      disabled={!newPost.trim() || posting || !selectedCategory}
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                    >
+                      {posting ? "Posting..." : "Post"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Posts Feed */}
             <div className="space-y-6">
-              {/* Filter Tabs */}
-              <Tabs defaultValue="hot" className="w-full">
-                <TabsList>
-                  <TabsTrigger value="hot">🔥 Hot</TabsTrigger>
-                  <TabsTrigger value="new">🆕 New</TabsTrigger>
-                  <TabsTrigger value="top">⭐ Top</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="hot" className="space-y-4 mt-6">
-                  {isLoading ? (
-                    <div className="flex items-center justify-center py-12">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              {posts.map((post) => (
+                <Card
+                  key={post.id}
+                  className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm hover:shadow-xl transition-shadow"
+                >
+                  <CardContent className="p-6">
+                    {/* Post Header */}
+                    <div className="flex items-center space-x-3 mb-4">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={post.user?.avatar_url || "/placeholder.svg"} />
+                        <AvatarFallback>{post.user?.full_name?.[0] || post.user?.username?.[0] || "U"}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <p className="font-semibold">{post.user?.full_name}</p>
+                          <Badge
+                            className={`text-xs ${TIER_COLORS[post.user?.tier as keyof typeof TIER_COLORS] || "bg-gray-500 text-white"}`}
+                          >
+                            {post.user?.tier}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-500">@{post.user?.username}</p>
+                      </div>
+                      <div className="text-sm text-gray-500">{new Date(post.created_at).toLocaleDateString()}</div>
                     </div>
-                  ) : filteredPosts.length === 0 ? (
-                    <Card>
-                      <CardContent className="flex flex-col items-center justify-center py-12">
-                        <MessageSquare className="w-12 h-12 text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-semibold mb-2">No posts yet</h3>
-                        <p className="text-muted-foreground text-center mb-4">
-                          Be the first to start a conversation in this category!
-                        </p>
-                        <Button asChild>
-                          <Link href="/community/create">Create First Post</Link>
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    filteredPosts.map((post) => (
-                      <Card key={post.id} className="hover:shadow-md transition-shadow">
-                        <CardContent className="p-6">
-                          {/* Post Header */}
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                              <Avatar className="w-10 h-10">
-                                <AvatarImage src={post.author.avatar_url || ""} alt={post.author.display_name} />
-                                <AvatarFallback>{post.author.display_name.charAt(0).toUpperCase()}</AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold">{post.author.display_name}</span>
-                                  {post.author.is_verified && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      ✓
-                                    </Badge>
-                                  )}
-                                  <Badge
-                                    className={`${getTierColor(post.author.subscription_tier)} text-white text-xs`}
-                                  >
-                                    {getTierIcon(post.author.subscription_tier)}
-                                    <span className="ml-1 capitalize">{post.author.subscription_tier}</span>
-                                  </Badge>
-                                </div>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <span>@{post.author.username}</span>
-                                  <span>•</span>
-                                  <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
-                                  <span>•</span>
-                                  <Badge variant="outline" className="text-xs">
-                                    {post.category.name}
-                                  </Badge>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
 
-                          {/* Post Content */}
-                          <div className="mb-4">
-                            <h3 className="text-lg font-semibold mb-2">{post.title}</h3>
-                            <p className="text-gray-700 leading-relaxed">{post.content}</p>
-                          </div>
-
-                          <Separator className="my-4" />
-
-                          {/* Post Actions */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <Button variant="ghost" size="sm" className="gap-2">
-                                <Heart className="w-4 h-4" />
-                                <span>{post.vote_count}</span>
-                              </Button>
-                              <Button variant="ghost" size="sm" className="gap-2" asChild>
-                                <Link href={`/community/posts/${post.id}`}>
-                                  <MessageSquare className="w-4 h-4" />
-                                  <span>{post.comment_count}</span>
-                                </Link>
-                              </Button>
-                              <Button variant="ghost" size="sm" className="gap-2">
-                                <Share2 className="w-4 h-4" />
-                                <span>Share</span>
-                              </Button>
-                            </div>
-                            <Button variant="outline" size="sm" asChild>
-                              <Link href={`/community/posts/${post.id}`}>View Post</Link>
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))
-                  )}
-                </TabsContent>
-
-                <TabsContent value="new" className="space-y-4 mt-6">
-                  <Card>
-                    <CardContent className="flex items-center justify-center py-12">
-                      <div className="text-center">
-                        <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold mb-2">Newest Posts</h3>
-                        <p className="text-muted-foreground">Fresh content from the community</p>
+                    {/* Category Badge */}
+                    {post.category && (
+                      <div className="mb-3">
+                        <Badge variant="secondary" className="text-xs">
+                          {post.category.name}
+                        </Badge>
                       </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                    )}
 
-                <TabsContent value="top" className="space-y-4 mt-6">
-                  <Card>
-                    <CardContent className="flex items-center justify-center py-12">
-                      <div className="text-center">
-                        <Trophy className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold mb-2">Top Posts</h3>
-                        <p className="text-muted-foreground">Most popular content this week</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
+                    {/* Post Content */}
+                    <div className="mb-4">
+                      <p className="text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
+                        {post.content}
+                      </p>
+                    </div>
+
+                    {/* Post Actions */}
+                    <div className="flex items-center space-x-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => voteOnPost(post.id)}
+                        className={`flex items-center space-x-2 ${
+                          post.user_has_voted ? "text-red-500 hover:text-red-600" : "text-gray-500 hover:text-red-500"
+                        }`}
+                        disabled={!profile}
+                      >
+                        <Heart className={`h-4 w-4 ${post.user_has_voted ? "fill-current" : ""}`} />
+                        <span>{post.vote_count || 0}</span>
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="flex items-center space-x-2 text-gray-500 hover:text-blue-500"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        <span>{post.comment_count || 0}</span>
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="flex items-center space-x-2 text-gray-500 hover:text-green-500"
+                      >
+                        <Share2 className="h-4 w-4" />
+                        <span>Share</span>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+
+              {posts.length === 0 && (
+                <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+                  <CardContent className="p-12 text-center">
+                    <MessageCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-600 dark:text-gray-400 mb-2">No posts yet</h3>
+                    <p className="text-gray-500 dark:text-gray-400">
+                      Be the first to share something with the community!
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </div>
@@ -455,5 +594,3 @@ function CommunityPage() {
     </div>
   )
 }
-
-export default CommunityPage

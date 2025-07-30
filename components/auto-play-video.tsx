@@ -33,7 +33,7 @@ export function AutoPlayVideo({
       src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/erigga-hero-video-F19YWf5JgcnmasQmH2s37F8lND161t.mp4",
       type: "video/mp4",
     },
-    { src: "/videos/erigga-hero-video.mp4", type: "video/mp4" },
+    { src: "/videoshttps://hebbkx1anhila5yf.public.blob.vercel-storage.com/git-blob/prj_87iLY6t51DXvy0yPJ00SYhwlKXWl/K6Q-Lit6vuzvhNfoGXuTFB/public/erigga-hero-video.mp4", type: "video/mp4" },
     { src: "/videos/erigga-hero-video.webm", type: "video/webm" },
   ]
 

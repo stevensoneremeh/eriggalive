@@ -1,251 +1,314 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Play, Pause, Volume2, VolumeX, Radio, Minimize2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Slider } from "@/components/ui/slider"
-import { Badge } from "@/components/ui/badge"
-import Image from "next/image"
+import { usePathname } from "next/navigation"
+import { Play, Pause, Volume2, VolumeX, X, Radio } from "lucide-react"
+import { cn } from "@/lib/utils"
 
-interface RadioStation {
+interface RadioLyrics {
   id: string
-  name: string
-  url: string
-  genre: string
-  description: string
-  image: string
+  text: string
+  song_title: string
+  artist: string
 }
 
-const radioStations: RadioStation[] = [
+const defaultLyrics: RadioLyrics[] = [
   {
-    id: "erigga-live",
-    name: "Erigga Live Radio",
-    url: "https://stream.zeno.fm/your-stream-url",
-    genre: "Hip Hop",
-    description: "24/7 Erigga hits and Nigerian hip hop",
-    image: "/images/radio-man.gif",
+    id: "1",
+    text: "Welcome to Erigga Radio - Your home for the best Afrobeats and Nigerian hip-hop",
+    song_title: "Station ID",
+    artist: "Erigga Radio",
   },
   {
-    id: "naija-hits",
-    name: "Naija Hits",
-    url: "https://stream.zeno.fm/naija-hits",
-    genre: "Afrobeats",
-    description: "Latest Nigerian hits",
-    image: "/placeholder.jpg",
+    id: "2",
+    text: "Paper Boi dey here, we dey run the streets with pure fire lyrics",
+    song_title: "Paper Boi",
+    artist: "Erigga",
+  },
+  {
+    id: "3",
+    text: "From Warri to Lagos, we bringing you that authentic street sound",
+    song_title: "Street Anthem",
+    artist: "Erigga",
+  },
+  {
+    id: "4",
+    text: "Erigga Radio - Where the streets meet the beats, 24/7 non-stop music",
+    song_title: "Station Promo",
+    artist: "Erigga Radio",
   },
 ]
 
 export default function EriggaRadio() {
+  const pathname = usePathname()
+  const audioRef = useRef<HTMLAudioElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
-  const [volume, setVolume] = useState([70])
-  const [currentStation, setCurrentStation] = useState(radioStations[0])
-  const [isMinimized, setIsMinimized] = useState(true)
+  const [isVisible, setIsVisible] = useState(true)
+  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [currentLyricIndex, setCurrentLyricIndex] = useState(0)
+  const [isHovered, setIsHovered] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const audioRef = useRef<HTMLAudioElement>(null)
 
+  // Only show on home page
+  const shouldShow = pathname === "/" && isVisible
+
+  // Rotate lyrics every 8 seconds
   useEffect(() => {
-    const audio = audioRef.current
-    if (!audio) return
+    if (!shouldShow) return
 
-    audio.volume = volume[0] / 100
+    const interval = setInterval(() => {
+      setCurrentLyricIndex((prev) => (prev + 1) % defaultLyrics.length)
+    }, 8000)
 
-    const handleLoadStart = () => setIsLoading(true)
-    const handleCanPlay = () => {
-      setIsLoading(false)
-      setError(null)
+    return () => clearInterval(interval)
+  }, [shouldShow])
+
+  // Auto-play audio when component mounts (only on home page)
+  useEffect(() => {
+    if (shouldShow && audioRef.current) {
+      const audio = audioRef.current
+      audio.volume = 0.7 // Set default volume to 70%
+
+      // Try to auto-play (may be blocked by browser)
+      const playPromise = audio.play()
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true)
+            setIsLoading(false)
+          })
+          .catch(() => {
+            // Auto-play was prevented
+            setIsPlaying(false)
+            setIsLoading(false)
+          })
+      }
     }
-    const handleError = () => {
-      setIsLoading(false)
-      setError("Failed to load radio stream")
-      setIsPlaying(false)
-    }
+  }, [shouldShow])
 
-    audio.addEventListener("loadstart", handleLoadStart)
-    audio.addEventListener("canplay", handleCanPlay)
-    audio.addEventListener("error", handleError)
+  const togglePlayPause = async () => {
+    if (!audioRef.current) return
 
-    return () => {
-      audio.removeEventListener("loadstart", handleLoadStart)
-      audio.removeEventListener("canplay", handleCanPlay)
-      audio.removeEventListener("error", handleError)
-    }
-  }, [volume])
-
-  const togglePlay = async () => {
-    const audio = audioRef.current
-    if (!audio) return
-
+    setIsLoading(true)
     try {
       if (isPlaying) {
-        audio.pause()
+        audioRef.current.pause()
         setIsPlaying(false)
       } else {
-        setIsLoading(true)
-        await audio.play()
+        await audioRef.current.play()
         setIsPlaying(true)
-        setIsLoading(false)
       }
-    } catch (err) {
-      console.error("Error playing audio:", err)
-      setError("Failed to play radio stream")
-      setIsPlaying(false)
+    } catch (error) {
+      console.error("Audio playback error:", error)
+    } finally {
       setIsLoading(false)
     }
   }
 
   const toggleMute = () => {
-    const audio = audioRef.current
-    if (!audio) return
+    if (!audioRef.current) return
 
-    audio.muted = !isMuted
+    audioRef.current.muted = !isMuted
     setIsMuted(!isMuted)
   }
 
-  const handleVolumeChange = (newVolume: number[]) => {
-    setVolume(newVolume)
-    const audio = audioRef.current
-    if (audio) {
-      audio.volume = newVolume[0] / 100
-    }
-  }
-
-  const changeStation = (station: RadioStation) => {
-    const audio = audioRef.current
-    if (!audio) return
-
-    const wasPlaying = isPlaying
-
-    if (isPlaying) {
-      audio.pause()
+  const closeRadio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause()
       setIsPlaying(false)
     }
-
-    setCurrentStation(station)
-    audio.src = station.url
-
-    if (wasPlaying) {
-      setTimeout(() => {
-        togglePlay()
-      }, 500)
-    }
+    setIsVisible(false)
   }
+
+  const toggleCollapse = () => {
+    setIsCollapsed(!isCollapsed)
+  }
+
+  if (!shouldShow) return null
+
+  const currentLyric = defaultLyrics[currentLyricIndex]
 
   return (
     <>
-      {/* Audio Element */}
-      <audio ref={audioRef} src={currentStation.url} preload="none" crossOrigin="anonymous" />
+      {/* Audio element */}
+      <audio
+        ref={audioRef}
+        loop
+        preload="none"
+        onLoadStart={() => setIsLoading(true)}
+        onCanPlay={() => setIsLoading(false)}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onError={() => {
+          setIsLoading(false)
+          setIsPlaying(false)
+        }}
+      >
+        <source
+          src="https://yor5bfsajnljnrjg.public.blob.vercel-storage.com/erigga-radio-stream-qGVtALspqbLlH9VQJgg93RVa3Qs7Kb.mp3"
+          type="audio/mpeg"
+        />
+        Your browser does not support the audio element.
+      </audio>
 
-      {/* Floating Radio Widget */}
-      <div className="fixed bottom-4 right-4 z-50">
-        <Card
-          className={`transition-all duration-300 ${
-            isMinimized ? "w-16 h-16" : "w-80 h-auto"
-          } bg-background/95 backdrop-blur-sm border shadow-lg`}
+      {/* Radio Widget */}
+      <div
+        className={cn(
+          "fixed bottom-4 left-4 z-50 transition-all duration-500 ease-in-out",
+          "transform hover:scale-105",
+          isCollapsed ? "translate-y-16" : "translate-y-0",
+        )}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {/* Main Radio Container */}
+        <div
+          className={cn(
+            "relative bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl shadow-2xl",
+            "border-4 border-orange-700 overflow-hidden",
+            "transition-all duration-300 ease-in-out",
+            isCollapsed ? "w-16 h-16" : "w-80 h-24 md:w-96 md:h-28",
+          )}
         >
-          {isMinimized ? (
-            <div className="p-4 flex items-center justify-center">
-              <Button variant="ghost" size="icon" onClick={() => setIsMinimized(false)} className="h-8 w-8">
-                <Radio className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <div className="p-4 space-y-4">
-              {/* Header */}
+          {/* Radio GIF */}
+          <div
+            className={cn("absolute left-2 top-2 transition-all duration-300", isCollapsed ? "w-12 h-12" : "w-20 h-20")}
+          >
+            <img
+              src="/images/radio-man.gif"
+              alt="Erigga Radio"
+              className="w-full h-full object-contain rounded-lg"
+              loading="lazy"
+            />
+          </div>
+
+          {/* Radio Content */}
+          {!isCollapsed && (
+            <div className="ml-24 pr-4 py-2 h-full flex flex-col justify-between">
+              {/* Station Info */}
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Radio className="h-4 w-4 text-primary" />
-                  <span className="font-semibold text-sm">Erigga Radio</span>
+                <div className="flex items-center space-x-2">
+                  <Radio className="w-4 h-4 text-white" />
+                  <span className="text-white font-bold text-sm">Erigga Radio</span>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => setIsMinimized(true)} className="h-6 w-6">
-                  <Minimize2 className="h-3 w-3" />
-                </Button>
-              </div>
 
-              {/* Current Station */}
-              <div className="flex items-center gap-3">
-                <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-muted">
-                  <Image
-                    src={currentStation.image || "/placeholder.svg"}
-                    alt={currentStation.name}
-                    fill
-                    className="object-cover"
-                    unoptimized={currentStation.image.endsWith(".gif")}
-                  />
-                  {isPlaying && (
-                    <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                    </div>
+                {/* Controls - Show on hover or mobile */}
+                <div
+                  className={cn(
+                    "flex items-center space-x-1 transition-opacity duration-200",
+                    isHovered || window.innerWidth < 768 ? "opacity-100" : "opacity-0 md:opacity-0",
                   )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm truncate">{currentStation.name}</h3>
-                  <p className="text-xs text-muted-foreground truncate">{currentStation.description}</p>
-                  <Badge variant="secondary" className="text-xs mt-1">
-                    {currentStation.genre}
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Controls */}
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={togglePlay}
-                  disabled={isLoading}
-                  className="h-8 w-8 bg-transparent"
                 >
-                  {isLoading ? (
-                    <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  ) : isPlaying ? (
-                    <Pause className="h-3 w-3" />
-                  ) : (
-                    <Play className="h-3 w-3" />
-                  )}
-                </Button>
-
-                <Button variant="ghost" size="icon" onClick={toggleMute} className="h-8 w-8">
-                  {isMuted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
-                </Button>
-
-                <div className="flex-1 px-2">
-                  <Slider value={volume} onValueChange={handleVolumeChange} max={100} step={1} className="w-full" />
-                </div>
-              </div>
-
-              {/* Station List */}
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">Stations</p>
-                {radioStations.map((station) => (
                   <button
-                    key={station.id}
-                    onClick={() => changeStation(station)}
-                    className={`w-full text-left p-2 rounded-md text-xs transition-colors ${
-                      currentStation.id === station.id ? "bg-primary/10 text-primary" : "hover:bg-muted"
-                    }`}
+                    onClick={togglePlayPause}
+                    disabled={isLoading}
+                    className="p-1 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                    aria-label={isPlaying ? "Pause radio" : "Play radio"}
                   >
-                    <div className="font-medium">{station.name}</div>
-                    <div className="text-muted-foreground">{station.genre}</div>
+                    {isLoading ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : isPlaying ? (
+                      <Pause className="w-4 h-4 text-white" />
+                    ) : (
+                      <Play className="w-4 h-4 text-white" />
+                    )}
                   </button>
-                ))}
+
+                  <button
+                    onClick={toggleMute}
+                    className="p-1 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                    aria-label={isMuted ? "Unmute radio" : "Mute radio"}
+                  >
+                    {isMuted ? <VolumeX className="w-4 h-4 text-white" /> : <Volume2 className="w-4 h-4 text-white" />}
+                  </button>
+
+                  <button
+                    onClick={closeRadio}
+                    className="p-1 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                    aria-label="Close radio"
+                  >
+                    <X className="w-4 h-4 text-white" />
+                  </button>
+                </div>
               </div>
 
-              {/* Error Message */}
-              {error && <div className="text-xs text-destructive bg-destructive/10 p-2 rounded-md">{error}</div>}
-
-              {/* Live Indicator */}
-              {isPlaying && !error && (
-                <div className="flex items-center gap-2 text-xs text-primary">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                  <span>LIVE</span>
+              {/* Scrolling Lyrics */}
+              <div className="relative overflow-hidden bg-black/20 rounded-lg px-2 py-1">
+                <div
+                  className="whitespace-nowrap animate-marquee text-white text-xs font-medium"
+                  key={currentLyricIndex} // Force re-render for animation restart
+                >
+                  <span className="inline-block">
+                    ♪ {currentLyric.text} - {currentLyric.song_title} by {currentLyric.artist} ♪
+                  </span>
                 </div>
-              )}
+              </div>
             </div>
           )}
-        </Card>
+
+          {/* Collapse/Expand Button */}
+          <button
+            onClick={toggleCollapse}
+            className={cn(
+              "absolute -top-2 -right-2 w-6 h-6 bg-orange-600 rounded-full",
+              "flex items-center justify-center text-white text-xs font-bold",
+              "hover:bg-orange-700 transition-colors shadow-lg border-2 border-white",
+            )}
+            aria-label={isCollapsed ? "Expand radio" : "Collapse radio"}
+          >
+            {isCollapsed ? "+" : "−"}
+          </button>
+
+          {/* Playing Indicator */}
+          {isPlaying && !isCollapsed && (
+            <div className="absolute top-1 right-1">
+              <div className="flex space-x-1">
+                {[...Array(3)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="w-1 bg-green-400 rounded-full animate-pulse"
+                    style={{
+                      height: "8px",
+                      animationDelay: `${i * 0.2}s`,
+                      animationDuration: "1s",
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile-specific controls */}
+        <div className="md:hidden mt-2 flex justify-center space-x-2">
+          {!isCollapsed && (
+            <>
+              <button
+                onClick={togglePlayPause}
+                disabled={isLoading}
+                className="p-2 rounded-full bg-orange-600 hover:bg-orange-700 transition-colors shadow-lg"
+                aria-label={isPlaying ? "Pause radio" : "Play radio"}
+              >
+                {isLoading ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : isPlaying ? (
+                  <Pause className="w-5 h-5 text-white" />
+                ) : (
+                  <Play className="w-5 h-5 text-white" />
+                )}
+              </button>
+
+              <button
+                onClick={toggleMute}
+                className="p-2 rounded-full bg-orange-600 hover:bg-orange-700 transition-colors shadow-lg"
+                aria-label={isMuted ? "Unmute radio" : "Mute radio"}
+              >
+                {isMuted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </>
   )

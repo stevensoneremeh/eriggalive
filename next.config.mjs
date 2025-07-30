@@ -19,12 +19,8 @@ const nextConfig = {
         protocol: 'https',
         hostname: '**.supabase.co',
       },
-      {
-        protocol: 'https',
-        hostname: '**.vercel.app',
-      },
     ],
-    unoptimized: false,
+    unoptimized: true,
   },
   async headers() {
     return [
@@ -64,17 +60,14 @@ const nextConfig = {
     ];
   },
   experimental: {
+    // Disable the missing suspense with CSR bailout check
     missingSuspenseWithCSRBailout: false,
+    // Additional experimental flags to help with SSR issues
     serverComponentsExternalPackages: [],
     optimizePackageImports: ['lucide-react'],
   },
+  // Force static generation for specific pages
   output: 'standalone',
-  poweredByHeader: false,
-  compress: true,
-  generateEtags: false,
-  httpAgentOptions: {
-    keepAlive: true,
-  },
 };
 
 export default nextConfig;

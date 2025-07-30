@@ -9,18 +9,23 @@ type ThemeProviderProps = {
   children: React.ReactNode
   defaultTheme?: Theme
   storageKey?: string
+  attribute?: string
+  enableSystem?: boolean
+  disableTransitionOnChange?: boolean
 }
 
 type ThemeProviderState = {
   theme: Theme
   setTheme: (theme: Theme) => void
-  mounted: boolean
+  resolvedTheme: "dark" | "light"
+  isLoading: boolean
 }
 
 const initialState: ThemeProviderState = {
   theme: "system",
   setTheme: () => null,
-  mounted: false,
+  resolvedTheme: "light",
+  isLoading: true,
 }
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
@@ -28,47 +33,65 @@ const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
 export function ThemeProvider({
   children,
   defaultTheme = "system",
-  storageKey = "vite-ui-theme",
+  storageKey = "ui-theme",
+  attribute = "class",
+  enableSystem = true,
+  disableTransitionOnChange = false,
   ...props
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(defaultTheme)
-  const [mounted, setMounted] = useState(false)
+  const [resolvedTheme, setResolvedTheme] = useState<"dark" | "light">("light")
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    setMounted(true)
-    if (typeof window !== "undefined") {
+    try {
       const storedTheme = localStorage.getItem(storageKey) as Theme
       if (storedTheme) {
         setTheme(storedTheme)
       }
+    } catch (error) {
+      console.warn("Failed to read theme from localStorage:", error)
     }
+    setIsLoading(false)
   }, [storageKey])
 
   useEffect(() => {
-    if (!mounted || typeof window === "undefined") return
-
     const root = window.document.documentElement
 
     root.classList.remove("light", "dark")
 
-    if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
-      root.classList.add(systemTheme)
-      return
+    let systemTheme: "dark" | "light" = "light"
+
+    try {
+      if (enableSystem && theme === "system") {
+        systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+      }
+    } catch (error) {
+      console.warn("Failed to detect system theme:", error)
     }
 
-    root.classList.add(theme)
-  }, [theme, mounted])
+    const resolvedTheme = theme === "system" ? systemTheme : theme
+    setResolvedTheme(resolvedTheme)
+
+    if (attribute === "class") {
+      root.classList.add(resolvedTheme)
+    } else {
+      root.setAttribute(attribute, resolvedTheme)
+    }
+  }, [theme, attribute, enableSystem])
 
   const value = {
     theme,
     setTheme: (theme: Theme) => {
-      if (typeof window !== "undefined") {
+      try {
         localStorage.setItem(storageKey, theme)
+      } catch (error) {
+        console.warn("Failed to save theme to localStorage:", error)
       }
       setTheme(theme)
     },
-    mounted,
+    resolvedTheme,
+    isLoading,
   }
 
   return (
@@ -81,9 +104,15 @@ export function ThemeProvider({
 export const useTheme = () => {
   const context = useContext(ThemeProviderContext)
 
-  if (context === undefined) throw new Error("useTheme must be used within a ThemeProvider")
+  if (context === undefined) {
+    console.warn("useTheme must be used within a ThemeProvider")
+    return initialState
+  }
 
   return context
 }
 
-export const useThemeContext = useTheme
+// Safe theme provider with error boundary
+export function SafeThemeProvider({ children, ...props }: ThemeProviderProps) {
+  return <ThemeProvider {...props}>{children}</ThemeProvider>
+}

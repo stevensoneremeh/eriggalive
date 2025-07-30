@@ -2,36 +2,20 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/contexts/auth-context"
-import { ThemeProvider as NextThemeProvider } from "next-themes"
-import { ThemeProvider } from "@/contexts/theme-context"
-import { Toaster } from "@/components/ui/sonner"
-import { SessionRefresh } from "@/components/session-refresh"
-import { Navigation } from "@/components/navigation"
+import { SafeThemeProvider } from "@/contexts/theme-context"
+import { UnifiedNavigation } from "@/components/navigation/unified-navigation"
+import { Toaster } from "@/components/ui/toaster"
+import { ErrorBoundary } from "@/components/error-boundary"
+import { Suspense } from "react"
+import { SimpleLoading } from "@/components/simple-loading"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Erigga Live - Official Fan Community",
-  description:
-    "Join the official Erigga fan community. Connect with fans, access exclusive content, and stay updated with the latest from Erigga.",
-  keywords: "Erigga, Nigerian music, hip hop, fan community, exclusive content",
-  authors: [{ name: "Erigga Live Team" }],
-  openGraph: {
-    title: "Erigga Live - Official Fan Community",
-    description:
-      "Join the official Erigga fan community. Connect with fans, access exclusive content, and stay updated with the latest from Erigga.",
-    type: "website",
-    locale: "en_US",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Erigga Live - Official Fan Community",
-    description:
-      "Join the official Erigga fan community. Connect with fans, access exclusive content, and stay updated with the latest from Erigga.",
-  },
-  viewport: "width=device-width, initial-scale=1",
-  robots: "index, follow",
+  title: "Erigga Live - Official Fan Platform",
+  description: "The official fan platform for Erigga - Music, Community, and Exclusive Content",
   generator: "v0.dev",
 }
 
@@ -43,29 +27,26 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <NextThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange={false}
-          storageKey="erigga-theme"
-        >
-          <ThemeProvider>
-            <AuthProvider>
-              <SessionRefresh />
-              <Navigation />
-              <main className="min-h-screen bg-background text-foreground transition-colors duration-300">
-                {children}
-              </main>
-              <Toaster
-                position="top-right"
-                toastOptions={{
-                  className: "bg-background border-border text-foreground",
-                }}
-              />
-            </AuthProvider>
-          </ThemeProvider>
-        </NextThemeProvider>
+        <ErrorBoundary>
+          <SafeThemeProvider>
+            <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+              <AuthProvider>
+                <div className="min-h-screen bg-background">
+                  {/* Main Navigation - Always Visible */}
+                  <Suspense fallback={<SimpleLoading />}>
+                    <UnifiedNavigation />
+                  </Suspense>
+
+                  {/* Main Content with proper spacing for fixed nav */}
+                  <main className="pt-16 pb-20 md:pb-4">
+                    <Suspense fallback={<SimpleLoading />}>{children}</Suspense>
+                  </main>
+                </div>
+                <Toaster />
+              </AuthProvider>
+            </ThemeProvider>
+          </SafeThemeProvider>
+        </ErrorBoundary>
       </body>
     </html>
   )

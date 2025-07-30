@@ -6,40 +6,23 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface HeroVideoCarouselProps {
-  images?: string[]
-  videoUrl?: string
+  images: string[]
+  videoUrl: string
   autoScrollInterval?: number
   className?: string
 }
 
-export function HeroVideoCarousel({
-  images = [],
-  videoUrl = "",
-  autoScrollInterval = 5000,
-  className,
-}: HeroVideoCarouselProps) {
+export function HeroVideoCarousel({ images, videoUrl, autoScrollInterval = 5000, className }: HeroVideoCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [videoEnded, setVideoEnded] = useState(false)
   const [videoError, setVideoError] = useState(false)
   const [videoLoaded, setVideoLoaded] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
-
-  // Ensure we have default images if none provided
-  const defaultImages = [
-    "/images/hero/erigga1.jpeg",
-    "/images/hero/erigga2.jpeg",
-    "/images/hero/erigga3.jpeg",
-    "/images/hero/erigga4.jpeg",
-  ]
-
-  const slideImages = images.length > 0 ? images : defaultImages
-  const totalSlides = slideImages.length + (videoUrl ? 1 : 0)
+  const totalSlides = images.length + 1
 
   // Handle video loading and events
   useEffect(() => {
-    if (!videoUrl) return
-
     const video = videoRef.current
     if (!video) return
 
@@ -52,7 +35,7 @@ export function HeroVideoCarousel({
     const handleError = (e: any) => {
       console.error("❌ Video error:", e)
       setVideoError(true)
-      setCurrentIndex(videoUrl ? 1 : 0) // Move to first image on error
+      setCurrentIndex(1) // Move to first image on error
     }
 
     const handleCanPlay = () => {
@@ -76,7 +59,7 @@ export function HeroVideoCarousel({
       if (video.paused && !videoEnded && !videoLoaded) {
         console.log("⚠️ Video still paused after timeout, showing images instead")
         setVideoError(true)
-        setCurrentIndex(videoUrl ? 1 : 0)
+        setCurrentIndex(1)
       }
     }, 3000)
 
@@ -90,7 +73,7 @@ export function HeroVideoCarousel({
         console.error("❌ Error cleaning up video event listeners:", err)
       }
     }
-  }, [videoEnded, videoLoaded, videoUrl])
+  }, [videoEnded, videoLoaded])
 
   // Function to safely attempt to play the video
   const playVideo = () => {
@@ -108,28 +91,28 @@ export function HeroVideoCarousel({
       .catch((err) => {
         console.error("❌ Video play failed:", err)
         setVideoError(true)
-        setCurrentIndex(videoUrl ? 1 : 0)
+        setCurrentIndex(1)
       })
   }
 
   // Auto scroll functionality - only for image slides
   useEffect(() => {
     // Don't auto-scroll if on video slide (index 0) and video hasn't ended
-    if (currentIndex === 0 && !videoEnded && !videoError && videoUrl) return
+    if (currentIndex === 0 && !videoEnded && !videoError) return
 
     const interval = setInterval(() => {
       goToNext()
     }, autoScrollInterval)
 
     return () => clearInterval(interval)
-  }, [currentIndex, autoScrollInterval, videoEnded, videoError, videoUrl])
+  }, [currentIndex, autoScrollInterval, videoEnded, videoError])
 
   const goToPrevious = () => {
     if (isTransitioning) return
     setIsTransitioning(true)
 
-    // Skip video slide if it has ended or had an error or no video
-    if (currentIndex === 1 && (videoEnded || videoError || !videoUrl)) {
+    // Skip video slide if it has ended or had an error
+    if (currentIndex === 1 && (videoEnded || videoError)) {
       setCurrentIndex(totalSlides - 1)
     } else {
       setCurrentIndex((prevIndex) => (prevIndex === 0 ? totalSlides - 1 : prevIndex - 1))
@@ -141,20 +124,15 @@ export function HeroVideoCarousel({
   const goToNext = () => {
     if (isTransitioning) return
     setIsTransitioning(true)
-    setCurrentIndex((prevIndex) => {
-      if (prevIndex === totalSlides - 1) {
-        return videoEnded || videoError || !videoUrl ? (videoUrl ? 1 : 0) : 0
-      }
-      return prevIndex + 1
-    })
+    setCurrentIndex((prevIndex) => (prevIndex === totalSlides - 1 ? (videoEnded || videoError ? 1 : 0) : prevIndex + 1))
     setTimeout(() => setIsTransitioning(false), 500)
   }
 
   const goToSlide = (index: number) => {
     if (isTransitioning) return
 
-    // Skip video slide if it has ended or had an error or no video
-    if (index === 0 && (videoEnded || videoError || !videoUrl)) {
+    // Skip video slide if it has ended or had an error
+    if (index === 0 && (videoEnded || videoError)) {
       return
     }
 
@@ -165,34 +143,32 @@ export function HeroVideoCarousel({
 
   return (
     <div className={cn("absolute inset-0 w-full h-full", className)}>
-      {/* Video Slide - only render if videoUrl exists */}
-      {videoUrl && (
-        <div
-          className={cn(
-            "absolute inset-0 w-full h-full transition-opacity duration-1000",
-            currentIndex === 0 ? "opacity-100 z-10" : "opacity-0 z-0",
-          )}
+      {/* Video Slide */}
+      <div
+        className={cn(
+          "absolute inset-0 w-full h-full transition-opacity duration-1000",
+          currentIndex === 0 ? "opacity-100 z-10" : "opacity-0 z-0",
+        )}
+      >
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          loop
+          className="absolute inset-0 w-full h-full object-cover"
+          poster={images[0]}
         >
-          <video
-            ref={videoRef}
-            playsInline
-            muted
-            loop
-            className="absolute inset-0 w-full h-full object-cover"
-            poster={slideImages[0]}
-          >
-            <source src={videoUrl} type="video/mp4" />
-            <source src={videoUrl} type="video/webm" />
-            Your browser does not support the video tag.
-          </video>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
-        </div>
-      )}
+          <source src={videoUrl} type="video/mp4" />
+          <source src={videoUrl} type="video/webm" />
+          Your browser does not support the video tag.
+        </video>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
+      </div>
 
       {/* Image Slides */}
-      {slideImages.map((image, index) => {
-        // Adjust index for image slides based on whether video exists
-        const slideIndex = videoUrl ? index + 1 : index
+      {images.map((image, index) => {
+        // Adjust index for image slides
+        const slideIndex = index + 1
 
         return (
           <div
@@ -218,60 +194,54 @@ export function HeroVideoCarousel({
         )
       })}
 
-      {/* Navigation arrows - only show if we have multiple slides */}
-      {totalSlides > 1 && (
-        <>
-          <button
-            onClick={goToPrevious}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full backdrop-blur-sm transition-all"
-            aria-label="Previous slide"
-          >
-            <ChevronLeft className="h-6 w-6" />
-          </button>
-          <button
-            onClick={goToNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full backdrop-blur-sm transition-all"
-            aria-label="Next slide"
-          >
-            <ChevronRight className="h-6 w-6" />
-          </button>
-        </>
-      )}
+      {/* Navigation arrows */}
+      <button
+        onClick={goToPrevious}
+        className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full backdrop-blur-sm transition-all"
+        aria-label="Previous slide"
+      >
+        <ChevronLeft className="h-6 w-6" />
+      </button>
+      <button
+        onClick={goToNext}
+        className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full backdrop-blur-sm transition-all"
+        aria-label="Next slide"
+      >
+        <ChevronRight className="h-6 w-6" />
+      </button>
 
-      {/* Indicators - only show if we have multiple slides */}
-      {totalSlides > 1 && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex space-x-2">
-          {/* Video indicator - only show if video exists and hasn't ended/errored */}
-          {videoUrl && !videoEnded && !videoError && (
+      {/* Indicators */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex space-x-2">
+        {/* Video indicator */}
+        {!videoEnded && !videoError && (
+          <button
+            onClick={() => goToSlide(0)}
+            className={cn(
+              "transition-all rounded-full flex items-center justify-center",
+              currentIndex === 0 ? "bg-white w-8 h-2" : "bg-white/50 hover:bg-white/80 w-2 h-2",
+            )}
+            aria-label="Video slide"
+          >
+            {currentIndex === 0 && <div className="w-1/2 h-full bg-orange-500 animate-pulse rounded-full" />}
+          </button>
+        )}
+
+        {/* Image indicators */}
+        {images.map((_, index) => {
+          const slideIndex = index + 1
+          return (
             <button
-              onClick={() => goToSlide(0)}
+              key={index}
+              onClick={() => goToSlide(slideIndex)}
               className={cn(
-                "transition-all rounded-full flex items-center justify-center",
-                currentIndex === 0 ? "bg-white w-8 h-2" : "bg-white/50 hover:bg-white/80 w-2 h-2",
+                "w-2 h-2 rounded-full transition-all",
+                currentIndex === slideIndex ? "bg-white w-6" : "bg-white/50 hover:bg-white/80",
               )}
-              aria-label="Video slide"
-            >
-              {currentIndex === 0 && <div className="w-1/2 h-full bg-orange-500 animate-pulse rounded-full" />}
-            </button>
-          )}
-
-          {/* Image indicators */}
-          {slideImages.map((_, index) => {
-            const slideIndex = videoUrl ? index + 1 : index
-            return (
-              <button
-                key={index}
-                onClick={() => goToSlide(slideIndex)}
-                className={cn(
-                  "w-2 h-2 rounded-full transition-all",
-                  currentIndex === slideIndex ? "bg-white w-6" : "bg-white/50 hover:bg-white/80",
-                )}
-                aria-label={`Go to image ${index + 1}`}
-              />
-            )
-          })}
-        </div>
-      )}
+              aria-label={`Go to image ${index + 1}`}
+            />
+          )
+        })}
+      </div>
     </div>
   )
 }
