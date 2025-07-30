@@ -96,17 +96,8 @@ export function createClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co"
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key"
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn("Missing Supabase environment variables")
-    throw new Error("Missing Supabase environment variables")
-  }
-
   return createSupabaseClient(supabaseUrl, supabaseAnonKey)
 }
 
-// Create a singleton client instance
-const supabaseInstance = createClient()
-
-// Export both the function and the instance
-export { supabaseInstance }
-export default supabaseInstance
+// Create and export the client instance
+export const supabase = createClient()

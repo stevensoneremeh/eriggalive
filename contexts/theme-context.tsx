@@ -21,14 +21,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setMounted(true)
 
     // Only access localStorage on client side
-    const savedTheme = localStorage.getItem("theme") as Theme
-    if (savedTheme) {
-      setTheme(savedTheme)
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("theme") as Theme
+      if (savedTheme && ["light", "dark", "system"].includes(savedTheme)) {
+        setTheme(savedTheme)
+      }
     }
   }, [])
 
   useEffect(() => {
-    if (!mounted) return
+    if (!mounted || typeof window === "undefined") return
 
     const root = window.document.documentElement
     root.classList.remove("light", "dark")

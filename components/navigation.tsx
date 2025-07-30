@@ -29,6 +29,7 @@ import {
   Moon,
   Gamepad2,
 } from "lucide-react"
+import type { Theme } from "@/types/theme" // Declare the Theme variable
 
 const navigationItems = [
   { name: "Home", href: "/", icon: Home },
@@ -72,7 +73,10 @@ export function Navigation() {
   }
 
   const toggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark")
+    const themes: Theme[] = ["light", "dark", "system"]
+    const currentIndex = themes.indexOf(theme)
+    const nextIndex = (currentIndex + 1) % themes.length
+    setTheme(themes[nextIndex])
   }
 
   const handleSignOut = async () => {

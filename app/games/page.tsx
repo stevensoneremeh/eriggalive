@@ -10,7 +10,8 @@ import { useAuth } from "@/contexts/auth-context"
 import { supabase } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Gamepad2, Users, Coins, Plus, Play } from "lucide-react"
+import { Gamepad2, Users, Coins, Plus, Play, Clock, Trophy } from "lucide-react"
+import Link from "next/link"
 
 interface GameRoom {
   id: string
@@ -21,6 +22,8 @@ interface GameRoom {
   status: string
   created_by: string
   created_at: string
+  prize_pool?: number
+  players?: string[]
 }
 
 export default function GamesPage() {
@@ -31,6 +34,7 @@ export default function GamesPage() {
   const [roomName, setRoomName] = useState("")
   const [entryFee, setEntryFee] = useState(10)
   const [loadingRooms, setLoadingRooms] = useState(true)
+  const [showCreateForm, setShowCreateForm] = useState(false)
 
   useEffect(() => {
     fetchRooms()
@@ -87,6 +91,12 @@ export default function GamesPage() {
           created_by: user.id,
           players: [user.id],
           prize_pool: entryFee,
+          game_state: {
+            board: Array(52).fill(null),
+            currentPlayer: 0,
+            diceValue: 0,
+            winner: null,
+          },
         })
         .select()
         .single()
@@ -110,6 +120,8 @@ export default function GamesPage() {
       toast.success("Room created successfully!")
       setRoomName("")
       setEntryFee(10)
+      setShowCreateForm(false)
+      fetchRooms()
       router.push(`/games/ludo/${data.id}`)
     } catch (error) {
       console.error("Error creating room:", error)
@@ -127,6 +139,11 @@ export default function GamesPage() {
 
     if (profile.coins_balance < room.entry_fee) {
       toast.error("Insufficient coins to join this room")
+      return
+    }
+
+    if (room.current_players >= room.max_players) {
+      toast.error("Room is full")
       return
     }
 
@@ -178,10 +195,17 @@ export default function GamesPage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
-          <Gamepad2 className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Games</h1>
-          <p className="text-muted-foreground mb-4">Sign in to play games and compete with other fans!</p>
-          <Button onClick={() => router.push("/login")}>Sign In</Button>
+          <Gamepad2 className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+          <h1 className="text-3xl font-bold mb-2">Games</h1>
+          <p className="text-muted-foreground mb-6">Sign in to play games and compete with other fans!</p>
+          <div className="space-x-4">
+            <Link href="/login">
+              <Button>Sign In</Button>
+            </Link>
+            <Link href="/signup">
+              <Button variant="outline">Sign Up</Button>
+            </Link>
+          </div>
         </div>
       </div>
     )
@@ -197,17 +221,22 @@ export default function GamesPage() {
           </h1>
           <p className="text-muted-foreground">Play Ludo and compete for coin prizes!</p>
         </div>
-        {profile && (
-          <Badge variant="secondary" className="text-lg px-4 py-2">
-            <Coins className="mr-2 h-4 w-4" />
-            {profile.coins_balance?.toLocaleString() || 0} Coins
-          </Badge>
-        )}
+        <div className="flex items-center gap-4">
+          {profile && (
+            <Badge variant="secondary" className="text-lg px-4 py-2">
+              <Coins className="mr-2 h-4 w-4" />
+              {profile.coins_balance?.toLocaleString() || 0} Coins
+            </Badge>
+          )}
+          <Button onClick={() => setShowCreateForm(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Room
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Create Room Card */}
-        <Card>
+      {showCreateForm && (
+        <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Plus className="h-5 w-5" />
@@ -235,62 +264,103 @@ export default function GamesPage() {
                 value={entryFee}
                 onChange={(e) => setEntryFee(Number.parseInt(e.target.value) || 10)}
               />
+              <p className="text-sm text-muted-foreground mt-1">
+                Your balance: {profile?.coins_balance?.toLocaleString() || 0} coins
+              </p>
             </div>
-            <Button onClick={createRoom} disabled={isCreating || !roomName.trim()} className="w-full">
-              {isCreating ? "Creating..." : "Create Room"}
-            </Button>
+            <div className="flex space-x-2">
+              <Button onClick={createRoom} disabled={isCreating || !roomName.trim()} className="flex-1">
+                {isCreating ? "Creating..." : "Create Room"}
+              </Button>
+              <Button variant="outline" onClick={() => setShowCreateForm(false)}>
+                Cancel
+              </Button>
+            </div>
           </CardContent>
         </Card>
+      )}
 
-        {/* Available Rooms */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Available Rooms
-            </CardTitle>
-            <CardDescription>Join an existing game room</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loadingRooms ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-              </div>
-            ) : rooms.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No rooms available. Create one to get started!
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {rooms.map((room) => (
-                  <div key={room.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <h4 className="font-medium">{room.name}</h4>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Users className="h-3 w-3" />
-                          {room.current_players}/{room.max_players}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Coins className="h-3 w-3" />
-                          {room.entry_fee}
-                        </span>
+      <div className="space-y-6">
+        <h2 className="text-xl font-semibold">Available Rooms</h2>
+
+        {loadingRooms ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <CardHeader>
+                  <div className="h-6 bg-muted rounded w-3/4" />
+                  <div className="h-4 bg-muted rounded w-1/2" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="h-4 bg-muted rounded" />
+                    <div className="h-4 bg-muted rounded w-2/3" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : rooms.length === 0 ? (
+          <div className="text-center py-12">
+            <Gamepad2 className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+            <h3 className="text-xl font-semibold mb-2">No Game Rooms Available</h3>
+            <p className="text-muted-foreground mb-4">Be the first to create a game room!</p>
+            <Button onClick={() => setShowCreateForm(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Room
+            </Button>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {rooms.map((room) => (
+              <Card key={room.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="truncate">{room.name}</span>
+                    <Badge variant="secondary">
+                      <Users className="h-3 w-3 mr-1" />
+                      {room.current_players}/{room.max_players}
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Created {new Date(room.created_at).toLocaleDateString()}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Entry Fee:</span>
+                      <div className="flex items-center">
+                        <Coins className="h-4 w-4 mr-1 text-yellow-500" />
+                        <span className="font-medium">{room.entry_fee}</span>
                       </div>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => joinRoom(room)}
-                      disabled={room.current_players >= room.max_players}
-                    >
-                      <Play className="h-3 w-3 mr-1" />
-                      Join
-                    </Button>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Prize Pool:</span>
+                      <div className="flex items-center">
+                        <Trophy className="h-4 w-4 mr-1 text-yellow-500" />
+                        <span className="font-medium">{room.prize_pool || room.entry_fee * room.current_players}</span>
+                      </div>
+                    </div>
+                    <div className="pt-2">
+                      {room.current_players >= room.max_players ? (
+                        <Button disabled className="w-full">
+                          Room Full
+                        </Button>
+                      ) : (
+                        <Button onClick={() => joinRoom(room)} className="w-full">
+                          <Play className="h-4 w-4 mr-2" />
+                          Join Game ({room.entry_fee} coins)
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
