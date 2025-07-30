@@ -1,10 +1,11 @@
 "use client"
+
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, Home, Users, Radio, Coins, User } from "lucide-react"
+import { Menu, Home, Users, Radio, Coins, User, LogOut } from "lucide-react"
 import { DynamicLogo } from "@/components/dynamic-logo"
 import { useAuth } from "@/contexts/auth-context"
 
@@ -13,18 +14,25 @@ const navigationItems = [
   { name: "Community", href: "/community", icon: Users },
   { name: "Radio", href: "/radio", icon: Radio },
   { name: "Coins", href: "/coins", icon: Coins },
-  { name: "Profile", href: "/profile", icon: User },
 ]
 
 export function UnifiedNavigation() {
   const [mounted, setMounted] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
-  const { user, loading } = useAuth()
+  const { user, isLoading, signOut } = useAuth()
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+    } catch (error) {
+      console.error("Error signing out:", error)
+    }
+  }
 
   // Don't render anything until mounted to prevent hydration issues
   if (!mounted) {
@@ -91,6 +99,28 @@ export function UnifiedNavigation() {
                     <span>{item.name}</span>
                   </Link>
                 ))}
+                {user && (
+                  <>
+                    <Link
+                      href="/profile"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center space-x-2 text-sm font-medium transition-colors hover:text-foreground/80"
+                    >
+                      <User className="h-4 w-4" />
+                      <span>Profile</span>
+                    </Link>
+                    <button
+                      onClick={() => {
+                        handleSignOut()
+                        setIsOpen(false)
+                      }}
+                      className="flex items-center space-x-2 text-sm font-medium transition-colors hover:text-foreground/80 text-left"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span>Sign Out</span>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </SheetContent>
@@ -104,19 +134,30 @@ export function UnifiedNavigation() {
             </Link>
           </div>
           <nav className="flex items-center space-x-2">
-            {!loading && (
+            {!isLoading && (
               <>
                 {user ? (
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href="/profile">
-                      <User className="h-4 w-4" />
-                      <span className="sr-only">Profile</span>
-                    </Link>
-                  </Button>
+                  <div className="flex items-center space-x-2">
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href="/profile">
+                        <User className="h-4 w-4" />
+                        <span className="sr-only">Profile</span>
+                      </Link>
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                      <LogOut className="h-4 w-4" />
+                      <span className="sr-only">Sign Out</span>
+                    </Button>
+                  </div>
                 ) : (
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href="/login">Login</Link>
-                  </Button>
+                  <div className="flex items-center space-x-2">
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href="/login">Login</Link>
+                    </Button>
+                    <Button size="sm" asChild>
+                      <Link href="/signup">Sign Up</Link>
+                    </Button>
+                  </div>
                 )}
               </>
             )}
