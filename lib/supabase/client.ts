@@ -103,3 +103,10 @@ export function createClient() {
 
   return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }
+
+// Create a singleton client instance
+const supabase = createClient()
+
+// Export both the function and the instance
+export { supabase }
+export default createClient

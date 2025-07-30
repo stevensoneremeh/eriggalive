@@ -1,4 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
+
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 // Check if we're in preview/development mode
 const isPreviewMode = () => {
@@ -207,40 +210,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create transaction record
-    const transaction = {
-      id: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      userId: user.id,
-      type: "purchase",
-      coinAmount: coins,
-      nairaAmount: amount,
-      reference,
-      status: "completed",
-      createdAt: new Date().toISOString(),
-      paymentData: {
-        channel: paystackData.data.channel || "card",
-        paidAt: paystackData.data.paid_at || new Date().toISOString(),
-        currency: paystackData.data.currency || "NGN",
-      },
-      metadata: {
-        paymentMethod: "paystack",
-        exchangeRate: 0.5,
-        isPreviewMode: isPreviewMode(),
-      },
+    // Update user's coin balance
+    const { data, error } = await supabase
+      .from("user_profiles")
+      .update({
+        coin_balance: supabase.raw(`coin_balance + ${coins}`),
+      })
+      .eq("id", user.id)
+      .select()
+
+    if (error) {
+      console.error("Error updating coin balance:", error)
+      return NextResponse.json({ error: "Failed to update coin balance" }, { status: 500 })
     }
 
-    // In production, save transaction to database
-    console.log("Transaction completed:", transaction)
-
-    // Calculate new balance (in production, update database)
-    const newBalance = user.coins + coins
+    // Log the transaction
+    await supabase.from("coin_transactions").insert({
+      user_id: user.id,
+      amount,
+      type: "purchase",
+      reference,
+      status: "completed",
+    })
 
     return NextResponse.json({
       success: true,
-      transaction,
-      newBalance,
-      message: `Successfully purchased ${coins.toLocaleString()} Erigga Coins`,
-      isPreviewMode: isPreviewMode(),
+      newBalance: data[0]?.coin_balance,
     })
   } catch (error) {
     console.error("Purchase API error:", error)
