@@ -1,118 +1,213 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, useCallback } from "react"
+import { createClient } from "@/lib/supabase/client"
 import type { User, Session } from "@supabase/supabase-js"
-import { supabase } from "@/lib/supabase/client"
-import { toast } from "sonner"
+
+interface Profile {
+  id: string
+  username: string
+  display_name: string
+  email: string
+  avatar_url?: string
+  subscription_tier: string
+  coins_balance: number
+  created_at: string
+  updated_at: string
+}
 
 interface AuthContextType {
   user: User | null
+  profile: Profile | null
   session: Session | null
-  loading: boolean
+  isAuthenticated: boolean
+  isLoading: boolean
+  signIn: (email: string, password: string) => Promise<{ error?: string }>
+  signUp: (email: string, password: string, username: string, displayName: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
-  refreshSession: () => Promise<void>
+  refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
 
-  let isMounted = true
+  const supabase = createClient()
 
+  // Only access localStorage on client side
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  useEffect(() => {
-    if (!mounted) return
-
-    async function getInitialSession() {
+  const fetchProfile = useCallback(
+    async (userId: string) => {
       try {
+        const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
+
+        if (error) {
+          console.error("Error fetching profile:", error)
+          return null
+        }
+
+        return data
+      } catch (error) {
+        console.error("Error in fetchProfile:", error)
+        return null
+      }
+    },
+    [supabase],
+  )
+
+  const refreshProfile = useCallback(async () => {
+    if (!user) return
+
+    const profileData = await fetchProfile(user.id)
+    setProfile(profileData)
+  }, [user, fetchProfile])
+
+  useEffect(() => {
+    let mounted = true
+
+    const initializeAuth = async () => {
+      try {
+        // Get initial session
         const {
-          data: { session },
+          data: { session: initialSession },
           error,
         } = await supabase.auth.getSession()
 
         if (error) {
           console.error("Error getting session:", error)
-          toast.error("Authentication error")
         }
 
-        if (isMounted) {
-          setSession(session)
-          setUser(session?.user ?? null)
-          setLoading(false)
+        if (mounted) {
+          setSession(initialSession)
+          setUser(initialSession?.user ?? null)
+
+          if (initialSession?.user) {
+            const profileData = await fetchProfile(initialSession.user.id)
+            if (mounted) {
+              setProfile(profileData)
+            }
+          }
         }
       } catch (error) {
-        console.error("Error in getInitialSession:", error)
-        if (isMounted) {
-          setLoading(false)
+        console.error("Error initializing auth:", error)
+      } finally {
+        if (mounted) {
+          setIsLoading(false)
         }
       }
     }
 
-    getInitialSession()
+    initializeAuth()
 
+    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return
+      console.log("Auth state changed:", event, session?.user?.id)
 
       setSession(session)
       setUser(session?.user ?? null)
-      setLoading(false)
 
-      if (event === "SIGNED_IN") {
-        toast.success("Successfully signed in!")
-      } else if (event === "SIGNED_OUT") {
-        toast.success("Successfully signed out!")
+      if (session?.user) {
+        const profileData = await fetchProfile(session.user.id)
+        setProfile(profileData)
+      } else {
+        setProfile(null)
       }
+
+      setIsLoading(false)
     })
 
     return () => {
-      isMounted = false
+      mounted = false
       subscription.unsubscribe()
     }
-  }, [mounted])
+  }, [fetchProfile, supabase.auth])
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        return { error: error.message }
+      }
+
+      return {}
+    } catch (error) {
+      return { error: "An unexpected error occurred" }
+    }
+  }
+
+  const signUp = async (email: string, password: string, username: string, displayName: string) => {
+    try {
+      // First check if username is available
+      const { data: existingUser } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("username", username)
+        .single()
+
+      if (existingUser) {
+        return { error: "Username is already taken" }
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username,
+            display_name: displayName,
+          },
+        },
+      })
+
+      if (error) {
+        return { error: error.message }
+      }
+
+      return {}
+    } catch (error) {
+      return { error: "An unexpected error occurred" }
+    }
+  }
 
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut()
       if (error) {
         console.error("Error signing out:", error)
-        toast.error("Error signing out")
       }
     } catch (error) {
       console.error("Error in signOut:", error)
-      toast.error("Error signing out")
     }
   }
 
-  const refreshSession = async () => {
-    try {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.refreshSession()
-      if (error) {
-        console.error("Error refreshing session:", error)
-      } else {
-        setSession(session)
-        setUser(session?.user ?? null)
-      }
-    } catch (error) {
-      console.error("Error in refreshSession:", error)
-    }
+  const value: AuthContextType = {
+    user,
+    profile,
+    session,
+    isAuthenticated: !!user,
+    isLoading: isLoading,
+    signIn,
+    signUp,
+    signOut,
+    refreshProfile,
   }
 
-  return (
-    <AuthContext.Provider value={{ user, session, loading, signOut, refreshSession }}>{children}</AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

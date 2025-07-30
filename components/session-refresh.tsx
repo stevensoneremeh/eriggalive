@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
+import { createClient } from "@/lib/supabase/client"
 
 export function SessionRefresh() {
-  const { refreshSession } = useAuth()
+  const { refreshProfile } = useAuth()
   const [mounted, setMounted] = useState(false)
+  const supabase = createClient()
 
   useEffect(() => {
     setMounted(true)
@@ -16,15 +18,23 @@ export function SessionRefresh() {
 
     // Refresh session every 30 minutes
     const interval = setInterval(
-      () => {
-        refreshSession()
+      async () => {
+        try {
+          const { data, error } = await supabase.auth.refreshSession()
+          if (error) {
+            console.error("Error refreshing session:", error)
+          } else if (data.session) {
+            await refreshProfile()
+          }
+        } catch (error) {
+          console.error("Error in session refresh:", error)
+        }
       },
       30 * 60 * 1000,
-    )
+    ) // 30 minutes
 
     return () => clearInterval(interval)
-  }, [refreshSession, mounted])
+  }, [mounted, refreshProfile, supabase.auth])
 
-  // This component doesn't render anything
   return null
 }

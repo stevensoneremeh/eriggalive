@@ -1,15 +1,23 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import { Gamepad2, Users, Coins, Plus, Play } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { useAuth } from "@/contexts/auth-context"
-import { supabase } from "@/lib/supabase/client"
-import { toast } from "sonner"
+import { useToast } from "@/hooks/use-toast"
+import { createClient } from "@/lib/supabase/client"
+import { Gamepad2, Users, Coins, Plus, Play, Clock } from "lucide-react"
 import Link from "next/link"
 
 interface GameRoom {
@@ -20,60 +28,102 @@ interface GameRoom {
   max_players: number
   current_players: number
   status: "waiting" | "active" | "finished"
-  created_by: string
   created_at: string
+  host_id: string
+  host_username: string
 }
 
 export default function GamesPage() {
-  const { user } = useAuth()
   const [gameRooms, setGameRooms] = useState<GameRoom[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
-  const [showCreateForm, setShowCreateForm] = useState(false)
   const [roomName, setRoomName] = useState("")
   const [entryFee, setEntryFee] = useState(10)
-  const [mounted, setMounted] = useState(false)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const { user, profile, isAuthenticated } = useAuth()
+  const { toast } = useToast()
+  const supabase = createClient()
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  useEffect(() => {
-    if (!mounted) return
     fetchGameRooms()
-  }, [mounted])
+
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel("game-rooms")
+      .on("postgres_changes", { event: "*", schema: "public", table: "ludo_games" }, () => {
+        fetchGameRooms()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
 
   const fetchGameRooms = async () => {
     try {
       const { data, error } = await supabase
         .from("ludo_games")
-        .select("*")
-        .eq("status", "waiting")
+        .select(`
+          id,
+          room_name,
+          entry_fee,
+          prize_pool,
+          max_players,
+          current_players,
+          status,
+          created_at,
+          host_id,
+          profiles!ludo_games_host_id_fkey(username)
+        `)
         .order("created_at", { ascending: false })
 
-      if (error) {
-        console.error("Error fetching game rooms:", error)
-        toast.error("Failed to load game rooms")
-        return
-      }
+      if (error) throw error
 
-      setGameRooms(data || [])
+      const formattedRooms =
+        data?.map((room) => ({
+          ...room,
+          host_username: room.profiles?.username || "Unknown",
+        })) || []
+
+      setGameRooms(formattedRooms)
     } catch (error) {
-      console.error("Error in fetchGameRooms:", error)
-      toast.error("Failed to load game rooms")
+      console.error("Error fetching game rooms:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load game rooms",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
   }
 
   const createGameRoom = async () => {
-    if (!user) {
-      toast.error("Please sign in to create a game room")
+    if (!isAuthenticated || !user || !profile) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to create a game room",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (profile.coins_balance < entryFee) {
+      toast({
+        title: "Insufficient Coins",
+        description: "You don't have enough coins to create this room",
+        variant: "destructive",
+      })
       return
     }
 
     if (!roomName.trim()) {
-      toast.error("Please enter a room name")
+      toast({
+        title: "Room Name Required",
+        description: "Please enter a room name",
+        variant: "destructive",
+      })
       return
     }
 
@@ -86,138 +136,177 @@ export default function GamesPage() {
           room_name: roomName.trim(),
           entry_fee: entryFee,
           prize_pool: entryFee,
+          host_id: user.id,
           max_players: 4,
           current_players: 1,
           status: "waiting",
-          created_by: user.id,
-          players: [user.id],
           game_state: {
-            board: Array(52).fill(null),
-            currentPlayer: 0,
-            diceValue: 1,
-            playerPositions: {
-              [user.id]: { pieces: [0, 0, 0, 0], color: "red" },
+            board: Array(40).fill(null),
+            players: {
+              [user.id]: {
+                color: "red",
+                pieces: [0, 0, 0, 0],
+                position: "home",
+              },
             },
+            currentTurn: user.id,
+            diceValue: null,
           },
         })
         .select()
         .single()
 
-      if (error) {
-        console.error("Error creating game room:", error)
-        toast.error("Failed to create game room")
-        return
-      }
+      if (error) throw error
 
-      toast.success("Game room created successfully!")
-      setShowCreateForm(false)
+      // Deduct entry fee from user's balance
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({
+          coins_balance: profile.coins_balance - entryFee,
+        })
+        .eq("id", user.id)
+
+      if (updateError) throw updateError
+
+      toast({
+        title: "Room Created!",
+        description: `Game room "${roomName}" has been created successfully`,
+      })
+
       setRoomName("")
       setEntryFee(10)
-      fetchGameRooms()
+      setIsDialogOpen(false)
+
+      // Redirect to the game room
+      window.location.href = `/games/ludo/${data.id}`
     } catch (error) {
-      console.error("Error in createGameRoom:", error)
-      toast.error("Failed to create game room")
+      console.error("Error creating game room:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create game room",
+        variant: "destructive",
+      })
     } finally {
       setCreating(false)
     }
   }
 
-  const joinGameRoom = async (roomId: string, currentEntryFee: number) => {
-    if (!user) {
-      toast.error("Please sign in to join a game")
+  const joinGameRoom = async (roomId: string, entryFee: number) => {
+    if (!isAuthenticated || !user || !profile) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to join a game",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (profile.coins_balance < entryFee) {
+      toast({
+        title: "Insufficient Coins",
+        description: "You don't have enough coins to join this room",
+        variant: "destructive",
+      })
       return
     }
 
     try {
-      // First, get the current game state
-      const { data: gameData, error: fetchError } = await supabase
+      // Check if room is still available
+      const { data: roomData, error: roomError } = await supabase
         .from("ludo_games")
-        .select("*")
+        .select("current_players, max_players, status, game_state")
         .eq("id", roomId)
         .single()
 
-      if (fetchError || !gameData) {
-        toast.error("Game room not found")
+      if (roomError) throw roomError
+
+      if (roomData.status !== "waiting") {
+        toast({
+          title: "Room Unavailable",
+          description: "This game room is no longer accepting players",
+          variant: "destructive",
+        })
         return
       }
 
-      if (gameData.current_players >= gameData.max_players) {
-        toast.error("Game room is full")
+      if (roomData.current_players >= roomData.max_players) {
+        toast({
+          title: "Room Full",
+          description: "This game room is already full",
+          variant: "destructive",
+        })
         return
       }
 
-      if (gameData.players.includes(user.id)) {
-        toast.error("You are already in this game")
-        return
-      }
-
-      // Update the game with new player
-      const updatedPlayers = [...gameData.players, user.id]
+      // Add player to game
       const colors = ["red", "blue", "green", "yellow"]
-      const playerColor = colors[gameData.current_players]
+      const usedColors = Object.values(roomData.game_state.players).map((p: any) => p.color)
+      const availableColor = colors.find((color) => !usedColors.includes(color))
 
       const updatedGameState = {
-        ...gameData.game_state,
-        playerPositions: {
-          ...gameData.game_state.playerPositions,
-          [user.id]: { pieces: [0, 0, 0, 0], color: playerColor },
+        ...roomData.game_state,
+        players: {
+          ...roomData.game_state.players,
+          [user.id]: {
+            color: availableColor,
+            pieces: [0, 0, 0, 0],
+            position: "home",
+          },
         },
       }
 
       const { error: updateError } = await supabase
         .from("ludo_games")
         .update({
-          players: updatedPlayers,
-          current_players: gameData.current_players + 1,
-          prize_pool: gameData.prize_pool + currentEntryFee,
+          current_players: roomData.current_players + 1,
+          prize_pool: (roomData.current_players + 1) * entryFee,
           game_state: updatedGameState,
         })
         .eq("id", roomId)
 
-      if (updateError) {
-        console.error("Error joining game:", updateError)
-        toast.error("Failed to join game")
-        return
-      }
+      if (updateError) throw updateError
 
-      toast.success("Successfully joined the game!")
-      fetchGameRooms()
+      // Deduct entry fee from user's balance
+      const { error: balanceError } = await supabase
+        .from("profiles")
+        .update({
+          coins_balance: profile.coins_balance - entryFee,
+        })
+        .eq("id", user.id)
+
+      if (balanceError) throw balanceError
+
+      toast({
+        title: "Joined Game!",
+        description: "You have successfully joined the game room",
+      })
+
+      // Redirect to the game room
+      window.location.href = `/games/ludo/${roomId}`
     } catch (error) {
-      console.error("Error in joinGameRoom:", error)
-      toast.error("Failed to join game")
+      console.error("Error joining game room:", error)
+      toast({
+        title: "Error",
+        description: "Failed to join game room",
+        variant: "destructive",
+      })
     }
   }
 
-  if (!mounted) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-muted rounded w-48 mb-4"></div>
-          <div className="h-4 bg-muted rounded w-96 mb-8"></div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-48 bg-muted rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!user) {
+  if (!isAuthenticated) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
           <Gamepad2 className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
           <h1 className="text-2xl font-bold mb-2">Games</h1>
-          <p className="text-muted-foreground mb-6">Please sign in to play games and compete with other fans</p>
+          <p className="text-muted-foreground mb-6">Sign in to play games and win coins!</p>
           <div className="space-x-4">
-            <Link href="/login">
-              <Button>Sign In</Button>
-            </Link>
-            <Link href="/signup">
-              <Button variant="outline">Sign Up</Button>
-            </Link>
+            <Button asChild>
+              <Link href="/login">Sign In</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/signup">Sign Up</Link>
+            </Button>
           </div>
         </div>
       </div>
@@ -234,60 +323,65 @@ export default function GamesPage() {
           </h1>
           <p className="text-muted-foreground mt-2">Play Ludo with other fans and win coins!</p>
         </div>
-        <Button onClick={() => setShowCreateForm(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Room
-        </Button>
+
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Create Room
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Game Room</DialogTitle>
+              <DialogDescription>
+                Create a new Ludo game room. Entry fee will be deducted from your coin balance.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="roomName">Room Name</Label>
+                <Input
+                  id="roomName"
+                  value={roomName}
+                  onChange={(e) => setRoomName(e.target.value)}
+                  placeholder="Enter room name..."
+                  maxLength={50}
+                />
+              </div>
+              <div>
+                <Label htmlFor="entryFee">Entry Fee (Coins)</Label>
+                <Input
+                  id="entryFee"
+                  type="number"
+                  value={entryFee}
+                  onChange={(e) => setEntryFee(Math.max(1, Number.parseInt(e.target.value) || 1))}
+                  min={1}
+                  max={profile?.coins_balance || 0}
+                />
+                <p className="text-sm text-muted-foreground mt-1">Your balance: {profile?.coins_balance || 0} coins</p>
+              </div>
+              <Button
+                onClick={createGameRoom}
+                disabled={creating || !roomName.trim() || entryFee > (profile?.coins_balance || 0)}
+                className="w-full"
+              >
+                {creating ? "Creating..." : `Create Room (${entryFee} coins)`}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {showCreateForm && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Create Game Room</CardTitle>
-            <CardDescription>Set up a new Ludo game room for other players to join</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="roomName">Room Name</Label>
-              <Input
-                id="roomName"
-                value={roomName}
-                onChange={(e) => setRoomName(e.target.value)}
-                placeholder="Enter room name..."
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="entryFee">Entry Fee (Coins)</Label>
-              <Input
-                id="entryFee"
-                type="number"
-                value={entryFee}
-                onChange={(e) => setEntryFee(Number(e.target.value))}
-                min="1"
-                max="1000"
-                className="mt-1"
-              />
-            </div>
-            <div className="flex space-x-2">
-              <Button onClick={createGameRoom} disabled={creating}>
-                {creating ? "Creating..." : "Create Room"}
-              </Button>
-              <Button variant="outline" onClick={() => setShowCreateForm(false)}>
-                Cancel
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {loading ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
             <Card key={i} className="animate-pulse">
-              <CardContent className="p-6">
-                <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-                <div className="h-3 bg-muted rounded w-1/2 mb-4"></div>
+              <CardHeader>
+                <div className="h-4 bg-muted rounded w-3/4"></div>
+                <div className="h-3 bg-muted rounded w-1/2"></div>
+              </CardHeader>
+              <CardContent>
                 <div className="space-y-2">
                   <div className="h-3 bg-muted rounded"></div>
                   <div className="h-3 bg-muted rounded w-2/3"></div>
@@ -299,55 +393,76 @@ export default function GamesPage() {
       ) : gameRooms.length === 0 ? (
         <div className="text-center py-12">
           <Gamepad2 className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Game Rooms Available</h3>
+          <h3 className="text-lg font-semibold mb-2">No Game Rooms</h3>
           <p className="text-muted-foreground mb-4">Be the first to create a game room and start playing!</p>
-          <Button onClick={() => setShowCreateForm(true)}>
+          <Button onClick={() => setIsDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Create First Room
           </Button>
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {gameRooms.map((room) => (
             <Card key={room.id} className="hover:shadow-lg transition-shadow">
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span className="truncate">{room.room_name}</span>
-                  <Badge variant="secondary">
-                    <Users className="h-3 w-3 mr-1" />
-                    {room.current_players}/{room.max_players}
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">{room.room_name}</CardTitle>
+                  <Badge
+                    variant={room.status === "waiting" ? "default" : room.status === "active" ? "secondary" : "outline"}
+                  >
+                    {room.status === "waiting" && <Clock className="h-3 w-3 mr-1" />}
+                    {room.status === "active" && <Play className="h-3 w-3 mr-1" />}
+                    {room.status.charAt(0).toUpperCase() + room.status.slice(1)}
                   </Badge>
-                </CardTitle>
-                <CardDescription>Created {new Date(room.created_at).toLocaleDateString()}</CardDescription>
+                </div>
+                <CardDescription>Hosted by @{room.host_username}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Entry Fee:</span>
-                    <div className="flex items-center">
-                      <Coins className="h-4 w-4 mr-1 text-yellow-500" />
-                      <span className="font-medium">{room.entry_fee}</span>
-                    </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-1">
+                      <Users className="h-4 w-4" />
+                      Players
+                    </span>
+                    <span>
+                      {room.current_players}/{room.max_players}
+                    </span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Prize Pool:</span>
-                    <div className="flex items-center">
-                      <Coins className="h-4 w-4 mr-1 text-yellow-500" />
-                      <span className="font-medium">{room.prize_pool}</span>
-                    </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-1">
+                      <Coins className="h-4 w-4" />
+                      Entry Fee
+                    </span>
+                    <span>{room.entry_fee} coins</span>
                   </div>
-                  <div className="pt-2">
-                    {room.current_players >= room.max_players ? (
-                      <Button disabled className="w-full">
-                        Room Full
-                      </Button>
-                    ) : (
-                      <Button onClick={() => joinGameRoom(room.id, room.entry_fee)} className="w-full">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-1">
+                      <Coins className="h-4 w-4 text-yellow-500" />
+                      Prize Pool
+                    </span>
+                    <span className="font-semibold text-yellow-600">{room.prize_pool} coins</span>
+                  </div>
+
+                  {room.status === "waiting" && room.current_players < room.max_players ? (
+                    <Button
+                      onClick={() => joinGameRoom(room.id, room.entry_fee)}
+                      className="w-full"
+                      disabled={!profile || profile.coins_balance < room.entry_fee}
+                    >
+                      Join Game ({room.entry_fee} coins)
+                    </Button>
+                  ) : room.status === "active" ? (
+                    <Button asChild className="w-full">
+                      <Link href={`/games/ludo/${room.id}`}>
                         <Play className="h-4 w-4 mr-2" />
-                        Join Game
-                      </Button>
-                    )}
-                  </div>
+                        Watch Game
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button disabled className="w-full">
+                      Game {room.status}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

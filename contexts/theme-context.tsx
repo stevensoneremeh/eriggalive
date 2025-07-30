@@ -3,26 +3,27 @@
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 
-type Theme = "light" | "dark" | "system"
+type Theme = "dark" | "light" | "system"
 
 interface ThemeContextType {
   theme: Theme
   setTheme: (theme: Theme) => void
-  resolvedTheme: "light" | "dark"
+  actualTheme: "dark" | "light"
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("system")
-  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light")
+  const [actualTheme, setActualTheme] = useState<"dark" | "light">("light")
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-    // Only access localStorage on client side
-    const savedTheme = localStorage.getItem("erigga-theme") as Theme
-    if (savedTheme && ["light", "dark", "system"].includes(savedTheme)) {
+
+    // Only access localStorage after component mounts
+    const savedTheme = localStorage.getItem("theme") as Theme
+    if (savedTheme && ["dark", "light", "system"].includes(savedTheme)) {
       setTheme(savedTheme)
     }
   }, [])
@@ -30,30 +31,32 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!mounted) return
 
-    const updateResolvedTheme = () => {
-      let resolved: "light" | "dark" = "light"
+    const updateActualTheme = () => {
+      let newActualTheme: "dark" | "light"
 
       if (theme === "system") {
-        resolved = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+        newActualTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
       } else {
-        resolved = theme as "light" | "dark"
+        newActualTheme = theme
       }
 
-      setResolvedTheme(resolved)
+      setActualTheme(newActualTheme)
 
-      // Apply theme to document
-      const root = document.documentElement
-      root.classList.remove("light", "dark")
-      root.classList.add(resolved)
+      // Update document class
+      document.documentElement.classList.remove("light", "dark")
+      document.documentElement.classList.add(newActualTheme)
     }
 
-    updateResolvedTheme()
+    updateActualTheme()
+
+    // Save to localStorage only on client
+    localStorage.setItem("theme", theme)
 
     // Listen for system theme changes
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
     const handleChange = () => {
       if (theme === "system") {
-        updateResolvedTheme()
+        updateActualTheme()
       }
     }
 
@@ -61,24 +64,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => mediaQuery.removeEventListener("change", handleChange)
   }, [theme, mounted])
 
-  useEffect(() => {
-    if (!mounted) return
-    // Save theme to localStorage only on client side
-    localStorage.setItem("erigga-theme", theme)
-  }, [theme, mounted])
-
-  const handleSetTheme = (newTheme: Theme) => {
-    setTheme(newTheme)
+  const value: ThemeContextType = {
+    theme,
+    setTheme,
+    actualTheme,
   }
 
-  // Don't render until mounted to prevent hydration mismatch
-  if (!mounted) {
-    return <>{children}</>
-  }
-
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme: handleSetTheme, resolvedTheme }}>{children}</ThemeContext.Provider>
-  )
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 
 export function useTheme() {

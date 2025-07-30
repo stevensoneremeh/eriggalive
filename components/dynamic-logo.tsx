@@ -1,40 +1,69 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useTheme } from "next-themes"
+import { useEffect, useState } from "react"
 import Image from "next/image"
-import { useTheme } from "@/contexts/theme-context"
 
-export function DynamicLogo() {
-  const { resolvedTheme } = useTheme()
+interface DynamicLogoProps {
+  className?: string
+}
+
+export function DynamicLogo({ className = "h-8 w-auto" }: DynamicLogoProps) {
+  const { theme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Show a placeholder until mounted to prevent hydration mismatch
   if (!mounted) {
+    // Return a simple fallback during SSR
     return (
-      <div className="flex items-center space-x-2">
-        <div className="h-8 w-8 rounded bg-muted animate-pulse" />
-        <span className="hidden font-bold sm:inline-block">Erigga Live</span>
+      <div
+        className={`${className} bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center`}
+      >
+        <span className="text-white font-bold text-sm">E</span>
       </div>
     )
   }
 
-  const logoSrc = resolvedTheme === "dark" ? "/images/loggotrans-dark.png" : "/images/loggotrans-light.png"
+  const currentTheme = resolvedTheme || theme
 
   return (
-    <div className="flex items-center space-x-2">
-      <Image
-        src={logoSrc || "/placeholder.svg"}
-        alt="Erigga Live"
-        width={32}
-        height={32}
-        className="h-8 w-8"
-        priority
-      />
-      <span className="hidden font-bold sm:inline-block">Erigga Live</span>
+    <div className={`${className} relative`}>
+      {currentTheme === "dark" ? (
+        <Image
+          src="/images/loggotrans-dark.png"
+          alt="Erigga Live"
+          width={32}
+          height={32}
+          className="object-contain"
+          onError={() => {
+            // Fallback if image fails to load
+            return (
+              <div className="h-8 w-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                <span className="text-white font-bold text-sm">E</span>
+              </div>
+            )
+          }}
+        />
+      ) : (
+        <Image
+          src="/images/loggotrans-light.png"
+          alt="Erigga Live"
+          width={32}
+          height={32}
+          className="object-contain"
+          onError={() => {
+            // Fallback if image fails to load
+            return (
+              <div className="h-8 w-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                <span className="text-white font-bold text-sm">E</span>
+              </div>
+            )
+          }}
+        />
+      )}
     </div>
   )
 }
