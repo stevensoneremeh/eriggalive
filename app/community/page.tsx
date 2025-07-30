@@ -57,7 +57,7 @@ interface Category {
   is_active: boolean
 }
 
-export default function CommunityPage() {
+function CommunityPage() {
   const { profile } = useAuth()
   const [posts, setPosts] = useState<Post[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -455,3 +455,5 @@ export default function CommunityPage() {
     </div>
   )
 }
+
+export default CommunityPage

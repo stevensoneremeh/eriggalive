@@ -17,8 +17,8 @@ const protectedRoutes = [
 // Define auth routes that should redirect if already authenticated
 const authRoutes = ["/login", "/signup"]
 
-// Define public routes that don't require authentication but benefit from it
-const publicRoutes = ["/", "/community", "/radio"]
+// Define public routes that don't require authentication
+const publicRoutes = ["/", "/community", "/mission", "/radio"]
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -79,7 +79,7 @@ export async function middleware(request: NextRequest) {
   })
 
   try {
-    // Get the current session
+    // Refresh session if expired - required for Server Components
     const {
       data: { session },
       error,
@@ -87,6 +87,8 @@ export async function middleware(request: NextRequest) {
 
     if (error) {
       console.error("Middleware auth error:", error)
+      // Don't block the request on auth errors, let the client handle it
+      return response
     }
 
     const { pathname } = request.nextUrl
@@ -97,25 +99,22 @@ export async function middleware(request: NextRequest) {
     // If user is not authenticated and trying to access protected route
     if (!session && isProtectedRoute) {
       const redirectUrl = new URL("/login", request.url)
-      redirectUrl.searchParams.set("redirectTo", pathname)
+      redirectUrl.searchParams.set("redirect", pathname)
       return NextResponse.redirect(redirectUrl)
     }
 
     // If user is authenticated and trying to access auth routes, redirect to dashboard
     if (session && isAuthRoute) {
-      const redirectTo = request.nextUrl.searchParams.get("redirectTo")
+      const redirectTo = request.nextUrl.searchParams.get("redirect")
       const destination = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/dashboard"
       return NextResponse.redirect(new URL(destination, request.url))
     }
 
-    // For public routes, allow access regardless of auth status
-    if (isPublicRoute) {
-      return response
-    }
-
+    // For all other routes (including public routes), allow access
     return response
   } catch (error) {
     console.error("Middleware error:", error)
+    // Don't block the request on errors, let the client handle auth
     return response
   }
 }

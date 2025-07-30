@@ -8,6 +8,8 @@ import { ThemeProvider } from "@/contexts/theme-context"
 import { Toaster } from "@/components/ui/sonner"
 import { SessionRefresh } from "@/components/session-refresh"
 import { UnifiedNavigation } from "@/components/navigation/unified-navigation"
+import { createClient } from "@/lib/supabase/client"
+import { SessionContextProvider } from "@supabase/auth-helpers-react"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -40,32 +42,36 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  const supabase = createClient()
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <NextThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange={false}
-          storageKey="erigga-theme"
-        >
-          <ThemeProvider>
-            <AuthProvider>
-              <SessionRefresh />
-              <UnifiedNavigation />
-              <main className="min-h-screen bg-background text-foreground transition-colors duration-300">
-                {children}
-              </main>
-              <Toaster
-                position="top-right"
-                toastOptions={{
-                  className: "bg-background border-border text-foreground",
-                }}
-              />
-            </AuthProvider>
-          </ThemeProvider>
-        </NextThemeProvider>
+        <SessionContextProvider supabaseClient={supabase}>
+          <NextThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange={false}
+            storageKey="erigga-theme"
+          >
+            <ThemeProvider>
+              <AuthProvider>
+                <SessionRefresh />
+                <UnifiedNavigation />
+                <main className="min-h-screen bg-background text-foreground transition-colors duration-300">
+                  {children}
+                </main>
+                <Toaster
+                  position="top-right"
+                  toastOptions={{
+                    className: "bg-background border-border text-foreground",
+                  }}
+                />
+              </AuthProvider>
+            </ThemeProvider>
+          </NextThemeProvider>
+        </SessionContextProvider>
       </body>
     </html>
   )

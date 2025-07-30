@@ -1,659 +1,338 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { AuthGuard } from "@/components/auth-guard"
 import { useAuth } from "@/contexts/auth-context"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import {
-  Coins,
-  CreditCard,
-  ArrowUpRight,
-  ArrowDownLeft,
-  Gift,
-  Zap,
-  TrendingUp,
-  Wallet,
-  History,
-  Info,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Star,
-} from "lucide-react"
-import { toast } from "sonner"
-
-interface CoinPackage {
-  id: string
-  coins: number
-  price: number
-  bonus: number
-  popular?: boolean
-  savings?: string
-}
-
-interface Transaction {
-  id: string
-  type: "purchase" | "withdrawal" | "earned" | "spent"
-  amount: number
-  coins: number
-  status: "completed" | "pending" | "failed"
-  description: string
-  reference?: string
-  created_at: string
-}
+import { Coins, CreditCard, ArrowUpRight, ArrowDownLeft, Gift, Star, Crown, Zap, TrendingUp } from "lucide-react"
+import Link from "next/link"
 
 export default function CoinsPage() {
-  const { profile, updateCoins, refreshProfile } = useAuth()
-  const [isLoading, setIsLoading] = useState(false)
-  const [customAmount, setCustomAmount] = useState("")
-  const [withdrawAmount, setWithdrawAmount] = useState("")
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
-  const [selectedPackage, setSelectedPackage] = useState<CoinPackage | null>(null)
+  const { profile, isLoading } = useAuth()
 
-  // Current coin value in Naira
-  const coinValue = 0.5 // 1 coin = ₦0.50
-
-  const coinPackages: CoinPackage[] = [
-    {
-      id: "starter",
-      coins: 100,
-      price: 50,
-      bonus: 0,
-    },
-    {
-      id: "basic",
-      coins: 500,
-      price: 200,
-      bonus: 50,
-      savings: "Save ₦50",
-    },
-    {
-      id: "popular",
-      coins: 1000,
-      price: 350,
-      bonus: 150,
-      popular: true,
-      savings: "Save ₦150",
-    },
-    {
-      id: "premium",
-      coins: 2500,
-      price: 800,
-      bonus: 500,
-      savings: "Save ₦450",
-    },
-    {
-      id: "ultimate",
-      coins: 5000,
-      price: 1500,
-      bonus: 1500,
-      savings: "Save ₦1000",
-    },
-  ]
-
-  // Mock transactions for demo
-  useEffect(() => {
-    const mockTransactions: Transaction[] = [
-      {
-        id: "1",
-        type: "purchase",
-        amount: 350,
-        coins: 1150,
-        status: "completed",
-        description: "Purchased Popular Package",
-        reference: "PAY_123456789",
-        created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-      },
-      {
-        id: "2",
-        type: "earned",
-        amount: 0,
-        coins: 50,
-        status: "completed",
-        description: "Community engagement reward",
-        created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-      },
-      {
-        id: "3",
-        type: "spent",
-        amount: 0,
-        coins: -25,
-        status: "completed",
-        description: "Meet & Greet session booking",
-        created_at: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-      },
-      {
-        id: "4",
-        type: "withdrawal",
-        amount: 100,
-        coins: -200,
-        status: "pending",
-        description: "Withdrawal to bank account",
-        reference: "WTH_987654321",
-        created_at: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
-      },
-    ]
-    setTransactions(mockTransactions)
-  }, [])
-
-  const handlePaystackPayment = async (packageData: CoinPackage) => {
-    if (!profile?.email) {
-      toast.error("Profile information missing")
-      return
-    }
-
-    setIsLoading(true)
-    setSelectedPackage(packageData)
-
-    try {
-      // Initialize Paystack payment
-      const handler = (window as any).PaystackPop.setup({
-        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_demo", // Use demo key for preview
-        email: profile.email,
-        amount: packageData.price * 100, // Convert to kobo
-        currency: "NGN",
-        ref: `COIN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        metadata: {
-          custom_fields: [
-            {
-              display_name: "Coin Package",
-              variable_name: "coin_package",
-              value: packageData.id,
-            },
-            {
-              display_name: "Coins",
-              variable_name: "coins",
-              value: packageData.coins + packageData.bonus,
-            },
-          ],
-        },
-        callback: async (response: any) => {
-          console.log("Payment successful:", response)
-
-          // Verify payment on server
-          try {
-            const verifyResponse = await fetch("/api/coins/verify-payment", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                reference: response.reference,
-                packageId: packageData.id,
-              }),
-            })
-
-            if (verifyResponse.ok) {
-              const totalCoins = packageData.coins + packageData.bonus
-              updateCoins(totalCoins)
-
-              // Add transaction to history
-              const newTransaction: Transaction = {
-                id: Date.now().toString(),
-                type: "purchase",
-                amount: packageData.price,
-                coins: totalCoins,
-                status: "completed",
-                description: `Purchased ${packageData.id} package`,
-                reference: response.reference,
-                created_at: new Date().toISOString(),
-              }
-              setTransactions((prev) => [newTransaction, ...prev])
-
-              toast.success(`Successfully purchased ${totalCoins} coins!`)
-              setShowPaymentDialog(false)
-            } else {
-              toast.error("Payment verification failed")
-            }
-          } catch (error) {
-            console.error("Payment verification error:", error)
-            toast.error("Payment verification failed")
-          }
-        },
-        onClose: () => {
-          console.log("Payment dialog closed")
-          setIsLoading(false)
-        },
-      })
-
-      handler.openIframe()
-    } catch (error) {
-      console.error("Payment initialization error:", error)
-      toast.error("Failed to initialize payment")
-      setIsLoading(false)
-    }
-  }
-
-  const handleCustomPayment = async () => {
-    const amount = Number.parseFloat(customAmount)
-    if (!amount || amount < 10) {
-      toast.error("Minimum purchase amount is ₦10")
-      return
-    }
-
-    const coins = Math.floor(amount / coinValue)
-    const customPackage: CoinPackage = {
-      id: "custom",
-      coins,
-      price: amount,
-      bonus: 0,
-    }
-
-    await handlePaystackPayment(customPackage)
-  }
-
-  const handleWithdrawal = async () => {
-    const coins = Number.parseInt(withdrawAmount)
-    if (!coins || coins < 100) {
-      toast.error("Minimum withdrawal is 100 coins")
-      return
-    }
-
-    if (coins > (profile?.coins_balance || 0)) {
-      toast.error("Insufficient coin balance")
-      return
-    }
-
-    setIsLoading(true)
-
-    try {
-      // Simulate withdrawal processing
-      const withdrawalFee = Math.ceil(coins * 0.05) // 5% fee
-      const netCoins = coins - withdrawalFee
-      const amount = netCoins * coinValue
-
-      // Update local state
-      updateCoins(-coins)
-
-      // Add transaction
-      const newTransaction: Transaction = {
-        id: Date.now().toString(),
-        type: "withdrawal",
-        amount,
-        coins: -coins,
-        status: "pending",
-        description: `Withdrawal to bank account (Fee: ${withdrawalFee} coins)`,
-        reference: `WTH_${Date.now()}`,
-        created_at: new Date().toISOString(),
-      }
-      setTransactions((prev) => [newTransaction, ...prev])
-
-      toast.success(`Withdrawal request submitted! You'll receive ₦${amount.toFixed(2)} after processing.`)
-      setWithdrawAmount("")
-    } catch (error) {
-      console.error("Withdrawal error:", error)
-      toast.error("Withdrawal failed")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const getTransactionIcon = (transaction: Transaction) => {
-    switch (transaction.type) {
-      case "purchase":
-        return <ArrowDownLeft className="w-4 h-4 text-green-500" />
-      case "withdrawal":
-        return <ArrowUpRight className="w-4 h-4 text-red-500" />
-      case "earned":
-        return <Gift className="w-4 h-4 text-blue-500" />
-      case "spent":
-        return <Zap className="w-4 h-4 text-orange-500" />
-      default:
-        return <Coins className="w-4 h-4" />
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "completed":
-        return <CheckCircle className="w-4 h-4 text-green-500" />
-      case "pending":
-        return <Clock className="w-4 h-4 text-yellow-500" />
-      case "failed":
-        return <XCircle className="w-4 h-4 text-red-500" />
-      default:
-        return <Clock className="w-4 h-4" />
-    }
-  }
-
-  if (!profile) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <AuthGuard>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        </div>
+      </AuthGuard>
     )
   }
 
+  const coinPackages = [
+    {
+      id: 1,
+      name: "Starter Pack",
+      coins: 500,
+      price: 1000,
+      bonus: 0,
+      popular: false,
+      icon: <Coins className="w-6 h-6" />,
+      color: "from-gray-500 to-gray-600",
+    },
+    {
+      id: 2,
+      name: "Popular Pack",
+      coins: 1200,
+      price: 2000,
+      bonus: 200,
+      popular: true,
+      icon: <Star className="w-6 h-6" />,
+      color: "from-purple-500 to-purple-600",
+    },
+    {
+      id: 3,
+      name: "Premium Pack",
+      coins: 2500,
+      price: 4000,
+      bonus: 500,
+      popular: false,
+      icon: <Crown className="w-6 h-6" />,
+      color: "from-blue-500 to-blue-600",
+    },
+    {
+      id: 4,
+      name: "Ultimate Pack",
+      coins: 5500,
+      price: 8000,
+      bonus: 1500,
+      popular: false,
+      icon: <Zap className="w-6 h-6" />,
+      color: "from-yellow-500 to-yellow-600",
+    },
+  ]
+
+  const recentTransactions = [
+    {
+      id: 1,
+      type: "earned",
+      amount: 50,
+      description: "Daily login bonus",
+      date: "2024-01-15",
+      icon: <Gift className="w-4 h-4 text-green-600" />,
+    },
+    {
+      id: 2,
+      type: "spent",
+      amount: -100,
+      description: "Exclusive content unlock",
+      date: "2024-01-14",
+      icon: <ArrowDownLeft className="w-4 h-4 text-red-600" />,
+    },
+    {
+      id: 3,
+      type: "earned",
+      amount: 25,
+      description: "Community post upvote",
+      date: "2024-01-13",
+      icon: <TrendingUp className="w-4 h-4 text-green-600" />,
+    },
+    {
+      id: 4,
+      type: "purchased",
+      amount: 1000,
+      description: "Coin package purchase",
+      date: "2024-01-12",
+      icon: <ArrowUpRight className="w-4 h-4 text-blue-600" />,
+    },
+  ]
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Erigga Coins</h1>
-          <p className="text-gray-600">Manage your coins, make purchases, and track transactions</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Balance & Info */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Current Balance */}
-            <Card className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-white">
-                  <Wallet className="w-5 h-5" />
-                  Current Balance
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold mb-2">{profile.coins_balance.toLocaleString()}</div>
-                <p className="text-yellow-100 text-sm mb-4">
-                  ≈ ₦{(profile.coins_balance * coinValue).toLocaleString()} NGN
-                </p>
-                <div className="flex items-center gap-2 text-yellow-100 text-xs">
-                  <TrendingUp className="w-4 h-4" />
-                  <span>1 coin = ₦{coinValue}</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Coin Info */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Info className="w-5 h-5" />
-                  How to Use Coins
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <CreditCard className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Meet & Greet Sessions</p>
-                    <p className="text-xs text-muted-foreground">Book exclusive sessions</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                    <Gift className="w-4 h-4 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Exclusive Merchandise</p>
-                    <p className="text-xs text-muted-foreground">Purchase limited items</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                    <Star className="w-4 h-4 text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Premium Content</p>
-                    <p className="text-xs text-muted-foreground">Access exclusive media</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                    <Zap className="w-4 h-4 text-red-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Community Features</p>
-                    <p className="text-xs text-muted-foreground">Boost posts & more</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Earning Tips */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Gift className="w-5 h-5" />
-                  Earn Free Coins
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="text-sm">
-                  <p className="font-medium">• Daily login bonus: 10 coins</p>
-                  <p className="font-medium">• Create posts: 5 coins each</p>
-                  <p className="font-medium">• Receive upvotes: 2 coins each</p>
-                  <p className="font-medium">• Comment engagement: 1 coin each</p>
-                  <p className="font-medium">• Referral bonus: 100 coins</p>
-                </div>
-              </CardContent>
-            </Card>
+    <AuthGuard>
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4 sm:p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Erigga Coins</h1>
+            <p className="text-gray-600 dark:text-gray-300">
+              Earn, purchase, and spend coins for exclusive experiences and content
+            </p>
           </div>
 
-          {/* Right Column - Purchase & Transactions */}
-          <div className="lg:col-span-2">
-            <Tabs defaultValue="purchase" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="purchase">Purchase Coins</TabsTrigger>
-                <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
-                <TabsTrigger value="history">Transaction History</TabsTrigger>
-              </TabsList>
+          {/* Balance Card */}
+          <Card className="mb-8 bg-gradient-to-r from-purple-500 to-blue-500 text-white">
+            <CardContent className="p-8">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-100 mb-2">Your Balance</p>
+                  <div className="flex items-center space-x-2">
+                    <Coins className="w-8 h-8" />
+                    <span className="text-4xl font-bold">{profile?.coins_balance?.toLocaleString() || "0"}</span>
+                  </div>
+                  <p className="text-purple-100 mt-2">Erigga Coins</p>
+                </div>
+                <div className="text-right">
+                  <Button variant="secondary" asChild>
+                    <Link href="/coins/history">View History</Link>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-              {/* Purchase Tab */}
-              <TabsContent value="purchase" className="space-y-6">
-                {/* Coin Packages */}
+          <Tabs defaultValue="purchase" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="purchase">Purchase Coins</TabsTrigger>
+              <TabsTrigger value="earn">Earn Coins</TabsTrigger>
+              <TabsTrigger value="spend">Spend Coins</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="purchase" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {coinPackages.map((pkg) => (
+                  <Card key={pkg.id} className={`relative ${pkg.popular ? "ring-2 ring-purple-500" : ""}`}>
+                    {pkg.popular && (
+                      <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-purple-500 text-white">
+                        Most Popular
+                      </Badge>
+                    )}
+                    <CardHeader className="text-center">
+                      <div
+                        className={`w-16 h-16 bg-gradient-to-r ${pkg.color} rounded-full flex items-center justify-center mx-auto mb-4 text-white`}
+                      >
+                        {pkg.icon}
+                      </div>
+                      <CardTitle>{pkg.name}</CardTitle>
+                      <CardDescription>
+                        {pkg.coins.toLocaleString()} coins
+                        {pkg.bonus > 0 && <span className="text-green-600 font-medium"> + {pkg.bonus} bonus</span>}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-center">
+                      <div className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+                        ₦{pkg.price.toLocaleString()}
+                      </div>
+                      <Button className="w-full" variant={pkg.popular ? "default" : "outline"}>
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Purchase
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="earn" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Coin Packages</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Choose a package that suits your needs. Larger packages include bonus coins!
-                    </p>
+                    <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center mb-4">
+                      <Gift className="w-6 h-6 text-green-600 dark:text-green-400" />
+                    </div>
+                    <CardTitle>Daily Login</CardTitle>
+                    <CardDescription>Earn 50 coins every day you log in</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {coinPackages.map((pkg) => (
-                        <Card
-                          key={pkg.id}
-                          className={`relative cursor-pointer transition-all hover:shadow-lg ${
-                            pkg.popular ? "ring-2 ring-primary" : ""
-                          }`}
-                          onClick={() => handlePaystackPayment(pkg)}
-                        >
-                          {pkg.popular && (
-                            <Badge className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-primary">
-                              Most Popular
-                            </Badge>
-                          )}
-                          <CardContent className="p-6 text-center">
-                            <div className="text-2xl font-bold mb-2">{pkg.coins.toLocaleString()}</div>
-                            {pkg.bonus > 0 && (
-                              <div className="text-sm text-green-600 font-medium mb-2">+{pkg.bonus} bonus coins</div>
-                            )}
-                            <div className="text-3xl font-bold text-primary mb-2">₦{pkg.price}</div>
-                            {pkg.savings && (
-                              <Badge variant="secondary" className="mb-4">
-                                {pkg.savings}
-                              </Badge>
-                            )}
-                            <Button className="w-full" disabled={isLoading}>
-                              {isLoading && selectedPackage?.id === pkg.id ? (
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                              ) : (
-                                <CreditCard className="w-4 h-4 mr-2" />
-                              )}
-                              Buy Now
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
+                    <Button className="w-full">Claim Daily Bonus</Button>
                   </CardContent>
                 </Card>
 
-                {/* Custom Amount */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Custom Amount</CardTitle>
-                    <p className="text-sm text-muted-foreground">Purchase any amount of coins (minimum ₦10)</p>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex gap-4">
-                      <div className="flex-1">
-                        <Label htmlFor="custom-amount">Amount (NGN)</Label>
-                        <Input
-                          id="custom-amount"
-                          type="number"
-                          placeholder="Enter amount"
-                          value={customAmount}
-                          onChange={(e) => setCustomAmount(e.target.value)}
-                          min="10"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <Label>Coins You'll Get</Label>
-                        <div className="h-10 px-3 py-2 border rounded-md bg-muted flex items-center">
-                          {customAmount
-                            ? Math.floor(Number.parseFloat(customAmount) / coinValue).toLocaleString()
-                            : "0"}{" "}
-                          coins
-                        </div>
-                      </div>
+                    <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center mb-4">
+                      <TrendingUp className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <Button onClick={handleCustomPayment} disabled={isLoading || !customAmount}>
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Purchase Custom Amount
+                    <CardTitle>Community Engagement</CardTitle>
+                    <CardDescription>Earn coins for posts, comments, and upvotes</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button variant="outline" className="w-full bg-transparent" asChild>
+                      <Link href="/community">Join Community</Link>
                     </Button>
                   </CardContent>
                 </Card>
-              </TabsContent>
 
-              {/* Withdraw Tab */}
-              <TabsContent value="withdraw" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Withdraw Coins</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Convert your coins back to cash (minimum 100 coins, 5% processing fee)
-                    </p>
+                    <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center mb-4">
+                      <Star className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <CardTitle>Referral Program</CardTitle>
+                    <CardDescription>Earn 100 coins for each friend you refer</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Alert>
-                      <Info className="h-4 w-4" />
-                      <AlertDescription>
-                        Withdrawals are processed within 24-48 hours. A 5% processing fee applies.
-                      </AlertDescription>
-                    </Alert>
+                  <CardContent>
+                    <Button variant="outline" className="w-full bg-transparent">
+                      Invite Friends
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="withdraw-amount">Coins to Withdraw</Label>
-                        <Input
-                          id="withdraw-amount"
-                          type="number"
-                          placeholder="Enter coins"
-                          value={withdrawAmount}
-                          onChange={(e) => setWithdrawAmount(e.target.value)}
-                          min="100"
-                          max={profile.coins_balance}
-                        />
-                      </div>
-                      <div>
-                        <Label>You'll Receive</Label>
-                        <div className="h-10 px-3 py-2 border rounded-md bg-muted flex items-center">
-                          {withdrawAmount
-                            ? `₦${(Number.parseInt(withdrawAmount) * 0.95 * coinValue).toFixed(2)}`
-                            : "₦0.00"}
-                        </div>
+            <TabsContent value="spend" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card>
+                  <CardHeader>
+                    <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center mb-4">
+                      <Crown className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                    </div>
+                    <CardTitle>Exclusive Content</CardTitle>
+                    <CardDescription>Unlock premium tracks and videos</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="font-medium">Starting from</span>
+                      <div className="flex items-center">
+                        <Coins className="w-4 h-4 mr-1" />
+                        <span>50 coins</span>
                       </div>
                     </div>
+                    <Button variant="outline" className="w-full bg-transparent" asChild>
+                      <Link href="/vault">Browse Content</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
 
-                    {withdrawAmount && Number.parseInt(withdrawAmount) >= 100 && (
-                      <div className="text-sm text-muted-foreground">
-                        <p>Processing fee: {Math.ceil(Number.parseInt(withdrawAmount) * 0.05)} coins</p>
-                        <p>
-                          Net coins:{" "}
-                          {Number.parseInt(withdrawAmount) - Math.ceil(Number.parseInt(withdrawAmount) * 0.05)} coins
-                        </p>
+                <Card>
+                  <CardHeader>
+                    <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center mb-4">
+                      <Star className="w-6 h-6 text-red-600 dark:text-red-400" />
+                    </div>
+                    <CardTitle>Merchandise</CardTitle>
+                    <CardDescription>Get exclusive Erigga merchandise</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="font-medium">Starting from</span>
+                      <div className="flex items-center">
+                        <Coins className="w-4 h-4 mr-1" />
+                        <span>500 coins</span>
                       </div>
-                    )}
+                    </div>
+                    <Button variant="outline" className="w-full bg-transparent" asChild>
+                      <Link href="/merch">Shop Now</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
 
-                    <Button
-                      onClick={handleWithdrawal}
-                      disabled={isLoading || !withdrawAmount || Number.parseInt(withdrawAmount) < 100}
-                      className="w-full"
+                <Card>
+                  <CardHeader>
+                    <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center mb-4">
+                      <Zap className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <CardTitle>Meet & Greet</CardTitle>
+                    <CardDescription>Book exclusive sessions with Erigga</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="font-medium">Starting from</span>
+                      <div className="flex items-center">
+                        <Coins className="w-4 h-4 mr-1" />
+                        <span>2000 coins</span>
+                      </div>
+                    </div>
+                    <Button variant="outline" className="w-full bg-transparent" asChild>
+                      <Link href="/meet-greet">Book Session</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          {/* Recent Transactions */}
+          <Card className="mt-8">
+            <CardHeader>
+              <CardTitle>Recent Transactions</CardTitle>
+              <CardDescription>Your latest coin activities</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {recentTransactions.map((transaction) => (
+                  <div
+                    key={transaction.id}
+                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-white dark:bg-gray-700 rounded-full flex items-center justify-center">
+                        {transaction.icon}
+                      </div>
+                      <div>
+                        <p className="font-medium">{transaction.description}</p>
+                        <p className="text-sm text-gray-500">{transaction.date}</p>
+                      </div>
+                    </div>
+                    <div
+                      className={`flex items-center font-bold ${
+                        transaction.amount > 0 ? "text-green-600" : "text-red-600"
+                      }`}
                     >
-                      <ArrowUpRight className="w-4 h-4 mr-2" />
-                      Request Withdrawal
-                    </Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Transaction History Tab */}
-              <TabsContent value="history" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <History className="w-5 h-5" />
-                      Transaction History
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {transactions.length === 0 ? (
-                      <div className="text-center py-8">
-                        <History className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                        <p className="text-muted-foreground">No transactions yet</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {transactions.map((transaction) => (
-                          <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg">
-                            <div className="flex items-center gap-3">
-                              {getTransactionIcon(transaction)}
-                              <div>
-                                <p className="font-medium text-sm">{transaction.description}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <p className="text-xs text-muted-foreground">
-                                    {new Date(transaction.created_at).toLocaleDateString()}
-                                  </p>
-                                  {transaction.reference && (
-                                    <Badge variant="outline" className="text-xs">
-                                      {transaction.reference}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={`font-semibold ${
-                                    transaction.coins > 0 ? "text-green-600" : "text-red-600"
-                                  }`}
-                                >
-                                  {transaction.coins > 0 ? "+" : ""}
-                                  {transaction.coins} coins
-                                </span>
-                                {getStatusIcon(transaction.status)}
-                              </div>
-                              {transaction.amount > 0 && (
-                                <p className="text-xs text-muted-foreground">₦{transaction.amount.toFixed(2)}</p>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
+                      <Coins className="w-4 h-4 mr-1" />
+                      <span>
+                        {transaction.amount > 0 ? "+" : ""}
+                        {transaction.amount}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
-
-      {/* Load Paystack Script */}
-      <script src="https://js.paystack.co/v1/inline.js"></script>
-    </div>
+    </AuthGuard>
   )
 }

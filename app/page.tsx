@@ -1,427 +1,377 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { HeroVideoCarousel } from "@/components/hero-video-carousel"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Star, Users, Music, MessageCircle, Coins, Crown, Shield, Zap } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Music, Video, Users, ShoppingBag, Calendar, Newspaper } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { SafeHeroVideoCarousel } from "@/components/safe-hero-video-carousel"
-import EriggaRadio from "@/components/erigga-radio"
-
-const featuredContent = [
-  {
-    id: 1,
-    title: "Latest Track: Paper Boi",
-    description: "The hottest new release from Erigga",
-    type: "music",
-    thumbnail: "/images/hero/erigga1.jpeg",
-    duration: "3:45",
-  },
-  {
-    id: 2,
-    title: "Behind the Scenes",
-    description: "Exclusive studio footage",
-    type: "video",
-    thumbnail: "/images/hero/erigga2.jpeg",
-    duration: "12:30",
-  },
-  {
-    id: 3,
-    title: "Live Performance",
-    description: "Concert highlights from Lagos",
-    type: "video",
-    thumbnail: "/images/hero/erigga3.jpeg",
-    duration: "8:15",
-  },
-]
-
-const upcomingEvents = [
-  {
-    id: 1,
-    title: "Meet & Greet Session",
-    date: "Dec 25, 2024",
-    time: "7:00 PM",
-    type: "Virtual",
-    price: "500 coins",
-  },
-  {
-    id: 2,
-    title: "Live Radio Show",
-    date: "Dec 28, 2024",
-    time: "8:00 PM",
-    type: "Live Stream",
-    price: "Free",
-  },
-  {
-    id: 3,
-    title: "New Year Concert",
-    date: "Dec 31, 2024",
-    time: "10:00 PM",
-    type: "Live Event",
-    price: "₦15,000",
-  },
-]
-
-const communityStats = [
-  { label: "Active Fans", value: "12.5K", icon: Users },
-  { label: "Total Streams", value: "2.8M", icon: Video },
-  { label: "Community Posts", value: "8.9K", icon: Video },
-  { label: "Live Sessions", value: "156", icon: Video },
-]
 
 export default function HomePage() {
-  const { user, loading } = useAuth()
-  const [mounted, setMounted] = useState(false)
-
-  // Features data
-  const features = [
-    {
-      title: "Media Vault",
-      description: "Access Erigga's complete discography, music videos, and exclusive content.",
-      icon: Music,
-      href: "/vault",
-      color: "from-orange-400 to-red-500",
-    },
-    {
-      title: "Erigga Chronicles",
-      description: "Follow Erigga's journey through animated stories and documentaries.",
-      icon: Video,
-      href: "/chronicles",
-      color: "from-blue-400 to-purple-500",
-    },
-    {
-      title: "Community",
-      description: "Connect with other fans, share content, and participate in discussions.",
-      icon: Users,
-      href: "/community",
-      color: "from-green-400 to-blue-500",
-    },
-    {
-      title: "Merch Store",
-      description: "Shop exclusive Erigga merchandise and limited edition items.",
-      icon: ShoppingBag,
-      href: "/merch",
-      color: "from-purple-400 to-pink-500",
-    },
-    {
-      title: "Events & Tickets",
-      description: "Get early access to concert tickets and exclusive events.",
-      icon: Calendar,
-      href: "/tickets",
-      color: "from-yellow-400 to-orange-500",
-    },
-    {
-      title: "Premium Tiers",
-      description: "Upgrade your experience with exclusive perks and content.",
-      icon: Newspaper,
-      href: "/premium",
-      color: "from-indigo-400 to-purple-500",
-    },
-  ]
-
-  // Testimonials data
-  const testimonials = [
-    {
-      quote: "Erigga's platform connects me directly with real fans. The community here is authentic.",
-      author: "WarriKing23",
-      tier: "Blood Brotherhood",
-    },
-    {
-      quote: "The exclusive content in the vault is worth every coin. Can't get this anywhere else!",
-      author: "PaperBoi99",
-      tier: "Elder",
-    },
-    {
-      quote: "Chronicles series tells Erigga's story in a way I've never seen before. Pure street wisdom.",
-      author: "LagosHustler",
-      tier: "Pioneer",
-    },
-  ]
-
-  // Tier plans data
-  const tierPlans = [
-    {
-      name: "Grassroot",
-      price: "Free",
-      description: "Basic access to the platform",
-      features: ["Community access", "Public content", "Event announcements", "Basic profile"],
-      color: "border-green-500",
-      bgColor: "bg-green-50 dark:bg-green-900/20",
-      href: "/signup",
-    },
-    {
-      name: "Pioneer",
-      price: "₦2,000",
-      period: "monthly",
-      description: "Enhanced access with exclusive content",
-      features: [
-        "All Grassroot features",
-        "Early music releases",
-        "Exclusive interviews",
-        "Discounted merch",
-        "Pioneer badge",
-      ],
-      color: "border-blue-500",
-      bgColor: "bg-blue-50 dark:bg-blue-900/20",
-      href: "/premium",
-      popular: true,
-    },
-    {
-      name: "Elder",
-      price: "₦5,000",
-      period: "monthly",
-      description: "Premium access with VIP benefits",
-      features: [
-        "All Pioneer features",
-        "Behind-the-scenes content",
-        "Studio session videos",
-        "Priority event access",
-        "Monthly Erigga coins",
-        "Elder badge",
-      ],
-      color: "border-purple-500",
-      bgColor: "bg-purple-50 dark:bg-purple-900/20",
-      href: "/premium",
-    },
-    {
-      name: "Blood Brotherhood",
-      price: "₦10,000",
-      period: "monthly",
-      description: "Ultimate fan experience",
-      features: [
-        "All Elder features",
-        "Direct messaging with Erigga",
-        "Virtual meet & greets",
-        "Exclusive merchandise",
-        "Blood Brotherhood badge",
-        "Voting rights on new content",
-      ],
-      color: "border-red-500",
-      bgColor: "bg-red-50 dark:bg-red-900/20",
-      href: "/premium",
-    },
-  ]
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="animate-pulse">
-          <div className="h-screen bg-muted" />
-        </div>
-      </div>
-    )
-  }
+  const { isAuthenticated, user } = useAuth()
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       {/* Hero Section */}
-      <SafeHeroVideoCarousel />
-
-      {/* Rest of the home page content */}
-      <section className="py-12 px-4 bg-gray-50 dark:bg-gray-900">
+      <section className="relative py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12 text-gray-900 dark:text-white">Explore the Platform</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Media Vault</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Access exclusive music, videos, and behind-the-scenes content
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/vault">Explore Vault</Link>
+          <div className="text-center mb-12">
+            <Badge variant="secondary" className="mb-4 px-4 py-2 text-sm font-medium">
+              🎵 Official Erigga Fan Community
+            </Badge>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-6">
+              Welcome to{" "}
+              <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                Erigga Live
+              </span>
+            </h1>
+            <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
+              Join the ultimate fan community for Erigga. Connect with fellow fans, access exclusive content, earn
+              coins, and be part of the movement that's changing Nigerian hip-hop.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              {isAuthenticated ? (
+                <Button asChild size="lg" className="px-8 py-3">
+                  <Link href="/dashboard">
+                    <Crown className="w-5 h-5 mr-2" />
+                    Go to Dashboard
+                  </Link>
                 </Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Community</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Connect with other fans, share content, and join discussions
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/community">Join Community</Link>
-                </Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Chronicles</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Follow Erigga's journey through exclusive stories and updates
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/chronicles">Read Chronicles</Link>
-                </Button>
-              </CardContent>
-            </Card>
+              ) : (
+                <>
+                  <Button asChild size="lg" className="px-8 py-3">
+                    <Link href="/signup">
+                      <Users className="w-5 h-5 mr-2" />
+                      Join the Community
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" size="lg" className="px-8 py-3 bg-transparent">
+                    <Link href="/login">Sign In</Link>
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Hero Video Carousel */}
+          <div className="max-w-4xl mx-auto">
+            <HeroVideoCarousel />
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-background">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Platform Features</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Everything you need to connect with Erigga and fellow fans in one place.
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white/50 dark:bg-gray-800/50">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Everything You Need as an Erigga Fan
+            </h2>
+            <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+              From exclusive content to community interactions, we've got everything to enhance your fan experience.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <Link key={index} href={feature.href}>
-                <Card className="h-full transition-all duration-300 hover:scale-105 overflow-hidden border border-gray-200 dark:border-gray-800">
-                  <CardContent className="p-6 flex flex-col h-full">
-                    <div
-                      className={cn(
-                        "w-12 h-12 rounded-full mb-4 flex items-center justify-center bg-gradient-to-br",
-                        feature.color,
-                      )}
-                    >
-                      <feature.icon className="h-6 w-6 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
-                    <p className="text-muted-foreground flex-grow">{feature.description}</p>
-                    <div className="mt-4 flex items-center text-sm font-medium text-primary">
-                      Learn more
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4 ml-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center mb-4">
+                  <MessageCircle className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                </div>
+                <CardTitle>Community Chat</CardTitle>
+                <CardDescription>
+                  Connect with fellow fans in real-time chat rooms organized by subscription tiers.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center mb-4">
+                  <Music className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <CardTitle>Exclusive Content</CardTitle>
+                <CardDescription>
+                  Access unreleased tracks, behind-the-scenes videos, and exclusive merchandise.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center mb-4">
+                  <Coins className="w-6 h-6 text-green-600 dark:text-green-400" />
+                </div>
+                <CardTitle>Erigga Coins</CardTitle>
+                <CardDescription>
+                  Earn and spend coins for exclusive perks, merchandise, and special experiences.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center mb-4">
+                  <Crown className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                </div>
+                <CardTitle>VIP Experiences</CardTitle>
+                <CardDescription>Meet & greet sessions, exclusive events, and direct access to Erigga.</CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center mb-4">
+                  <Shield className="w-6 h-6 text-red-600 dark:text-red-400" />
+                </div>
+                <CardTitle>Tier System</CardTitle>
+                <CardDescription>
+                  Progress through Grassroot, Pioneer, Elder, and Blood Brotherhood tiers.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center mb-4">
+                  <Zap className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <CardTitle>Live Radio</CardTitle>
+                <CardDescription>
+                  24/7 Erigga radio with latest tracks, interviews, and fan-submitted content.
+                </CardDescription>
+              </CardHeader>
+            </Card>
           </div>
         </div>
       </section>
 
       {/* Testimonials Section */}
-      <section className="py-20 bg-accent">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Fan Testimonials</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Hear what the community has to say about the Erigga fan platform.
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">What Fans Are Saying</h2>
+            <p className="text-lg text-gray-600 dark:text-gray-300">
+              Join thousands of satisfied fans in the Erigga Live community.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <Card key={index} className="h-full border border-gray-200 dark:border-gray-800">
-                <CardContent className="p-6 flex flex-col h-full">
-                  <div className="mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <svg
-                        key={i}
-                        className="inline-block w-5 h-5 text-yellow-500"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                    ))}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
+                  ))}
+                </div>
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  "Being part of Erigga Live has been incredible. The exclusive content and community interactions make
+                  me feel closer to the music I love."
+                </p>
+                <div className="flex items-center">
+                  <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center mr-3">
+                    <Users className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                   </div>
-                  <p className="text-lg italic mb-6 flex-grow">"{testimonial.quote}"</p>
                   <div>
-                    <p className="font-bold">{testimonial.author}</p>
-                    <p className="text-sm text-muted-foreground">{testimonial.tier} Member</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">Sarah O.</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Pioneer Member</p>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
+                  ))}
+                </div>
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  "The coin system is genius! I've earned enough to get exclusive merchandise and even attended a meet &
+                  greet session."
+                </p>
+                <div className="flex items-center">
+                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mr-3">
+                    <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 dark:text-white">Michael A.</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Elder Member</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
+                  ))}
+                </div>
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  "This platform brings all Erigga fans together. The community discussions and exclusive content drops
+                  are absolutely amazing!"
+                </p>
+                <div className="flex items-center">
+                  <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mr-3">
+                    <Users className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 dark:text-white">Blessing I.</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Blood Brotherhood</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
 
       {/* Pricing Section */}
-      <section className="py-20 bg-background">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Membership Tiers</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Choose the tier that fits your level of fandom and unlock exclusive perks.
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white/50 dark:bg-gray-800/50">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">Choose Your Tier</h2>
+            <p className="text-lg text-gray-600 dark:text-gray-300">
+              Start free and upgrade as you become more involved in the community.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {tierPlans.map((plan, index) => (
-              <div key={index} className="relative">
-                {plan.popular && (
-                  <div className="absolute -top-4 left-0 right-0 flex justify-center">
-                    <span className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm font-medium">
-                      Most Popular
-                    </span>
-                  </div>
-                )}
-                <Card
-                  className={cn(
-                    "h-full border-2 transition-all duration-300",
-                    plan.color,
-                    plan.popular ? "transform scale-105" : "",
-                  )}
-                >
-                  <CardContent className={cn("p-6", plan.bgColor)}>
-                    <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
-                    <div className="mb-4">
-                      <span className="text-3xl font-bold">{plan.price}</span>
-                      {plan.period && <span className="text-muted-foreground">/{plan.period}</span>}
-                    </div>
-                    <p className="text-muted-foreground mb-6">{plan.description}</p>
-                    <ul className="space-y-2 mb-6">
-                      {plan.features.map((feature, i) => (
-                        <li key={i} className="flex items-start">
-                          <svg
-                            className="h-5 w-5 text-green-500 mr-2 mt-0.5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                          </svg>
-                          <span>{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Button className="w-full" asChild>
-                      <Link href={plan.href}>{plan.name === "Grassroot" ? "Sign Up Free" : "Subscribe Now"}</Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            ))}
+            <Card className="relative">
+              <CardHeader>
+                <CardTitle className="text-center">Grassroot</CardTitle>
+                <div className="text-center">
+                  <span className="text-3xl font-bold">Free</span>
+                </div>
+                <CardDescription className="text-center">Perfect for new fans getting started</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm">
+                  <li>✓ Basic community access</li>
+                  <li>✓ General chat rooms</li>
+                  <li>✓ 100 welcome coins</li>
+                  <li>✓ Basic profile features</li>
+                </ul>
+                <Button className="w-full mt-6 bg-transparent" variant="outline" asChild>
+                  <Link href="/signup">Get Started</Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="relative border-purple-200 dark:border-purple-800">
+              <CardHeader>
+                <CardTitle className="text-center text-purple-600 dark:text-purple-400">Pioneer</CardTitle>
+                <div className="text-center">
+                  <span className="text-3xl font-bold">₦2,500</span>
+                  <span className="text-gray-500">/month</span>
+                </div>
+                <CardDescription className="text-center">For dedicated fans who want more</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm">
+                  <li>✓ Everything in Grassroot</li>
+                  <li>✓ Exclusive content access</li>
+                  <li>✓ Pioneer chat rooms</li>
+                  <li>✓ Monthly coin bonus</li>
+                  <li>✓ Priority support</li>
+                </ul>
+                <Button className="w-full mt-6" asChild>
+                  <Link href="/premium">Upgrade Now</Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="relative border-blue-200 dark:border-blue-800">
+              <CardHeader>
+                <CardTitle className="text-center text-blue-600 dark:text-blue-400">Elder</CardTitle>
+                <div className="text-center">
+                  <span className="text-3xl font-bold">₦5,000</span>
+                  <span className="text-gray-500">/month</span>
+                </div>
+                <CardDescription className="text-center">For true supporters of the movement</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm">
+                  <li>✓ Everything in Pioneer</li>
+                  <li>✓ Elder exclusive content</li>
+                  <li>✓ Meet & greet opportunities</li>
+                  <li>✓ Merchandise discounts</li>
+                  <li>✓ Direct artist interaction</li>
+                </ul>
+                <Button className="w-full mt-6" asChild>
+                  <Link href="/premium">Upgrade Now</Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="relative border-yellow-200 dark:border-yellow-800">
+              <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-yellow-500 text-white">
+                VIP
+              </Badge>
+              <CardHeader>
+                <CardTitle className="text-center text-yellow-600 dark:text-yellow-400">Blood Brotherhood</CardTitle>
+                <div className="text-center">
+                  <span className="text-3xl font-bold">₦10,000</span>
+                  <span className="text-gray-500">/month</span>
+                </div>
+                <CardDescription className="text-center">The ultimate fan experience</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm">
+                  <li>✓ Everything in Elder</li>
+                  <li>✓ VIP exclusive content</li>
+                  <li>✓ Private artist sessions</li>
+                  <li>✓ Free merchandise</li>
+                  <li>✓ Concert VIP access</li>
+                  <li>✓ Personal artist messages</li>
+                </ul>
+                <Button className="w-full mt-6" asChild>
+                  <Link href="/premium">Go VIP</Link>
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-primary text-primary-foreground">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Join the Movement?</h2>
-          <p className="text-lg max-w-2xl mx-auto mb-8 opacity-90">
-            Get access to exclusive content, connect with other fans, and be part of Erigga's journey.
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-6">
+            Ready to Join the Movement?
+          </h2>
+          <p className="text-xl text-gray-600 dark:text-gray-300 mb-8">
+            Become part of the largest Erigga fan community and experience music like never before.
           </p>
-          <Button size="lg" variant="secondary" asChild>
-            <Link href="/signup">Join Now</Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            {!isAuthenticated && (
+              <>
+                <Button asChild size="lg" className="px-8 py-3">
+                  <Link href="/signup">
+                    <Users className="w-5 h-5 mr-2" />
+                    Join Free Today
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg" className="px-8 py-3 bg-transparent">
+                  <Link href="/community">Explore Community</Link>
+                </Button>
+              </>
+            )}
+            {isAuthenticated && (
+              <Button asChild size="lg" className="px-8 py-3">
+                <Link href="/community">
+                  <MessageCircle className="w-5 h-5 mr-2" />
+                  Join the Discussion
+                </Link>
+              </Button>
+            )}
+          </div>
         </div>
       </section>
-
-      <EriggaRadio />
     </div>
   )
 }
