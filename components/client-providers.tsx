@@ -18,9 +18,9 @@ export function ClientProviders({ children }: ClientProvidersProps) {
 
   return (
     <SessionContextProvider supabaseClient={supabase}>
+      <SessionRefresh />
       <ThemeProvider>
         <AuthProvider>
-          <SessionRefresh />
           <UnifiedNavigation />
           <AuthGuard>{children}</AuthGuard>
         </AuthProvider>

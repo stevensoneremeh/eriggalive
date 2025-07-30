@@ -1,29 +1,28 @@
 "use client"
-
 import { useTheme } from "next-themes"
-import { useEffect, useState } from "react"
 import Image from "next/image"
+import { cn } from "@/lib/utils"
 
 interface DynamicLogoProps {
   className?: string
 }
 
-export function DynamicLogo({ className = "h-8 w-auto" }: DynamicLogoProps) {
-  const { theme, resolvedTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
+export function DynamicLogo({ className }: DynamicLogoProps) {
+  const { theme, systemTheme } = useTheme()
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return <div className={`${className} bg-gray-200 dark:bg-gray-800 rounded animate-pulse`} />
-  }
-
-  const currentTheme = theme === "system" ? resolvedTheme : theme
-  const logoSrc = currentTheme === "dark" ? "/images/loggotrans-dark.png" : "/images/loggotrans-light.png"
+  // Determine the current theme
+  const currentTheme = theme === "system" ? systemTheme : theme
 
   return (
-    <Image src={logoSrc || "/placeholder.svg"} alt="Erigga" width={120} height={40} className={className} priority />
+    <div className={cn("relative", className)}>
+      <Image
+        src={currentTheme === "dark" ? "/images/loggotrans-dark.png" : "/images/loggotrans-light.png"}
+        alt="Erigga Live Logo"
+        width={32}
+        height={32}
+        className="object-contain"
+        priority
+      />
+    </div>
   )
 }

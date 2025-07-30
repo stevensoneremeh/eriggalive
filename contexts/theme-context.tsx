@@ -2,38 +2,40 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-import { useTheme as useNextTheme } from "next-themes"
+
+type Theme = "dark" | "light" | "system"
 
 interface ThemeContextType {
-  theme: string | undefined
-  setTheme: (theme: string) => void
-  systemTheme: string | undefined
-  resolvedTheme: string | undefined
+  theme: Theme
+  setTheme: (theme: Theme) => void
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setTheme] = useState<Theme>("system")
   const [mounted, setMounted] = useState(false)
-  const { theme, setTheme, systemTheme, resolvedTheme } = useNextTheme()
 
   useEffect(() => {
     setMounted(true)
+    // Get theme from localStorage or default to system
+    const savedTheme = localStorage.getItem("erigga-theme") as Theme
+    if (savedTheme) {
+      setTheme(savedTheme)
+    }
   }, [])
 
-  const value: ThemeContextType = {
-    theme,
-    setTheme,
-    systemTheme,
-    resolvedTheme,
-  }
+  useEffect(() => {
+    if (!mounted) return
+    localStorage.setItem("erigga-theme", theme)
+  }, [theme, mounted])
 
   // Don't render anything until mounted to prevent hydration issues
   if (!mounted) {
     return <>{children}</>
   }
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>
 }
 
 export function useTheme() {
