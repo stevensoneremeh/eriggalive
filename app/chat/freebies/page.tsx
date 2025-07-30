@@ -12,26 +12,24 @@ export default async function FreebiesPage() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect("/login")
+    redirect("/auth/login")
   }
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
   if (!profile) {
-    redirect("/login")
+    redirect("/auth/login")
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-1">
-            <ChatSidebar userTier={profile.subscription_tier || "Grassroot"} />
-          </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className="lg:col-span-1">
+          <ChatSidebar userTier={profile.subscription_tier || "Grassroot"} />
+        </div>
 
-          <div className="lg:col-span-3">
-            <FreebiesFeed currentUserId={user.id} />
-          </div>
+        <div className="lg:col-span-3">
+          <FreebiesFeed currentUserId={user.id} />
         </div>
       </div>
     </div>

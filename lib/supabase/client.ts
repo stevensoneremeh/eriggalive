@@ -1,7 +1,8 @@
-import { createBrowserClient } from "@supabase/ssr"
+import { createClientComponentClient } from "@supabase/ssr"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 
-let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null
+let supabaseClient: ReturnType<typeof createSupabaseClient<Database>> | null = null
 
 export function createClient() {
   if (supabaseClient) return supabaseClient
@@ -10,26 +11,37 @@ export function createClient() {
   const isPreviewMode =
     isBrowser && (window.location.hostname.includes("vusercontent.net") || window.location.hostname.includes("v0.dev"))
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-  if (isPreviewMode || !supabaseUrl || !supabaseAnonKey) {
+  if (isPreviewMode) {
     console.warn("Using mock Supabase client for preview/development")
     return createMockClient()
   }
 
-  supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+  supabaseClient = createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
-      persistSession: true,
+      storage: typeof window !== "undefined" ? window.localStorage : undefined,
       autoRefreshToken: true,
+      persistSession: true,
       detectSessionInUrl: true,
       flowType: "pkce",
-      storage: typeof window !== "undefined" ? window.localStorage : undefined,
-      storageKey: "erigga-auth-token",
+    },
+    global: {
+      headers: {
+        "X-Client-Info": "erigga-live-web",
+      },
     },
   })
 
   return supabaseClient
+}
+
+export const createClientComponentClientFn = () => {
+  return createClientComponentClient({
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  })
 }
 
 function createMockClient() {

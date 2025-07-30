@@ -32,8 +32,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   // Get user's posts
   const { data: posts } = await supabase
     .from("posts")
-    .select(`
-      *,
+    .select(`*
       categories:category_id (name, color, icon)
     `)
     .eq("author_id", profile.id)
@@ -43,8 +42,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   // Get user's comments
   const { data: comments } = await supabase
     .from("comments")
-    .select(`
-      *,
+    .select(`*
       posts:post_id (title, id)
     `)
     .eq("author_id", profile.id)
@@ -54,10 +52,8 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   const isOwnProfile = currentUser?.id === profile.id
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <div className="container mx-auto px-4 py-8">
-        <ProfileView profile={profile} posts={posts || []} comments={comments || []} isOwnProfile={isOwnProfile} />
-      </div>
+    <div className="container mx-auto px-4 py-8">
+      <ProfileView profile={profile} posts={posts || []} comments={comments || []} isOwnProfile={isOwnProfile} />
     </div>
   )
 }

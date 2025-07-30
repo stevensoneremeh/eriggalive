@@ -10,6 +10,7 @@ import { SessionRefresh } from "@/components/session-refresh"
 import { UnifiedNavigation } from "@/components/navigation/unified-navigation"
 import { createClient } from "@/lib/supabase/client"
 import { SessionContextProvider } from "@supabase/auth-helpers-react"
+import { AuthGuard } from "@/components/auth-guard"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -59,9 +60,11 @@ export default function RootLayout({
               <AuthProvider>
                 <SessionRefresh />
                 <UnifiedNavigation />
-                <main className="min-h-screen bg-background text-foreground transition-colors duration-300">
-                  {children}
-                </main>
+                <AuthGuard>
+                  <main className="min-h-screen bg-background text-foreground transition-colors duration-300">
+                    {children}
+                  </main>
+                </AuthGuard>
                 <Toaster
                   position="top-right"
                   toastOptions={{
