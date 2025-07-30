@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import type { ReactNode } from "react"
 import { createContext, useContext, useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { User, Session } from "@supabase/supabase-js"
@@ -35,7 +35,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
   signIn: (email: string, password: string) => Promise<{ error: any }>
-  signUp: (email: string, password: string, username: string) => Promise<{ error: any }>
+  signUp: (email: string, password: string, options: any) => Promise<{ error: any }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   updateCoins: (amount: number) => void
@@ -43,7 +43,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -116,15 +116,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const signUp = async (email: string, password: string, username: string) => {
+  const signUp = async (email: string, password: string, options: any) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            username,
-            full_name: username,
+            username: options.username,
+            full_name: options.full_name,
           },
         },
       })
@@ -137,12 +137,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.user) {
         const { error: profileError } = await supabase.from("users").insert({
           auth_user_id: data.user.id,
-          username,
-          display_name: username,
-          full_name: username,
+          username: options.username,
+          display_name: options.full_name || options.username,
+          full_name: options.full_name || options.username,
           email,
-          subscription_tier: "grassroot",
-          coins_balance: 100, // Welcome bonus
+          subscription_tier: options.tier || "grassroot",
+          coins_balance: options.tier === "grassroot" ? 100 : options.tier === "pioneer" ? 500 : 1000,
         })
 
         if (profileError) {
@@ -241,7 +241,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe()
     }
-  }, [mounted, supabase.auth, fetchProfile])
+  }, [mounted, supabase, fetchProfile])
 
   // Auto-refresh profile every 5 minutes to keep coin balance updated
   useEffect(() => {

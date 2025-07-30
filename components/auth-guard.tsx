@@ -1,62 +1,83 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
-import { usePathname, useRouter } from "next/navigation"
+
 import { useAuth } from "@/contexts/auth-context"
-import { SimpleLoading } from "@/components/simple-loading"
+import { useRouter, usePathname } from "next/navigation"
+import { useEffect } from "react"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface AuthGuardProps {
   children: React.ReactNode
+  requireAuth?: boolean
+  redirectTo?: string
 }
 
-const publicRoutes = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/signup/success"]
+// Define which routes require authentication
+const PROTECTED_ROUTES = [
+  "/dashboard",
+  "/profile",
+  "/coins",
+  "/premium",
+  "/chat",
+  "/community",
+  "/mission",
+  "/vault",
+  "/tickets",
+  "/merch",
+  "/meet-greet",
+]
 
-const adminRoutes = ["/admin"]
+// Define public routes that don't require auth
+const PUBLIC_ROUTES = ["/", "/login", "/signup", "/forgot-password", "/reset-password"]
 
-export function AuthGuard({ children }: AuthGuardProps) {
-  const [mounted, setMounted] = useState(false)
-  const { user, profile, isLoading, isAuthenticated } = useAuth()
-  const pathname = usePathname()
+export function AuthGuard({ children, requireAuth, redirectTo = "/login" }: AuthGuardProps) {
+  const { user, loading, isAuthenticated } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
+
+  // Determine if current route requires auth
+  const routeRequiresAuth = requireAuth ?? PROTECTED_ROUTES.some((route) => pathname.startsWith(route))
+
+  const isPublicRoute = PUBLIC_ROUTES.includes(pathname) || pathname.startsWith("/auth")
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    // Don't redirect while loading
+    if (loading) return
 
-  useEffect(() => {
-    if (!mounted || isLoading) return
-
-    const isPublicRoute = publicRoutes.includes(pathname)
-    const isAdminRoute = adminRoutes.some((route) => pathname.startsWith(route))
-
-    // Redirect to login if not authenticated and trying to access protected route
-    if (!isAuthenticated && !isPublicRoute) {
-      router.push("/login")
+    // If route requires auth and user is not authenticated
+    if (routeRequiresAuth && !isAuthenticated) {
+      const returnUrl = encodeURIComponent(pathname)
+      router.push(`${redirectTo}?returnUrl=${returnUrl}`)
       return
     }
 
-    // Redirect to home if authenticated and trying to access auth pages
+    // If user is authenticated and on auth pages, redirect to dashboard
     if (isAuthenticated && (pathname === "/login" || pathname === "/signup")) {
-      router.push("/")
+      router.push("/dashboard")
       return
     }
+  }, [loading, isAuthenticated, routeRequiresAuth, pathname, router, redirectTo])
 
-    // Check admin access
-    if (isAdminRoute && (!profile || profile.subscription_tier !== "admin")) {
-      router.push("/")
-      return
-    }
-  }, [mounted, isLoading, isAuthenticated, pathname, router, profile])
-
-  // Don't render anything until mounted
-  if (!mounted) {
-    return <SimpleLoading />
+  // Show loading skeleton while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        </div>
+      </div>
+    )
   }
 
-  // Show loading while checking auth
-  if (isLoading) {
-    return <SimpleLoading />
+  // If route requires auth and user is not authenticated, don't render
+  if (routeRequiresAuth && !isAuthenticated) {
+    return null
   }
 
   return <>{children}</>
