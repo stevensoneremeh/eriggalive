@@ -5,15 +5,14 @@ import { createContext, useContext, useEffect, useState } from "react"
 import type { User, Session } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import { toast } from "@/hooks/use-toast"
 
 interface UserProfile {
   id: string
   username: string
   email: string
-  full_name?: string
-  avatar_url?: string
   tier: string
-  coin_balance: number
+  coins_balance: number
   created_at: string
   updated_at: string
 }
@@ -23,9 +22,7 @@ interface AuthContextType {
   profile: UserProfile | null
   session: Session | null
   isAuthenticated: boolean
-  loading: boolean
-  signIn: (email: string, password: string) => Promise<{ error: any }>
-  signUp: (email: string, password: string, username: string) => Promise<{ error: any }>
+  isLoading: boolean
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
@@ -36,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
   const fetchProfile = async (userId: string) => {
@@ -62,18 +59,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const signOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to sign out",
+          variant: "destructive",
+        })
+      } else {
+        setUser(null)
+        setProfile(null)
+        setSession(null)
+        router.push("/")
+        toast({
+          title: "Success",
+          description: "Signed out successfully",
+        })
+      }
+    } catch (error) {
+      console.error("Sign out error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to sign out",
+        variant: "destructive",
+      })
+    }
+  }
+
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
+    const getInitialSession = async () => {
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession()
 
-      if (session?.user) {
-        fetchProfile(session.user.id).then(setProfile)
+      if (error) {
+        console.error("Error getting session:", error)
+      } else if (session) {
+        setSession(session)
+        setUser(session.user)
+        const profileData = await fetchProfile(session.user.id)
+        setProfile(profileData)
       }
 
-      setLoading(false)
-    })
+      setIsLoading(false)
+    }
+
+    getInitialSession()
 
     // Listen for auth changes
     const {
@@ -89,49 +124,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null)
       }
 
-      setLoading(false)
+      setIsLoading(false)
     })
 
     return () => subscription.unsubscribe()
   }, [])
-
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    return { error }
-  }
-
-  const signUp = async (email: string, password: string, username: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          username,
-        },
-      },
-    })
-    return { error }
-  }
-
-  const signOut = async () => {
-    await supabase.auth.signOut()
-    setUser(null)
-    setProfile(null)
-    setSession(null)
-    router.push("/")
-  }
 
   const value = {
     user,
     profile,
     session,
     isAuthenticated: !!user,
-    loading,
-    signIn,
-    signUp,
+    isLoading,
     signOut,
     refreshProfile,
   }

@@ -9,6 +9,7 @@ interface ThemeContextType {
   theme: Theme
   setTheme: (theme: Theme) => void
   toggleTheme: () => void
+  mounted: boolean
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
@@ -19,8 +20,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setMounted(true)
-
-    // Get theme from localStorage or default to system
     const savedTheme = localStorage.getItem("theme") as Theme
     if (savedTheme) {
       setTheme(savedTheme)
@@ -55,15 +54,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     theme,
     setTheme,
     toggleTheme,
+    mounted,
   }
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 
-export function useTheme() {
+export function useThemeContext() {
   const context = useContext(ThemeContext)
   if (context === undefined) {
-    throw new Error("useTheme must be used within a ThemeProvider")
+    throw new Error("useThemeContext must be used within a ThemeProvider")
   }
   return context
+}
+
+export function useTheme() {
+  return useThemeContext()
 }
