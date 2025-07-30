@@ -1,7 +1,7 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 
-export function createClient() {
+export function createSupabaseClientWrapper() {
   // Check if we're in a browser environment
   const isBrowser = typeof window !== "undefined"
 
@@ -105,8 +105,9 @@ export function createClient() {
   })
 }
 
-// Create and export the client instance
-export const supabase = createClient()
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// Export the client as default as well for compatibility
+export const supabase = createSupabaseClientWrapper()
+
 export default supabase

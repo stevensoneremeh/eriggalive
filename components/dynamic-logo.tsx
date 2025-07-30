@@ -8,7 +8,11 @@ interface DynamicLogoProps {
 }
 
 export function DynamicLogo({ className }: DynamicLogoProps) {
-  const { theme } = useTheme()
+  const { theme, mounted } = useTheme()
+
+  if (!mounted) {
+    return <div className={cn("h-8 w-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full", className)} />
+  }
 
   return (
     <div className={cn("relative", className)}>

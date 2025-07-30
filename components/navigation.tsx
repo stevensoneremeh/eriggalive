@@ -15,7 +15,7 @@ import {
   Home,
   Users,
   Radio,
-  Archive,
+  Shield,
   Coins,
   Crown,
   MessageCircle,
@@ -34,7 +34,7 @@ const navigationItems = [
   { name: "Home", href: "/", icon: Home },
   { name: "Community", href: "/community", icon: Users },
   { name: "Radio", href: "/radio", icon: Radio },
-  { name: "Vault", href: "/vault", icon: Archive },
+  { name: "Vault", href: "/vault", icon: Shield },
   { name: "Games", href: "/games", icon: Gamepad2 },
 ]
 
