@@ -1,6 +1,5 @@
 import { GeneralChat } from "@/components/chat/general-chat"
 import { ChatSidebar } from "@/components/chat/chat-sidebar"
-import { Navigation } from "@/components/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 
@@ -13,19 +12,17 @@ export default async function GeneralChatPage() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect("/auth/login")
+    redirect("/login")
   }
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
   if (!profile) {
-    redirect("/auth/login")
+    redirect("/login")
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <Navigation user={profile} />
-
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-1">

@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server"
-import { Navigation } from "@/components/navigation"
 import { ProfileView } from "@/components/profile/profile-view"
 import { notFound } from "next/navigation"
 
@@ -56,8 +55,6 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <Navigation user={currentProfile} />
-
       <div className="container mx-auto px-4 py-8">
         <ProfileView profile={profile} posts={posts || []} comments={comments || []} isOwnProfile={isOwnProfile} />
       </div>
