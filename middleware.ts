@@ -1,69 +1,122 @@
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
+import { createServerClient, type CookieOptions } from "@supabase/ssr"
+import { NextResponse, type NextRequest } from "next/server"
 
-// Define protected routes
-const PROTECTED_ROUTES = [
+// Define protected routes that require authentication
+const protectedRoutes = [
   "/dashboard",
-  "/profile",
-  "/coins",
-  "/premium",
-  "/chat",
-  "/community",
-  "/mission",
   "/vault",
-  "/tickets",
+  "/coins",
   "/merch",
+  "/profile",
   "/meet-greet",
+  "/admin",
+  "/premium",
+  "/tickets",
+  "/chat",
 ]
 
-// Define auth routes
-const AUTH_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password"]
+// Define auth routes that should redirect if already authenticated
+const authRoutes = ["/login", "/signup"]
 
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
-  const pathname = req.nextUrl.pathname
+// Define public routes that don't require authentication
+const publicRoutes = ["/", "/community", "/mission", "/radio", "/chronicles"]
 
-  // Skip middleware for static files and API routes
-  if (
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/api") ||
-    pathname.startsWith("/static") ||
-    pathname.includes(".")
-  ) {
-    return res
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  // Skip middleware if Supabase is not configured
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn("Supabase not configured, skipping auth middleware")
+    return response
   }
 
-  try {
-    const supabase = createMiddlewareClient({ req, res })
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      get(name: string) {
+        return request.cookies.get(name)?.value
+      },
+      set(name: string, value: string, options: CookieOptions) {
+        request.cookies.set({
+          name,
+          value,
+          ...options,
+        })
+        response = NextResponse.next({
+          request: {
+            headers: request.headers,
+          },
+        })
+        response.cookies.set({
+          name,
+          value,
+          ...options,
+        })
+      },
+      remove(name: string, options: CookieOptions) {
+        request.cookies.set({
+          name,
+          value: "",
+          ...options,
+        })
+        response = NextResponse.next({
+          request: {
+            headers: request.headers,
+          },
+        })
+        response.cookies.set({
+          name,
+          value: "",
+          ...options,
+        })
+      },
+    },
+  })
 
-    // Refresh session if expired
+  try {
+    // Refresh session if expired - required for Server Components
     const {
       data: { session },
       error,
     } = await supabase.auth.getSession()
 
-    // Check if route requires authentication
-    const isProtectedRoute = PROTECTED_ROUTES.some((route) => pathname.startsWith(route))
-    const isAuthRoute = AUTH_ROUTES.includes(pathname)
+    if (error) {
+      console.error("Middleware auth error:", error)
+      // Don't block the request on auth errors, let the client handle it
+      return response
+    }
 
-    // If protected route and no session, redirect to login
-    if (isProtectedRoute && !session) {
-      const redirectUrl = new URL("/login", req.url)
-      redirectUrl.searchParams.set("returnUrl", pathname)
+    const { pathname } = request.nextUrl
+    const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
+    const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
+    const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(route))
+
+    // If user is not authenticated and trying to access protected route
+    if (!session && isProtectedRoute) {
+      const redirectUrl = new URL("/login", request.url)
+      redirectUrl.searchParams.set("redirect", pathname)
       return NextResponse.redirect(redirectUrl)
     }
 
-    // If auth route and has session, redirect to dashboard
-    if (isAuthRoute && session) {
-      return NextResponse.redirect(new URL("/dashboard", req.url))
+    // If user is authenticated and trying to access auth routes, redirect to dashboard
+    if (session && isAuthRoute) {
+      const redirectTo = request.nextUrl.searchParams.get("redirect")
+      const destination = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/dashboard"
+      return NextResponse.redirect(new URL(destination, request.url))
     }
 
-    return res
+    // For all other routes (including public routes), allow access
+    return response
   } catch (error) {
     console.error("Middleware error:", error)
-    // Don't block the request on middleware errors
-    return res
+    // Don't block the request on errors, let the client handle auth
+    return response
   }
 }
 
@@ -75,7 +128,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
+     * - api routes
      */
-    "/((?!_next/static|_next/image|favicon.ico|public|.*\\..*|api).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 }

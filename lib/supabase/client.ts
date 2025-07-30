@@ -1,7 +1,7 @@
-import { createBrowserClient } from "@supabase/ssr"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 
-let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null
+let supabaseClient: ReturnType<typeof createSupabaseClient<Database>> | null = null
 
 export function createClient() {
   if (supabaseClient) return supabaseClient
@@ -18,7 +18,7 @@ export function createClient() {
     return createMockClient()
   }
 
-  supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+  supabaseClient = createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
@@ -282,6 +282,9 @@ function createMockClient() {
         },
         unsubscribe: () => {
           mockChannels.delete(name)
+          return Promise.resolve({ error: null })
+        },
+        send: async (payload: any) => {
           return Promise.resolve({ error: null })
         },
       }
