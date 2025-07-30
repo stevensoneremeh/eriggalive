@@ -1,8 +1,7 @@
-import { createClientComponentClient } from "@supabase/ssr"
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { createBrowserClient } from "@supabase/ssr"
 import type { Database } from "@/types/database"
 
-let supabaseClient: ReturnType<typeof createSupabaseClient<Database>> | null = null
+let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null
 
 export function createClient() {
   if (supabaseClient) return supabaseClient
@@ -11,37 +10,36 @@ export function createClient() {
   const isPreviewMode =
     isBrowser && (window.location.hostname.includes("vusercontent.net") || window.location.hostname.includes("v0.dev"))
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  if (isPreviewMode) {
+  if (isPreviewMode || !supabaseUrl || !supabaseAnonKey) {
     console.warn("Using mock Supabase client for preview/development")
     return createMockClient()
   }
 
-  supabaseClient = createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
+  supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
-      storage: typeof window !== "undefined" ? window.localStorage : undefined,
-      autoRefreshToken: true,
       persistSession: true,
+      autoRefreshToken: true,
       detectSessionInUrl: true,
       flowType: "pkce",
+      storage: typeof window !== "undefined" ? window.localStorage : undefined,
+      storageKey: "erigga-auth-token",
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 2,
+      },
     },
     global: {
       headers: {
-        "X-Client-Info": "erigga-live-web",
+        "x-my-custom-header": "erigga-live",
       },
     },
   })
 
   return supabaseClient
-}
-
-export const createClientComponentClientFn = () => {
-  return createClientComponentClient({
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  })
 }
 
 function createMockClient() {
