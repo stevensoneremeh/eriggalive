@@ -1,7 +1,7 @@
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createBrowserClient } from "@supabase/ssr"
 import type { Database } from "@/types/database"
 
-let supabaseClient: ReturnType<typeof createClientComponentClient<Database>> | null = null
+let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null
 
 export function createClient() {
   if (supabaseClient) return supabaseClient
@@ -18,18 +18,14 @@ export function createClient() {
     return createMockClient()
   }
 
-  supabaseClient = createClientComponentClient<Database>({
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    options: {
-      auth: {
-        persistSession: true,
-        storageKey: "erigga-auth-token",
-        storage: typeof window !== "undefined" ? window.localStorage : undefined,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        flowType: "pkce",
-      },
+  supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: "pkce",
+      storage: typeof window !== "undefined" ? window.localStorage : undefined,
+      storageKey: "erigga-auth-token",
     },
   })
 

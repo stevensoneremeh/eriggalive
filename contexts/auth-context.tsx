@@ -2,15 +2,28 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-import type { User } from "@supabase/supabase-js"
+import type { User, Session } from "@supabase/supabase-js"
 import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
-import type { Database } from "@/types/database"
+import { toast } from "sonner"
 
-type Profile = Database["public"]["Tables"]["profiles"]["Row"]
+interface Profile {
+  id: string
+  username: string
+  full_name?: string
+  display_name?: string
+  avatar_url?: string
+  subscription_tier?: string
+  coins_balance?: number
+  points?: number
+  email?: string
+  created_at?: string
+  updated_at?: string
+}
 
 interface AuthContextType {
   user: User | null
   profile: Profile | null
+  session: Session | null
   isAuthenticated: boolean
   loading: boolean
   signOut: () => Promise<void>
@@ -21,11 +34,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { session, isLoading: sessionLoading } = useSessionContext()
-  const supabase = useSupabaseClient<Database>()
+  const supabase = useSupabaseClient()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const user = session?.user ?? null
+  const user = session?.user || null
   const isAuthenticated = !!user
 
   const fetchProfile = async (userId: string) => {
@@ -59,34 +72,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true)
       const { error } = await supabase.auth.signOut()
       if (error) {
-        console.error("Error signing out:", error)
-        throw error
+        console.error("Sign out error:", error)
+        toast.error("Error signing out")
+      } else {
+        setProfile(null)
+        toast.success("Signed out successfully")
       }
-      setProfile(null)
     } catch (error) {
       console.error("Sign out error:", error)
-      throw error
+      toast.error("Error signing out")
     } finally {
       setLoading(false)
     }
   }
 
+  // Load profile when user changes
   useEffect(() => {
-    const initializeAuth = async () => {
-      if (sessionLoading) return
+    if (sessionLoading) return
 
-      setLoading(true)
-
-      if (user) {
-        await refreshProfile()
-      } else {
-        setProfile(null)
-      }
-
-      setLoading(false)
+    if (user) {
+      refreshProfile()
+    } else {
+      setProfile(null)
     }
 
-    initializeAuth()
+    setLoading(false)
   }, [user, sessionLoading])
 
   // Listen for auth state changes
@@ -108,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContextType = {
     user,
     profile,
+    session,
     isAuthenticated,
     loading: loading || sessionLoading,
     signOut,

@@ -14,9 +14,21 @@ interface AuthGuardProps {
 }
 
 // Define which routes require authentication
-const PROTECTED_ROUTES = ["/dashboard", "/profile", "/coins", "/chat", "/community", "/mission", "/premium", "/admin"]
+const PROTECTED_ROUTES = [
+  "/dashboard",
+  "/profile",
+  "/coins",
+  "/premium",
+  "/chat",
+  "/community",
+  "/mission",
+  "/vault",
+  "/tickets",
+  "/merch",
+  "/meet-greet",
+]
 
-// Define public routes that don't require auth
+// Define public routes that don't need auth
 const PUBLIC_ROUTES = ["/", "/login", "/signup", "/forgot-password", "/reset-password"]
 
 export function AuthGuard({ children, requireAuth, redirectTo = "/login" }: AuthGuardProps) {
@@ -25,12 +37,13 @@ export function AuthGuard({ children, requireAuth, redirectTo = "/login" }: Auth
   const pathname = usePathname()
 
   // Determine if current route requires auth
-  const routeRequiresAuth = requireAuth ?? PROTECTED_ROUTES.some((route) => pathname.startsWith(route))
+  const routeRequiresAuth =
+    requireAuth !== undefined ? requireAuth : PROTECTED_ROUTES.some((route) => pathname.startsWith(route))
 
-  const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname === route || (route === "/" && pathname === "/"))
+  const isPublicRoute = PUBLIC_ROUTES.includes(pathname) || pathname.startsWith("/auth/")
 
   useEffect(() => {
-    if (loading) return
+    if (loading) return // Wait for auth to load
 
     // If route requires auth and user is not authenticated
     if (routeRequiresAuth && !user) {
@@ -46,7 +59,7 @@ export function AuthGuard({ children, requireAuth, redirectTo = "/login" }: Auth
     }
   }, [user, loading, routeRequiresAuth, pathname, router, redirectTo])
 
-  // Show loading state
+  // Show loading state while checking auth
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -64,6 +77,5 @@ export function AuthGuard({ children, requireAuth, redirectTo = "/login" }: Auth
     return null
   }
 
-  // Render children for all other cases
   return <>{children}</>
 }
