@@ -8,7 +8,7 @@ type Theme = "dark" | "light" | "system"
 interface ThemeContextType {
   theme: Theme
   setTheme: (theme: Theme) => void
-  mounted: boolean
+  toggleTheme: () => void
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
@@ -20,17 +20,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMounted(true)
 
-    // Only access localStorage on client side
-    if (typeof window !== "undefined") {
-      const savedTheme = localStorage.getItem("theme") as Theme
-      if (savedTheme && ["light", "dark", "system"].includes(savedTheme)) {
-        setTheme(savedTheme)
-      }
+    // Get theme from localStorage or default to system
+    const savedTheme = localStorage.getItem("theme") as Theme
+    if (savedTheme) {
+      setTheme(savedTheme)
     }
   }, [])
 
   useEffect(() => {
-    if (!mounted || typeof window === "undefined") return
+    if (!mounted) return
 
     const root = window.document.documentElement
     root.classList.remove("light", "dark")
@@ -45,19 +43,27 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("theme", theme)
   }, [theme, mounted])
 
+  const toggleTheme = () => {
+    setTheme((current) => {
+      if (current === "light") return "dark"
+      if (current === "dark") return "system"
+      return "light"
+    })
+  }
+
   const value = {
     theme,
     setTheme,
-    mounted,
+    toggleTheme,
   }
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 
-export function useThemeContext() {
+export function useTheme() {
   const context = useContext(ThemeContext)
   if (context === undefined) {
-    throw new Error("useThemeContext must be used within a ThemeProvider")
+    throw new Error("useTheme must be used within a ThemeProvider")
   }
   return context
 }

@@ -4,24 +4,28 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import type { User, Session } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
 
-interface Profile {
+interface UserProfile {
   id: string
   username: string
-  display_name: string
+  email: string
+  full_name?: string
   avatar_url?: string
-  subscription_tier: string
-  coins_balance: number
+  tier: string
+  coin_balance: number
   created_at: string
   updated_at: string
 }
 
 interface AuthContextType {
   user: User | null
-  profile: Profile | null
+  profile: UserProfile | null
   session: Session | null
-  isLoading: boolean
   isAuthenticated: boolean
+  loading: boolean
+  signIn: (email: string, password: string) => Promise<{ error: any }>
+  signUp: (email: string, password: string, username: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
@@ -30,14 +34,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -63,16 +63,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    if (!mounted) return
-
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
+
       if (session?.user) {
         fetchProfile(session.user.id).then(setProfile)
       }
-      setIsLoading(false)
+
+      setLoading(false)
     })
 
     // Listen for auth changes
@@ -89,25 +89,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null)
       }
 
-      setIsLoading(false)
+      setLoading(false)
     })
 
     return () => subscription.unsubscribe()
-  }, [mounted])
+  }, [])
+
+  const signIn = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    return { error }
+  }
+
+  const signUp = async (email: string, password: string, username: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          username,
+        },
+      },
+    })
+    return { error }
+  }
 
   const signOut = async () => {
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
     setSession(null)
+    router.push("/")
   }
 
   const value = {
     user,
     profile,
     session,
-    isLoading,
     isAuthenticated: !!user,
+    loading,
+    signIn,
+    signUp,
     signOut,
     refreshProfile,
   }

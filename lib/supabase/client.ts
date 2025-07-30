@@ -1,4 +1,5 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/database"
 
 export function createClient() {
   // Check if we're in a browser environment
@@ -96,8 +97,17 @@ export function createClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co"
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key"
 
-  return createSupabaseClient(supabaseUrl, supabaseAnonKey)
+  return createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  })
 }
 
 // Create and export the client instance
 export const supabase = createClient()
+
+// Export the client as default as well for compatibility
+export default supabase

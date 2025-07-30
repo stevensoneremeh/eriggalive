@@ -1,230 +1,246 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { DynamicLogo } from "@/components/dynamic-logo"
-import { useAuth } from "@/contexts/auth-context"
-import { useThemeContext } from "@/contexts/theme-context"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
   Menu,
-  Home,
-  Users,
-  Radio,
-  Archive,
-  Coins,
-  Crown,
-  MessageCircle,
-  Target,
-  Ticket,
-  ShoppingBag,
-  Video,
   User,
   LogOut,
-  Sun,
+  Crown,
+  Coins,
   Moon,
+  Sun,
+  Home,
+  Users,
+  Archive,
+  Radio,
+  ShoppingBag,
+  Calendar,
   Gamepad2,
 } from "lucide-react"
-import type { Theme } from "@/types/theme" // Declare the Theme variable
+import { useAuth } from "@/contexts/auth-context"
+import { useTheme } from "@/contexts/theme-context"
+import { DynamicLogo } from "@/components/dynamic-logo"
+import { cn } from "@/lib/utils"
 
 const navigationItems = [
   { name: "Home", href: "/", icon: Home },
   { name: "Community", href: "/community", icon: Users },
-  { name: "Radio", href: "/radio", icon: Radio },
   { name: "Vault", href: "/vault", icon: Archive },
+  { name: "Radio", href: "/radio", icon: Radio },
+  { name: "Merch", href: "/merch", icon: ShoppingBag },
+  { name: "Meet & Greet", href: "/meet-greet", icon: Calendar },
   { name: "Games", href: "/games", icon: Gamepad2 },
 ]
 
-const authenticatedItems = [
-  { name: "Dashboard", href: "/dashboard", icon: Home },
-  { name: "Coins", href: "/coins", icon: Coins },
-  { name: "Premium", href: "/premium", icon: Crown },
-  { name: "Chat", href: "/chat", icon: MessageCircle },
-  { name: "Mission", href: "/mission", icon: Target },
-  { name: "Tickets", href: "/tickets", icon: Ticket },
-  { name: "Merch", href: "/merch", icon: ShoppingBag },
-  { name: "Meet & Greet", href: "/meet-greet", icon: Video },
-]
-
 export function Navigation() {
+  const { user, profile, signOut, isAuthenticated } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const pathname = usePathname()
-  const { user, profile, signOut, isLoading } = useAuth()
-  const { theme, setTheme, mounted } = useThemeContext()
-  const [isOpen, setIsOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
-  // Don't render until mounted to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   if (!mounted) {
-    return (
-      <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center">
-          <div className="mr-4 hidden md:flex">
-            <div className="mr-6 flex items-center space-x-2">
-              <div className="h-8 w-8 bg-muted rounded animate-pulse" />
-              <div className="h-6 w-24 bg-muted rounded animate-pulse" />
-            </div>
-          </div>
-        </div>
-      </nav>
-    )
+    return null
   }
 
-  const toggleTheme = () => {
-    const themes: Theme[] = ["light", "dark", "system"]
-    const currentIndex = themes.indexOf(theme)
-    const nextIndex = (currentIndex + 1) % themes.length
-    setTheme(themes[nextIndex])
+  const getTierColor = (tier: string) => {
+    switch (tier?.toLowerCase()) {
+      case "blood_brotherhood":
+      case "blood":
+        return "bg-red-500 hover:bg-red-600"
+      case "elder":
+        return "bg-purple-500 hover:bg-purple-600"
+      case "pioneer":
+        return "bg-blue-500 hover:bg-blue-600"
+      case "grassroot":
+        return "bg-green-500 hover:bg-green-600"
+      default:
+        return "bg-gray-500 hover:bg-gray-600"
+    }
   }
 
-  const handleSignOut = async () => {
-    await signOut()
-    setIsOpen(false)
+  const getTierDisplayName = (tier: string) => {
+    switch (tier?.toLowerCase()) {
+      case "blood_brotherhood":
+      case "blood":
+        return "Blood"
+      case "elder":
+        return "Elder"
+      case "pioneer":
+        return "Pioneer"
+      case "grassroot":
+        return "Grassroot"
+      default:
+        return "Fan"
+    }
   }
-
-  const closeSheet = () => setIsOpen(false)
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center">
-        {/* Desktop Navigation */}
-        <div className="mr-4 hidden md:flex">
-          <Link href="/" className="mr-6 flex items-center space-x-2">
+      <div className="container mx-auto px-4">
+        <div className="flex h-16 items-center justify-between">
+          {/* Logo */}
+          <Link href="/" className="flex items-center space-x-2">
             <DynamicLogo className="h-8 w-8" />
-            <span className="hidden font-bold sm:inline-block">Erigga Live</span>
+            <span className="font-bold text-xl bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              EriggaLive
+            </span>
           </Link>
-          <nav className="flex items-center space-x-6 text-sm font-medium">
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-1">
             {navigationItems.map((item) => {
               const Icon = item.icon
+              const isActive = pathname === item.href
+
               return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`flex items-center space-x-2 transition-colors hover:text-foreground/80 ${
-                    pathname === item.href ? "text-foreground" : "text-foreground/60"
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{item.name}</span>
+                <Link key={item.name} href={item.href}>
+                  <Button
+                    variant={isActive ? "default" : "ghost"}
+                    size="sm"
+                    className={cn("flex items-center space-x-2", isActive && "bg-primary text-primary-foreground")}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{item.name}</span>
+                  </Button>
                 </Link>
               )
             })}
-          </nav>
-        </div>
-
-        {/* Mobile Navigation */}
-        <Sheet open={isOpen} onOpenChange={setIsOpen}>
-          <SheetTrigger asChild>
-            <Button
-              variant="ghost"
-              className="mr-2 px-0 text-base hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 md:hidden"
-            >
-              <Menu className="h-6 w-6" />
-              <span className="sr-only">Toggle Menu</span>
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="pr-0">
-            <Link href="/" className="flex items-center space-x-2" onClick={closeSheet}>
-              <DynamicLogo className="h-6 w-6" />
-              <span className="font-bold">Erigga Live</span>
-            </Link>
-            <div className="my-4 h-[calc(100vh-8rem)] pb-10 pl-6">
-              <div className="flex flex-col space-y-3">
-                {navigationItems.map((item) => {
-                  const Icon = item.icon
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      onClick={closeSheet}
-                      className={`flex items-center space-x-2 text-sm font-medium transition-colors hover:text-foreground/80 ${
-                        pathname === item.href ? "text-foreground" : "text-foreground/60"
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span>{item.name}</span>
-                    </Link>
-                  )
-                })}
-
-                {user && (
-                  <>
-                    <Separator className="my-4" />
-                    {authenticatedItems.map((item) => {
-                      const Icon = item.icon
-                      return (
-                        <Link
-                          key={item.name}
-                          href={item.href}
-                          onClick={closeSheet}
-                          className={`flex items-center space-x-2 text-sm font-medium transition-colors hover:text-foreground/80 ${
-                            pathname === item.href ? "text-foreground" : "text-foreground/60"
-                          }`}
-                        >
-                          <Icon className="h-4 w-4" />
-                          <span>{item.name}</span>
-                        </Link>
-                      )
-                    })}
-                  </>
-                )}
-              </div>
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Right side items */}
-        <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-          <div className="w-full flex-1 md:w-auto md:flex-none">
-            <Link href="/" className="flex items-center space-x-2 md:hidden">
-              <DynamicLogo className="h-6 w-6" />
-              <span className="font-bold">Erigga Live</span>
-            </Link>
           </div>
 
-          <div className="flex items-center space-x-2">
+          {/* Right Side */}
+          <div className="flex items-center space-x-4">
             {/* Theme Toggle */}
-            <Button variant="ghost" size="sm" onClick={toggleTheme}>
+            <Button variant="ghost" size="sm" onClick={toggleTheme} className="hidden sm:flex">
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              <span className="sr-only">Toggle theme</span>
             </Button>
 
             {/* User Menu */}
-            {isLoading ? (
-              <div className="h-8 w-8 bg-muted rounded-full animate-pulse" />
-            ) : user ? (
-              <div className="flex items-center space-x-2">
-                {profile && (
-                  <Badge variant="secondary" className="hidden sm:inline-flex">
-                    <Coins className="mr-1 h-3 w-3" />
-                    {profile.coins_balance?.toLocaleString() || 0}
-                  </Badge>
-                )}
-                <Link href="/profile">
-                  <Button variant="ghost" size="sm">
-                    <User className="h-4 w-4" />
-                    <span className="sr-only">Profile</span>
-                  </Button>
-                </Link>
-                <Button variant="ghost" size="sm" onClick={handleSignOut}>
-                  <LogOut className="h-4 w-4" />
-                  <span className="sr-only">Sign out</span>
-                </Button>
+            {isAuthenticated && profile ? (
+              <div className="flex items-center space-x-3">
+                {/* Coin Balance */}
+                <Badge variant="secondary" className="flex items-center space-x-1">
+                  <Coins className="h-3 w-3" />
+                  <span>{profile.coin_balance?.toLocaleString() || 0}</span>
+                </Badge>
+
+                {/* User Dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-r from-primary to-primary/60 flex items-center justify-center">
+                          <User className="h-4 w-4 text-white" />
+                        </div>
+                        <div className="hidden sm:block text-left">
+                          <p className="text-sm font-medium">{profile.username}</p>
+                          <Badge className={cn("text-xs text-white", getTierColor(profile.tier))}>
+                            <Crown className="h-3 w-3 mr-1" />
+                            {getTierDisplayName(profile.tier)}
+                          </Badge>
+                        </div>
+                      </div>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <div className="px-2 py-1.5">
+                      <p className="text-sm font-medium">{profile.username}</p>
+                      <p className="text-xs text-muted-foreground">{profile.email}</p>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile" className="flex items-center">
+                        <User className="h-4 w-4 mr-2" />
+                        Profile
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/coins" className="flex items-center">
+                        <Coins className="h-4 w-4 mr-2" />
+                        Coins
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/premium" className="flex items-center">
+                        <Crown className="h-4 w-4 mr-2" />
+                        Upgrade Tier
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={signOut} className="text-red-600">
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             ) : (
               <div className="flex items-center space-x-2">
-                <Link href="/login">
-                  <Button variant="ghost" size="sm">
-                    Sign In
-                  </Button>
-                </Link>
-                <Link href="/signup">
-                  <Button size="sm">Sign Up</Button>
-                </Link>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/login">Sign In</Link>
+                </Button>
+                <Button size="sm" asChild>
+                  <Link href="/signup">Sign Up</Link>
+                </Button>
               </div>
             )}
+
+            {/* Mobile Menu */}
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="sm" className="md:hidden">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-80">
+                <div className="flex flex-col space-y-4 mt-8">
+                  {navigationItems.map((item) => {
+                    const Icon = item.icon
+                    const isActive = pathname === item.href
+
+                    return (
+                      <Link key={item.name} href={item.href}>
+                        <Button variant={isActive ? "default" : "ghost"} className="w-full justify-start">
+                          <Icon className="h-4 w-4 mr-2" />
+                          {item.name}
+                        </Button>
+                      </Link>
+                    )
+                  })}
+
+                  <div className="pt-4 border-t">
+                    <Button variant="ghost" onClick={toggleTheme} className="w-full justify-start">
+                      {theme === "dark" ? (
+                        <>
+                          <Sun className="h-4 w-4 mr-2" />
+                          Light Mode
+                        </>
+                      ) : (
+                        <>
+                          <Moon className="h-4 w-4 mr-2" />
+                          Dark Mode
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </div>
