@@ -1,6 +1,5 @@
 "use client"
 
-import { AuthGuard } from "@/components/auth-guard"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -58,7 +57,7 @@ interface Category {
   is_active: boolean
 }
 
-function CommunityContent() {
+export default function CommunityPage() {
   const { profile } = useAuth()
   const [posts, setPosts] = useState<Post[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -454,13 +453,5 @@ function CommunityContent() {
         </div>
       </div>
     </div>
-  )
-}
-
-export default function CommunityPage() {
-  return (
-    <AuthGuard>
-      <CommunityContent />
-    </AuthGuard>
   )
 }

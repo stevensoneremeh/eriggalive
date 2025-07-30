@@ -54,7 +54,7 @@ export default function RootLayout({
             <AuthProvider>
               <SessionRefresh />
               <UnifiedNavigation />
-              <main className="pt-16 pb-20 md:pb-0 min-h-screen bg-background text-foreground transition-colors duration-300">
+              <main className="min-h-screen bg-background text-foreground transition-colors duration-300">
                 {children}
               </main>
               <Toaster

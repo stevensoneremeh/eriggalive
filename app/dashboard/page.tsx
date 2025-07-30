@@ -1,6 +1,5 @@
 "use client"
 
-import { AuthGuard } from "@/components/auth-guard"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -27,7 +26,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
-function DashboardContent() {
+export default function DashboardPage() {
   const { profile, user } = useAuth()
 
   if (!profile) {
@@ -381,13 +380,5 @@ function DashboardContent() {
         </div>
       </div>
     </div>
-  )
-}
-
-export default function DashboardPage() {
-  return (
-    <AuthGuard>
-      <DashboardContent />
-    </AuthGuard>
   )
 }

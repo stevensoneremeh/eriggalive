@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { AuthGuard } from "@/components/auth-guard"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -48,7 +47,7 @@ interface Transaction {
   created_at: string
 }
 
-function CoinsContent() {
+export default function CoinsPage() {
   const { profile, updateCoins, refreshProfile } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [customAmount, setCustomAmount] = useState("")
@@ -656,13 +655,5 @@ function CoinsContent() {
       {/* Load Paystack Script */}
       <script src="https://js.paystack.co/v1/inline.js"></script>
     </div>
-  )
-}
-
-export default function CoinsPage() {
-  return (
-    <AuthGuard>
-      <CoinsContent />
-    </AuthGuard>
   )
 }
