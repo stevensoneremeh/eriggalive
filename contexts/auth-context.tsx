@@ -10,10 +10,8 @@ interface AuthContextType {
   user: User | null
   session: Session | null
   loading: boolean
-  signUp: (email: string, password: string, userData?: any) => Promise<any>
-  signIn: (email: string, password: string) => Promise<any>
   signOut: () => Promise<void>
-  resetPassword: (email: string) => Promise<any>
+  refreshSession: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -24,35 +22,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
 
+  let isMounted = true
+
   useEffect(() => {
     setMounted(true)
+  }, [])
 
-    // Get initial session
-    const getInitialSession = async () => {
+  useEffect(() => {
+    if (!mounted) return
+
+    async function getInitialSession() {
       try {
         const {
           data: { session },
           error,
         } = await supabase.auth.getSession()
+
         if (error) {
           console.error("Error getting session:", error)
-        } else {
+          toast.error("Authentication error")
+        }
+
+        if (isMounted) {
           setSession(session)
           setUser(session?.user ?? null)
+          setLoading(false)
         }
       } catch (error) {
         console.error("Error in getInitialSession:", error)
-      } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
     getInitialSession()
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return
+
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
@@ -64,102 +74,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })
 
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const signUp = async (email: string, password: string, userData?: any) => {
-    try {
-      setLoading(true)
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: userData,
-        },
-      })
-
-      if (error) throw error
-
-      if (data.user && !data.user.email_confirmed_at) {
-        toast.success("Check your email for the confirmation link!")
-      }
-
-      return { data, error: null }
-    } catch (error: any) {
-      console.error("Sign up error:", error)
-      toast.error(error.message || "Failed to sign up")
-      return { data: null, error }
-    } finally {
-      setLoading(false)
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
     }
-  }
-
-  const signIn = async (email: string, password: string) => {
-    try {
-      setLoading(true)
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) throw error
-
-      return { data, error: null }
-    } catch (error: any) {
-      console.error("Sign in error:", error)
-      toast.error(error.message || "Failed to sign in")
-      return { data: null, error }
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [mounted])
 
   const signOut = async () => {
     try {
-      setLoading(true)
       const { error } = await supabase.auth.signOut()
-      if (error) throw error
-    } catch (error: any) {
-      console.error("Sign out error:", error)
-      toast.error(error.message || "Failed to sign out")
-    } finally {
-      setLoading(false)
+      if (error) {
+        console.error("Error signing out:", error)
+        toast.error("Error signing out")
+      }
+    } catch (error) {
+      console.error("Error in signOut:", error)
+      toast.error("Error signing out")
     }
   }
 
-  const resetPassword = async (email: string) => {
+  const refreshSession = async () => {
     try {
-      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      })
-
-      if (error) throw error
-
-      toast.success("Password reset email sent!")
-      return { data, error: null }
-    } catch (error: any) {
-      console.error("Reset password error:", error)
-      toast.error(error.message || "Failed to send reset email")
-      return { data: null, error }
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.refreshSession()
+      if (error) {
+        console.error("Error refreshing session:", error)
+      } else {
+        setSession(session)
+        setUser(session?.user ?? null)
+      }
+    } catch (error) {
+      console.error("Error in refreshSession:", error)
     }
   }
 
-  // Don't render until mounted to avoid hydration issues
-  if (!mounted) {
-    return <div style={{ visibility: "hidden" }}>{children}</div>
-  }
-
-  const value = {
-    user,
-    session,
-    loading,
-    signUp,
-    signIn,
-    signOut,
-    resetPassword,
-  }
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, session, loading, signOut, refreshSession }}>{children}</AuthContext.Provider>
+  )
 }
 
 export function useAuth() {

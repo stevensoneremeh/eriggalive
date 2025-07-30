@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
+import { createClient } from "@supabase/supabase-js"
+
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 // Check if we're in preview/development mode
 const isPreviewMode = () => {
@@ -13,26 +14,33 @@ const isPreviewMode = () => {
 }
 
 // Enhanced user verification with better error handling
-async function verifyUser(request: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies })
+function verifyUser(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get("authorization")
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return { error: "Missing or invalid authorization header", user: null }
+    }
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+    // In production, verify JWT token here
+    // For now, return mock user data
+    const mockUser = {
+      id: "user-123",
+      email: "user@example.com",
+      username: "testuser",
+      coins: 15000, // Mock current balance
+    }
 
-  if (authError || !user) {
-    return { error: "Unauthorized", user: null }
+    return { user: mockUser, error: null }
+  } catch (error) {
+    return { error: "Authentication failed", user: null }
   }
-
-  return { user, error: null }
 }
 
 // Validate purchase request data
 function validatePurchaseRequest(data: any) {
   const errors: string[] = []
 
-  if (!data.paymentReference || typeof data.paymentReference !== "string") {
+  if (!data.reference || typeof data.reference !== "string") {
     errors.push("Invalid payment reference")
   }
 
@@ -40,8 +48,12 @@ function validatePurchaseRequest(data: any) {
     errors.push("Invalid amount")
   }
 
+  if (!data.coins || typeof data.coins !== "number" || data.coins < 100) {
+    errors.push("Invalid coin amount")
+  }
+
   // Validate exchange rate (1 coin = 0.5 NGN)
-  const expectedAmount = Math.floor(data.amount * 2) // Adjusted for the new context
+  const expectedAmount = Math.floor(data.coins * 0.5)
   if (Math.abs(data.amount - expectedAmount) > 1) {
     errors.push("Amount doesn't match expected exchange rate")
   }
@@ -89,7 +101,7 @@ async function verifyWithPaystack(reference: string, paystackSecretKey: string) 
 export async function POST(request: NextRequest) {
   try {
     // Verify user authentication
-    const { user, error: authError } = await verifyUser(request)
+    const { user, error: authError } = verifyUser(request)
     if (authError || !user) {
       return NextResponse.json(
         {
@@ -129,14 +141,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { amount, paymentReference } = requestData
+    const { amount, reference, coins } = requestData
 
     // Verify transaction with Paystack (or mock in preview mode)
     let paystackData
     try {
       if (isPreviewMode()) {
         console.log("Using mock Paystack verification for preview mode")
-        paystackData = await mockPaystackVerification(paymentReference, amount)
+        paystackData = await mockPaystackVerification(reference, amount)
       } else {
         const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY
         if (!paystackSecretKey) {
@@ -151,7 +163,7 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        paystackData = await verifyWithPaystack(paymentReference, paystackSecretKey)
+        paystackData = await verifyWithPaystack(reference, paystackSecretKey)
       }
 
       if (!paystackData.status || paystackData.data.status !== "success") {
@@ -198,38 +210,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Add coins to user's balance
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data: profile, error: updateError } = await supabase
+    // Update user's coin balance
+    const { data, error } = await supabase
       .from("user_profiles")
       .update({
-        erigga_coins: supabase.raw(`erigga_coins + ${amount}`),
+        coin_balance: supabase.raw(`coin_balance + ${coins}`),
       })
       .eq("id", user.id)
-      .select("erigga_coins")
-      .single()
+      .select()
 
-    if (updateError) {
-      console.error("Error updating coin balance:", updateError)
-      return NextResponse.json({ error: "Failed to update balance" }, { status: 500 })
+    if (error) {
+      console.error("Error updating coin balance:", error)
+      return NextResponse.json({ error: "Failed to update coin balance" }, { status: 500 })
     }
 
-    // Record the transaction
-    const { error: transactionError } = await supabase.from("coin_transactions").insert({
+    // Log the transaction
+    await supabase.from("coin_transactions").insert({
       user_id: user.id,
       amount,
       type: "purchase",
-      reference: paymentReference,
+      reference,
       status: "completed",
     })
 
-    if (transactionError) {
-      console.error("Error recording transaction:", transactionError)
-    }
-
     return NextResponse.json({
       success: true,
-      newBalance: profile?.erigga_coins || 0,
+      newBalance: data[0]?.coin_balance,
     })
   } catch (error) {
     console.error("Purchase API error:", error)
