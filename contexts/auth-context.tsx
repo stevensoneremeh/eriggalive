@@ -1,9 +1,10 @@
 "use client"
 
-import type { ReactNode } from "react"
+import type React from "react"
 import { createContext, useContext, useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { User, Session } from "@supabase/supabase-js"
+import { toast } from "sonner"
 
 interface UserProfile {
   id: number
@@ -35,7 +36,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
   signIn: (email: string, password: string) => Promise<{ error: any }>
-  signUp: (email: string, password: string, options: any) => Promise<{ error: any }>
+  signUp: (email: string, password: string, metadata: any) => Promise<{ error: any }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   updateCoins: (amount: number) => void
@@ -43,7 +44,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -101,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
+      setIsLoading(true)
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -113,18 +115,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null }
     } catch (error) {
       return { error }
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const signUp = async (email: string, password: string, options: any) => {
+  const signUp = async (email: string, password: string, metadata: any) => {
     try {
+      setIsLoading(true)
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            username: options.username,
-            full_name: options.full_name,
+            username: metadata.username,
+            full_name: metadata.full_name,
           },
         },
       })
@@ -133,26 +138,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error }
       }
 
-      // Create user profile
-      if (data.user) {
+      // Create user profile if sign up was successful
+      if (data.user && !error) {
         const { error: profileError } = await supabase.from("users").insert({
           auth_user_id: data.user.id,
-          username: options.username,
-          display_name: options.full_name || options.username,
-          full_name: options.full_name || options.username,
+          username: metadata.username,
+          display_name: metadata.username,
+          full_name: metadata.full_name,
           email,
-          subscription_tier: options.tier || "grassroot",
-          coins_balance: options.tier === "grassroot" ? 100 : options.tier === "pioneer" ? 500 : 1000,
+          subscription_tier: metadata.tier || "grassroot",
+          coins_balance: metadata.tier === "grassroot" ? 100 : metadata.tier === "pioneer" ? 500 : 1000,
         })
 
         if (profileError) {
           console.error("Error creating profile:", profileError)
+          // Don't return error here as the user account was created successfully
         }
       }
 
       return { error: null }
     } catch (error) {
       return { error }
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -163,8 +171,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(null)
       setProfile(null)
       setIsAuthenticated(false)
+      toast.success("Signed out successfully")
     } catch (error) {
       console.error("Error signing out:", error)
+      toast.error("Error signing out")
     }
   }
 
@@ -174,6 +184,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!mounted) return
+
+    let isMounted = true
 
     // Get initial session
     const getInitialSession = async () => {
@@ -185,25 +197,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (error) {
           console.error("Error getting session:", error)
-          setIsLoading(false)
+          if (isMounted) setIsLoading(false)
           return
         }
 
-        if (session?.user) {
+        if (session?.user && isMounted) {
           setSession(session)
           setUser(session.user)
           setIsAuthenticated(true)
 
           // Fetch user profile
           const profileData = await fetchProfile(session.user.id)
-          if (profileData) {
+          if (profileData && isMounted) {
             setProfile(profileData)
           }
         }
       } catch (error) {
         console.error("Error getting initial session:", error)
       } finally {
-        setIsLoading(false)
+        if (isMounted) setIsLoading(false)
       }
     }
 
@@ -215,6 +227,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state changed:", event, session?.user?.id)
 
+      if (!isMounted) return
+
       if (event === "SIGNED_IN" && session?.user) {
         setSession(session)
         setUser(session.user)
@@ -225,6 +239,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (profileData) {
           setProfile(profileData)
         }
+
+        toast.success("Signed in successfully")
       } else if (event === "SIGNED_OUT") {
         setSession(null)
         setUser(null)
@@ -239,9 +255,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     return () => {
+      isMounted = false
       subscription.unsubscribe()
     }
-  }, [mounted, supabase, fetchProfile])
+  }, [mounted, supabase.auth, fetchProfile])
 
   // Auto-refresh profile every 5 minutes to keep coin balance updated
   useEffect(() => {
@@ -270,9 +287,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updateCoins,
   }
 
-  // Don't render anything until mounted to prevent hydration issues
+  // Don't render children until mounted to prevent hydration issues
   if (!mounted) {
-    return <>{children}</>
+    return null
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

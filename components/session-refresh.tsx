@@ -1,15 +1,20 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { createClient } from "@/lib/supabase/client"
 
 export function SessionRefresh() {
+  const [mounted, setMounted] = useState(false)
   const { isAuthenticated, refreshProfile } = useAuth()
   const supabase = createClient()
 
   useEffect(() => {
-    if (!isAuthenticated) return
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted || !isAuthenticated) return
 
     // Set up an interval to refresh the session every 10 minutes
     const interval = setInterval(
@@ -31,7 +36,7 @@ export function SessionRefresh() {
     ) // 10 minutes
 
     return () => clearInterval(interval)
-  }, [isAuthenticated, refreshProfile, supabase])
+  }, [mounted, isAuthenticated, refreshProfile, supabase])
 
   // This component doesn't render anything
   return null

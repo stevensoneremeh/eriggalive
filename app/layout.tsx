@@ -14,13 +14,13 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Erigga Live - Official Fan Community",
   description:
-    "Join the official Erigga fan community. Connect with fans, access exclusive content, play games, and stay updated with the latest from Erigga.",
-  keywords: "Erigga, Nigerian music, hip hop, fan community, exclusive content, games, ludo",
+    "Join the official Erigga fan community. Connect with fans, access exclusive content, and stay updated with the latest from Erigga.",
+  keywords: "Erigga, Nigerian music, hip hop, fan community, exclusive content",
   authors: [{ name: "Erigga Live Team" }],
   openGraph: {
     title: "Erigga Live - Official Fan Community",
     description:
-      "Join the official Erigga fan community. Connect with fans, access exclusive content, play games, and stay updated with the latest from Erigga.",
+      "Join the official Erigga fan community. Connect with fans, access exclusive content, and stay updated with the latest from Erigga.",
     type: "website",
     locale: "en_US",
   },
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Erigga Live - Official Fan Community",
     description:
-      "Join the official Erigga fan community. Connect with fans, access exclusive content, play games, and stay updated with the latest from Erigga.",
+      "Join the official Erigga fan community. Connect with fans, access exclusive content, and stay updated with the latest from Erigga.",
   },
   viewport: "width=device-width, initial-scale=1",
   robots: "index, follow",
