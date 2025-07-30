@@ -1,39 +1,40 @@
 -- Create ludo_games table
 CREATE TABLE IF NOT EXISTS public.ludo_games (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    room_name TEXT NOT NULL,
+    room_name VARCHAR(100) NOT NULL,
+    host_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     entry_fee INTEGER NOT NULL DEFAULT 10,
+    prize_pool INTEGER NOT NULL DEFAULT 0,
     max_players INTEGER NOT NULL DEFAULT 4,
-    players JSONB NOT NULL DEFAULT '{}',
-    current_player UUID,
-    dice_value INTEGER NOT NULL DEFAULT 0,
-    status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'active', 'finished')),
-    winner UUID,
-    board_state JSONB NOT NULL DEFAULT '[]',
-    created_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    current_players INTEGER NOT NULL DEFAULT 1,
+    status VARCHAR(20) NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'active', 'finished')),
+    winner_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    game_state JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_ludo_games_status ON public.ludo_games(status);
-CREATE INDEX IF NOT EXISTS idx_ludo_games_created_by ON public.ludo_games(created_by);
-CREATE INDEX IF NOT EXISTS idx_ludo_games_created_at ON public.ludo_games(created_at);
+CREATE INDEX IF NOT EXISTS idx_ludo_games_host_id ON public.ludo_games(host_id);
+CREATE INDEX IF NOT EXISTS idx_ludo_games_created_at ON public.ludo_games(created_at DESC);
 
 -- Enable RLS
 ALTER TABLE public.ludo_games ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
-CREATE POLICY "Users can view all games" ON public.ludo_games
+CREATE POLICY "Anyone can view active games" ON public.ludo_games
     FOR SELECT USING (true);
 
-CREATE POLICY "Users can create games" ON public.ludo_games
-    FOR INSERT WITH CHECK (auth.uid() = created_by);
+CREATE POLICY "Authenticated users can create games" ON public.ludo_games
+    FOR INSERT WITH CHECK (auth.uid() IS NOT NULL AND host_id = auth.uid());
 
-CREATE POLICY "Players can update games they're in" ON public.ludo_games
+CREATE POLICY "Host can update their games" ON public.ludo_games
+    FOR UPDATE USING (host_id = auth.uid());
+
+CREATE POLICY "Players in game can update game state" ON public.ludo_games
     FOR UPDATE USING (
-        auth.uid() = created_by OR 
-        auth.uid()::text = ANY(SELECT jsonb_object_keys(players))
+        game_state ? auth.uid()::text OR host_id = auth.uid()
     );
 
 -- Function to update updated_at timestamp
@@ -55,35 +56,5 @@ CREATE TRIGGER update_ludo_games_updated_at
 GRANT ALL ON public.ludo_games TO authenticated;
 GRANT ALL ON public.ludo_games TO service_role;
 
--- Add foreign key constraint to profiles table
-ALTER TABLE public.ludo_games 
-ADD CONSTRAINT ludo_games_created_by_fkey 
-FOREIGN KEY (created_by) REFERENCES public.profiles(id) ON DELETE CASCADE;
-
--- Insert some sample data for testing
-INSERT INTO public.ludo_games (room_name, entry_fee, created_by, players) 
-SELECT 
-    'Sample Game Room',
-    50,
-    id,
-    jsonb_build_object(
-        id::text, jsonb_build_object(
-            'username', username,
-            'color', 'red',
-            'pieces', '[0,0,0,0]',
-            'position', 0
-        )
-    )
-FROM public.profiles 
-WHERE username = 'testuser1'
-LIMIT 1;
-
--- Verify the setup
-SELECT 
-    table_name,
-    column_name,
-    data_type,
-    is_nullable
-FROM information_schema.columns 
-WHERE table_name = 'ludo_games' 
-ORDER BY ordinal_position;
+-- Enable realtime for the table
+ALTER PUBLICATION supabase_realtime ADD TABLE public.ludo_games;

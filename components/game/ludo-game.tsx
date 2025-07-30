@@ -1,36 +1,34 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
-import { toast } from "sonner"
-import { Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Users, Coins, Trophy, Clock, Play, Loader2 } from "lucide-react"
+import { Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Users, Coins, Crown, Play } from "lucide-react"
 
 interface GameState {
-  id: string
-  room_name: string
-  entry_fee: number
-  players: Record<string, Player>
-  current_player: string
-  dice_value: number
-  status: "waiting" | "active" | "finished"
+  board: (string | null)[]
+  players: {
+    [playerId: string]: {
+      color: string
+      pieces: number[]
+      position: string
+    }
+  }
+  currentTurn: string
+  diceValue: number | null
   winner?: string
-  board_state: number[][]
-  created_at: string
-}
-
-interface Player {
-  username: string
-  color: "red" | "blue" | "green" | "yellow"
-  pieces: number[]
-  position: number
 }
 
 interface LudoGameProps {
   gameId: string
+  initialGameState: GameState
+  roomName: string
+  prizePool: number
+  players: any[]
 }
 
 const DICE_ICONS = {
@@ -49,39 +47,44 @@ const COLORS = {
   yellow: "bg-yellow-500",
 }
 
-export function LudoGame({ gameId }: LudoGameProps) {
-  const { user, profile } = useAuth()
-  const [gameState, setGameState] = useState<GameState | null>(null)
-  const [loading, setLoading] = useState(true)
+const BOARD_POSITIONS = {
+  // Home positions for each color
+  red: [1, 2, 3, 4],
+  blue: [11, 12, 13, 14],
+  green: [21, 22, 23, 24],
+  yellow: [31, 32, 33, 34],
+  // Safe positions
+  safe: [9, 14, 22, 27, 35, 40, 48, 1],
+}
+
+export function LudoGame({ gameId, initialGameState, roomName, prizePool, players }: LudoGameProps) {
+  const [gameState, setGameState] = useState<GameState>(initialGameState)
   const [rolling, setRolling] = useState(false)
   const [selectedPiece, setSelectedPiece] = useState<number | null>(null)
+  const { user, profile } = useAuth()
+  const { toast } = useToast()
   const supabase = createClient()
 
-  const fetchGameState = useCallback(async () => {
-    try {
-      const { data, error } = await supabase.from("ludo_games").select("*").eq("id", gameId).single()
-
-      if (error) throw error
-      setGameState(data)
-    } catch (error) {
-      console.error("Error fetching game state:", error)
-      toast.error("Failed to load game")
-    } finally {
-      setLoading(false)
-    }
-  }, [gameId, supabase])
+  const currentPlayer = gameState.players[user?.id || ""]
+  const isMyTurn = gameState.currentTurn === user?.id
+  const DiceIcon = gameState.diceValue ? DICE_ICONS[gameState.diceValue as keyof typeof DICE_ICONS] : Dice1
 
   useEffect(() => {
-    fetchGameState()
-
-    // Subscribe to real-time updates
+    // Subscribe to real-time game updates
     const channel = supabase
       .channel(`game-${gameId}`)
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "ludo_games", filter: `id=eq.${gameId}` },
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "ludo_games",
+          filter: `id=eq.${gameId}`,
+        },
         (payload) => {
-          setGameState(payload.new as GameState)
+          if (payload.new.game_state) {
+            setGameState(payload.new.game_state)
+          }
         },
       )
       .subscribe()
@@ -89,321 +92,356 @@ export function LudoGame({ gameId }: LudoGameProps) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [gameId, fetchGameState, supabase])
+  }, [gameId])
 
   const rollDice = async () => {
-    if (!user || !gameState || gameState.current_player !== user.id || rolling) {
-      return
-    }
+    if (!isMyTurn || rolling || !user) return
 
     setRolling(true)
 
-    try {
-      const diceValue = Math.floor(Math.random() * 6) + 1
+    // Animate dice roll
+    const rollAnimation = setInterval(() => {
+      setGameState((prev) => ({
+        ...prev,
+        diceValue: Math.floor(Math.random() * 6) + 1,
+      }))
+    }, 100)
 
-      const { error } = await supabase
-        .from("ludo_games")
-        .update({
-          dice_value: diceValue,
-          // Don't change turn yet - wait for piece movement
+    setTimeout(async () => {
+      clearInterval(rollAnimation)
+
+      const finalDiceValue = Math.floor(Math.random() * 6) + 1
+
+      const updatedGameState = {
+        ...gameState,
+        diceValue: finalDiceValue,
+      }
+
+      try {
+        const { error } = await supabase.from("ludo_games").update({ game_state: updatedGameState }).eq("id", gameId)
+
+        if (error) throw error
+
+        setGameState(updatedGameState)
+
+        toast({
+          title: "Dice Rolled!",
+          description: `You rolled a ${finalDiceValue}`,
         })
-        .eq("id", gameId)
-
-      if (error) throw error
-
-      toast.success(`Rolled a ${diceValue}!`)
-    } catch (error) {
-      console.error("Error rolling dice:", error)
-      toast.error("Failed to roll dice")
-    } finally {
-      setRolling(false)
-    }
+      } catch (error) {
+        console.error("Error updating dice roll:", error)
+        toast({
+          title: "Error",
+          description: "Failed to roll dice",
+          variant: "destructive",
+        })
+      } finally {
+        setRolling(false)
+      }
+    }, 1000)
   }
 
   const movePiece = async (pieceIndex: number) => {
-    if (!user || !gameState || gameState.current_player !== user.id) {
-      return
+    if (!isMyTurn || !gameState.diceValue || !user || !currentPlayer) return
+
+    const currentPosition = currentPlayer.pieces[pieceIndex]
+    const newPosition = currentPosition + gameState.diceValue
+
+    // Basic move validation (simplified)
+    if (newPosition > 56) return // Can't move past finish
+
+    const updatedPlayers = {
+      ...gameState.players,
+      [user.id]: {
+        ...currentPlayer,
+        pieces: currentPlayer.pieces.map((pos, idx) => (idx === pieceIndex ? newPosition : pos)),
+      },
     }
 
-    const currentPlayer = gameState.players[user.id]
-    if (!currentPlayer) return
+    // Check for winner (simplified - if any piece reaches position 56)
+    const hasWon = updatedPlayers[user.id].pieces.some((pos) => pos >= 56)
+
+    // Get next player
+    const playerIds = Object.keys(gameState.players)
+    const currentIndex = playerIds.indexOf(user.id)
+    const nextIndex = (currentIndex + 1) % playerIds.length
+    const nextPlayer = playerIds[nextIndex]
+
+    const updatedGameState: GameState = {
+      ...gameState,
+      players: updatedPlayers,
+      currentTurn: hasWon ? user.id : gameState.diceValue === 6 ? user.id : nextPlayer,
+      diceValue: null,
+      winner: hasWon ? user.id : undefined,
+    }
 
     try {
-      const newPieces = [...currentPlayer.pieces]
-      newPieces[pieceIndex] += gameState.dice_value
-
-      // Simple validation - pieces can't go beyond 57 (home)
-      if (newPieces[pieceIndex] > 57) {
-        toast.error("Invalid move - piece would go beyond home")
-        return
+      const updateData: any = {
+        game_state: updatedGameState,
       }
 
-      const updatedPlayers = {
-        ...gameState.players,
-        [user.id]: {
-          ...currentPlayer,
-          pieces: newPieces,
-        },
+      if (hasWon) {
+        updateData.status = "finished"
+        updateData.winner_id = user.id
+
+        // Award prize to winner
+        const { error: prizeError } = await supabase
+          .from("profiles")
+          .update({
+            coins_balance: (profile?.coins_balance || 0) + prizePool,
+          })
+          .eq("id", user.id)
+
+        if (prizeError) throw prizeError
       }
 
-      // Determine next player
-      const playerIds = Object.keys(gameState.players)
-      const currentIndex = playerIds.indexOf(user.id)
-      const nextIndex = (currentIndex + 1) % playerIds.length
-      const nextPlayer = playerIds[nextIndex]
-
-      // Check for win condition (all pieces at position 57)
-      const hasWon = newPieces.every((piece) => piece === 57)
-      const newStatus = hasWon ? "finished" : gameState.status
-
-      const { error } = await supabase
-        .from("ludo_games")
-        .update({
-          players: updatedPlayers,
-          current_player: hasWon ? gameState.current_player : nextPlayer,
-          status: newStatus,
-          winner: hasWon ? user.id : gameState.winner,
-          dice_value: 0, // Reset dice after move
-        })
-        .eq("id", gameId)
+      const { error } = await supabase.from("ludo_games").update(updateData).eq("id", gameId)
 
       if (error) throw error
 
-      if (hasWon) {
-        toast.success("Congratulations! You won the game!")
-        // Award prize money
-        const totalPrize = gameState.entry_fee * Object.keys(gameState.players).length
-        await supabase
-          .from("profiles")
-          .update({
-            coins_balance: (profile?.coins_balance || 0) + totalPrize,
-          })
-          .eq("id", user.id)
-      }
-
+      setGameState(updatedGameState)
       setSelectedPiece(null)
+
+      if (hasWon) {
+        toast({
+          title: "🎉 Congratulations!",
+          description: `You won ${prizePool} coins!`,
+        })
+      } else {
+        toast({
+          title: "Piece Moved!",
+          description: `Moved piece ${pieceIndex + 1} to position ${newPosition}`,
+        })
+      }
     } catch (error) {
       console.error("Error moving piece:", error)
-      toast.error("Failed to move piece")
+      toast({
+        title: "Error",
+        description: "Failed to move piece",
+        variant: "destructive",
+      })
     }
   }
 
   const startGame = async () => {
-    if (!user || !gameState || gameState.created_by !== user.id) {
-      return
-    }
+    if (!user) return
 
     try {
       const { error } = await supabase.from("ludo_games").update({ status: "active" }).eq("id", gameId)
 
       if (error) throw error
-      toast.success("Game started!")
+
+      toast({
+        title: "Game Started!",
+        description: "The game has begun. Good luck!",
+      })
     } catch (error) {
       console.error("Error starting game:", error)
-      toast.error("Failed to start game")
+      toast({
+        title: "Error",
+        description: "Failed to start game",
+        variant: "destructive",
+      })
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    )
-  }
-
-  if (!gameState) {
+  if (gameState.winner) {
+    const winner = players.find((p) => p.id === gameState.winner)
     return (
       <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardContent className="text-center py-8">
-            <h2 className="text-xl font-semibold mb-2">Game not found</h2>
-            <p className="text-muted-foreground">This game room doesn't exist or has been deleted.</p>
+        <Card className="max-w-md mx-auto text-center">
+          <CardHeader>
+            <Crown className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
+            <CardTitle className="text-2xl">Game Over!</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg mb-4">
+              🎉 <strong>@{winner?.username || "Unknown"}</strong> wins!
+            </p>
+            <div className="flex items-center justify-center gap-2 text-yellow-600">
+              <Coins className="h-5 w-5" />
+              <span className="font-semibold">{prizePool} coins</span>
+            </div>
+            <Button className="mt-6" onClick={() => (window.location.href = "/games")}>
+              Back to Games
+            </Button>
           </CardContent>
         </Card>
       </div>
     )
   }
-
-  const playerList = Object.entries(gameState.players)
-  const currentPlayerData = user ? gameState.players[user.id] : null
-  const isCurrentTurn = user && gameState.current_player === user.id
-  const canRoll = isCurrentTurn && gameState.dice_value === 0 && gameState.status === "active"
-  const canMove = isCurrentTurn && gameState.dice_value > 0 && gameState.status === "active"
-
-  const DiceIcon = DICE_ICONS[gameState.dice_value as keyof typeof DICE_ICONS] || Dice1
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Game Header */}
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Play className="h-6 w-6" />
-              {gameState.room_name}
-            </CardTitle>
-            <Badge
-              variant={
-                gameState.status === "waiting" ? "default" : gameState.status === "active" ? "secondary" : "outline"
-              }
-            >
-              {gameState.status === "waiting"
-                ? "Waiting for Players"
-                : gameState.status === "active"
-                  ? "Game Active"
-                  : "Game Finished"}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <span>{playerList.length}/4 Players</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Coins className="h-4 w-4 text-yellow-500" />
-              <span>Entry: {gameState.entry_fee} coins</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Trophy className="h-4 w-4 text-yellow-500" />
-              <span>Prize: {gameState.entry_fee * playerList.length} coins</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Game Controls */}
-      {gameState.status === "waiting" && (
-        <Card className="mb-6">
-          <CardContent className="text-center py-6">
-            <h3 className="text-lg font-semibold mb-2">Waiting for Players</h3>
-            <p className="text-muted-foreground mb-4">Need {4 - playerList.length} more players to start the game</p>
-            {user && gameState.created_by === user.id && playerList.length >= 2 && (
-              <Button onClick={startGame}>Start Game ({playerList.length} players)</Button>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Game Board */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Players List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Players</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {playerList.map(([playerId, player]) => (
-              <div
-                key={playerId}
-                className={`flex items-center justify-between p-3 rounded-lg border ${
-                  gameState.current_player === playerId ? "bg-primary/10 border-primary" : ""
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <div className={`w-4 h-4 rounded-full ${COLORS[player.color]}`} />
-                  <span className="font-medium">@{player.username}</span>
-                  {gameState.current_player === playerId && (
-                    <Badge variant="secondary" className="text-xs">
-                      Current Turn
-                    </Badge>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Game Board */}
+        <div className="lg:col-span-3">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>{roomName}</CardTitle>
+                <div className="flex items-center gap-4">
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <Coins className="h-3 w-3" />
+                    {prizePool} coins
+                  </Badge>
+                  {players.length < 4 && (
+                    <Button onClick={startGame} size="sm">
+                      <Play className="h-4 w-4 mr-2" />
+                      Start Game
+                    </Button>
                   )}
                 </div>
-                {gameState.winner === playerId && <Trophy className="h-4 w-4 text-yellow-500" />}
               </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Game Board */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Game Board</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {gameState.status === "active" && (
-              <div className="text-center mb-6">
-                <div className="flex items-center justify-center gap-4 mb-4">
+            </CardHeader>
+            <CardContent>
+              {/* Simplified Ludo Board */}
+              <div className="aspect-square max-w-lg mx-auto bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 rounded-lg p-4 relative">
+                {/* Center area */}
+                <div className="absolute inset-1/3 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center">
                   <div className="text-center">
-                    <DiceIcon className="h-12 w-12 mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                      {gameState.dice_value > 0 ? `Rolled: ${gameState.dice_value}` : "Roll the dice"}
-                    </p>
+                    <h3 className="font-bold text-lg">LUDO</h3>
+                    <p className="text-sm text-muted-foreground">Home</p>
                   </div>
                 </div>
 
-                {canRoll && (
-                  <Button onClick={rollDice} disabled={rolling} size="lg">
-                    {rolling ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Rolling...
-                      </>
-                    ) : (
-                      "Roll Dice"
-                    )}
-                  </Button>
-                )}
+                {/* Player home areas */}
+                {Object.entries(gameState.players).map(([playerId, player]) => {
+                  const playerInfo = players.find((p) => p.id === playerId)
+                  const colorClass = COLORS[player.color as keyof typeof COLORS]
 
-                {isCurrentTurn && !canRoll && !canMove && (
-                  <p className="text-muted-foreground">Waiting for your move...</p>
-                )}
-
-                {!isCurrentTurn && gameState.status === "active" && (
-                  <p className="text-muted-foreground">
-                    Waiting for @{gameState.players[gameState.current_player]?.username}'s turn
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Simple Board Representation */}
-            <div className="bg-muted/20 rounded-lg p-6 min-h-[300px] flex items-center justify-center">
-              <div className="text-center">
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  {playerList.map(([playerId, player]) => (
-                    <div key={playerId} className="text-center">
-                      <div className={`w-8 h-8 rounded-full ${COLORS[player.color]} mx-auto mb-2`} />
-                      <p className="text-sm font-medium">@{player.username}</p>
-                      <div className="flex gap-1 justify-center mt-1">
-                        {player.pieces.map((position, index) => (
+                  return (
+                    <div
+                      key={playerId}
+                      className={`absolute w-20 h-20 ${colorClass} rounded-lg opacity-80 flex flex-col items-center justify-center text-white text-xs`}
+                      style={{
+                        top: player.color === "red" ? "10px" : player.color === "blue" ? "10px" : "auto",
+                        bottom: player.color === "green" ? "10px" : player.color === "yellow" ? "10px" : "auto",
+                        left: player.color === "red" ? "10px" : player.color === "yellow" ? "10px" : "auto",
+                        right: player.color === "blue" ? "10px" : player.color === "green" ? "10px" : "auto",
+                      }}
+                    >
+                      <div className="font-semibold">@{playerInfo?.username}</div>
+                      <div className="flex gap-1 mt-1">
+                        {player.pieces.map((position, idx) => (
                           <button
-                            key={index}
-                            onClick={() => (canMove ? movePiece(index) : null)}
-                            className={`w-6 h-6 rounded-full text-xs font-bold ${COLORS[player.color]} ${
-                              canMove && playerId === user?.id ? "hover:opacity-80 cursor-pointer" : ""
-                            } ${selectedPiece === index ? "ring-2 ring-white" : ""}`}
-                            disabled={!canMove || playerId !== user?.id}
-                          >
-                            {position}
-                          </button>
+                            key={idx}
+                            onClick={() => isMyTurn && gameState.diceValue && playerId === user?.id && movePiece(idx)}
+                            className={`w-3 h-3 rounded-full border-2 border-white ${
+                              selectedPiece === idx ? "ring-2 ring-yellow-400" : ""
+                            } ${
+                              isMyTurn && gameState.diceValue && playerId === user?.id
+                                ? "cursor-pointer hover:scale-110 transition-transform"
+                                : ""
+                            }`}
+                            style={{
+                              backgroundColor: position > 0 ? "#fff" : "rgba(255,255,255,0.5)",
+                            }}
+                          />
                         ))}
                       </div>
                     </div>
-                  ))}
-                </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-                {gameState.status === "finished" && gameState.winner && (
-                  <div className="text-center">
-                    <Trophy className="h-12 w-12 mx-auto text-yellow-500 mb-2" />
-                    <h3 className="text-xl font-bold mb-2">Game Finished!</h3>
-                    <p className="text-lg">🎉 @{gameState.players[gameState.winner]?.username} wins!</p>
-                    <p className="text-muted-foreground">Prize: {gameState.entry_fee * playerList.length} coins</p>
+        {/* Game Controls */}
+        <div className="space-y-6">
+          {/* Current Turn */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Current Turn</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isMyTurn ? (
+                <div className="text-center">
+                  <Badge className="mb-4">Your Turn</Badge>
+                  <div className="space-y-4">
+                    <Button onClick={rollDice} disabled={rolling || !!gameState.diceValue} className="w-full" size="lg">
+                      <DiceIcon className="h-6 w-6 mr-2" />
+                      {rolling ? "Rolling..." : gameState.diceValue ? `Rolled ${gameState.diceValue}` : "Roll Dice"}
+                    </Button>
+                    {gameState.diceValue && (
+                      <p className="text-sm text-muted-foreground">
+                        Click on a piece to move it {gameState.diceValue} spaces
+                      </p>
+                    )}
                   </div>
-                )}
+                </div>
+              ) : (
+                <div className="text-center">
+                  <Badge variant="secondary" className="mb-2">
+                    Waiting
+                  </Badge>
+                  <p className="text-sm text-muted-foreground">
+                    {players.find((p) => p.id === gameState.currentTurn)?.username || "Unknown"}'s turn
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-                {gameState.status === "waiting" && (
-                  <div className="text-center text-muted-foreground">
-                    <Clock className="h-12 w-12 mx-auto mb-2" />
-                    <p>Waiting for more players to join...</p>
+          {/* Players */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Players ({players.length}/4)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {players.map((player) => {
+                  const gamePlayer = gameState.players[player.id]
+                  const colorClass = gamePlayer ? COLORS[gamePlayer.color as keyof typeof COLORS] : "bg-gray-400"
+
+                  return (
+                    <div key={player.id} className="flex items-center gap-3">
+                      <div className={`w-4 h-4 rounded-full ${colorClass}`} />
+                      <div className="flex-1">
+                        <div className="font-medium">@{player.username}</div>
+                        {gameState.currentTurn === player.id && (
+                          <Badge variant="outline" className="text-xs">
+                            Current Turn
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+                {players.length < 4 && (
+                  <div className="text-center py-4 border-2 border-dashed border-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">Waiting for more players...</p>
                   </div>
                 )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {/* Game Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Game Info</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between">
+                <span>Prize Pool:</span>
+                <span className="font-semibold text-yellow-600">{prizePool} coins</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Players:</span>
+                <span>{players.length}/4</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Status:</span>
+                <Badge variant="secondary">Active</Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )
