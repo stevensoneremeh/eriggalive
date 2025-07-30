@@ -1,7 +1,6 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
-import type { Database } from "@/types/database"
 
-export function createSupabaseClientWrapper() {
+export function createClient() {
   // Check if we're in a browser environment
   const isBrowser = typeof window !== "undefined"
 
@@ -36,27 +35,14 @@ export function createSupabaseClientWrapper() {
         select: (columns?: string) => ({
           eq: (column: string, value: any) => ({
             single: () => {
-              if (table === "users" && column === "auth_user_id") {
+              if (table === "user_profiles") {
                 return Promise.resolve({
                   data: {
-                    id: 1,
-                    auth_user_id: value,
+                    id: value,
                     username: "mockuser",
-                    display_name: "Mock User",
-                    full_name: "Mock User",
                     email: "mock@example.com",
-                    subscription_tier: "grassroot",
+                    tier: "grassroot",
                     coins_balance: 500,
-                    avatar_url: null,
-                    bio: null,
-                    location: null,
-                    website: null,
-                    total_posts: 0,
-                    total_votes_received: 0,
-                    total_comments: 0,
-                    is_verified: false,
-                    is_active: true,
-                    last_seen_at: new Date().toISOString(),
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString(),
                   },
@@ -94,10 +80,10 @@ export function createSupabaseClientWrapper() {
     } as any
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co"
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key"
 
-  return createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
+  return createSupabaseClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
@@ -105,9 +91,8 @@ export function createSupabaseClientWrapper() {
   })
 }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// Create and export the client instance
+export const supabase = createClient()
 
-export const supabase = createSupabaseClientWrapper()
-
+// Export the client as default as well for compatibility
 export default supabase

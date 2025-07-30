@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/contexts/auth-context"
-import { toast } from "@/hooks/use-toast"
 import { Gamepad2, Users, Coins, Plus, Play, Trophy, Clock, Star, Loader2 } from "lucide-react"
 import Link from "next/link"
 
@@ -85,29 +84,17 @@ export default function GamesPage() {
 
   const handleCreateRoom = async () => {
     if (!isAuthenticated || !profile) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to create a game room",
-        variant: "destructive",
-      })
+      alert("Please sign in to create a game room")
       return
     }
 
     if (!roomName.trim()) {
-      toast({
-        title: "Room Name Required",
-        description: "Please enter a name for your game room",
-        variant: "destructive",
-      })
+      alert("Please enter a name for your game room")
       return
     }
 
     if (profile.coins_balance < entryFee) {
-      toast({
-        title: "Insufficient Coins",
-        description: `You need ${entryFee} coins to create this room`,
-        variant: "destructive",
-      })
+      alert(`You need ${entryFee} coins to create this room`)
       return
     }
 
@@ -135,16 +122,9 @@ export default function GamesPage() {
       setRoomName("")
       setEntryFee(50)
 
-      toast({
-        title: "Room Created!",
-        description: `Your game room "${roomName}" has been created`,
-      })
+      alert(`Your game room "${roomName}" has been created`)
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create game room. Please try again.",
-        variant: "destructive",
-      })
+      alert("Failed to create game room. Please try again.")
     } finally {
       setCreating(false)
     }
@@ -152,36 +132,21 @@ export default function GamesPage() {
 
   const handleJoinRoom = async (room: GameRoom) => {
     if (!isAuthenticated || !profile) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to join a game room",
-        variant: "destructive",
-      })
+      alert("Please sign in to join a game room")
       return
     }
 
     if (profile.coins_balance < room.entry_fee) {
-      toast({
-        title: "Insufficient Coins",
-        description: `You need ${room.entry_fee} coins to join this room`,
-        variant: "destructive",
-      })
+      alert(`You need ${room.entry_fee} coins to join this room`)
       return
     }
 
     if (room.current_players >= room.max_players) {
-      toast({
-        title: "Room Full",
-        description: "This game room is already full",
-        variant: "destructive",
-      })
+      alert("This game room is already full")
       return
     }
 
-    toast({
-      title: "Joining Game...",
-      description: `Joining "${room.name}"`,
-    })
+    alert(`Joining "${room.name}"`)
 
     // Simulate joining and redirect to game
     setTimeout(() => {

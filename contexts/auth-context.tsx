@@ -5,7 +5,6 @@ import { createContext, useContext, useEffect, useState } from "react"
 import type { User, Session } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { toast } from "@/hooks/use-toast"
 
 interface UserProfile {
   id: string
@@ -62,29 +61,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut()
-      if (error) {
-        toast({
-          title: "Error",
-          description: "Failed to sign out",
-          variant: "destructive",
-        })
-      } else {
+      if (!error) {
         setUser(null)
         setProfile(null)
         setSession(null)
         router.push("/")
-        toast({
-          title: "Success",
-          description: "Signed out successfully",
-        })
       }
     } catch (error) {
       console.error("Sign out error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to sign out",
-        variant: "destructive",
-      })
     }
   }
 
