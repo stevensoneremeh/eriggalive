@@ -180,7 +180,7 @@ export default function HomePage() {
         <div className="absolute inset-0 flex items-center justify-center z-10">
           <div className="text-center max-w-3xl px-4">
             <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 drop-shadow-lg">
-              Welcome to the Official Erigga Fan Platform
+              Welcome to the Official Erigga Live Platform
             </h1>
             <p className="text-xl md:text-2xl text-white/90 mb-8 drop-shadow-md">
               Join the community and get exclusive access to music, videos, and events
