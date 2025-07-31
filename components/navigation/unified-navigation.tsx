@@ -113,6 +113,13 @@ const navigationItems: NavigationItem[] = [
     showInMobile: false,
     requiresAuth: false,
   },
+   {
+    name: "About",
+    href: "/about",
+    icon: ShoppingBag,
+    showInMobile: false,
+    requiresAuth: false,
+  },
 ]
 
 type ScreenSize = "mobile" | "tablet" | "desktop"

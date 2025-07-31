@@ -54,6 +54,7 @@ const NAVIGATION_ITEMS = [
   { href: "/premium", label: "Premium", icon: Crown },
   { href: "/merch", label: "Merch", icon: ShoppingBag },
   { href: "/coins", label: "Coins", icon: Coins },
+   { href: "/about", label: "about", icon: Coins },
 ]
 
 export function EnhancedNavigation() {
