@@ -3,10 +3,10 @@
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CheckCircle, Video, Clock, Users, Mic, Camera, Headphones } from "lucide-react"
+import { CheckCircle, Clock, Users, Mic, Headphones, Phone } from "lucide-react"
 
 interface ConfirmationScreenProps {
-  bookingData: { date: string; time: string }
+  bookingData: { date: string; time: string; amount: number }
 }
 
 export function ConfirmationScreen({ bookingData }: ConfirmationScreenProps) {
@@ -28,9 +28,18 @@ export function ConfirmationScreen({ bookingData }: ConfirmationScreenProps) {
   }
 
   const handleJoinCall = () => {
-    // This would redirect to the actual video call room
-    console.log("Joining call...")
-    // window.open('https://your-video-call-platform.com/room/xyz', '_blank')
+    // Get the call number from environment variables
+    const callNumber = process.env.NEXT_PUBLIC_MEET_GREET_PHONE || "+234-XXX-XXX-XXXX"
+
+    // For mobile devices, try to open the phone app
+    if (typeof window !== "undefined") {
+      if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        window.location.href = `tel:${callNumber}`
+      } else {
+        // For desktop, show the number to call
+        alert(`Please call: ${callNumber} at your scheduled time`)
+      }
+    }
   }
 
   return (
@@ -79,7 +88,14 @@ export function ConfirmationScreen({ bookingData }: ConfirmationScreenProps) {
                   <Users className="w-4 h-4 mr-2" />
                   Session Type
                 </span>
-                <span className="font-medium text-green-900">1-on-1 Spiritual Guidance</span>
+                <span className="font-medium text-green-900">1-on-1 Meet & Greet</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center text-green-700">
+                  <Phone className="w-4 h-4 mr-2" />
+                  Amount Paid
+                </span>
+                <span className="font-medium text-green-900">₦{bookingData.amount.toLocaleString()}</span>
               </div>
             </div>
           </motion.div>
@@ -90,8 +106,8 @@ export function ConfirmationScreen({ bookingData }: ConfirmationScreenProps) {
               onClick={handleJoinCall}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 text-lg font-semibold transition-all duration-300 transform hover:scale-105"
             >
-              <Video className="w-5 h-5 mr-2" />
-              Join Call
+              <Phone className="w-5 h-5 mr-2" />
+              Join Call at Scheduled Time
             </Button>
           </motion.div>
 
@@ -105,17 +121,17 @@ export function ConfirmationScreen({ bookingData }: ConfirmationScreenProps) {
             <h3 className="font-semibold text-blue-900">Preparation & Setup</h3>
             <div className="space-y-3">
               <div className="flex items-start space-x-3">
-                <Camera className="w-5 h-5 text-blue-600 mt-0.5" />
+                <Phone className="w-5 h-5 text-blue-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-blue-900">Camera & Lighting</p>
-                  <p className="text-sm text-blue-600">Ensure good lighting and a stable camera position</p>
+                  <p className="font-medium text-blue-900">Phone Ready</p>
+                  <p className="text-sm text-blue-600">Ensure your phone is charged and has good signal</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
                 <Mic className="w-5 h-5 text-blue-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-blue-900">Audio Quality</p>
-                  <p className="text-sm text-blue-600">Use headphones or find a quiet space</p>
+                  <p className="font-medium text-blue-900">Quiet Environment</p>
+                  <p className="text-sm text-blue-600">Find a quiet space for your call</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
@@ -128,20 +144,20 @@ export function ConfirmationScreen({ bookingData }: ConfirmationScreenProps) {
             </div>
           </motion.div>
 
-          {/* Call Etiquette */}
+          {/* Call Instructions */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
             className="bg-blue-50 p-4 rounded-lg"
           >
-            <h3 className="font-semibold text-blue-900 mb-3">Session Etiquette</h3>
+            <h3 className="font-semibold text-blue-900 mb-3">Call Instructions</h3>
             <ul className="space-y-2 text-sm text-blue-700">
-              <li>• Join 2-3 minutes before your scheduled time</li>
-              <li>• Maintain a respectful and open demeanor</li>
-              <li>• Feel free to share what's on your heart</li>
+              <li>• Call at your exact scheduled time</li>
+              <li>• Have your booking reference ready</li>
+              <li>• The call will last approximately 15-30 minutes</li>
+              <li>• Be respectful and maintain a positive attitude</li>
               <li>• Take notes if something resonates with you</li>
-              <li>• End with gratitude and reflection</li>
             </ul>
           </motion.div>
 
@@ -153,7 +169,7 @@ export function ConfirmationScreen({ bookingData }: ConfirmationScreenProps) {
             className="text-center text-sm text-blue-600 bg-blue-50 p-3 rounded-lg"
           >
             <p>Need help? Contact support before your session</p>
-            <p className="font-medium">🙏 May this journey bring you peace and clarity</p>
+            <p className="font-medium">🙏 Thank you for booking your Meet & Greet session!</p>
           </motion.div>
         </CardContent>
       </Card>

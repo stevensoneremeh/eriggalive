@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/contexts/auth-context"
-import { Loader2, AlertCircle, CheckCircle, Eye, EyeOff } from "lucide-react"
+import { Loader2, AlertCircle, Eye, EyeOff } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 // Loading skeleton for the login page
@@ -35,60 +35,28 @@ function LoginFormWithSearchParams() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showSuccess, setShowSuccess] = useState(false)
-  const [redirectPath, setRedirectPath] = useState("/dashboard")
 
   const router = useRouter()
   const { signIn, user, loading } = useAuth()
   const searchParams = useSearchParams()
-  const [searchParamsReady, setSearchParamsReady] = useState(false)
 
-  useEffect(() => {
-    if (!searchParamsReady) {
-      setSearchParamsReady(true)
-    }
-  }, [searchParamsReady])
-
-  // Set redirect path after component mounts and search params are ready
-  useEffect(() => {
-    if (searchParamsReady && searchParams) {
-      const redirect = searchParams.get("redirect")
-      if (redirect && redirect.startsWith("/")) {
-        setRedirectPath(redirect)
-      }
-    }
-  }, [searchParams, searchParamsReady])
-
-  // Handle already authenticated users
+  // Handle already authenticated users - redirect immediately
   useEffect(() => {
     if (user && !loading) {
-      setShowSuccess(true)
-      const timer = setTimeout(() => {
-        router.replace("/dashboard")
-      }, 1000)
-      return () => clearTimeout(timer)
+      const redirect = searchParams?.get("redirect")
+      const redirectPath = redirect && redirect.startsWith("/") ? redirect : "/dashboard"
+      router.replace(redirectPath)
     }
-  }, [user, loading, router])
+  }, [user, loading, router, searchParams])
 
   // Show loading state during initialization
   if (loading) {
     return <LoginPageSkeleton />
   }
 
-  // Show success state for already authenticated users
-  if (showSuccess) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <Card className="w-full max-w-md border-lime-500/20">
-          <CardContent className="flex items-center justify-center p-8">
-            <div className="flex flex-col items-center space-y-4">
-              <CheckCircle className="h-8 w-8 text-green-500" />
-              <p className="text-sm text-muted-foreground">Already signed in! Redirecting...</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  // Don't render form if user is already authenticated
+  if (user) {
+    return <LoginPageSkeleton />
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -113,11 +81,10 @@ function LoginFormWithSearchParams() {
       if (result.error) {
         setError(result.error?.message || "Failed to sign in. Please check your credentials.")
       } else {
-        setShowSuccess(true)
-        // Redirect to dashboard after a brief delay
-        setTimeout(() => {
-          router.replace("/dashboard")
-        }, 1000)
+        // Success - the useEffect above will handle the redirect
+        const redirect = searchParams?.get("redirect")
+        const redirectPath = redirect && redirect.startsWith("/") ? redirect : "/dashboard"
+        router.replace(redirectPath)
       }
     } catch (err: any) {
       console.error("Login error:", err)
@@ -133,11 +100,6 @@ function LoginFormWithSearchParams() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Welcome Back</CardTitle>
           <CardDescription className="text-center">Sign in to access your Erigga fan account</CardDescription>
-          {redirectPath !== "/dashboard" && (
-            <div className="text-xs text-center text-muted-foreground bg-muted/50 rounded-md p-2">
-              You'll be redirected to your requested page after signing in
-            </div>
-          )}
         </CardHeader>
 
         <CardContent>

@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { AuthGuard } from "@/components/auth-guard"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,6 +21,7 @@ import {
   Camera,
   Edit,
   Phone,
+  Settings,
 } from "lucide-react"
 import Link from "next/link"
 import { useState, useRef } from "react"
@@ -79,16 +79,6 @@ export default function DashboardPage() {
     } finally {
       setIsUploadingAvatar(false)
     }
-  }
-
-  if (isLoading) {
-    return (
-      <AuthGuard>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-        </div>
-      </AuthGuard>
-    )
   }
 
   const getTierColor = (tier: string) => {
@@ -285,7 +275,7 @@ export default function DashboardPage() {
                     <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
                       <Link href="/community">
                         <MessageCircle className="w-6 h-6 mb-2" />
-                        <span className="text-sm">Join Discussion</span>
+                        <span className="text-sm">Community</span>
                       </Link>
                     </Button>
                     <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
@@ -317,9 +307,9 @@ export default function DashboardPage() {
                       </Link>
                     </Button>
                     <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/premium">
-                        <Crown className="w-6 h-6 mb-2" />
-                        <span className="text-sm">Upgrade Tier</span>
+                      <Link href="/profile">
+                        <Settings className="w-6 h-6 mb-2" />
+                        <span className="text-sm">Settings</span>
                       </Link>
                     </Button>
                   </div>
@@ -371,7 +361,7 @@ export default function DashboardPage() {
                       />
                     </div>
                     <div>
-                      <p className="font-medium text-lg">{profile?.full_name || "User"}</p>
+                      <p className="font-medium text-lg">{profile?.full_name || profile?.username || "User"}</p>
                       <p className="text-sm text-gray-500">@{profile?.username || "username"}</p>
                       <p className="text-xs text-gray-400">{user?.email}</p>
                     </div>

@@ -5,26 +5,159 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft, CreditCard, Shield, Clock } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { createClient } from "@/lib/supabase/client"
 
 interface PaymentScreenProps {
-  bookingData: { date: string; time: string }
+  bookingData: { date: string; time: string; amount: number }
+  user: any
+  profile: any
   onSuccess: () => void
   onBack: () => void
 }
 
-export function PaymentScreen({ bookingData, onSuccess, onBack }: PaymentScreenProps) {
+export function PaymentScreen({ bookingData, user, profile, onSuccess, onBack }: PaymentScreenProps) {
   const [isProcessing, setIsProcessing] = useState(false)
+  const { toast } = useToast()
+  const supabase = createClient()
 
   const handlePayment = async () => {
+    if (!user || !profile) {
+      toast({
+        title: "Authentication Error",
+        description: "Please log in to continue with payment.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsProcessing(true)
 
-    // Simulate payment processing
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    try {
+      // Initialize Paystack payment
+      const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
 
-    // Here you would integrate with actual Paystack
-    // For now, we'll simulate success
-    setIsProcessing(false)
-    onSuccess()
+      if (!paystackPublicKey) {
+        throw new Error("Paystack configuration missing")
+      }
+
+      // Create payment reference
+      const reference = `meet_greet_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      // Load Paystack script dynamically
+      const script = document.createElement("script")
+      script.src = "https://js.paystack.co/v1/inline.js"
+      document.body.appendChild(script)
+
+      script.onload = () => {
+        const handler = (window as any).PaystackPop.setup({
+          key: paystackPublicKey,
+          email: user.email,
+          amount: bookingData.amount * 100, // Convert to kobo
+          currency: "NGN",
+          ref: reference,
+          metadata: {
+            custom_fields: [
+              {
+                display_name: "Booking Date",
+                variable_name: "booking_date",
+                value: bookingData.date,
+              },
+              {
+                display_name: "Booking Time",
+                variable_name: "booking_time",
+                value: bookingData.time,
+              },
+              {
+                display_name: "Service Type",
+                variable_name: "service_type",
+                value: "Meet & Greet",
+              },
+            ],
+          },
+          callback: async (response: any) => {
+            // Payment successful
+            try {
+              // Save booking to database
+              const { error: bookingError } = await supabase.from("meet_greet_bookings").insert({
+                user_id: profile.id,
+                booking_date: bookingData.date,
+                booking_time: bookingData.time,
+                amount: bookingData.amount,
+                payment_reference: reference,
+                payment_status: "completed",
+                status: "confirmed",
+              })
+
+              if (bookingError) {
+                console.error("Booking save error:", bookingError)
+              }
+
+              // Save payment record
+              const { error: paymentError } = await supabase.from("payments").insert({
+                user_id: profile.id,
+                amount: bookingData.amount,
+                currency: "NGN",
+                payment_method: "paystack",
+                reference: reference,
+                status: "completed",
+                service_type: "meet_greet",
+                metadata: {
+                  booking_date: bookingData.date,
+                  booking_time: bookingData.time,
+                  paystack_reference: response.reference,
+                },
+              })
+
+              if (paymentError) {
+                console.error("Payment save error:", paymentError)
+              }
+
+              toast({
+                title: "Payment Successful!",
+                description: "Your Meet & Greet session has been booked.",
+              })
+
+              onSuccess()
+            } catch (error) {
+              console.error("Post-payment error:", error)
+              toast({
+                title: "Booking Error",
+                description: "Payment successful but booking failed. Please contact support.",
+                variant: "destructive",
+              })
+            }
+          },
+          onClose: () => {
+            setIsProcessing(false)
+            toast({
+              title: "Payment Cancelled",
+              description: "You cancelled the payment process.",
+              variant: "destructive",
+            })
+          },
+        })
+
+        handler.openIframe()
+      }
+
+      script.onerror = () => {
+        setIsProcessing(false)
+        toast({
+          title: "Payment Error",
+          description: "Failed to load payment system. Please try again.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Payment error:", error)
+      setIsProcessing(false)
+      toast({
+        title: "Payment Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -86,7 +219,7 @@ export function PaymentScreen({ bookingData, onSuccess, onBack }: PaymentScreenP
             </div>
             <div className="border-t border-blue-200 pt-3 flex items-center justify-between">
               <span className="font-semibold text-blue-900">Total Amount</span>
-              <span className="font-bold text-xl text-blue-900">₦5,000</span>
+              <span className="font-bold text-xl text-blue-900">₦{bookingData.amount.toLocaleString()}</span>
             </div>
           </motion.div>
 
