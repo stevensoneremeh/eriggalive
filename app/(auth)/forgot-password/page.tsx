@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+
 import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -8,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, ArrowLeft, Mail, CheckCircle } from "lucide-react"
+import { Loader2, ArrowLeft, Mail } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 export default function ForgotPasswordPage() {
@@ -16,7 +17,6 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
-  const [emailSent, setEmailSent] = useState(false)
 
   const supabase = createClient()
 
@@ -26,6 +26,12 @@ export default function ForgotPasswordPage() {
     setError("")
     setMessage("")
 
+    if (!email) {
+      setError("Email is required")
+      setLoading(false)
+      return
+    }
+
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
@@ -34,8 +40,7 @@ export default function ForgotPasswordPage() {
       if (error) {
         setError(error.message)
       } else {
-        setEmailSent(true)
-        setMessage("Check your email for the password reset link")
+        setMessage("Password reset link has been sent to your email!")
       }
     } catch (err) {
       setError("An unexpected error occurred")
@@ -44,61 +49,37 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  if (emailSent) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background to-muted/20">
-        <Card className="w-full max-w-md border-green-500/20 shadow-lg">
-          <CardContent className="flex flex-col items-center justify-center p-8 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="h-8 w-8 text-green-600" />
-            </div>
-            <h2 className="text-2xl font-bold text-green-600 mb-2">Email Sent!</h2>
-            <p className="text-muted-foreground mb-6">
-              We've sent a password reset link to <strong>{email}</strong>
-            </p>
-            <p className="text-sm text-muted-foreground mb-6">
-              Check your email and click the link to reset your password. The link will expire in 1 hour.
-            </p>
-            <Link href="/login">
-              <Button variant="outline" className="w-full bg-transparent">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Login
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background to-muted/20">
       <Card className="w-full max-w-md border-lime-500/20 shadow-lg">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Reset Password</CardTitle>
-          <CardDescription className="text-center">
-            Enter your email address and we'll send you a link to reset your password
-          </CardDescription>
+          <div className="flex items-center mb-4">
+            <Link href="/login" className="mr-3">
+              <Button variant="ghost" size="icon">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div>
+              <CardTitle className="text-2xl">Forgot Password</CardTitle>
+              <CardDescription>Enter your email to reset your password</CardDescription>
+            </div>
+          </div>
         </CardHeader>
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={loading}
-                  className="pl-10 border-lime-500/20 focus:border-lime-500"
-                  autoComplete="email"
-                />
-              </div>
+              <Input
+                id="email"
+                type="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={loading}
+                className="border-lime-500/20 focus:border-lime-500"
+              />
             </div>
 
             {error && (
@@ -108,16 +89,13 @@ export default function ForgotPasswordPage() {
             )}
 
             {message && (
-              <Alert>
+              <Alert className="border-green-200 bg-green-50 text-green-800">
+                <Mail className="h-4 w-4" />
                 <AlertDescription>{message}</AlertDescription>
               </Alert>
             )}
 
-            <Button
-              type="submit"
-              className="w-full bg-lime-500 hover:bg-lime-600 text-teal-900 font-medium"
-              disabled={loading || !email}
-            >
+            <Button type="submit" className="w-full bg-lime-500 hover:bg-lime-600 text-teal-900" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -129,20 +107,10 @@ export default function ForgotPasswordPage() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <Link
-              href="/login"
-              className="text-sm text-lime-500 hover:underline focus:underline focus:outline-none inline-flex items-center"
-            >
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Back to Login
-            </Link>
-          </div>
-
-          <div className="mt-4 text-center text-xs text-muted-foreground">
-            Don't have an account?{" "}
-            <Link href="/signup" className="text-lime-500 hover:underline focus:underline focus:outline-none">
-              Sign up here
+          <div className="mt-4 text-center text-sm">
+            Remember your password?{" "}
+            <Link href="/login" className="text-lime-500 hover:underline">
+              Sign in here
             </Link>
           </div>
         </CardContent>

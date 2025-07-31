@@ -64,11 +64,11 @@ function LoginFormWithSearchParams() {
     if (user && !loading) {
       setShowSuccess(true)
       const timer = setTimeout(() => {
-        router.replace(redirectPath)
+        router.replace("/dashboard")
       }, 1000)
       return () => clearTimeout(timer)
     }
-  }, [user, loading, router, redirectPath])
+  }, [user, loading, router])
 
   // Show loading state during initialization
   if (loading) {
@@ -114,6 +114,10 @@ function LoginFormWithSearchParams() {
         setError(result.error?.message || "Failed to sign in. Please check your credentials.")
       } else {
         setShowSuccess(true)
+        // Redirect to dashboard after a brief delay
+        setTimeout(() => {
+          router.replace("/dashboard")
+        }, 1000)
       }
     } catch (err: any) {
       console.error("Login error:", err)

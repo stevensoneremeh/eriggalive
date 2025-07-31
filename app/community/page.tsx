@@ -500,77 +500,96 @@ export default function CommunityPage() {
               {posts.map((post) => (
                 <Card
                   key={post.id}
-                  className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm hover:shadow-xl transition-shadow"
+                  className="border-0 shadow-sm bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm hover:shadow-md transition-all duration-200 rounded-xl"
                 >
-                  <CardContent className="p-6">
+                  <CardContent className="p-4">
                     {/* Post Header */}
-                    <div className="flex items-center space-x-3 mb-4">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={post.user?.avatar_url || "/placeholder.svg"} />
-                        <AvatarFallback>{post.user?.full_name?.[0] || post.user?.username?.[0] || "U"}</AvatarFallback>
+                    <div className="flex items-center space-x-3 mb-3">
+                      <Avatar className="h-10 w-10 ring-2 ring-primary/10">
+                        <AvatarImage src={post.user?.avatar_url || "/placeholder-user.jpg"} />
+                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                          {post.user?.full_name?.[0] || post.user?.username?.[0] || "U"}
+                        </AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
                         <div className="flex items-center space-x-2">
-                          <p className="font-semibold">{post.user?.full_name}</p>
+                          <p className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                            {post.user?.full_name || post.user?.username}
+                          </p>
                           <Badge
-                            className={`text-xs ${TIER_COLORS[post.user?.tier as keyof typeof TIER_COLORS] || "bg-gray-500 text-white"}`}
+                            className={`text-xs px-2 py-1 ${TIER_COLORS[post.user?.tier as keyof typeof TIER_COLORS] || "bg-gray-500 text-white"}`}
                           >
                             {post.user?.tier}
                           </Badge>
                         </div>
-                        <p className="text-sm text-gray-500">@{post.user?.username}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {new Date(post.created_at).toLocaleString()}
+                        </p>
                       </div>
-                      <div className="text-sm text-gray-500">{new Date(post.created_at).toLocaleDateString()}</div>
                     </div>
 
                     {/* Category Badge */}
                     {post.category && (
                       <div className="mb-3">
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge
+                          variant="outline"
+                          className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300"
+                        >
                           {post.category.name}
                         </Badge>
                       </div>
                     )}
 
-                    {/* Post Content */}
-                    <div className="mb-4">
-                      <p className="text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
+                    {/* Post Content - WhatsApp style bubble */}
+                    <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-2xl border-l-4 border-blue-400">
+                      <p className="text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap text-sm">
                         {post.content}
                       </p>
                     </div>
 
-                    {/* Post Actions */}
-                    <div className="flex items-center space-x-6 pt-4 border-t border-gray-100 dark:border-gray-700">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => voteOnPost(post.id)}
-                        className={`flex items-center space-x-2 ${
-                          post.user_has_voted ? "text-red-500 hover:text-red-600" : "text-gray-500 hover:text-red-500"
-                        }`}
-                        disabled={!profile}
-                      >
-                        <Heart className={`h-4 w-4 ${post.user_has_voted ? "fill-current" : ""}`} />
-                        <span>{post.vote_count || 0}</span>
-                      </Button>
+                    {/* Post Actions - WhatsApp style */}
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
+                      <div className="flex items-center space-x-4">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => voteOnPost(post.id)}
+                          className={`flex items-center space-x-1 text-xs px-3 py-2 rounded-full transition-all ${
+                            post.user_has_voted
+                              ? "text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-900/20"
+                              : "text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          }`}
+                          disabled={!profile}
+                        >
+                          <Heart className={`h-4 w-4 ${post.user_has_voted ? "fill-current" : ""}`} />
+                          <span className="font-medium">{post.vote_count || 0}</span>
+                        </Button>
 
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="flex items-center space-x-2 text-gray-500 hover:text-blue-500"
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                        <span>{post.comment_count || 0}</span>
-                      </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="flex items-center space-x-1 text-xs px-3 py-2 rounded-full text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          <span className="font-medium">{post.comment_count || 0}</span>
+                        </Button>
 
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="flex items-center space-x-2 text-gray-500 hover:text-green-500"
-                      >
-                        <Share2 className="h-4 w-4" />
-                        <span>Share</span>
-                      </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="flex items-center space-x-1 text-xs px-3 py-2 rounded-full text-gray-500 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all"
+                        >
+                          <Share2 className="h-4 w-4" />
+                          <span className="font-medium">Share</span>
+                        </Button>
+                      </div>
+
+                      {/* Timestamp in WhatsApp style */}
+                      <div className="text-xs text-gray-400 dark:text-gray-500 flex items-center">
+                        <span>
+                          {new Date(post.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

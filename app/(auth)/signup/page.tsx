@@ -75,7 +75,7 @@ export default function SignUpPage() {
         // Redirect to dashboard after showing success message
         setTimeout(() => {
           router.push("/dashboard")
-        }, 3000)
+        }, 2000)
       }
     } catch (err) {
       setError("An unexpected error occurred")

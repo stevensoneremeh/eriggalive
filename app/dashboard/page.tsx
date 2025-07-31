@@ -1,145 +1,120 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+
+import { useState, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
-import { ProfileUpload } from "@/components/dashboard/profile-upload"
 import { useAuth } from "@/contexts/auth-context"
-import { Music, Users, Calendar, TrendingUp, Clock, Home, Activity } from "lucide-react"
+import { Music, Users, Calendar, TrendingUp, Home, Camera, Edit2, Save } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 
-// Mock data for the dashboard
-const mockRecentTracks = [
-  { id: 1, title: "Send Her Money", artist: "Erigga ft. Yemi Alade", plays: 5200000 },
-  { id: 2, title: "The Fear of God", artist: "Erigga", plays: 3800000 },
-  { id: 3, title: "Area to the World", artist: "Erigga ft. Zlatan", plays: 4100000 },
-]
-
-const mockUpcomingEvents = [
-  { id: 1, title: "Erigga Live in Lagos", date: "Dec 31, 2024", venue: "Eko Hotel & Suites" },
-  { id: 2, title: "Street Motivation Tour - Abuja", date: "Nov 15, 2024", venue: "ICC Abuja" },
-]
-
-interface RecentActivity {
-  id: number
-  type: "post" | "comment" | "like" | "join"
-  description: string
-  timestamp: string
-}
-
 export default function DashboardPage() {
-  const { profile, user } = useAuth()
+  const { profile, refreshProfile } = useAuth()
   const [activeTab, setActiveTab] = useState("overview")
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
-  const [stats, setStats] = useState({
-    totalPosts: 0,
-    totalComments: 0,
-    totalLikes: 0,
+  const [isEditing, setIsEditing] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [editData, setEditData] = useState({
+    full_name: profile?.full_name || "",
+    bio: profile?.bio || "",
+    location: profile?.location || "",
   })
-
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { toast } = useToast()
   const supabase = createClient()
 
-  useEffect(() => {
-    if (profile?.id) {
-      loadUserStats()
-      loadRecentActivity()
-    }
-  }, [profile?.id])
-
-  const loadUserStats = async () => {
-    if (!profile?.id) return
-
-    try {
-      // Get user's post count
-      const { count: postCount } = await supabase
-        .from("community_posts")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", profile.id)
-        .eq("is_deleted", false)
-
-      // Get user's comment count
-      const { count: commentCount } = await supabase
-        .from("community_comments")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", profile.id)
-        .eq("is_deleted", false)
-
-      // Get user's vote count
-      const { count: voteCount } = await supabase
-        .from("community_votes")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", profile.id)
-
-      setStats({
-        totalPosts: postCount || 0,
-        totalComments: commentCount || 0,
-        totalLikes: voteCount || 0,
-      })
-    } catch (error) {
-      console.error("Error loading user stats:", error)
-    }
-  }
-
-  const loadRecentActivity = async () => {
-    if (!profile?.id) return
-
-    try {
-      // Get recent posts
-      const { data: recentPosts } = await supabase
-        .from("community_posts")
-        .select("id, content, created_at")
-        .eq("user_id", profile.id)
-        .eq("is_deleted", false)
-        .order("created_at", { ascending: false })
-        .limit(3)
-
-      // Get recent comments
-      const { data: recentComments } = await supabase
-        .from("community_comments")
-        .select("id, content, created_at, post_id")
-        .eq("user_id", profile.id)
-        .eq("is_deleted", false)
-        .order("created_at", { ascending: false })
-        .limit(3)
-
-      const activities: RecentActivity[] = []
-
-      // Add posts to activity
-      recentPosts?.forEach((post) => {
-        activities.push({
-          id: post.id,
-          type: "post",
-          description: `Posted: ${post.content.substring(0, 50)}${post.content.length > 50 ? "..." : ""}`,
-          timestamp: post.created_at,
-        })
-      })
-
-      // Add comments to activity
-      recentComments?.forEach((comment) => {
-        activities.push({
-          id: comment.id,
-          type: "comment",
-          description: `Commented: ${comment.content.substring(0, 50)}${comment.content.length > 50 ? "..." : ""}`,
-          timestamp: comment.created_at,
-        })
-      })
-
-      // Sort by timestamp
-      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-
-      setRecentActivity(activities.slice(0, 5))
-    } catch (error) {
-      console.error("Error loading recent activity:", error)
-    }
-  }
-
   if (!profile) {
-    return null // This will be handled by the DashboardLayout
+    return null
+  }
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const file = event.target.files?.[0]
+      if (!file) return
+
+      if (file.size > 5 * 1024 * 1024) {
+        // 5MB limit
+        toast({
+          title: "File too large",
+          description: "Please choose an image under 5MB",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setUploading(true)
+
+      const fileExt = file.name.split(".").pop()
+      const fileName = `${profile.id}_${Date.now()}.${fileExt}`
+      const filePath = `avatars/${fileName}`
+
+      const { error: uploadError } = await supabase.storage.from("user-avatars").upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("user-avatars").getPublicUrl(filePath)
+
+      const { error: updateError } = await supabase.from("users").update({ avatar_url: publicUrl }).eq("id", profile.id)
+
+      if (updateError) throw updateError
+
+      await refreshProfile()
+
+      toast({
+        title: "Success",
+        description: "Profile picture updated successfully!",
+      })
+    } catch (error) {
+      console.error("Error uploading image:", error)
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload image. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleSaveProfile = async () => {
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({
+          full_name: editData.full_name,
+          bio: editData.bio,
+          location: editData.location,
+        })
+        .eq("id", profile.id)
+
+      if (error) throw error
+
+      await refreshProfile()
+      setIsEditing(false)
+
+      toast({
+        title: "Success",
+        description: "Profile updated successfully!",
+      })
+    } catch (error) {
+      console.error("Error updating profile:", error)
+      toast({
+        title: "Update failed",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -156,25 +131,110 @@ export default function DashboardPage() {
         </nav>
 
         {/* Welcome Header with Profile */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Welcome back, {profile.full_name || profile.username}!
-            </h1>
-            <p className="text-muted-foreground">Here's what's happening with your Erigga fan account today.</p>
-          </div>
-          <div className="flex-shrink-0">
-            <ProfileUpload currentAvatarUrl={profile.avatar_url} />
+        <div className="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg p-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+            <div className="relative">
+              <Avatar className="h-20 w-20">
+                <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} />
+                <AvatarFallback className="text-2xl">
+                  {profile.full_name?.[0] || profile.username?.[0] || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <Button
+                size="icon"
+                variant="outline"
+                className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full bg-transparent"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />
+                ) : (
+                  <Camera className="h-4 w-4" />
+                )}
+              </Button>
+              <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+            </div>
+
+            <div className="flex-1">
+              {isEditing ? (
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="full_name">Full Name</Label>
+                    <Input
+                      id="full_name"
+                      value={editData.full_name}
+                      onChange={(e) => setEditData({ ...editData, full_name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="bio">Bio</Label>
+                    <Textarea
+                      id="bio"
+                      value={editData.bio}
+                      onChange={(e) => setEditData({ ...editData, bio: e.target.value })}
+                      placeholder="Tell us about yourself..."
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="location">Location</Label>
+                    <Input
+                      id="location"
+                      value={editData.location}
+                      onChange={(e) => setEditData({ ...editData, location: e.target.value })}
+                      placeholder="Where are you based?"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleSaveProfile}>
+                      <Save className="h-4 w-4 mr-1" />
+                      Save
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <h1 className="text-2xl font-bold">Welcome back, {profile.full_name || profile.username}!</h1>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        setEditData({
+                          full_name: profile.full_name || "",
+                          bio: profile.bio || "",
+                          location: profile.location || "",
+                        })
+                        setIsEditing(true)
+                      }}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-muted-foreground mb-2">@{profile.username}</p>
+                  {profile.bio && <p className="text-sm mb-2">{profile.bio}</p>}
+                  {profile.location && <p className="text-sm text-muted-foreground mb-2">📍 {profile.location}</p>}
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="capitalize">
+                      {profile.tier} Tier
+                    </Badge>
+                    <Badge variant="secondary">Level {profile.level}</Badge>
+                    <Badge variant="outline">{profile.coins} Coins</Badge>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
         <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="activity">Activity</TabsTrigger>
-            <TabsTrigger value="music">Music</TabsTrigger>
+            <TabsTrigger value="activity">Recent Activity</TabsTrigger>
             <TabsTrigger value="community">Community</TabsTrigger>
-            <TabsTrigger value="events">Events</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
@@ -182,11 +242,22 @@ export default function DashboardPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Your Balance</CardTitle>
-                  <Coins className="h-4 w-4 text-yellow-500" />
+                  <CoinsIcon className="h-4 w-4 text-yellow-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{profile.coins || 0} Coins</div>
+                  <div className="text-2xl font-bold">{profile.coins} Coins</div>
                   <p className="text-xs text-muted-foreground">Use coins to unlock premium content</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Your Level</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">Level {profile.level}</div>
+                  <p className="text-xs text-muted-foreground">{profile.points} points earned</p>
                 </CardContent>
               </Card>
 
@@ -203,95 +274,72 @@ export default function DashboardPage() {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Community Posts</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Meet & Greet</CardTitle>
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stats.totalPosts}</div>
-                  <p className="text-xs text-muted-foreground">Posts you've created</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Engagement</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.totalLikes + stats.totalComments}</div>
-                  <p className="text-xs text-muted-foreground">Total likes and comments</p>
+                  <div className="text-2xl font-bold">Book Now</div>
+                  <p className="text-xs text-muted-foreground">Schedule a personal session</p>
+                  <Link href="/meet-and-greet" className="mt-2 inline-block">
+                    <Button size="sm" className="bg-blue-500 hover:bg-blue-600">
+                      Book Session
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-              <Card className="col-span-2">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
                 <CardHeader>
                   <CardTitle>Quick Actions</CardTitle>
-                  <CardDescription>Manage your account and explore features</CardDescription>
+                  <CardDescription>Jump to your favorite features</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-2">
+                  <Link href="/community">
+                    <Button variant="outline" className="w-full justify-start bg-transparent">
+                      <Users className="h-4 w-4 mr-2" />
+                      Visit Community
+                    </Button>
+                  </Link>
+                  <Link href="/vault">
+                    <Button variant="outline" className="w-full justify-start bg-transparent">
+                      <Music className="h-4 w-4 mr-2" />
+                      Media Vault
+                    </Button>
+                  </Link>
+                  <Link href="/coins">
+                    <Button variant="outline" className="w-full justify-start bg-transparent">
+                      <CoinsIcon className="h-4 w-4 mr-2" />
+                      Manage Coins
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Account Status</CardTitle>
+                  <CardDescription>Your account information</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button asChild className="w-full bg-green-500 hover:bg-green-600">
-                    <Link href="/coins">
-                      <Coins className="h-4 w-4 mr-2" />
-                      Manage Coins
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" className="w-full bg-transparent">
-                    <Link href="/community">
-                      <Users className="h-4 w-4 mr-2" />
-                      Join Community
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" className="w-full bg-transparent">
-                    <Link href="/meet-and-greet">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Book Meet & Greet
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="col-span-4">
-                <CardHeader>
-                  <CardTitle>Recent Tracks</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {mockRecentTracks.map((track) => (
-                      <div key={track.id} className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{track.title}</p>
-                          <p className="text-sm text-muted-foreground">{track.artist}</p>
-                        </div>
-                        <div className="flex items-center">
-                          <TrendingUp className="h-4 w-4 text-muted-foreground mr-1" />
-                          <span className="text-sm">{formatNumber(track.plays)}</span>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="flex justify-between">
+                    <span className="text-sm">Account Status:</span>
+                    <Badge variant={profile.is_active ? "default" : "destructive"}>
+                      {profile.is_active ? "Active" : "Inactive"}
+                    </Badge>
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card className="col-span-3">
-                <CardHeader>
-                  <CardTitle>Upcoming Events</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {mockUpcomingEvents.map((event) => (
-                      <div key={event.id} className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{event.title}</p>
-                          <p className="text-sm text-muted-foreground">{event.venue}</p>
-                        </div>
-                        <div className="flex items-center">
-                          <Clock className="h-4 w-4 text-muted-foreground mr-1" />
-                          <span className="text-sm">{event.date}</span>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="flex justify-between">
+                    <span className="text-sm">Email Verified:</span>
+                    <Badge variant={profile.email_verified ? "default" : "secondary"}>
+                      {profile.email_verified ? "Verified" : "Pending"}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Member Since:</span>
+                    <span className="text-sm text-muted-foreground">
+                      {new Date(profile.created_at).toLocaleDateString()}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -301,66 +349,27 @@ export default function DashboardPage() {
           <TabsContent value="activity" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Activity className="h-5 w-5 mr-2" />
-                  Recent Activity
-                </CardTitle>
-                <CardDescription>Your latest interactions and posts</CardDescription>
+                <CardTitle>Recent Activity</CardTitle>
+                <CardDescription>Your latest interactions on the platform</CardDescription>
               </CardHeader>
               <CardContent>
-                {recentActivity.length > 0 ? (
-                  <div className="space-y-4">
-                    {recentActivity.map((activity) => (
-                      <div
-                        key={`${activity.type}-${activity.id}`}
-                        className="flex items-start space-x-3 p-3 bg-muted/50 rounded-lg"
-                      >
-                        <div className="flex-shrink-0">
-                          {activity.type === "post" && <Users className="h-4 w-4 text-blue-500" />}
-                          {activity.type === "comment" && <Users className="h-4 w-4 text-green-500" />}
-                          {activity.type === "like" && <TrendingUp className="h-4 w-4 text-red-500" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium">{activity.description}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(activity.timestamp).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {activity.type}
-                        </Badge>
-                      </div>
-                    ))}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <div>
+                      <p className="text-sm font-medium">Joined the community</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(profile.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No recent activity</p>
-                    <p className="text-sm text-muted-foreground">
-                      Start engaging with the community to see your activity here
-                    </p>
+                  <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <div>
+                      <p className="text-sm font-medium">Profile updated</p>
+                      <p className="text-xs text-muted-foreground">Recent</p>
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="music" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Music Library</CardTitle>
-                <CardDescription>Access your favorite Erigga tracks and albums</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <Music className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground mb-4">Visit the Media Vault for full access to music content.</p>
-                  <Button asChild>
-                    <Link href="/vault">
-                      <Music className="h-4 w-4 mr-2" />
-                      Go to Media Vault
-                    </Link>
-                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -369,64 +378,16 @@ export default function DashboardPage() {
           <TabsContent value="community" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Community Stats</CardTitle>
-                <CardDescription>Your community engagement overview</CardDescription>
+                <CardTitle>Community Activity</CardTitle>
+                <CardDescription>Your participation in the Erigga community</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-4 mb-6">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{stats.totalPosts}</div>
-                    <div className="text-sm text-muted-foreground">Posts</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{stats.totalComments}</div>
-                    <div className="text-sm text-muted-foreground">Comments</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-red-600">{stats.totalLikes}</div>
-                    <div className="text-sm text-muted-foreground">Likes Given</div>
-                  </div>
-                </div>
-                <div className="text-center">
-                  <Button asChild>
-                    <Link href="/community">
-                      <Users className="h-4 w-4 mr-2" />
-                      Visit Community
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="events" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Upcoming Events</CardTitle>
-                <CardDescription>Concerts, tours, and meet & greets</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4 mb-6">
-                  {mockUpcomingEvents.map((event) => (
-                    <div key={event.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <p className="font-medium">{event.title}</p>
-                        <p className="text-sm text-muted-foreground">{event.venue}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium">{event.date}</p>
-                        <Badge variant="outline">Upcoming</Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="text-center">
-                  <Button asChild>
-                    <Link href="/tickets">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      View All Events
-                    </Link>
-                  </Button>
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-sm text-muted-foreground mb-4">Join the conversation in our community</p>
+                  <Link href="/community">
+                    <Button>Visit Community</Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
@@ -437,18 +398,7 @@ export default function DashboardPage() {
   )
 }
 
-// Helper function to format large numbers
-function formatNumber(num: number): string {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + "M"
-  }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + "K"
-  }
-  return num.toString()
-}
-
-// Helper function to get tier descriptions
+// Helper functions remain the same
 function getTierDescription(tier: string): string {
   switch (tier.toLowerCase()) {
     case "grassroot":
@@ -457,15 +407,14 @@ function getTierDescription(tier: string): string {
       return "Early access to new releases"
     case "elder":
       return "Exclusive content and event discounts"
-    case "blood_brotherhood":
+    case "blood":
       return "VIP access to all content and events"
     default:
       return "Fan membership tier"
   }
 }
 
-// Coins icon component
-function Coins(props: React.SVGProps<SVGSVGElement>) {
+function CoinsIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       {...props}
