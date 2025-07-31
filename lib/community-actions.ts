@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import DOMPurify from "isomorphic-dompurify"
 import type { User as PublicUser, CommunityComment, ReportReason, ReportTargetType } from "@/types/database"
+import type { FormData } from "formdata-node" // Import FormData
 
 const VOTE_COIN_AMOUNT = 100
 
@@ -395,11 +396,13 @@ export async function editCommentAction(commentId: number, content: string) {
       return { success: false, error: "User not authenticated or profile not found." }
     }
 
-    if (!content?.trim()) {
+    const rawContent = content // Use the content parameter directly
+
+    if (!rawContent?.trim()) {
       return { success: false, error: "Comment cannot be empty." }
     }
 
-    const sanitizedContent = DOMPurify.sanitize(content)
+    const sanitizedContent = DOMPurify.sanitize(rawContent)
 
     const { data, error } = await supabase
       .from("community_comments")

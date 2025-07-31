@@ -64,6 +64,7 @@
     "expo-asset": "latest",
     "expo-file-system": "latest",
     "expo-gl": "latest",
+    "formdata-node": "latest",
     "framer-motion": "latest",
     "input-otp": "latest",
     "isomorphic-dompurify": "latest",
