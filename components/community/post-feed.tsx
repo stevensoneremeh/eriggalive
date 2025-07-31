@@ -18,13 +18,13 @@ interface PostFeedProps {
   sortOrder?: string
 }
 
-export function PostFeed({
-  initialPosts,
-  userId,
+export function PostFeed({ 
+  initialPosts, 
+  userId, 
   onVoteUpdate,
   categories,
   categoryFilter,
-  sortOrder = "newest",
+  sortOrder = "newest" 
 }: PostFeedProps) {
   const [posts, setPosts] = useState(initialPosts)
   const [loading, setLoading] = useState(false)
@@ -36,42 +36,39 @@ export function PostFeed({
 
   const debouncedSearchQuery = useDebounce(searchQuery, 500)
 
-  const loadPosts = useCallback(
-    async (isRefresh = false) => {
-      setLoading(true)
+  const loadPosts = useCallback(async (isRefresh = false) => {
+    setLoading(true)
+    
+    try {
+      const currentPage = isRefresh ? 1 : page
+      const result = await fetchCommunityPosts(userId, {
+        categoryFilter: selectedCategory,
+        sortOrder: selectedSort,
+        page: currentPage,
+        limit: 10,
+        searchQuery: debouncedSearchQuery,
+      })
 
-      try {
-        const currentPage = isRefresh ? 1 : page
-        const result = await fetchCommunityPosts(userId, {
-          categoryFilter: selectedCategory,
-          sortOrder: selectedSort,
-          page: currentPage,
-          limit: 10,
-          searchQuery: debouncedSearchQuery,
-        })
-
-        if (result.error) {
-          console.error("Error loading posts:", result.error)
-          return
-        }
-
-        if (isRefresh) {
-          setPosts(result.posts)
-          setPage(2)
-        } else {
-          setPosts((prev) => [...prev, ...result.posts])
-          setPage((prev) => prev + 1)
-        }
-
-        setHasMore(result.posts.length === 10)
-      } catch (error) {
-        console.error("Error loading posts:", error)
-      } finally {
-        setLoading(false)
+      if (result.error) {
+        console.error("Error loading posts:", result.error)
+        return
       }
-    },
-    [userId, selectedCategory, selectedSort, debouncedSearchQuery, page],
-  )
+
+      if (isRefresh) {
+        setPosts(result.posts)
+        setPage(2)
+      } else {
+        setPosts(prev => [...prev, ...result.posts])
+        setPage(prev => prev + 1)
+      }
+
+      setHasMore(result.posts.length === 10)
+    } catch (error) {
+      console.error("Error loading posts:", error)
+    } finally {
+      setLoading(false)
+    }
+  }, [userId, selectedCategory, selectedSort, debouncedSearchQuery, page])
 
   useEffect(() => {
     setPosts(initialPosts)
@@ -94,9 +91,11 @@ export function PostFeed({
   }
 
   const handleVoteUpdate = (postId: number, newVoteCount: number, hasVoted: boolean) => {
-    setPosts((prev) =>
-      prev.map((post) => (post.id === postId ? { ...post, vote_count: newVoteCount, has_voted: hasVoted } : post)),
-    )
+    setPosts(prev => prev.map(post => 
+      post.id === postId 
+        ? { ...post, vote_count: newVoteCount, has_voted: hasVoted }
+        : post
+    ))
     onVoteUpdate?.(postId, newVoteCount, hasVoted)
   }
 
@@ -116,15 +115,12 @@ export function PostFeed({
         </div>
 
         <div className="flex items-center gap-2">
-          <Select
-            value={selectedCategory?.toString() || "all"}
-            onValueChange={(value) => setSelectedCategory(value ? Number(value) : undefined)}
-          >
+          <Select value={selectedCategory?.toString() || ""} onValueChange={(value) => setSelectedCategory(value ? Number(value) : undefined)}>
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
+              <SelectItem value="">All Categories</SelectItem>
               {categories.map((category) => (
                 <SelectItem key={category.id} value={category.id.toString()}>
                   {category.name}
@@ -160,7 +156,12 @@ export function PostFeed({
       {/* Posts */}
       <div className="space-y-6">
         {posts.map((post) => (
-          <PostCard key={post.id} post={post} currentUserId={userId} onVoteUpdate={handleVoteUpdate} />
+          <PostCard 
+            key={post.id} 
+            post={post} 
+            currentUserId={userId}
+            onVoteUpdate={handleVoteUpdate}
+          />
         ))}
       </div>
 

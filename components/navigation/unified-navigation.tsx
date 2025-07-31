@@ -113,7 +113,7 @@ const navigationItems: NavigationItem[] = [
     showInMobile: false,
     requiresAuth: false,
   },
-  {
+   {
     name: "About",
     href: "/about",
     icon: ShoppingBag,
@@ -126,7 +126,7 @@ type ScreenSize = "mobile" | "tablet" | "desktop"
 
 export function UnifiedNavigation() {
   const [isScrolled, setIsScrolled] = useState(false)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [screenSize, setScreenSize] = useState<ScreenSize>("desktop")
   const [mounted, setMounted] = useState(false)
 

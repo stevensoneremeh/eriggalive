@@ -1,16 +1,85 @@
 "use client"
 
+import type React from "react"
+
 import { AuthGuard } from "@/components/auth-guard"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Users, MessageCircle, Coins, Trophy, Music, Calendar, Star, Crown, Zap, TrendingUp } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  Users,
+  MessageCircle,
+  Coins,
+  Trophy,
+  Music,
+  Star,
+  Crown,
+  Zap,
+  TrendingUp,
+  Camera,
+  Edit,
+  Phone,
+} from "lucide-react"
 import Link from "next/link"
+import { useState, useRef } from "react"
+import { useToast } from "@/hooks/use-toast"
+import { createClient } from "@/lib/supabase/client"
 
 export default function DashboardPage() {
-  const { user, profile, isLoading } = useAuth()
+  const { user, profile, isLoading, refreshProfile } = useAuth()
+  const { toast } = useToast()
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !profile) return
+
+    setIsUploadingAvatar(true)
+    const supabase = createClient()
+
+    try {
+      // Upload to Supabase Storage
+      const fileExt = file.name.split(".").pop()
+      const fileName = `${profile.id}-${Date.now()}.${fileExt}`
+      const filePath = `avatars/${fileName}`
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("eriggalive-assets")
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      // Get public URL
+      const { data: urlData } = supabase.storage.from("eriggalive-assets").getPublicUrl(uploadData.path)
+
+      // Update user profile
+      const { error: updateError } = await supabase
+        .from("users")
+        .update({ avatar_url: urlData.publicUrl })
+        .eq("id", profile.id)
+
+      if (updateError) throw updateError
+
+      await refreshProfile()
+      toast({
+        title: "Success!",
+        description: "Profile picture updated successfully.",
+      })
+    } catch (error: any) {
+      console.error("Avatar upload error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update profile picture. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploadingAvatar(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -61,16 +130,16 @@ export default function DashboardPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  Welcome back, {profile?.display_name || user?.email}!
+                  Welcome back, {profile?.full_name || profile?.username || user?.email}!
                 </h1>
                 <p className="text-gray-600 dark:text-gray-300 mt-1">
                   Here's what's happening in your Erigga Live community
                 </p>
               </div>
               <div className="mt-4 sm:mt-0">
-                <Badge className={`px-3 py-1 ${getTierColor(profile?.subscription_tier || "grassroot")}`}>
+                <Badge className={`px-3 py-1 ${getTierColor(profile?.tier || "grassroot")}`}>
                   <Crown className="w-4 h-4 mr-1" />
-                  {profile?.subscription_tier?.replace("_", " ").toUpperCase() || "GRASSROOT"}
+                  {profile?.tier?.replace("_", " ").toUpperCase() || "GRASSROOT"}
                 </Badge>
               </div>
             </div>
@@ -84,7 +153,7 @@ export default function DashboardPage() {
                   <div>
                     <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Coins Balance</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {profile?.coins_balance?.toLocaleString() || "0"}
+                      {profile?.coins?.toLocaleString() || "0"}
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
@@ -98,11 +167,11 @@ export default function DashboardPage() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Posts</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{profile?.total_posts || 0}</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Level</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{profile?.level || 1}</p>
                   </div>
                   <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                    <MessageCircle className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                    <Trophy className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                   </div>
                 </div>
               </CardContent>
@@ -112,9 +181,9 @@ export default function DashboardPage() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Votes Received</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Points</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {profile?.total_votes_received || 0}
+                      {profile?.points?.toLocaleString() || "0"}
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
@@ -128,8 +197,10 @@ export default function DashboardPage() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Comments</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{profile?.total_comments || 0}</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Status</p>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">
+                      {profile?.is_verified ? "✅ Verified" : "❌ Not Verified"}
+                    </p>
                   </div>
                   <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
                     <Users className="w-6 h-6 text-purple-600 dark:text-purple-400" />
@@ -155,20 +226,18 @@ export default function DashboardPage() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">
-                        {profile?.subscription_tier?.replace("_", " ").toUpperCase() || "GRASSROOT"} Member
+                        {profile?.tier?.replace("_", " ").toUpperCase() || "GRASSROOT"} Member
                       </span>
                       <span className="text-sm text-gray-500">
-                        {getTierProgress(profile?.subscription_tier || "grassroot")}% Complete
+                        {getTierProgress(profile?.tier || "grassroot")}% Complete
                       </span>
                     </div>
-                    <Progress value={getTierProgress(profile?.subscription_tier || "grassroot")} className="h-2" />
+                    <Progress value={getTierProgress(profile?.tier || "grassroot")} className="h-2" />
                     <div className="grid grid-cols-4 gap-2 text-xs">
                       <div className="text-center">
                         <div
                           className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.subscription_tier || "grassroot") >= 25
-                              ? "bg-green-500"
-                              : "bg-gray-300"
+                            getTierProgress(profile?.tier || "grassroot") >= 25 ? "bg-green-500" : "bg-gray-300"
                           }`}
                         />
                         <span>Grassroot</span>
@@ -176,9 +245,7 @@ export default function DashboardPage() {
                       <div className="text-center">
                         <div
                           className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.subscription_tier || "grassroot") >= 50
-                              ? "bg-purple-500"
-                              : "bg-gray-300"
+                            getTierProgress(profile?.tier || "grassroot") >= 50 ? "bg-purple-500" : "bg-gray-300"
                           }`}
                         />
                         <span>Pioneer</span>
@@ -186,9 +253,7 @@ export default function DashboardPage() {
                       <div className="text-center">
                         <div
                           className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.subscription_tier || "grassroot") >= 75
-                              ? "bg-blue-500"
-                              : "bg-gray-300"
+                            getTierProgress(profile?.tier || "grassroot") >= 75 ? "bg-blue-500" : "bg-gray-300"
                           }`}
                         />
                         <span>Elder</span>
@@ -196,9 +261,7 @@ export default function DashboardPage() {
                       <div className="text-center">
                         <div
                           className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.subscription_tier || "grassroot") >= 100
-                              ? "bg-yellow-500"
-                              : "bg-gray-300"
+                            getTierProgress(profile?.tier || "grassroot") >= 100 ? "bg-yellow-500" : "bg-gray-300"
                           }`}
                         />
                         <span>Blood Brotherhood</span>
@@ -237,10 +300,14 @@ export default function DashboardPage() {
                         <span className="text-sm">Media Vault</span>
                       </Link>
                     </Button>
-                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/meet-greet">
-                        <Calendar className="w-6 h-6 mb-2" />
-                        <span className="text-sm">Meet & Greet</span>
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="h-20 flex-col bg-transparent bg-gradient-to-r from-purple-100 to-blue-100 hover:from-purple-200 hover:to-blue-200 dark:from-purple-900/20 dark:to-blue-900/20"
+                    >
+                      <Link href="/meet-and-greet">
+                        <Phone className="w-6 h-6 mb-2 text-purple-600" />
+                        <span className="text-sm text-purple-600 font-medium">Meet & Greet</span>
                       </Link>
                     </Button>
                     <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
@@ -269,12 +336,44 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                      {profile?.display_name?.charAt(0) || user?.email?.charAt(0) || "U"}
+                    <div className="relative">
+                      <Avatar className="h-16 w-16">
+                        <AvatarImage
+                          src={profile?.avatar_url || "/placeholder-user.jpg"}
+                          alt={profile?.username || "User"}
+                        />
+                        <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold text-lg">
+                          {profile?.full_name?.charAt(0) ||
+                            profile?.username?.charAt(0) ||
+                            user?.email?.charAt(0) ||
+                            "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-white shadow-md hover:shadow-lg"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingAvatar}
+                      >
+                        {isUploadingAvatar ? (
+                          <div className="animate-spin rounded-full h-3 w-3 border border-primary border-t-transparent" />
+                        ) : (
+                          <Camera className="h-3 w-3" />
+                        )}
+                      </Button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleAvatarUpload}
+                      />
                     </div>
                     <div>
-                      <p className="font-medium">{profile?.display_name || "User"}</p>
+                      <p className="font-medium text-lg">{profile?.full_name || "User"}</p>
                       <p className="text-sm text-gray-500">@{profile?.username || "username"}</p>
+                      <p className="text-xs text-gray-400">{user?.email}</p>
                     </div>
                   </div>
                   <div className="space-y-2 text-sm">
@@ -284,7 +383,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex justify-between">
                       <span>Last active:</span>
-                      <span>{new Date(profile?.last_seen_at || Date.now()).toLocaleDateString()}</span>
+                      <span>Just now</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Verified:</span>
@@ -292,7 +391,10 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <Button asChild variant="outline" className="w-full bg-transparent">
-                    <Link href="/profile">Edit Profile</Link>
+                    <Link href="/profile">
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Profile
+                    </Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -310,7 +412,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                      <span>Earned 50 coins</span>
+                      <span>Earned {profile?.coins || 0} coins</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 bg-purple-500 rounded-full" />
@@ -329,7 +431,7 @@ export default function DashboardPage() {
                   <div className="grid grid-cols-3 gap-2">
                     <div className="text-center p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                       <Trophy className="w-6 h-6 text-yellow-600 mx-auto mb-1" />
-                      <span className="text-xs">First Post</span>
+                      <span className="text-xs">First Login</span>
                     </div>
                     <div className="text-center p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                       <Users className="w-6 h-6 text-blue-600 mx-auto mb-1" />
