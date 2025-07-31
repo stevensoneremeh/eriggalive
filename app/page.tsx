@@ -237,7 +237,7 @@ export default function HomePage() {
               <CardContent className="p-6">
                 <h3 className="text-xl font-bold mb-2">Community</h3>
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Connect with other fans, share content, and join discussions
+                  Connect with others, share content, and join discussions
                 </p>
                 <Button asChild variant="outline">
                   <Link href="/community">Join Community</Link>
