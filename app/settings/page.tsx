@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { AuthGuard } from "@/components/auth-guard"
@@ -16,7 +18,7 @@ import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { User, SettingsIcon, Bell, Shield, Save, Eye, EyeOff, Crown, Coins, Mail, Calendar, Lock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/supabaseClient"
 
 export default function SettingsPage() {
   const { user, profile, refreshProfile } = useAuth()
@@ -163,6 +165,51 @@ export default function SettingsPage() {
     }
   }
 
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !profile) return
+
+    setLoading(true)
+    try {
+      // Upload to Supabase Storage
+      const fileExt = file.name.split(".").pop()
+      const fileName = `${profile.id}-${Date.now()}.${fileExt}`
+      const filePath = `avatars/${fileName}`
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("eriggalive-assets")
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      // Get public URL
+      const { data: urlData } = supabase.storage.from("eriggalive-assets").getPublicUrl(uploadData.path)
+
+      // Update user profile
+      const { error: updateError } = await supabase
+        .from("users")
+        .update({ avatar_url: urlData.publicUrl })
+        .eq("id", profile.id)
+
+      if (updateError) throw updateError
+
+      await refreshProfile()
+      toast({
+        title: "Success!",
+        description: "Profile picture updated successfully.",
+      })
+    } catch (error: any) {
+      console.error("Avatar upload error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update profile picture. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const getTierColor = (tier: string) => {
     switch (tier) {
       case "grassroot":
@@ -252,6 +299,30 @@ export default function SettingsPage() {
                   <CardDescription>Update your personal information and profile details.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="avatar">Profile Picture</Label>
+                    <div className="flex items-center space-x-4">
+                      <Avatar className="h-16 w-16">
+                        <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
+                        <AvatarFallback>
+                          {profile?.full_name?.charAt(0) || profile?.username?.charAt(0) || "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <Input
+                          id="avatar"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleAvatarUpload}
+                          disabled={loading}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Upload a new profile picture. Max size: 5MB
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <Label htmlFor="full_name">Full Name</Label>

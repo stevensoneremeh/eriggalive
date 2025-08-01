@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
-import { createClient } from "@supabase/supabase-js"
+import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/contexts/auth-context"
 import { AuthGuard } from "@/components/auth-guard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,9 +29,6 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatDistanceToNow } from "date-fns"
-
-// Initialize Supabase client with v2 syntax
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 interface Post {
   id: number
@@ -113,7 +110,7 @@ export default function CommunityPage() {
     loadData()
     loadChatMessages()
 
-    // Set up real-time subscriptions using Supabase v2 syntax
+    // Set up real-time subscriptions
     const postsSubscription = supabase
       .channel("community_posts_changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "community_posts" }, (payload) => {
@@ -149,7 +146,7 @@ export default function CommunityPage() {
       setLoading(true)
       setError(null)
 
-      // Load categories using Supabase v2 syntax
+      // Load categories
       const { data: categoriesData, error: categoriesError } = await supabase
         .from("community_categories")
         .select("*")
@@ -163,7 +160,7 @@ export default function CommunityPage() {
         setCategories(categoriesData || [])
       }
 
-      // Build posts query using Supabase v2 syntax
+      // Build posts query
       let postsQuery = supabase
         .from("community_posts")
         .select(`
@@ -186,7 +183,7 @@ export default function CommunityPage() {
         postsQuery = postsQuery.ilike("content", `%${searchQuery}%`)
       }
 
-      // Apply sorting using Supabase v2 syntax
+      // Apply sorting
       switch (sortOrder) {
         case "oldest":
           postsQuery = postsQuery.order("created_at", { ascending: true })

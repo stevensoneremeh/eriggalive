@@ -69,64 +69,91 @@ export default function MeetAndGreetPage() {
   return (
     <AuthGuard>
       <div className="min-h-screen bg-gradient-to-b from-sky-200 via-blue-100 to-amber-50 relative overflow-hidden">
-        {/* 3D Phone Booth Background - Always visible */}
-        <div className="absolute inset-0 z-0">
-          <PhoneBoothScene />
-        </div>
+        {/* Improved Layout: Phone Booth and Content Side by Side */}
+        <div className="flex flex-col lg:flex-row min-h-screen">
+          {/* 3D Phone Booth Section */}
+          <div className="lg:w-1/2 h-64 lg:h-screen relative">
+            <PhoneBoothScene />
 
-        {/* Content Overlay */}
-        <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
-          <AnimatePresence mode="wait">
-            {currentStep === "booking" && (
+            {/* Overlay Title for Mobile */}
+            <div className="absolute top-4 left-4 right-4 lg:hidden">
               <motion.div
-                key="booking"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ duration: 0.5, ease: "easeInOut" }}
-                className="w-full max-w-md"
-              >
-                <BookingForm onSubmit={handleBookingSubmit} />
-              </motion.div>
-            )}
-
-            {currentStep === "payment" && bookingData && (
-              <motion.div
-                key="payment"
-                initial={{ opacity: 0, x: 100 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -100 }}
-                transition={{ duration: 0.5, ease: "easeInOut" }}
-                className="w-full max-w-md"
-              >
-                <PaymentScreen
-                  bookingData={bookingData}
-                  user={user}
-                  profile={profile}
-                  onSuccess={handlePaymentSuccess}
-                  onBack={handleBackToBooking}
-                />
-              </motion.div>
-            )}
-
-            {currentStep === "confirmation" && bookingData && (
-              <motion.div
-                key="confirmation"
-                initial={{ opacity: 0, y: 50 }}
+                initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -50 }}
-                transition={{ duration: 0.5, ease: "easeInOut" }}
-                className="w-full max-w-lg"
+                className="bg-white/90 backdrop-blur-sm rounded-lg p-4 text-center shadow-lg"
               >
-                <ConfirmationScreen bookingData={bookingData} />
+                <h1 className="text-2xl font-bold text-gray-800">Meet & Greet Experience</h1>
+                <p className="text-gray-600 text-sm mt-1">Step into the virtual phone booth</p>
               </motion.div>
-            )}
-          </AnimatePresence>
+            </div>
+          </div>
+
+          {/* Content Section */}
+          <div className="lg:w-1/2 flex items-center justify-center p-4 lg:p-8 relative z-10">
+            <div className="w-full max-w-md">
+              {/* Desktop Title */}
+              <div className="hidden lg:block mb-8 text-center">
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white/90 backdrop-blur-sm rounded-lg p-6 shadow-lg"
+                >
+                  <h1 className="text-3xl font-bold text-gray-800 mb-2">Meet & Greet Experience</h1>
+                  <p className="text-gray-600">Book your exclusive session with Erigga</p>
+                </motion.div>
+              </div>
+
+              {/* Form Content */}
+              <AnimatePresence mode="wait">
+                {currentStep === "booking" && (
+                  <motion.div
+                    key="booking"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ duration: 0.5, ease: "easeInOut" }}
+                  >
+                    <BookingForm onSubmit={handleBookingSubmit} />
+                  </motion.div>
+                )}
+
+                {currentStep === "payment" && bookingData && (
+                  <motion.div
+                    key="payment"
+                    initial={{ opacity: 0, x: 100 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -100 }}
+                    transition={{ duration: 0.5, ease: "easeInOut" }}
+                  >
+                    <PaymentScreen
+                      bookingData={bookingData}
+                      user={user}
+                      profile={profile}
+                      onSuccess={handlePaymentSuccess}
+                      onBack={handleBackToBooking}
+                    />
+                  </motion.div>
+                )}
+
+                {currentStep === "confirmation" && bookingData && (
+                  <motion.div
+                    key="confirmation"
+                    initial={{ opacity: 0, y: 50 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -50 }}
+                    transition={{ duration: 0.5, ease: "easeInOut" }}
+                  >
+                    <ConfirmationScreen bookingData={bookingData} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
         </div>
 
         {/* Ambient particles for atmosphere */}
-        <div className="absolute inset-0 z-5 pointer-events-none">
-          {[...Array(20)].map((_, i) => (
+        <div className="absolute inset-0 z-0 pointer-events-none">
+          {[...Array(15)].map((_, i) => (
             <motion.div
               key={i}
               className="absolute w-1 h-1 bg-white/20 rounded-full"
@@ -145,6 +172,24 @@ export default function MeetAndGreetPage() {
               }}
             />
           ))}
+        </div>
+
+        {/* Progress Indicator */}
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20">
+          <div className="flex space-x-2">
+            {["booking", "payment", "confirmation"].map((step, index) => (
+              <div
+                key={step}
+                className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                  currentStep === step
+                    ? "bg-blue-500 scale-125"
+                    : index < ["booking", "payment", "confirmation"].indexOf(currentStep)
+                      ? "bg-green-500"
+                      : "bg-white/50"
+                }`}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </AuthGuard>

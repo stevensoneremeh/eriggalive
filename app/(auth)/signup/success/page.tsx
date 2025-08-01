@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Mail, ArrowRight } from "lucide-react"
+import { CheckCircle, Mail, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { DynamicLogo } from "@/components/dynamic-logo"
 
@@ -15,55 +15,43 @@ export default function SignupSuccessPage() {
             <DynamicLogo className="h-12 w-auto" />
           </div>
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
-            </div>
+            <CheckCircle className="h-16 w-16 text-green-500" />
           </div>
-          <CardTitle className="text-2xl font-bold text-green-600 dark:text-green-400">
-            Account Created Successfully!
-          </CardTitle>
-          <CardDescription className="text-center">
-            Welcome to the Erigga Live community! We're excited to have you join us.
+          <CardTitle className="text-2xl font-bold text-green-600">Signup Successful!</CardTitle>
+          <CardDescription className="text-lg">
+            Please check your email to verify your account before logging in.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-            <div className="flex items-start space-x-3">
-              <Mail className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+            <div className="flex items-center space-x-3">
+              <Mail className="h-5 w-5 text-blue-600" />
               <div>
-                <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">Check Your Email</h3>
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  We've sent you a verification email. Please click the link in the email to verify your account before
-                  logging in.
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Verification email sent</p>
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  Check your inbox and click the verification link to activate your account.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="text-center">
-              <h3 className="font-semibold mb-2">What's Next?</h3>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>✅ Verify your email address</li>
-                <li>🎵 Explore exclusive Erigga content</li>
-                <li>💬 Join the community discussions</li>
-                <li>🪙 Earn Erigga Coins for activities</li>
-              </ul>
-            </div>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground text-center">
+              After verifying your email, you can sign in to access your dashboard and join the Erigga Live community.
+            </p>
+          </div>
 
+          <div className="space-y-3">
             <Button asChild className="w-full">
-              <Link href="/login" className="flex items-center justify-center">
-                Continue to Login
-                <ArrowRight className="w-4 h-4 ml-2" />
+              <Link href="/login">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Go to Login
               </Link>
             </Button>
 
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">
-                Didn't receive the email?{" "}
-                <button className="text-primary hover:underline">Resend verification email</button>
-              </p>
-            </div>
+            <Button asChild variant="outline" className="w-full bg-transparent">
+              <Link href="/">Back to Home</Link>
+            </Button>
           </div>
         </CardContent>
       </Card>

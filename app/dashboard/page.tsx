@@ -26,7 +26,7 @@ import {
 import Link from "next/link"
 import { useState, useRef } from "react"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/supabaseClient"
 
 export default function DashboardPage() {
   const { user, profile, loading, refreshProfile } = useAuth()
@@ -110,8 +110,17 @@ export default function DashboardPage() {
     }
   }
 
-  if (loading) return <p>Loading...</p>
-  if (!user) return null // Redirect happens in AuthProvider
+  if (loading) {
+    return (
+      <AuthGuard>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </AuthGuard>
+    )
+  }
+
+  if (!user) return null
 
   return (
     <AuthGuard>
@@ -309,7 +318,7 @@ export default function DashboardPage() {
                       </Link>
                     </Button>
                     <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/profile">
+                      <Link href="/settings">
                         <Settings className="w-6 h-6 mb-2" />
                         <span className="text-sm">Settings</span>
                       </Link>
@@ -383,7 +392,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <Button asChild variant="outline" className="w-full bg-transparent">
-                    <Link href="/profile">
+                    <Link href="/settings">
                       <Edit className="w-4 h-4 mr-2" />
                       Edit Profile
                     </Link>

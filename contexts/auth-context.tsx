@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/supabaseClient"
 import { useRouter } from "next/navigation"
 import type { User, Session } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
@@ -39,6 +39,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     try {
+      // Clean up duplicate profiles first
+      const { data: profiles } = await supabase.from("users").select("id").eq("auth_user_id", userId)
+
+      if (profiles && profiles.length > 1) {
+        const keepId = profiles[0].id
+        const deleteIds = profiles.slice(1).map((p) => p.id)
+        await supabase.from("users").delete().in("id", deleteIds)
+      }
+
       const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).maybeSingle()
 
       if (error) {
@@ -128,24 +137,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) return { error }
 
-      // Create user profile
+      // Create user profile only if it doesn't exist
       if (data.user) {
-        const { error: profileError } = await supabase.from("users").insert({
-          auth_user_id: data.user.id,
-          email: email,
-          username: userData.username,
-          full_name: userData.full_name,
-          tier: "grassroot",
-          coins: 100, // Starting coins
-          level: 1,
-          points: 0,
-          is_active: true,
-          is_verified: false,
-          is_banned: false,
-        })
+        const { data: existingProfile } = await supabase
+          .from("users")
+          .select("id")
+          .eq("auth_user_id", data.user.id)
+          .maybeSingle()
 
-        if (profileError) {
-          console.error("Error creating profile:", profileError)
+        if (!existingProfile) {
+          const { error: profileError } = await supabase.from("users").insert({
+            auth_user_id: data.user.id,
+            email: email,
+            username: userData.username,
+            full_name: userData.full_name,
+            tier: "grassroot",
+            coins: 100, // Starting coins
+            level: 1,
+            points: 0,
+            is_active: true,
+            is_verified: false,
+            is_banned: false,
+          })
+
+          if (profileError) {
+            console.error("Error creating profile:", profileError)
+          }
         }
       }
 
