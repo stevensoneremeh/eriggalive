@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { supabase } from "@/lib/supabase"
+import { createClient } from "@supabase/supabase-js"
 import { useAuth } from "@/contexts/auth-context"
 import { AuthGuard } from "@/components/auth-guard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,6 +15,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Heart, MessageCircle, Share2, Users, TrendingUp, Search, Plus, Filter, Send, Phone } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatDistanceToNow } from "date-fns"
+
+// Initialize Supabase client with v2 syntax
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 interface Post {
   id: number
@@ -83,6 +86,7 @@ export default function CommunityPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState("posts")
+  const [error, setError] = useState<string | null>(null)
 
   const { user, profile } = useAuth()
   const { toast } = useToast()
@@ -92,7 +96,7 @@ export default function CommunityPage() {
     loadData()
     loadChatMessages()
 
-    // Set up real-time subscriptions
+    // Set up real-time subscriptions using Supabase v2 syntax
     const postsSubscription = supabase
       .channel("community_posts_changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "community_posts" }, (payload) => {
@@ -110,8 +114,8 @@ export default function CommunityPage() {
       .subscribe()
 
     return () => {
-      postsSubscription.unsubscribe()
-      chatSubscription.unsubscribe()
+      supabase.removeChannel(postsSubscription)
+      supabase.removeChannel(chatSubscription)
     }
   }, [sortOrder, categoryFilter, searchQuery])
 
@@ -126,8 +130,9 @@ export default function CommunityPage() {
   const loadData = async () => {
     try {
       setLoading(true)
+      setError(null)
 
-      // Load categories
+      // Load categories using Supabase v2 syntax
       const { data: categoriesData, error: categoriesError } = await supabase
         .from("community_categories")
         .select("*")
@@ -136,22 +141,23 @@ export default function CommunityPage() {
 
       if (categoriesError) {
         console.error("Categories error:", categoriesError)
+        setError("Failed to load categories")
       } else {
         setCategories(categoriesData || [])
       }
 
-      // Build posts query
+      // Build posts query using Supabase v2 syntax
       let postsQuery = supabase
         .from("community_posts")
         .select(`
-        *,
-        user:users!community_posts_user_id_fkey (
-          id, username, full_name, tier, avatar_url
-        ),
-        category:community_categories!community_posts_category_id_fkey (
-          id, name, slug
-        )
-      `)
+          *,
+          user:users!community_posts_user_id_fkey (
+            id, username, full_name, tier, avatar_url
+          ),
+          category:community_categories!community_posts_category_id_fkey (
+            id, name, slug
+          )
+        `)
         .eq("is_published", true)
         .eq("is_deleted", false)
 
@@ -163,6 +169,7 @@ export default function CommunityPage() {
         postsQuery = postsQuery.ilike("content", `%${searchQuery}%`)
       }
 
+      // Apply sorting using Supabase v2 syntax
       switch (sortOrder) {
         case "oldest":
           postsQuery = postsQuery.order("created_at", { ascending: true })
@@ -182,6 +189,7 @@ export default function CommunityPage() {
 
       if (postsError) {
         console.error("Posts error:", postsError)
+        setError("Failed to load posts")
         throw postsError
       }
 
@@ -207,6 +215,7 @@ export default function CommunityPage() {
       }
     } catch (error) {
       console.error("Error loading data:", error)
+      setError("Failed to load community data. Please try again.")
       toast({
         title: "Error",
         description: "Failed to load community data. Please try again.",
@@ -344,10 +353,7 @@ export default function CommunityPage() {
 
         if (deleteError) throw deleteError
 
-        await supabase
-          .from("community_posts")
-          .update({ vote_count: supabase.raw("GREATEST(vote_count - 1, 0)") })
-          .eq("id", postId)
+        await supabase.rpc("decrement_vote_count", { post_id: postId })
 
         toast({
           title: "Vote Removed",
@@ -361,10 +367,7 @@ export default function CommunityPage() {
 
         if (insertError) throw insertError
 
-        await supabase
-          .from("community_posts")
-          .update({ vote_count: supabase.raw("vote_count + 1") })
-          .eq("id", postId)
+        await supabase.rpc("increment_vote_count", { post_id: postId })
 
         toast({
           title: "Vote Added",
@@ -391,6 +394,24 @@ export default function CommunityPage() {
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
               <p className="mt-4 text-gray-600 dark:text-gray-400">Loading community...</p>
+            </div>
+          </div>
+        </div>
+      </AuthGuard>
+    )
+  }
+
+  if (error) {
+    return (
+      <AuthGuard>
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 p-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center py-12">
+              <div className="text-red-500 mb-4">⚠️ Error</div>
+              <p className="text-gray-600 dark:text-gray-400">{error}</p>
+              <Button onClick={() => window.location.reload()} className="mt-4">
+                Try Again
+              </Button>
             </div>
           </div>
         </div>
