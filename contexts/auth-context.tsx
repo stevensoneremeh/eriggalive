@@ -3,12 +3,12 @@
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import type { User, Session } from "@supabase/supabase-js"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabaseClient"
 import { useRouter } from "next/navigation"
 
 interface UserProfile {
   id: number
-  user_id: string
+  auth_user_id: string
   username: string
   email: string
   full_name?: string
@@ -68,7 +68,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const supabase = createClient()
 
   const fetchProfile = async (userId: string) => {
     try {

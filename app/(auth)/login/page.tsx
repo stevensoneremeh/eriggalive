@@ -46,7 +46,13 @@ export default function LoginPage() {
     try {
       const { error } = await signIn(email, password)
       if (error) {
-        setError(error.message)
+        if (error.message.includes("Email not confirmed")) {
+          setError("Please verify your email address before logging in. Check your inbox for the verification link.")
+        } else if (error.message.includes("Invalid login credentials")) {
+          setError("Invalid email or password. Please try again.")
+        } else {
+          setError(error.message)
+        }
         setLoading(false)
       }
       // Don't set loading to false on success - let auth context handle redirect

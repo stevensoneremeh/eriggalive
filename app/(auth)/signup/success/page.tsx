@@ -1,9 +1,8 @@
 "use client"
-
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Mail, ArrowRight } from "lucide-react"
-import Link from "next/link"
+import { CheckCircle, Mail, ArrowLeft } from "lucide-react"
 import { DynamicLogo } from "@/components/dynamic-logo"
 
 export default function SignupSuccessPage() {
@@ -15,53 +14,50 @@ export default function SignupSuccessPage() {
             <DynamicLogo className="h-12 w-auto" />
           </div>
           <div className="flex justify-center mb-4">
-            <CheckCircle className="h-16 w-16 text-green-500" />
+            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+            </div>
           </div>
-          <CardTitle className="text-2xl font-bold text-green-600">Account Created Successfully!</CardTitle>
-          <CardDescription>Welcome to the Erigga Live community</CardDescription>
+          <CardTitle className="text-2xl font-bold text-green-600 dark:text-green-400">Account Created!</CardTitle>
+          <CardDescription className="text-center">
+            Your Erigga Live account has been successfully created.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="text-center space-y-4">
-            <div className="flex items-center justify-center space-x-2 text-muted-foreground">
-              <Mail className="h-5 w-5" />
-              <span>Check your email to verify your account</span>
+            <div className="flex justify-center">
+              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
+                <Mail className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              </div>
             </div>
-
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-              <h3 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">Next Steps:</h3>
-              <ol className="text-sm text-blue-700 dark:text-blue-300 space-y-1 text-left">
-                <li>1. Check your email inbox</li>
-                <li>2. Click the verification link</li>
-                <li>3. Return here to sign in</li>
-                <li>4. Start exploring exclusive content!</li>
-              </ol>
-            </div>
-
-            <div className="text-sm text-muted-foreground">
-              <p>Didn't receive an email? Check your spam folder or contact support.</p>
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Check Your Email</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                We've sent you a verification email. Please check your inbox and click the verification link to activate
+                your account before logging in.
+              </p>
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  <strong>Important:</strong> You must verify your email address before you can log in to your account.
+                </p>
+              </div>
             </div>
           </div>
 
           <div className="space-y-3">
             <Button asChild className="w-full">
-              <Link href="/login">
-                Continue to Sign In
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
+              <Link href="/login">Continue to Login</Link>
             </Button>
-
-            <Button variant="outline" asChild className="w-full bg-transparent">
-              <Link href="/">Back to Home</Link>
+            <Button asChild variant="outline" className="w-full bg-transparent">
+              <Link href="/">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Home
+              </Link>
             </Button>
           </div>
 
           <div className="text-center text-sm text-muted-foreground">
-            <p>
-              Need help?{" "}
-              <Link href="/contact" className="text-primary hover:underline underline-offset-4">
-                Contact Support
-              </Link>
-            </p>
+            <p>Didn't receive the email? Check your spam folder or contact support.</p>
           </div>
         </CardContent>
       </Card>
