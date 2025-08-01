@@ -92,7 +92,7 @@ export default function CommunityPage() {
     loadData()
     loadChatMessages()
 
-    // Set up real-time subscriptions with proper v2 syntax
+    // Set up real-time subscriptions
     const postsSubscription = supabase
       .channel("community_posts_changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "community_posts" }, (payload) => {
@@ -104,7 +104,7 @@ export default function CommunityPage() {
     const chatSubscription = supabase
       .channel("community_chat_changes")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "community_chat" }, (payload) => {
-        console.log("Chat change received:", payload)
+        console.log("Chat message received:", payload)
         loadChatMessages()
       })
       .subscribe()
@@ -127,7 +127,7 @@ export default function CommunityPage() {
     try {
       setLoading(true)
 
-      // Load categories with proper v2 syntax
+      // Load categories
       const { data: categoriesData, error: categoriesError } = await supabase
         .from("community_categories")
         .select("*")
@@ -140,7 +140,7 @@ export default function CommunityPage() {
         setCategories(categoriesData || [])
       }
 
-      // Build posts query with proper v2 syntax
+      // Build posts query
       let postsQuery = supabase
         .from("community_posts")
         .select(`
@@ -222,11 +222,11 @@ export default function CommunityPage() {
       const { data: messages, error } = await supabase
         .from("community_chat")
         .select(`
-        *,
-        user:users!community_chat_user_id_fkey (
-          id, username, full_name, avatar_url, tier
-        )
-      `)
+          *,
+          user:users!community_chat_user_id_fkey (
+            id, username, full_name, avatar_url, tier
+          )
+        `)
         .order("created_at", { ascending: true })
         .limit(50)
 
@@ -344,13 +344,10 @@ export default function CommunityPage() {
 
         if (deleteError) throw deleteError
 
-        // Update vote count
-        const { error: updateError } = await supabase
+        await supabase
           .from("community_posts")
-          .update({ vote_count: 0 }) // You may need to calculate this properly
+          .update({ vote_count: supabase.raw("GREATEST(vote_count - 1, 0)") })
           .eq("id", postId)
-
-        if (updateError) throw updateError
 
         toast({
           title: "Vote Removed",
@@ -364,13 +361,10 @@ export default function CommunityPage() {
 
         if (insertError) throw insertError
 
-        // Update vote count
-        const { error: updateError } = await supabase
+        await supabase
           .from("community_posts")
-          .update({ vote_count: 1 }) // You may need to calculate this properly
+          .update({ vote_count: supabase.raw("vote_count + 1") })
           .eq("id", postId)
-
-        if (updateError) throw updateError
 
         toast({
           title: "Vote Added",

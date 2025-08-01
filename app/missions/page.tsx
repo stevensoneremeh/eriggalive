@@ -4,241 +4,280 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
-import { Target, Users, Crown, Coins, Zap, Star, ArrowRight } from "lucide-react"
+import { Crown, Users, Trophy, Target, Coins, Zap } from "lucide-react"
 
 export default function MissionsPage() {
-  const missions = [
-    {
-      title: "Join the Movement",
-      description: "Connect with the real ones in the Erigga community",
-      icon: <Users className="h-8 w-8" />,
-      color: "from-blue-500 to-cyan-500",
-      delay: 0.1,
-    },
-    {
-      title: "Earn & Cash Out",
-      description: "Points, coins, and exclusive rewards for your loyalty",
-      icon: <Coins className="h-8 w-8" />,
-      color: "from-yellow-500 to-orange-500",
-      delay: 0.2,
-    },
-    {
-      title: "Exclusive Access",
-      description: "Meet & Greet with Erigga, private content, and more",
-      icon: <Crown className="h-8 w-8" />,
-      color: "from-purple-500 to-pink-500",
-      delay: 0.3,
-    },
-    {
-      title: "Rep the Street",
-      description: "Your profile, your hustle, your voice in the community",
-      icon: <Star className="h-8 w-8" />,
-      color: "from-green-500 to-emerald-500",
-      delay: 0.4,
-    },
-  ]
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
-        <div className="absolute top-40 right-10 w-72 h-72 bg-yellow-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-1000"></div>
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-2000"></div>
+    <div className="min-h-screen bg-black text-white relative overflow-hidden">
+      {/* Background Elements */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 via-black to-yellow-900/20" />
+      <div className="absolute inset-0 bg-[url('/placeholder.svg?height=1080&width=1920')] opacity-10" />
+
+      {/* Animated smoke */}
+      <div className="absolute top-0 left-0 w-full h-full">
+        <motion.div
+          className="absolute top-20 left-10 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl"
+          animate={{
+            x: [0, 100, 0],
+            y: [0, -50, 0],
+          }}
+          transition={{ duration: 8, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
+        />
+        <motion.div
+          className="absolute top-40 right-20 w-40 h-40 bg-yellow-500/10 rounded-full blur-3xl"
+          animate={{
+            x: [0, -80, 0],
+            y: [0, 60, 0],
+          }}
+          transition={{ duration: 10, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
+        />
       </div>
 
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-4">
-        <div className="max-w-6xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="mb-12"
-          >
-            <Target className="h-16 w-16 mx-auto mb-6 text-blue-400" />
-            <h1 className="text-6xl md:text-8xl font-black mb-8 leading-tight">
-              <span className="bg-gradient-to-r from-blue-400 via-purple-500 to-yellow-400 bg-clip-text text-transparent">
-                MISSIONS
-              </span>
-            </h1>
-          </motion.div>
-
-          {/* Animated Mission Statement */}
-          <motion.div
+      <div className="relative z-10 container mx-auto px-4 py-20">
+        {/* Hero Section */}
+        <motion.div
+          className="text-center mb-16"
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1 }}
+        >
+          <motion.h1
+            className="text-6xl md:text-8xl font-black mb-8 leading-none"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.5, duration: 1 }}
-            className="max-w-4xl mx-auto mb-16"
+            transition={{ delay: 0.5, duration: 2 }}
           >
-            <div className="text-2xl md:text-4xl font-bold leading-relaxed space-y-4">
-              <motion.div
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.8, duration: 0.6 }}
-                className="text-red-400"
-              >
-                No space for dirty boxers.
-              </motion.div>
+            <motion.div
+              className="bg-gradient-to-r from-neon-blue via-white to-gold bg-clip-text text-transparent"
+              animate={{
+                backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Number.POSITIVE_INFINITY,
+                ease: "linear",
+              }}
+            >
+              THE MISSION
+            </motion.div>
+          </motion.h1>
 
-              <motion.div
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 1.2, duration: 0.6 }}
-                className="text-red-400"
-              >
-                No space for fake fam.
-              </motion.div>
+          {/* Animated Mission Statement */}
+          <div className="max-w-4xl mx-auto space-y-6 text-xl md:text-2xl font-bold">
+            <motion.p
+              initial={{ opacity: 0, x: -100 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 1, duration: 0.8 }}
+              className="text-gray-300"
+            >
+              No space for dirty boxers.
+            </motion.p>
 
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 1.6, duration: 0.6 }}
-                className="text-yellow-400"
-              >
+            <motion.p
+              initial={{ opacity: 0, x: 100 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 1.5, duration: 0.8 }}
+              className="text-gray-300"
+            >
+              No space for fake fam.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 2, duration: 1 }}
+              className="relative"
+            >
+              <p className="text-neon-blue text-3xl md:text-4xl font-black">
                 Only room for the street kings and queens
-              </motion.div>
-
+              </p>
               <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 2.0, duration: 0.6 }}
-                className="text-blue-400"
-              >
-                who grind, rise, and rep Warri loud.
-              </motion.div>
+                className="absolute -inset-4 bg-blue-500/20 blur-xl rounded-lg"
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
+              />
+            </motion.div>
 
+            <motion.p
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 2.5, duration: 0.8 }}
+              className="text-gray-300"
+            >
+              who grind, rise, and rep Warri loud.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 3, duration: 1 }}
+              className="relative"
+            >
+              <p className="text-gold text-3xl md:text-4xl font-black">This is where the real ones connect,</p>
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 2.4, duration: 0.6 }}
-                className="text-purple-400"
-              >
-                This is where the real ones connect,
-              </motion.div>
+                className="absolute -inset-4 bg-yellow-500/20 blur-xl rounded-lg"
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY, delay: 0.5 }}
+              />
+            </motion.div>
 
+            <motion.p
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 3.5, duration: 0.8 }}
+              className="text-neon-blue font-black text-2xl md:text-3xl"
+            >
+              cash out, and leave their mark.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 4, duration: 1 }}
+              className="text-center pt-8"
+            >
               <motion.div
-                initial={{ opacity: 0, scale: 1.2 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 2.8, duration: 0.6 }}
-                className="text-green-400 relative"
+                className="inline-block text-6xl"
+                animate={{ rotate: [0, 360] }}
+                transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
               >
-                cash out, and leave their mark.
-                <motion.div
-                  initial={{ opacity: 0, scale: 0 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 3.2, duration: 0.4 }}
-                  className="absolute -top-2 -right-2"
-                >
-                  <Zap className="h-8 w-8 text-yellow-400 animate-pulse" />
-                </motion.div>
+                💫
               </motion.div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
+            </motion.div>
+          </div>
+        </motion.div>
 
-      {/* Missions Cards */}
-      <section className="relative py-20 px-4">
-        <div className="max-w-6xl mx-auto">
-          <motion.h2
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-4xl md:text-5xl font-bold text-center mb-16"
-          >
-            Your <span className="text-blue-400">Street</span> Missions
-          </motion.h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {missions.map((mission, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 50, rotateY: -15 }}
-                whileInView={{ opacity: 1, y: 0, rotateY: 0 }}
-                transition={{ delay: mission.delay, duration: 0.6 }}
-                whileHover={{
-                  scale: 1.05,
-                  rotateY: 5,
-                  transition: { duration: 0.3 },
-                }}
-                className="perspective-1000"
+        {/* Mission Cards */}
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16"
+          initial={{ opacity: 0, y: 100 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 4.5, duration: 1 }}
+        >
+          {[
+            {
+              title: "Join the Movement",
+              description: "Connect with the real ones",
+              icon: <Users className="h-8 w-8" />,
+              color: "from-blue-500 to-cyan-500",
+              bgColor: "bg-blue-500/10",
+            },
+            {
+              title: "Earn & Cash Out",
+              description: "Points, coins, and exclusive rewards",
+              icon: <Coins className="h-8 w-8" />,
+              color: "from-yellow-500 to-orange-500",
+              bgColor: "bg-yellow-500/10",
+            },
+            {
+              title: "Exclusive Access",
+              description: "Meet & Greet with Erigga, private content",
+              icon: <Crown className="h-8 w-8" />,
+              color: "from-purple-500 to-pink-500",
+              bgColor: "bg-purple-500/10",
+            },
+            {
+              title: "Rep the Street",
+              description: "Your profile, your hustle, your voice",
+              icon: <Trophy className="h-8 w-8" />,
+              color: "from-green-500 to-emerald-500",
+              bgColor: "bg-green-500/10",
+            },
+          ].map((mission, index) => (
+            <motion.div
+              key={mission.title}
+              initial={{ opacity: 0, rotateY: 90 }}
+              animate={{ opacity: 1, rotateY: 0 }}
+              transition={{ delay: 5 + index * 0.2, duration: 0.8 }}
+              whileHover={{
+                scale: 1.05,
+                rotateY: 10,
+                transition: { duration: 0.3 },
+              }}
+            >
+              <Card
+                className={`${mission.bgColor} border-2 border-gray-800 hover:border-gray-600 transition-all duration-300 h-full backdrop-blur-sm`}
               >
-                <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm h-full overflow-hidden group">
-                  <CardContent className="p-6 h-full flex flex-col">
-                    <div
-                      className={`w-16 h-16 rounded-full bg-gradient-to-r ${mission.color} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}
+                <CardContent className="p-6 text-center h-full flex flex-col justify-between">
+                  <div>
+                    <motion.div
+                      className={`w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r ${mission.color} flex items-center justify-center`}
+                      whileHover={{ rotate: 360 }}
+                      transition={{ duration: 0.6 }}
                     >
                       {mission.icon}
-                    </div>
+                    </motion.div>
+                    <h3 className="text-xl font-bold mb-3 text-white">{mission.title}</h3>
+                    <p className="text-gray-300 text-sm">{mission.description}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </motion.div>
 
-                    <h3 className="text-xl font-bold mb-4 text-white group-hover:text-blue-400 transition-colors">
-                      {mission.title}
-                    </h3>
-
-                    <p className="text-gray-300 flex-grow leading-relaxed">{mission.description}</p>
-
-                    <div className="mt-6">
-                      <div
-                        className={`h-1 bg-gradient-to-r ${mission.color} rounded-full transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500`}
-                      ></div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Call to Action */}
-      <section className="relative py-20 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8 }}
-            className="bg-gradient-to-r from-blue-600 via-purple-600 to-yellow-600 p-1 rounded-2xl"
-          >
-            <div className="bg-gray-900 rounded-2xl p-12">
-              <h2 className="text-4xl md:text-5xl font-bold mb-6">
-                Ready to{" "}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-yellow-400">Join</span>
-                ?
-              </h2>
-
-              <p className="text-xl text-gray-300 mb-8 leading-relaxed">
-                Step into the Erigga Live community where real recognizes real. Your street journey starts here.
-              </p>
-
-              <Link href="/login">
-                <Button
-                  size="lg"
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-full text-lg shadow-2xl hover:shadow-blue-500/25 transition-all duration-300 group"
-                >
-                  Join the Movement
-                  <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </Link>
-
-              <motion.div
-                animate={{
-                  scale: [1, 1.05, 1],
-                  opacity: [0.5, 1, 0.5],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Number.POSITIVE_INFINITY,
-                  ease: "easeInOut",
-                }}
-                className="mt-8"
+        {/* Call to Action */}
+        <motion.div
+          className="text-center"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 6, duration: 1 }}
+        >
+          <Link href="/login">
+            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                size="lg"
+                className="text-xl px-12 py-6 bg-gradient-to-r from-neon-blue to-gold hover:from-blue-600 hover:to-yellow-600 text-black font-black shadow-2xl relative overflow-hidden"
               >
-                <div className="w-2 h-2 bg-blue-400 rounded-full mx-auto animate-pulse"></div>
-              </motion.div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
+                <motion.div
+                  className="absolute inset-0 bg-white"
+                  animate={{
+                    opacity: [0, 0.3, 0],
+                    scale: [0, 1.5, 0],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Number.POSITIVE_INFINITY,
+                    ease: "easeInOut",
+                  }}
+                />
+                <span className="relative z-10 flex items-center gap-3">
+                  <Target className="h-6 w-6" />
+                  JOIN THE MOVEMENT
+                  <Zap className="h-6 w-6" />
+                </span>
+              </Button>
+            </motion.div>
+          </Link>
+
+          <motion.p
+            className="mt-6 text-gray-400 text-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 6.5, duration: 1 }}
+          >
+            Ready to rep Warri and make your mark?
+          </motion.p>
+        </motion.div>
+      </div>
+
+      {/* Custom styles for neon colors */}
+      <style jsx>{`
+        .text-neon-blue {
+          color: #00f5ff;
+          text-shadow: 0 0 10px #00f5ff;
+        }
+        .text-gold {
+          color: #ffd700;
+          text-shadow: 0 0 10px #ffd700;
+        }
+        .from-neon-blue {
+          --tw-gradient-from: #00f5ff;
+        }
+        .to-gold {
+          --tw-gradient-to: #ffd700;
+        }
+      `}</style>
     </div>
   )
 }
