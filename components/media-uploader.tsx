@@ -1,18 +1,13 @@
 "use client"
 
 import type React from "react"
+
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { toast } from "@/components/ui/use-toast"
 import { ImageIcon, Music, FileText, Video, X, Upload } from "lucide-react"
-import { supabase } from "@/lib/supabase"
-
-interface MediaUploadResult {
-  success: boolean
-  url?: string
-  error?: string
-}
+import { uploadMedia, type MediaUploadResult } from "@/utils/media-upload"
 
 interface MediaUploaderProps {
   userId: number
@@ -28,31 +23,6 @@ export function MediaUploader({ userId, postId, commentId, onUploadComplete, max
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const uploadMedia = async (file: File): Promise<MediaUploadResult> => {
-    try {
-      const fileExt = file.name.split(".").pop()
-      const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`
-      const filePath = `community/${fileName}`
-
-      const { data, error } = await supabase.storage.from("eriggalive-assets").upload(filePath, file)
-
-      if (error) throw error
-
-      const { data: urlData } = supabase.storage.from("eriggalive-assets").getPublicUrl(data.path)
-
-      return {
-        success: true,
-        url: urlData.publicUrl,
-      }
-    } catch (error) {
-      console.error("Error uploading file:", error)
-      return {
-        success: false,
-        error: "Failed to upload file",
-      }
-    }
-  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return
@@ -109,11 +79,19 @@ export function MediaUploader({ userId, postId, commentId, onUploadComplete, max
     const results: MediaUploadResult[] = []
 
     for (let i = 0; i < files.length; i++) {
-      const result = await uploadMedia(files[i])
-      results.push(result)
+      try {
+        const result = await uploadMedia(files[i], userId, postId, commentId)
+        results.push(result)
 
-      // Update progress
-      setProgress(Math.round(((i + 1) / files.length) * 100))
+        // Update progress
+        setProgress(Math.round(((i + 1) / files.length) * 100))
+      } catch (error) {
+        console.error("Error uploading file:", error)
+        results.push({
+          success: false,
+          error: "Failed to upload file",
+        })
+      }
     }
 
     // Call the callback with all results

@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
-import { supabase } from "@/lib/supabase"
+import { createClient } from "@supabase/supabase-js"
 import { useAuth } from "@/contexts/auth-context"
 import { AuthGuard } from "@/components/auth-guard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,6 +29,9 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatDistanceToNow } from "date-fns"
+
+// Initialize Supabase client with v2 syntax
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 interface Post {
   id: number
@@ -98,7 +101,6 @@ export default function CommunityPage() {
   const [categoryFilter, setCategoryFilter] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState("posts")
   const [error, setError] = useState<string | null>(null)
-  const [uploadingMedia, setUploadingMedia] = useState(false)
   const [selectedMedia, setSelectedMedia] = useState<File | null>(null)
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
 
@@ -111,7 +113,7 @@ export default function CommunityPage() {
     loadData()
     loadChatMessages()
 
-    // Set up real-time subscriptions
+    // Set up real-time subscriptions using Supabase v2 syntax
     const postsSubscription = supabase
       .channel("community_posts_changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "community_posts" }, (payload) => {
@@ -147,7 +149,7 @@ export default function CommunityPage() {
       setLoading(true)
       setError(null)
 
-      // Load categories
+      // Load categories using Supabase v2 syntax
       const { data: categoriesData, error: categoriesError } = await supabase
         .from("community_categories")
         .select("*")
@@ -161,7 +163,7 @@ export default function CommunityPage() {
         setCategories(categoriesData || [])
       }
 
-      // Build posts query
+      // Build posts query using Supabase v2 syntax
       let postsQuery = supabase
         .from("community_posts")
         .select(`
@@ -184,7 +186,7 @@ export default function CommunityPage() {
         postsQuery = postsQuery.ilike("content", `%${searchQuery}%`)
       }
 
-      // Apply sorting
+      // Apply sorting using Supabase v2 syntax
       switch (sortOrder) {
         case "oldest":
           postsQuery = postsQuery.order("created_at", { ascending: true })
@@ -266,55 +268,30 @@ export default function CommunityPage() {
 
   const handleMediaSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file) return
-
-    // Validate file type
-    const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "video/mp4", "video/webm"]
-    if (!validTypes.includes(file.type)) {
-      toast({
-        title: "Invalid file type",
-        description: "Please select an image or video file.",
-        variant: "destructive",
-      })
-      return
+    if (file) {
+      setSelectedMedia(file)
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setMediaPreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
     }
-
-    // Validate file size (10MB limit)
-    if (file.size > 10 * 1024 * 1024) {
-      toast({
-        title: "File too large",
-        description: "Please select a file smaller than 10MB.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setSelectedMedia(file)
-
-    // Create preview
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      setMediaPreview(e.target?.result as string)
-    }
-    reader.readAsDataURL(file)
   }
 
-  const uploadMedia = async (file: File): Promise<string | null> => {
-    try {
-      const fileExt = file.name.split(".").pop()
-      const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`
-      const filePath = `community/${fileName}`
+  const uploadMedia = async (file: File) => {
+    const fileExt = file.name.split(".").pop()
+    const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`
+    const filePath = `community/${fileName}`
 
-      const { data, error } = await supabase.storage.from("eriggalive-assets").upload(filePath, file)
+    const { data, error } = await supabase.storage.from("eriggalive-assets").upload(filePath, file)
 
-      if (error) throw error
+    if (error) throw error
 
-      const { data: urlData } = supabase.storage.from("eriggalive-assets").getPublicUrl(data.path)
+    const { data: urlData } = supabase.storage.from("eriggalive-assets").getPublicUrl(data.path)
 
-      return urlData.publicUrl
-    } catch (error) {
-      console.error("Error uploading media:", error)
-      return null
+    return {
+      url: urlData.publicUrl,
+      type: file.type.startsWith("image/") ? "image" : file.type.startsWith("video/") ? "video" : "file",
     }
   }
 
@@ -333,14 +310,10 @@ export default function CommunityPage() {
       let mediaUrl = null
       let mediaType = null
 
-      // Upload media if selected
       if (selectedMedia) {
-        setUploadingMedia(true)
-        mediaUrl = await uploadMedia(selectedMedia)
-        if (mediaUrl) {
-          mediaType = selectedMedia.type.startsWith("image/") ? "image" : "video"
-        }
-        setUploadingMedia(false)
+        const mediaData = await uploadMedia(selectedMedia)
+        mediaUrl = mediaData.url
+        mediaType = mediaData.type
       }
 
       const { data, error } = await supabase
@@ -378,7 +351,6 @@ export default function CommunityPage() {
       })
     } finally {
       setPosting(false)
-      setUploadingMedia(false)
     }
   }
 
@@ -688,19 +660,19 @@ export default function CommunityPage() {
                                 alt="Preview"
                                 className="max-h-64 rounded-lg"
                               />
-                            ) : (
+                            ) : selectedMedia?.type.startsWith("video/") ? (
                               <video src={mediaPreview} controls className="max-h-64 rounded-lg" />
-                            )}
+                            ) : null}
                             <Button
-                              size="sm"
                               variant="destructive"
+                              size="sm"
                               className="absolute top-2 right-2"
                               onClick={() => {
                                 setSelectedMedia(null)
                                 setMediaPreview(null)
                               }}
                             >
-                              Remove
+                              ×
                             </Button>
                           </div>
                         )}
@@ -723,16 +695,6 @@ export default function CommunityPage() {
                               </SelectContent>
                             </Select>
 
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => fileInputRef.current?.click()}
-                              disabled={posting || uploadingMedia}
-                            >
-                              <ImageIcon className="h-4 w-4 mr-2" />
-                              Media
-                            </Button>
                             <input
                               ref={fileInputRef}
                               type="file"
@@ -740,14 +702,18 @@ export default function CommunityPage() {
                               className="hidden"
                               onChange={handleMediaSelect}
                             />
+                            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                              <ImageIcon className="w-4 h-4 mr-1" />
+                              Media
+                            </Button>
                           </div>
 
                           <Button
                             onClick={createPost}
-                            disabled={!newPost.trim() || posting || !selectedCategory || uploadingMedia}
+                            disabled={!newPost.trim() || posting || !selectedCategory}
                             className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                           >
-                            {posting || uploadingMedia ? "Posting..." : "Post"}
+                            {posting ? "Posting..." : "Post"}
                           </Button>
                         </div>
                       </CardContent>

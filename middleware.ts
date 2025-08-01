@@ -1,11 +1,10 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { NextResponse, type NextRequest } from "next/server"
 
 // Define public paths that don't require authentication
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/terms", "/privacy"]
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/terms", "/privacy", "/about"]
 
 // Define paths that should always be accessible regardless of auth status
-const ALWAYS_ACCESSIBLE = ["/api", "/_next", "/favicon.ico", "/images", "/videos", "/fonts", "/placeholder"]
+const ALWAYS_ACCESSIBLE = ["/api", "/_next", "/favicon.ico", "/images", "/videos", "/fonts", "/placeholder", "/erigga"]
 
 // Define paths that require authentication
 const PROTECTED_PATHS = [
@@ -19,6 +18,8 @@ const PROTECTED_PATHS = [
   "/coins",
   "/settings",
   "/admin",
+  "/missions",
+  "/meet-and-greet",
 ]
 
 // Define auth paths that authenticated users should be redirected away from
@@ -58,101 +59,58 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  // Only proceed with auth checks if we have Supabase credentials
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return response
+  // Check if the path is public
+  const isPublicPath = PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+
+  // Check if the path requires authentication
+  const requiresAuth = PROTECTED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+
+  // Check if the path is an auth path
+  const isAuthPath = AUTH_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+
+  // Get auth token from cookies (simplified approach)
+  const authToken =
+    request.cookies.get("sb-access-token")?.value ||
+    request.cookies.get("supabase-auth-token")?.value ||
+    request.cookies.get("sb-localhost-auth-token")?.value
+
+  const isAuthenticated = !!authToken
+
+  // Handle authenticated users accessing auth pages
+  if (isAuthenticated && isAuthPath) {
+    let redirectPath = "/dashboard"
+
+    // Check for redirect parameter in URL
+    const redirectParam = request.nextUrl.searchParams.get("redirect")
+    if (
+      redirectParam &&
+      redirectParam.startsWith("/") &&
+      PROTECTED_PATHS.some((path) => redirectParam === path || redirectParam.startsWith(`${path}/`))
+    ) {
+      redirectPath = redirectParam
+    }
+
+    return NextResponse.redirect(new URL(redirectPath, request.url))
   }
 
-  try {
-    const supabase = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        auth: {
-          persistSession: false,
-        },
-        global: {
-          headers: {
-            Cookie: request.cookies.toString(),
-          },
-        },
-      },
-    )
+  // Handle unauthenticated users accessing protected routes
+  if (requiresAuth && !isAuthenticated) {
+    // Store the current path for post-login redirect
+    const redirectUrl = new URL("/login", request.url)
+    redirectUrl.searchParams.set("redirect", pathname)
 
-    // Get user session
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const redirectResponse = NextResponse.redirect(redirectUrl)
 
-    // Get stored redirect path from cookies
-    const storedRedirectPath = request.cookies.get("erigga_redirect_path")?.value
+    // Store redirect path in cookie for backup
+    redirectResponse.cookies.set("erigga_redirect_path", pathname, {
+      path: "/",
+      maxAge: 60 * 10, // 10 minutes
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    })
 
-    // Check if the path is public
-    const isPublicPath = PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
-
-    // Check if the path requires authentication
-    const requiresAuth = PROTECTED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
-
-    // Check if the path is an auth path
-    const isAuthPath = AUTH_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
-
-    // Handle authenticated users accessing auth pages
-    if (user && isAuthPath) {
-      let redirectPath = "/dashboard"
-
-      // Check for redirect parameter in URL
-      const redirectParam = request.nextUrl.searchParams.get("redirect")
-      if (
-        redirectParam &&
-        redirectParam.startsWith("/") &&
-        PROTECTED_PATHS.some((path) => redirectParam === path || redirectParam.startsWith(`${path}/`))
-      ) {
-        redirectPath = redirectParam
-      }
-      // Check for stored redirect path
-      else if (
-        storedRedirectPath &&
-        storedRedirectPath.startsWith("/") &&
-        PROTECTED_PATHS.some((path) => storedRedirectPath === path || storedRedirectPath.startsWith(`${path}/`))
-      ) {
-        redirectPath = storedRedirectPath
-      }
-
-      const redirectResponse = NextResponse.redirect(new URL(redirectPath, request.url))
-
-      // Clear the stored redirect path cookie
-      redirectResponse.cookies.delete("erigga_redirect_path")
-
-      return redirectResponse
-    }
-
-    // Handle unauthenticated users accessing protected routes
-    if (requiresAuth && !user) {
-      // Store the current path for post-login redirect
-      const redirectUrl = new URL("/login", request.url)
-      redirectUrl.searchParams.set("redirect", pathname)
-
-      const redirectResponse = NextResponse.redirect(redirectUrl)
-
-      // Store redirect path in cookie for backup
-      redirectResponse.cookies.set("erigga_redirect_path", pathname, {
-        path: "/",
-        maxAge: 60 * 10, // 10 minutes
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-      })
-
-      return redirectResponse
-    }
-
-    // Handle root path redirect for authenticated users
-    if (pathname === "/" && user) {
-      return NextResponse.redirect(new URL("/dashboard", request.url))
-    }
-  } catch (error) {
-    console.error("Middleware auth error:", error)
-    // Continue without auth checks if there's an error
+    return redirectResponse
   }
 
   // For all other cases, proceed normally
@@ -170,6 +128,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * - public files (images, etc.)
      */
-    "/((?!api/|_next/static|_next/image|favicon.ico|images/|videos/|fonts/|placeholder).*)",
+    "/((?!api/|_next/static|_next/image|favicon.ico|images/|videos/|fonts/|placeholder|erigga/).*)",
   ],
 }
