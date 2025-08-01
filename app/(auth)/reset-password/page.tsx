@@ -1,17 +1,15 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
+import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Eye, EyeOff, Loader2, CheckCircle } from "lucide-react"
-import Link from "next/link"
 import { DynamicLogo } from "@/components/dynamic-logo"
 
 export default function ResetPasswordPage() {
@@ -22,8 +20,6 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
-
-  const { updatePassword } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -33,14 +29,20 @@ export default function ResetPasswordPage() {
     const refreshToken = searchParams.get("refresh_token")
 
     if (!accessToken || !refreshToken) {
-      setError("Invalid or expired reset link. Please request a new password reset.")
+      setError("Invalid reset link. Please request a new password reset.")
     }
   }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setError("")
+    setLoading(true)
+
+    if (!password || !confirmPassword) {
+      setError("Please fill in all fields")
+      setLoading(false)
+      return
+    }
 
     if (password !== confirmPassword) {
       setError("Passwords do not match")
@@ -55,17 +57,22 @@ export default function ResetPasswordPage() {
     }
 
     try {
-      const { error } = await updatePassword(password)
+      const { error } = await supabase.auth.updateUser({
+        password: password,
+      })
+
       if (error) {
         setError(error.message)
       } else {
         setSuccess(true)
+        // Redirect to login after 3 seconds
         setTimeout(() => {
           router.push("/login")
         }, 3000)
       }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred")
+    } catch (error) {
+      console.error("Password reset error:", error)
+      setError("An unexpected error occurred")
     } finally {
       setLoading(false)
     }
@@ -80,21 +87,19 @@ export default function ResetPasswordPage() {
               <DynamicLogo className="h-12 w-auto" />
             </div>
             <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
-              </div>
+              <CheckCircle className="h-16 w-16 text-green-500" />
             </div>
-            <CardTitle className="text-2xl font-bold text-green-600 dark:text-green-400">Password Updated!</CardTitle>
-            <CardDescription>Your password has been successfully updated</CardDescription>
+            <CardTitle className="text-2xl font-bold text-green-600">Password Reset Successful!</CardTitle>
+            <CardDescription>Your password has been updated successfully</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="text-center space-y-4">
             <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
-              <p className="text-sm text-green-700 dark:text-green-300 text-center">
-                Redirecting you to login page in a few seconds...
+              <p className="text-green-800 dark:text-green-200">
+                You can now sign in with your new password. Redirecting to login page...
               </p>
             </div>
-            <Button asChild className="w-full">
-              <Link href="/login">Continue to Login</Link>
+            <Button onClick={() => router.push("/login")} className="w-full">
+              Continue to Sign In
             </Button>
           </CardContent>
         </Card>
@@ -114,13 +119,19 @@ export default function ResetPasswordPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="password">New Password</Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Enter new password"
+                  placeholder="Enter your new password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -138,13 +149,14 @@ export default function ResetPasswordPage() {
                 </Button>
               </div>
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm New Password</Label>
               <div className="relative">
                 <Input
                   id="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
-                  placeholder="Confirm new password"
+                  placeholder="Confirm your new password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
@@ -163,11 +175,9 @@ export default function ResetPasswordPage() {
               </div>
             </div>
 
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+            <div className="text-sm text-muted-foreground">
+              <p>Password must be at least 6 characters long</p>
+            </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? (
@@ -180,15 +190,6 @@ export default function ResetPasswordPage() {
               )}
             </Button>
           </form>
-
-          <div className="mt-6 text-center">
-            <Link
-              href="/login"
-              className="text-sm text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
-            >
-              Back to Login
-            </Link>
-          </div>
         </CardContent>
       </Card>
     </div>

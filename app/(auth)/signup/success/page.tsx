@@ -1,75 +1,65 @@
 "use client"
 
-import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Mail } from "lucide-react"
+import { CheckCircle, Mail, ArrowRight } from "lucide-react"
+import Link from "next/link"
+import { DynamicLogo } from "@/components/dynamic-logo"
 
 export default function SignupSuccessPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
-      <Card className="w-full max-w-md bg-white/10 backdrop-blur-md border-white/20">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
+      <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
-          <div className="mx-auto mb-4 w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center">
-            <CheckCircle className="w-8 h-8 text-green-400" />
+          <div className="flex justify-center mb-4">
+            <DynamicLogo className="h-12 w-auto" />
           </div>
-          <CardTitle className="text-2xl font-bold text-white">Welcome to Erigga Live!</CardTitle>
-          <CardDescription className="text-gray-300">Your account has been created successfully</CardDescription>
+          <div className="flex justify-center mb-4">
+            <CheckCircle className="h-16 w-16 text-green-500" />
+          </div>
+          <CardTitle className="text-2xl font-bold text-green-600">Account Created Successfully!</CardTitle>
+          <CardDescription>Welcome to the Erigga Live community</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-4">
-            <div className="flex items-start space-x-3">
-              <Mail className="w-5 h-5 text-blue-400 mt-0.5" />
-              <div>
-                <h3 className="text-white font-medium">Check Your Email</h3>
-                <p className="text-gray-300 text-sm mt-1">
-                  We've sent you a verification email. Please click the link in the email to verify your account before
-                  logging in.
-                </p>
-              </div>
+          <div className="text-center space-y-4">
+            <div className="flex items-center justify-center space-x-2 text-muted-foreground">
+              <Mail className="h-5 w-5" />
+              <span>Check your email to verify your account</span>
+            </div>
+
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+              <h3 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">Next Steps:</h3>
+              <ol className="text-sm text-blue-700 dark:text-blue-300 space-y-1 text-left">
+                <li>1. Check your email inbox</li>
+                <li>2. Click the verification link</li>
+                <li>3. Return here to sign in</li>
+                <li>4. Start exploring exclusive content!</li>
+              </ol>
+            </div>
+
+            <div className="text-sm text-muted-foreground">
+              <p>Didn't receive an email? Check your spam folder or contact support.</p>
             </div>
           </div>
 
           <div className="space-y-3">
-            <h4 className="text-white font-medium">What's Next?</h4>
-            <ul className="space-y-2 text-gray-300 text-sm">
-              <li className="flex items-center space-x-2">
-                <div className="w-1.5 h-1.5 bg-purple-400 rounded-full"></div>
-                <span>Verify your email address</span>
-              </li>
-              <li className="flex items-center space-x-2">
-                <div className="w-1.5 h-1.5 bg-purple-400 rounded-full"></div>
-                <span>Complete your profile setup</span>
-              </li>
-              <li className="flex items-center space-x-2">
-                <div className="w-1.5 h-1.5 bg-purple-400 rounded-full"></div>
-                <span>Explore exclusive content and community</span>
-              </li>
-              <li className="flex items-center space-x-2">
-                <div className="w-1.5 h-1.5 bg-purple-400 rounded-full"></div>
-                <span>Start earning Erigga Coins</span>
-              </li>
-            </ul>
+            <Button asChild className="w-full">
+              <Link href="/login">
+                Continue to Sign In
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+
+            <Button variant="outline" asChild className="w-full bg-transparent">
+              <Link href="/">Back to Home</Link>
+            </Button>
           </div>
 
-          <div className="space-y-3">
-            <Link href="/login">
-              <Button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white">
-                Go to Login
-              </Button>
-            </Link>
-            <Link href="/">
-              <Button variant="outline" className="w-full border-white/20 text-white hover:bg-white/10 bg-transparent">
-                Back to Home
-              </Button>
-            </Link>
-          </div>
-
-          <div className="text-center">
-            <p className="text-gray-400 text-xs">
-              Didn't receive the email? Check your spam folder or{" "}
-              <Link href="/signup" className="text-blue-400 hover:text-blue-300">
-                try again
+          <div className="text-center text-sm text-muted-foreground">
+            <p>
+              Need help?{" "}
+              <Link href="/contact" className="text-primary hover:underline underline-offset-4">
+                Contact Support
               </Link>
             </p>
           </div>

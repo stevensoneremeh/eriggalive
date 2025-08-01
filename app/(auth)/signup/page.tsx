@@ -1,28 +1,30 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { supabase } from "@/lib/supabase"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
+import { DynamicLogo } from "@/components/dynamic-logo"
 
 export default function SignupPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [username, setUsername] = useState("")
+  const [fullName, setFullName] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const router = useRouter()
+  const { signUp } = useAuth()
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -49,22 +51,14 @@ export default function SignupPage() {
     }
 
     try {
-      const { data, error: signupError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            username: username,
-          },
-        },
+      const { error } = await signUp(email, password, {
+        username,
+        full_name: fullName,
       })
 
-      if (signupError) {
-        setError(signupError.message)
-        return
-      }
-
-      if (data.user) {
+      if (error) {
+        setError(error.message)
+      } else {
         // Redirect to success page
         router.push("/signup/success")
       }
@@ -77,80 +71,90 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
-      <Card className="w-full max-w-md bg-white/10 backdrop-blur-md border-white/20">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center text-white">Join Erigga Live</CardTitle>
-          <CardDescription className="text-center text-gray-300">
-            Create your account to access exclusive content
-          </CardDescription>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1 text-center">
+          <div className="flex justify-center mb-4">
+            <DynamicLogo className="h-12 w-auto" />
+          </div>
+          <CardTitle className="text-2xl font-bold">Create your account</CardTitle>
+          <CardDescription>Join the Erigga Live community</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignup} className="space-y-4">
             {error && (
-              <Alert className="bg-red-500/20 border-red-500/50 text-red-100">
+              <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="username" className="text-white">
-                Username
-              </Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="Enter your username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
-                required
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Full Name</Label>
+                <Input
+                  id="fullName"
+                  type="text"
+                  placeholder="Your full name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="Choose username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-white">
-                Email
-              </Label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
                 required
+                disabled={loading}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-white">
-                Password
-              </Label>
+              <Label htmlFor="password">Password</Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
+                  placeholder="Create a password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 pr-10"
                   required
+                  disabled={loading}
                 />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                  disabled={loading}
                 >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-white">
-                Confirm Password
-              </Label>
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
               <div className="relative">
                 <Input
                   id="confirmPassword"
@@ -158,28 +162,27 @@ export default function SignupPage() {
                   placeholder="Confirm your password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 pr-10"
                   required
+                  disabled={loading}
                 />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                  disabled={loading}
                 >
-                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
               </div>
             </div>
 
-            <Button
-              type="submit"
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
-              disabled={loading}
-            >
+            <Button type="submit" className="w-full" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Account...
+                  Creating account...
                 </>
               ) : (
                 "Create Account"
@@ -188,12 +191,12 @@ export default function SignupPage() {
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-gray-300">
+            <div className="text-sm text-muted-foreground">
               Already have an account?{" "}
-              <Link href="/login" className="text-blue-400 hover:text-blue-300 font-medium">
+              <Link href="/login" className="text-primary hover:underline underline-offset-4">
                 Sign in
               </Link>
-            </p>
+            </div>
           </div>
         </CardContent>
       </Card>
