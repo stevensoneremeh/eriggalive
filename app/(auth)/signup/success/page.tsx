@@ -1,8 +1,9 @@
 "use client"
-import Link from "next/link"
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Mail, ArrowLeft } from "lucide-react"
+import { CheckCircle, Mail, ArrowRight } from "lucide-react"
+import Link from "next/link"
 import { DynamicLogo } from "@/components/dynamic-logo"
 
 export default function SignupSuccessPage() {
@@ -18,46 +19,51 @@ export default function SignupSuccessPage() {
               <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold text-green-600 dark:text-green-400">Account Created!</CardTitle>
+          <CardTitle className="text-2xl font-bold text-green-600 dark:text-green-400">
+            Account Created Successfully!
+          </CardTitle>
           <CardDescription className="text-center">
-            Your Erigga Live account has been successfully created.
+            Welcome to the Erigga Live community! We're excited to have you join us.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="text-center space-y-4">
-            <div className="flex justify-center">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
-                <Mail className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              </div>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Check Your Email</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                We've sent you a verification email. Please check your inbox and click the verification link to activate
-                your account before logging in.
-              </p>
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  <strong>Important:</strong> You must verify your email address before you can log in to your account.
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="flex items-start space-x-3">
+              <Mail className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">Check Your Email</h3>
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  We've sent you a verification email. Please click the link in the email to verify your account before
+                  logging in.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
+            <div className="text-center">
+              <h3 className="font-semibold mb-2">What's Next?</h3>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>✅ Verify your email address</li>
+                <li>🎵 Explore exclusive Erigga content</li>
+                <li>💬 Join the community discussions</li>
+                <li>🪙 Earn Erigga Coins for activities</li>
+              </ul>
+            </div>
+
             <Button asChild className="w-full">
-              <Link href="/login">Continue to Login</Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full bg-transparent">
-              <Link href="/">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Home
+              <Link href="/login" className="flex items-center justify-center">
+                Continue to Login
+                <ArrowRight className="w-4 h-4 ml-2" />
               </Link>
             </Button>
-          </div>
 
-          <div className="text-center text-sm text-muted-foreground">
-            <p>Didn't receive the email? Check your spam folder or contact support.</p>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">
+                Didn't receive the email?{" "}
+                <button className="text-primary hover:underline">Resend verification email</button>
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -12,7 +12,7 @@ interface PaymentScreenProps {
   bookingData: { date: string; time: string; amount: number }
   user: any
   profile: any
-  onSuccess: (bookingId: string) => void
+  onSuccess: () => void
   onBack: () => void
 }
 
@@ -79,20 +79,15 @@ export function PaymentScreen({ bookingData, user, profile, onSuccess, onBack }:
             // Payment successful
             try {
               // Save booking to database
-              const { data: booking, error: bookingError } = await supabase
-                .from("meet_greet_bookings")
-                .insert({
-                  user_id: profile.id,
-                  booking_date: bookingData.date,
-                  booking_time: bookingData.time,
-                  amount: bookingData.amount,
-                  payment_reference: reference,
-                  payment_status: "completed",
-                  status: "confirmed",
-                  created_at: new Date().toISOString(),
-                })
-                .select()
-                .single()
+              const { error: bookingError } = await supabase.from("meet_greet_bookings").insert({
+                user_id: profile.id,
+                booking_date: bookingData.date,
+                booking_time: bookingData.time,
+                amount: bookingData.amount,
+                payment_reference: reference,
+                payment_status: "completed",
+                status: "confirmed",
+              })
 
               if (bookingError) {
                 console.error("Booking save error:", bookingError)
@@ -112,7 +107,6 @@ export function PaymentScreen({ bookingData, user, profile, onSuccess, onBack }:
                   booking_time: bookingData.time,
                   paystack_reference: response.reference,
                 },
-                created_at: new Date().toISOString(),
               })
 
               if (paymentError) {
@@ -124,7 +118,7 @@ export function PaymentScreen({ bookingData, user, profile, onSuccess, onBack }:
                 description: "Your Meet & Greet session has been booked.",
               })
 
-              onSuccess(booking?.id || reference)
+              onSuccess()
             } catch (error) {
               console.error("Post-payment error:", error)
               toast({

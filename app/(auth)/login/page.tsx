@@ -1,16 +1,15 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useState } from "react"
 import Link from "next/link"
-import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Eye, EyeOff, Loader2 } from "lucide-react"
+import { Loader2, Eye, EyeOff } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
 
 export default function LoginPage() {
@@ -19,23 +18,13 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { signIn, user } = useAuth()
 
-  const redirectPath = searchParams.get("redirect") || "/dashboard"
+  const { signIn } = useAuth()
 
-  useEffect(() => {
-    // If user is already logged in, redirect
-    if (user) {
-      router.push(redirectPath)
-    }
-  }, [user, router, redirectPath])
-
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError("")
     setLoading(true)
+    setError("")
 
     if (!email || !password) {
       setError("Please fill in all fields")
@@ -46,18 +35,11 @@ export default function LoginPage() {
     try {
       const { error } = await signIn(email, password)
       if (error) {
-        if (error.message.includes("Email not confirmed")) {
-          setError("Please verify your email address before logging in. Check your inbox for the verification link.")
-        } else if (error.message.includes("Invalid login credentials")) {
-          setError("Invalid email or password. Please try again.")
-        } else {
-          setError(error.message)
-        }
+        setError(error.message)
         setLoading(false)
       }
-      // Don't set loading to false on success - let auth context handle redirect
-    } catch (error) {
-      console.error("Login error:", error)
+      // Don't set loading to false here if successful - let auth context handle redirect
+    } catch (err) {
       setError("An unexpected error occurred")
       setLoading(false)
     }
@@ -74,13 +56,7 @@ export default function LoginPage() {
           <CardDescription>Sign in to your Erigga Live account</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -93,7 +69,6 @@ export default function LoginPage() {
                 disabled={loading}
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
@@ -119,14 +94,11 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <Link
-                href="/forgot-password"
-                className="text-sm text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? (
@@ -140,7 +112,13 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 text-center space-y-2">
+            <Link
+              href="/forgot-password"
+              className="text-sm text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
+            >
+              Forgot your password?
+            </Link>
             <div className="text-sm text-muted-foreground">
               Don't have an account?{" "}
               <Link href="/signup" className="text-primary hover:underline underline-offset-4">

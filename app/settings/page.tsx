@@ -1,67 +1,39 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
-import { supabase } from "@/lib/supabaseClient"
+import { AuthGuard } from "@/components/auth-guard"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Switch } from "@/components/ui/switch"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
-import { AuthGuard } from "@/components/auth-guard"
-import {
-  Loader2,
-  Upload,
-  User,
-  Shield,
-  Bell,
-  Eye,
-  EyeOff,
-  Crown,
-  Coins,
-  Mail,
-  Calendar,
-  Lock,
-  Save,
-} from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { User, SettingsIcon, Bell, Shield, Save, Eye, EyeOff, Crown, Coins, Mail, Calendar, Lock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-
-interface UserProfile {
-  id: number
-  auth_user_id: string
-  username: string
-  email: string
-  full_name?: string
-  bio?: string
-  avatar_url?: string
-  tier: string
-  coins: number
-  created_at: string
-  updated_at: string
-}
+import { supabase } from "@/lib/supabase"
 
 export default function SettingsPage() {
-  const { user, profile: authProfile, refreshProfile } = useAuth()
+  const { user, profile, refreshProfile } = useAuth()
   const { toast } = useToast()
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
 
   // Profile form state
   const [profileForm, setProfileForm] = useState({
-    full_name: "",
-    username: "",
-    bio: "",
+    full_name: profile?.full_name || "",
+    username: profile?.username || "",
+    bio: profile?.bio || "",
+    location: profile?.location || "",
+    website: profile?.website || "",
+    phone: profile?.phone || "",
+    date_of_birth: profile?.date_of_birth || "",
   })
 
   // Password form state
@@ -73,41 +45,21 @@ export default function SettingsPage() {
 
   // Notification settings
   const [notifications, setNotifications] = useState({
-    email_notifications: true,
-    push_notifications: true,
-    community_updates: true,
-    marketing_emails: false,
+    email_notifications: profile?.email_notifications ?? true,
+    push_notifications: profile?.push_notifications ?? true,
+    community_updates: profile?.community_updates ?? true,
+    marketing_emails: profile?.marketing_emails ?? false,
   })
 
-  useEffect(() => {
-    if (user) {
-      fetchProfile()
-    }
-  }, [user])
-
-  const fetchProfile = async () => {
-    try {
-      const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", user?.id).single()
-
-      if (error) {
-        console.error("Error fetching profile:", error)
-      } else {
-        setProfile(data)
-        setProfileForm({
-          full_name: data.full_name || "",
-          username: data.username || "",
-          bio: data.bio || "",
-        })
-      }
-    } catch (error) {
-      console.error("Error fetching profile:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Privacy settings
+  const [privacy, setPrivacy] = useState({
+    profile_visibility: profile?.profile_visibility || "public",
+    show_online_status: profile?.show_online_status ?? true,
+    allow_direct_messages: profile?.allow_direct_messages ?? true,
+  })
 
   const handleProfileUpdate = async () => {
-    setSaving(true)
+    setLoading(true)
     try {
       const { error } = await supabase
         .from("users")
@@ -115,9 +67,12 @@ export default function SettingsPage() {
           full_name: profileForm.full_name,
           username: profileForm.username,
           bio: profileForm.bio,
-          updated_at: new Date().toISOString(),
+          location: profileForm.location,
+          website: profileForm.website,
+          phone: profileForm.phone,
+          date_of_birth: profileForm.date_of_birth,
         })
-        .eq("auth_user_id", user?.id)
+        .eq("id", profile?.id)
 
       if (error) throw error
 
@@ -133,7 +88,7 @@ export default function SettingsPage() {
         variant: "destructive",
       })
     } finally {
-      setSaving(false)
+      setLoading(false)
     }
   }
 
@@ -156,7 +111,7 @@ export default function SettingsPage() {
       return
     }
 
-    setSaving(true)
+    setLoading(true)
     try {
       const { error } = await supabase.auth.updateUser({
         password: passwordForm.newPassword,
@@ -181,50 +136,30 @@ export default function SettingsPage() {
         variant: "destructive",
       })
     } finally {
-      setSaving(false)
+      setLoading(false)
     }
   }
 
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    setUploading(true)
-
+  const handleNotificationUpdate = async () => {
+    setLoading(true)
     try {
-      const fileExt = file.name.split(".").pop()
-      const fileName = `${user?.id}-${Date.now()}.${fileExt}`
-      const filePath = `avatars/${fileName}`
+      const { error } = await supabase.from("users").update(notifications).eq("id", profile?.id)
 
-      const { error: uploadError } = await supabase.storage.from("eriggalive-assets").upload(filePath, file)
+      if (error) throw error
 
-      if (uploadError) throw uploadError
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("eriggalive-assets").getPublicUrl(filePath)
-
-      const { error: updateError } = await supabase
-        .from("users")
-        .update({ avatar_url: publicUrl })
-        .eq("auth_user_id", user?.id)
-
-      if (updateError) throw updateError
-
-      await fetchProfile()
       await refreshProfile()
       toast({
-        title: "Avatar Updated",
-        description: "Your profile picture has been updated successfully.",
+        title: "Settings Updated",
+        description: "Your notification preferences have been saved.",
       })
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to upload avatar.",
+        description: error.message || "Failed to update settings.",
         variant: "destructive",
       })
     } finally {
-      setUploading(false)
+      setLoading(false)
     }
   }
 
@@ -243,16 +178,6 @@ export default function SettingsPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <AuthGuard>
-        <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      </AuthGuard>
-    )
-  }
-
   return (
     <AuthGuard>
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4 sm:p-6 lg:p-8">
@@ -261,7 +186,7 @@ export default function SettingsPage() {
           <div className="mb-8">
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                <User className="w-6 h-6 text-primary" />
+                <SettingsIcon className="w-6 h-6 text-primary" />
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
@@ -327,39 +252,6 @@ export default function SettingsPage() {
                   <CardDescription>Update your personal information and profile details.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="flex items-center space-x-4">
-                    <Avatar className="w-20 h-20">
-                      <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
-                      <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xl">
-                        {profile?.username?.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <Label htmlFor="avatar" className="cursor-pointer">
-                        <Button type="button" variant="outline" disabled={uploading}>
-                          {uploading ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Uploading...
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="w-4 h-4 mr-2" />
-                              Change Avatar
-                            </>
-                          )}
-                        </Button>
-                      </Label>
-                      <input
-                        id="avatar"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAvatarUpload}
-                        className="hidden"
-                      />
-                    </div>
-                  </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <Label htmlFor="full_name">Full Name</Label>
@@ -379,8 +271,43 @@ export default function SettingsPage() {
                         placeholder="Your username"
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone Number</Label>
+                      <Input
+                        id="phone"
+                        value={profileForm.phone}
+                        onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                        placeholder="+234 xxx xxx xxxx"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="location">Location</Label>
+                      <Input
+                        id="location"
+                        value={profileForm.location}
+                        onChange={(e) => setProfileForm({ ...profileForm, location: e.target.value })}
+                        placeholder="Your location"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="website">Website</Label>
+                      <Input
+                        id="website"
+                        value={profileForm.website}
+                        onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
+                        placeholder="https://yourwebsite.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="date_of_birth">Date of Birth</Label>
+                      <Input
+                        id="date_of_birth"
+                        type="date"
+                        value={profileForm.date_of_birth}
+                        onChange={(e) => setProfileForm({ ...profileForm, date_of_birth: e.target.value })}
+                      />
+                    </div>
                   </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="bio">Bio</Label>
                     <Textarea
@@ -391,29 +318,9 @@ export default function SettingsPage() {
                       rows={4}
                     />
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label>Tier</Label>
-                      <div className="px-3 py-2 bg-muted border rounded-md">
-                        <Badge className={`${getTierColor(profile?.tier || "grassroot")}`}>
-                          <Crown className="w-3 h-3 mr-1" />
-                          {profile?.tier?.replace("_", " ").toUpperCase() || "GRASSROOT"}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Coins</Label>
-                      <div className="px-3 py-2 bg-muted border rounded-md flex items-center">
-                        <Coins className="w-4 h-4 mr-2 text-yellow-500" />
-                        {profile?.coins?.toLocaleString() || 0} coins
-                      </div>
-                    </div>
-                  </div>
-
-                  <Button onClick={handleProfileUpdate} disabled={saving}>
+                  <Button onClick={handleProfileUpdate} disabled={loading}>
                     <Save className="w-4 h-4 mr-2" />
-                    {saving ? "Saving..." : "Save Changes"}
+                    {loading ? "Saving..." : "Save Changes"}
                   </Button>
                 </CardContent>
               </Card>
@@ -490,9 +397,9 @@ export default function SettingsPage() {
                         placeholder="Confirm new password"
                       />
                     </div>
-                    <Button onClick={handlePasswordUpdate} disabled={saving}>
+                    <Button onClick={handlePasswordUpdate} disabled={loading}>
                       <Shield className="w-4 h-4 mr-2" />
-                      {saving ? "Updating..." : "Update Password"}
+                      {loading ? "Updating..." : "Update Password"}
                     </Button>
                   </div>
 
@@ -575,9 +482,9 @@ export default function SettingsPage() {
                       />
                     </div>
                   </div>
-                  <Button disabled={saving}>
+                  <Button onClick={handleNotificationUpdate} disabled={loading}>
                     <Bell className="w-4 h-4 mr-2" />
-                    {saving ? "Saving..." : "Save Preferences"}
+                    {loading ? "Saving..." : "Save Preferences"}
                   </Button>
                 </CardContent>
               </Card>
@@ -597,26 +504,25 @@ export default function SettingsPage() {
                         <Label>Show Online Status</Label>
                         <p className="text-sm text-muted-foreground">Let others see when you're online</p>
                       </div>
-                      <Switch defaultChecked />
+                      <Switch
+                        checked={privacy.show_online_status}
+                        onCheckedChange={(checked) => setPrivacy({ ...privacy, show_online_status: checked })}
+                      />
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
                         <Label>Allow Direct Messages</Label>
                         <p className="text-sm text-muted-foreground">Allow other users to send you direct messages</p>
                       </div>
-                      <Switch defaultChecked />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Profile Visibility</Label>
-                        <p className="text-sm text-muted-foreground">Make your profile visible to other users</p>
-                      </div>
-                      <Switch defaultChecked />
+                      <Switch
+                        checked={privacy.allow_direct_messages}
+                        onCheckedChange={(checked) => setPrivacy({ ...privacy, allow_direct_messages: checked })}
+                      />
                     </div>
                   </div>
-                  <Button disabled={saving}>
+                  <Button onClick={handleNotificationUpdate} disabled={loading}>
                     <Lock className="w-4 h-4 mr-2" />
-                    {saving ? "Saving..." : "Save Privacy Settings"}
+                    {loading ? "Saving..." : "Save Privacy Settings"}
                   </Button>
                 </CardContent>
               </Card>

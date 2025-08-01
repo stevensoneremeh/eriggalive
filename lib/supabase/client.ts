@@ -214,37 +214,28 @@ const createMockClient = () => {
 }
 
 // Create a Supabase client for browser usage
-const createSupabaseClient = () => {
+export function createClient() {
   if (isPreviewMode) {
     return createMockClient()
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing Supabase environment variables")
+    console.error("Missing Supabase environment variables")
+    return createMockClient()
   }
 
-  return supabaseCreateClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-  })
+  return supabaseCreateClient<Database>(supabaseUrl, supabaseAnonKey)
 }
 
 // Export a singleton instance for consistent usage
-let supabaseClient: ReturnType<typeof createSupabaseClient> | null = null
+let supabaseClient: ReturnType<typeof createClient> | null = null
 
 export function getSupabaseClient() {
   if (!supabaseClient) {
-    supabaseClient = createSupabaseClient()
+    supabaseClient = createClient()
   }
   return supabaseClient
 }
-
-export const supabase = getSupabaseClient()
-
-export default supabase

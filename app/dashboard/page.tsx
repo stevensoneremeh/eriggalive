@@ -26,7 +26,7 @@ import {
 import Link from "next/link"
 import { useState, useRef } from "react"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabaseClient"
+import { supabase } from "@/lib/supabase"
 
 export default function DashboardPage() {
   const { user, profile, loading, refreshProfile } = useAuth()
@@ -110,17 +110,7 @@ export default function DashboardPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg font-medium text-gray-600 dark:text-gray-400">Loading dashboard...</p>
-        </div>
-      </div>
-    )
-  }
-
+  if (loading) return <p>Loading...</p>
   if (!user) return null // Redirect happens in AuthProvider
 
   return (
@@ -307,9 +297,9 @@ export default function DashboardPage() {
                       variant="outline"
                       className="h-20 flex-col bg-transparent bg-gradient-to-r from-purple-100 to-blue-100 hover:from-purple-200 hover:to-blue-200 dark:from-purple-900/20 dark:to-blue-900/20"
                     >
-                      <Link href="/missions">
+                      <Link href="/meet-and-greet">
                         <Phone className="w-6 h-6 mb-2 text-purple-600" />
-                        <span className="text-sm text-purple-600 font-medium">Phone Booth</span>
+                        <span className="text-sm text-purple-600 font-medium">Meet & Greet</span>
                       </Link>
                     </Button>
                     <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
@@ -319,7 +309,7 @@ export default function DashboardPage() {
                       </Link>
                     </Button>
                     <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/settings">
+                      <Link href="/profile">
                         <Settings className="w-6 h-6 mb-2" />
                         <span className="text-sm">Settings</span>
                       </Link>
@@ -393,7 +383,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <Button asChild variant="outline" className="w-full bg-transparent">
-                    <Link href="/settings">
+                    <Link href="/profile">
                       <Edit className="w-4 h-4 mr-2" />
                       Edit Profile
                     </Link>
