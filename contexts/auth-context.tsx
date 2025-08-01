@@ -15,6 +15,7 @@ interface AuthContextType {
   profile: UserProfile | null
   loading: boolean
   isLoading: boolean
+  isAuthenticated: boolean
   signIn: (email: string, password: string) => Promise<{ error: any }>
   signUp: (
     email: string,
@@ -22,6 +23,8 @@ interface AuthContextType {
     userData: { username: string; full_name: string },
   ) => Promise<{ error: any }>
   signOut: () => Promise<void>
+  resetPassword: (email: string) => Promise<{ error: any }>
+  updatePassword: (password: string) => Promise<{ error: any }>
   refreshProfile: () => Promise<void>
 }
 
@@ -84,7 +87,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         const profileData = await fetchProfile(session.user.id)
         setProfile(profileData)
-        router.push("/dashboard")
+        if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+          router.push("/dashboard")
+        }
       } else {
         setProfile(null)
         if (event === "SIGNED_OUT") {
@@ -153,15 +158,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      return { error }
+    } catch (error) {
+      return { error }
+    }
+  }
+
+  const updatePassword = async (password: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: password,
+      })
+      return { error }
+    } catch (error) {
+      return { error }
+    }
+  }
+
   const value = {
     user,
     session,
     profile,
     loading,
     isLoading: loading,
+    isAuthenticated: !!user,
     signIn,
     signUp,
     signOut,
+    resetPassword,
+    updatePassword,
     refreshProfile,
   }
 

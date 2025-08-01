@@ -9,16 +9,17 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, ArrowLeft, Mail } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { Loader2, ArrowLeft, Mail, CheckCircle } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
+  const [emailSent, setEmailSent] = useState(false)
 
-  const supabase = createClient()
+  const { resetPassword } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,20 +34,50 @@ export default function ForgotPasswordPage() {
     }
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      })
+      const { error } = await resetPassword(email)
 
       if (error) {
         setError(error.message)
       } else {
         setMessage("Password reset link has been sent to your email!")
+        setEmailSent(true)
       }
     } catch (err) {
       setError("An unexpected error occurred")
     } finally {
       setLoading(false)
     }
+  }
+
+  if (emailSent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background to-muted/20">
+        <Card className="w-full max-w-md border-lime-500/20 shadow-lg">
+          <CardHeader className="space-y-1 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+              <CheckCircle className="h-6 w-6 text-green-600" />
+            </div>
+            <CardTitle className="text-2xl">Check your email</CardTitle>
+            <CardDescription>We've sent a password reset link to {email}</CardDescription>
+          </CardHeader>
+
+          <CardContent className="text-center space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Didn't receive the email? Check your spam folder or try again.
+            </p>
+
+            <div className="space-y-2">
+              <Button onClick={() => setEmailSent(false)} variant="outline" className="w-full">
+                Try again
+              </Button>
+              <Button asChild className="w-full bg-lime-500 hover:bg-lime-600 text-teal-900">
+                <Link href="/login">Back to sign in</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (

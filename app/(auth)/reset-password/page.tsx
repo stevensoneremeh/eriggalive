@@ -10,8 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Eye, EyeOff, ArrowLeft } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { Loader2, Eye, EyeOff, ArrowLeft, CheckCircle } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("")
@@ -20,24 +20,21 @@ export default function ResetPasswordPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [message, setMessage] = useState("")
+  const [success, setSuccess] = useState(false)
 
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClient()
+  const { updatePassword } = useAuth()
 
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY") {
-        // User is in password recovery mode
-        setMessage("You can now set a new password")
-      }
-    })
+    // Check if we have the necessary tokens from the URL
+    const accessToken = searchParams.get("access_token")
+    const refreshToken = searchParams.get("refresh_token")
 
-    return () => subscription.unsubscribe()
-  }, [supabase])
+    if (!accessToken || !refreshToken) {
+      setError("Invalid reset link. Please request a new password reset.")
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -57,14 +54,12 @@ export default function ResetPasswordPage() {
     }
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: password,
-      })
+      const { error } = await updatePassword(password)
 
       if (error) {
         setError(error.message)
       } else {
-        setMessage("Password updated successfully! Redirecting to dashboard...")
+        setSuccess(true)
         setTimeout(() => {
           router.push("/dashboard")
         }, 2000)
@@ -74,6 +69,22 @@ export default function ResetPasswordPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background to-muted/20">
+        <Card className="w-full max-w-md border-lime-500/20 shadow-lg">
+          <CardHeader className="space-y-1 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+              <CheckCircle className="h-6 w-6 text-green-600" />
+            </div>
+            <CardTitle className="text-2xl">Password Updated!</CardTitle>
+            <CardDescription>Your password has been successfully updated. Redirecting to dashboard...</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -157,12 +168,6 @@ export default function ResetPasswordPage() {
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            {message && (
-              <Alert className="border-green-200 bg-green-50 text-green-800">
-                <AlertDescription>{message}</AlertDescription>
               </Alert>
             )}
 
