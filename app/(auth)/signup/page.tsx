@@ -49,6 +49,7 @@ export default function SignUpPage() {
         username,
         full_name: fullName,
       })
+
       if (error) {
         setError(error.message || "Failed to create account")
       } else {

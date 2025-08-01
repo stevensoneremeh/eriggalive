@@ -53,6 +53,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const createProfile = async (user: User, userData?: { username: string; full_name: string }) => {
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .insert({
+          auth_user_id: user.id,
+          email: user.email || "",
+          username: userData?.username || user.email?.split("@")[0] || "user",
+          full_name: userData?.full_name || user.user_metadata?.full_name || "",
+          tier: "grassroot",
+          coins: 100,
+          level: 1,
+          points: 0,
+          is_active: true,
+          is_verified: false,
+          is_banned: false,
+        })
+        .select("*")
+        .single()
+
+      if (error) {
+        console.error("Error creating profile:", error)
+        return null
+      }
+
+      return data
+    } catch (error) {
+      console.error("Error in createProfile:", error)
+      return null
+    }
+  }
+
   const refreshProfile = async () => {
     if (user) {
       const profileData = await fetchProfile(user.id)
@@ -69,7 +101,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
 
       if (session?.user) {
-        const profileData = await fetchProfile(session.user.id)
+        let profileData = await fetchProfile(session.user.id)
+        if (!profileData) {
+          profileData = await createProfile(session.user)
+        }
         setProfile(profileData)
       }
 
@@ -81,13 +116,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state change:", event, session?.user?.email)
       setSession(session)
       setUser(session?.user ?? null)
 
       if (session?.user) {
-        const profileData = await fetchProfile(session.user.id)
+        let profileData = await fetchProfile(session.user.id)
+        if (!profileData) {
+          profileData = await createProfile(session.user)
+        }
         setProfile(profileData)
+
         if (event === "SIGNED_IN") {
           router.push("/dashboard")
         }
@@ -127,27 +165,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
 
       if (error) return { error }
-
-      // Create user profile
-      if (data.user) {
-        const { error: profileError } = await supabase.from("users").insert({
-          auth_user_id: data.user.id,
-          email: email,
-          username: userData.username,
-          full_name: userData.full_name,
-          tier: "grassroot",
-          coins: 100, // Starting coins
-          level: 1,
-          points: 0,
-          is_active: true,
-          is_verified: false,
-          is_banned: false,
-        })
-
-        if (profileError) {
-          console.error("Error creating profile:", profileError)
-        }
-      }
 
       return { error: null }
     } catch (error) {

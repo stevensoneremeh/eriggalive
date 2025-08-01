@@ -36,7 +36,7 @@ const validateEmail = (email: string): boolean => {
 }
 
 export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhancedProps) {
-  const { profile, refreshSession } = useAuth()
+  const { profile, refreshProfile } = useAuth()
   const { toast } = useToast()
   const [selectedPackage, setSelectedPackage] = useState(COIN_PACKAGES[1])
   const [customCoins, setCustomCoins] = useState("")
@@ -190,8 +190,8 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
         })
 
         // Refresh user session to update coin balance
-        if (refreshSession) {
-          await refreshSession()
+        if (refreshProfile) {
+          await refreshProfile()
         }
 
         if (onSuccess) {
@@ -221,7 +221,7 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
         setIsProcessing(false)
       }
     },
-    [verifyPayment, refreshSession, onSuccess, onError, toast],
+    [verifyPayment, refreshProfile, onSuccess, onError, toast],
   )
 
   const handlePaymentClose = useCallback(() => {

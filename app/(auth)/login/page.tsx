@@ -2,46 +2,46 @@
 
 import type React from "react"
 import { useState } from "react"
-import Link from "next/link"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Eye, EyeOff } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
+import Link from "next/link"
 import { DynamicLogo } from "@/components/dynamic-logo"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
   const { signIn } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    setIsLoading(true)
     setError("")
 
     if (!email || !password) {
       setError("Please fill in all fields")
-      setLoading(false)
+      setIsLoading(false)
       return
     }
 
     try {
       const { error } = await signIn(email, password)
       if (error) {
-        setError(error.message)
-        setLoading(false)
+        setError(error.message || "Failed to sign in")
+        setIsLoading(false)
       }
-      // Don't set loading to false here if successful - let auth context handle redirect
-    } catch (err) {
-      setError("An unexpected error occurred")
-      setLoading(false)
+      // Don't set loading to false here if successful - let the auth context handle redirect
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred")
+      setIsLoading(false)
     }
   }
 
@@ -66,7 +66,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={loading}
+                disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
@@ -79,7 +79,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={loading}
+                  disabled={isLoading}
                 />
                 <Button
                   type="button"
@@ -87,7 +87,7 @@ export default function LoginPage() {
                   size="sm"
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
-                  disabled={loading}
+                  disabled={isLoading}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
@@ -100,8 +100,8 @@ export default function LoginPage() {
               </Alert>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Signing in...
