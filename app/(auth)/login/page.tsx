@@ -1,177 +1,100 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, Suspense } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import Link from "next/link"
+import { useState } from "react"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { useAuth } from "@/contexts/auth-context"
-import { Loader2, AlertCircle, Eye, EyeOff } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
+import Link from "next/link"
+import { DynamicLogo } from "@/components/dynamic-logo"
 
-// Loading skeleton for the login page
-function LoginPageSkeleton() {
-  return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md border-lime-500/20">
-        <CardContent className="flex items-center justify-center p-8">
-          <div className="flex flex-col items-center space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin text-lime-500" />
-            <p className="text-sm text-muted-foreground">Loading...</p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-// Component that uses useSearchParams - wrapped in its own Suspense
-function LoginFormWithSearchParams() {
+export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
 
-  const router = useRouter()
-  const { signIn, user, loading } = useAuth()
-  const searchParams = useSearchParams()
-
-  // Handle already authenticated users - redirect immediately
-  useEffect(() => {
-    if (user && !loading) {
-      const redirect = searchParams?.get("redirect")
-      const redirectPath = redirect && redirect.startsWith("/") ? redirect : "/dashboard"
-      router.replace(redirectPath)
-    }
-  }, [user, loading, router, searchParams])
-
-  // Show loading state during initialization
-  if (loading) {
-    return <LoginPageSkeleton />
-  }
-
-  // Don't render form if user is already authenticated
-  if (user) {
-    return <LoginPageSkeleton />
-  }
+  const { signIn } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
-    setIsSubmitting(true)
+    setIsLoading(true)
+    setError("")
 
     try {
-      if (!email?.trim() || !password?.trim()) {
-        setError("Please enter both email and password")
-        return
-      }
-
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(email.trim())) {
-        setError("Please enter a valid email address")
-        return
-      }
-
-      const result = await signIn(email.trim(), password)
-
-      if (result.error) {
-        setError(result.error?.message || "Failed to sign in. Please check your credentials.")
-      } else {
-        // Success - the useEffect above will handle the redirect
-        const redirect = searchParams?.get("redirect")
-        const redirectPath = redirect && redirect.startsWith("/") ? redirect : "/dashboard"
-        router.replace(redirectPath)
+      const { error } = await signIn(email, password)
+      if (error) {
+        setError(error.message || "Failed to sign in")
       }
     } catch (err: any) {
-      console.error("Login error:", err)
-      setError(err.message || "An unexpected error occurred. Please try again.")
+      setError(err.message || "An unexpected error occurred")
     } finally {
-      setIsSubmitting(false)
+      setIsLoading(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-background to-muted/20">
-      <Card className="w-full max-w-md border-lime-500/20 shadow-lg">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Welcome Back</CardTitle>
-          <CardDescription className="text-center">Sign in to access your Erigga fan account</CardDescription>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1 text-center">
+          <div className="flex justify-center mb-4">
+            <DynamicLogo className="h-12 w-auto" />
+          </div>
+          <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
+          <CardDescription>Sign in to your Erigga Live account</CardDescription>
         </CardHeader>
-
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="your@email.com"
+                placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isSubmitting}
-                className="border-lime-500/20 focus:border-lime-500"
-                autoComplete="email"
+                disabled={isLoading}
               />
             </div>
-
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link
-                  href="/forgot-password"
-                  className="text-xs text-lime-500 hover:underline focus:underline focus:outline-none"
-                  tabIndex={isSubmitting ? -1 : 0}
-                >
-                  Forgot password?
-                </Link>
-              </div>
+              <Label htmlFor="password">Password</Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={isSubmitting}
-                  className="border-lime-500/20 focus:border-lime-500 pr-10"
-                  autoComplete="current-password"
+                  disabled={isLoading}
                 />
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon"
+                  size="sm"
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
-                  tabIndex={-1}
+                  disabled={isLoading}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-muted-foreground" />
-                  )}
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
 
             {error && (
               <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
-            <Button
-              type="submit"
-              className="w-full bg-lime-500 hover:bg-lime-600 text-teal-900 font-medium"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Signing in...
@@ -181,40 +104,23 @@ function LoginFormWithSearchParams() {
               )}
             </Button>
           </form>
-        </CardContent>
 
-        <CardFooter className="flex flex-col space-y-4">
-          <div className="text-center text-sm">
-            Don't have an account?{" "}
+          <div className="mt-6 text-center space-y-2">
             <Link
-              href="/signup"
-              className="text-lime-500 hover:underline focus:underline focus:outline-none"
-              tabIndex={isSubmitting ? -1 : 0}
+              href="/forgot-password"
+              className="text-sm text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
             >
-              Sign up here
+              Forgot your password?
             </Link>
+            <div className="text-sm text-muted-foreground">
+              Don't have an account?{" "}
+              <Link href="/signup" className="text-primary hover:underline underline-offset-4">
+                Sign up
+              </Link>
+            </div>
           </div>
-          <div className="text-center text-xs text-muted-foreground">
-            By signing in, you agree to our{" "}
-            <Link href="/terms" className="hover:underline focus:underline focus:outline-none">
-              Terms of Service
-            </Link>{" "}
-            and{" "}
-            <Link href="/privacy" className="hover:underline focus:underline focus:outline-none">
-              Privacy Policy
-            </Link>
-          </div>
-        </CardFooter>
+        </CardContent>
       </Card>
     </div>
-  )
-}
-
-// Main login page component with enhanced error boundary
-export default function LoginPage() {
-  return (
-    <Suspense fallback={<LoginPageSkeleton />}>
-      <LoginFormWithSearchParams />
-    </Suspense>
   )
 }

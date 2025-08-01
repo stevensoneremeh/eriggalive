@@ -2,7 +2,8 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase"
+import { useRouter } from "next/navigation"
 import type { User, Session } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 
@@ -13,6 +14,7 @@ interface AuthContextType {
   session: Session | null
   profile: UserProfile | null
   loading: boolean
+  isLoading: boolean
   signIn: (email: string, password: string) => Promise<{ error: any }>
   signUp: (
     email: string,
@@ -30,8 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
-
-  const supabase = createClient()
+  const router = useRouter()
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -57,19 +58,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const getSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       setSession(session)
       setUser(session?.user ?? null)
 
       if (session?.user) {
-        fetchProfile(session.user.id).then(setProfile)
+        const profileData = await fetchProfile(session.user.id)
+        setProfile(profileData)
       }
 
       setLoading(false)
-    })
+    }
 
-    // Listen for auth changes
+    getSession()
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -79,15 +84,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         const profileData = await fetchProfile(session.user.id)
         setProfile(profileData)
+        router.push("/dashboard")
       } else {
         setProfile(null)
+        if (event === "SIGNED_OUT") {
+          router.push("/login")
+        }
       }
 
       setLoading(false)
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [router])
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -149,6 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     profile,
     loading,
+    isLoading: loading,
     signIn,
     signUp,
     signOut,

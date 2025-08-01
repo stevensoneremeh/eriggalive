@@ -26,10 +26,10 @@ import {
 import Link from "next/link"
 import { useState, useRef } from "react"
 import { useToast } from "@/hooks/use-toast"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase"
 
 export default function DashboardPage() {
-  const { user, profile, isLoading, refreshProfile } = useAuth()
+  const { user, profile, loading, refreshProfile } = useAuth()
   const { toast } = useToast()
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -39,7 +39,6 @@ export default function DashboardPage() {
     if (!file || !profile) return
 
     setIsUploadingAvatar(true)
-    const supabase = createClient()
 
     try {
       // Upload to Supabase Storage
@@ -110,6 +109,9 @@ export default function DashboardPage() {
         return 0
     }
   }
+
+  if (loading) return <p>Loading...</p>
+  if (!user) return null // Redirect happens in AuthProvider
 
   return (
     <AuthGuard>
