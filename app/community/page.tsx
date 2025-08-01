@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@supabase/supabase-js"
 import { useAuth } from "@/contexts/auth-context"
@@ -12,7 +14,19 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Heart, MessageCircle, Share2, Users, TrendingUp, Search, Plus, Filter, Send, Phone } from "lucide-react"
+import {
+  Heart,
+  MessageCircle,
+  Share2,
+  Users,
+  TrendingUp,
+  Search,
+  Plus,
+  Filter,
+  Send,
+  Phone,
+  ImageIcon,
+} from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatDistanceToNow } from "date-fns"
 
@@ -87,10 +101,13 @@ export default function CommunityPage() {
   const [categoryFilter, setCategoryFilter] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState("posts")
   const [error, setError] = useState<string | null>(null)
+  const [selectedMedia, setSelectedMedia] = useState<File | null>(null)
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null)
 
   const { user, profile } = useAuth()
   const { toast } = useToast()
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     loadData()
@@ -249,6 +266,35 @@ export default function CommunityPage() {
     }
   }
 
+  const handleMediaSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      setSelectedMedia(file)
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setMediaPreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const uploadMedia = async (file: File) => {
+    const fileExt = file.name.split(".").pop()
+    const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`
+    const filePath = `community/${fileName}`
+
+    const { data, error } = await supabase.storage.from("eriggalive-assets").upload(filePath, file)
+
+    if (error) throw error
+
+    const { data: urlData } = supabase.storage.from("eriggalive-assets").getPublicUrl(data.path)
+
+    return {
+      url: urlData.publicUrl,
+      type: file.type.startsWith("image/") ? "image" : file.type.startsWith("video/") ? "video" : "file",
+    }
+  }
+
   const createPost = async () => {
     if (!newPost.trim() || !profile || !selectedCategory) {
       toast({
@@ -261,12 +307,23 @@ export default function CommunityPage() {
 
     setPosting(true)
     try {
+      let mediaUrl = null
+      let mediaType = null
+
+      if (selectedMedia) {
+        const mediaData = await uploadMedia(selectedMedia)
+        mediaUrl = mediaData.url
+        mediaType = mediaData.type
+      }
+
       const { data, error } = await supabase
         .from("community_posts")
         .insert({
           user_id: profile.id,
           category_id: selectedCategory,
           content: newPost.trim(),
+          media_url: mediaUrl,
+          media_type: mediaType,
           is_published: true,
           is_deleted: false,
         })
@@ -282,6 +339,8 @@ export default function CommunityPage() {
 
       setNewPost("")
       setSelectedCategory(null)
+      setSelectedMedia(null)
+      setMediaPreview(null)
       await loadData()
     } catch (error) {
       console.error("Error creating post:", error)
@@ -591,22 +650,64 @@ export default function CommunityPage() {
                           className="mb-4 border-0 bg-gray-50 dark:bg-gray-700"
                           rows={3}
                         />
+
+                        {/* Media Preview */}
+                        {mediaPreview && (
+                          <div className="mb-4 relative">
+                            {selectedMedia?.type.startsWith("image/") ? (
+                              <img
+                                src={mediaPreview || "/placeholder.svg"}
+                                alt="Preview"
+                                className="max-h-64 rounded-lg"
+                              />
+                            ) : selectedMedia?.type.startsWith("video/") ? (
+                              <video src={mediaPreview} controls className="max-h-64 rounded-lg" />
+                            ) : null}
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="absolute top-2 right-2"
+                              onClick={() => {
+                                setSelectedMedia(null)
+                                setMediaPreview(null)
+                              }}
+                            >
+                              ×
+                            </Button>
+                          </div>
+                        )}
+
                         <div className="flex items-center justify-between">
-                          <Select
-                            value={selectedCategory?.toString() || ""}
-                            onValueChange={(value) => setSelectedCategory(Number(value))}
-                          >
-                            <SelectTrigger className="w-48">
-                              <SelectValue placeholder="Select category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {categories.map((category) => (
-                                <SelectItem key={category.id} value={category.id.toString()}>
-                                  {category.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <div className="flex items-center space-x-2">
+                            <Select
+                              value={selectedCategory?.toString() || ""}
+                              onValueChange={(value) => setSelectedCategory(Number(value))}
+                            >
+                              <SelectTrigger className="w-48">
+                                <SelectValue placeholder="Select category" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {categories.map((category) => (
+                                  <SelectItem key={category.id} value={category.id.toString()}>
+                                    {category.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept="image/*,video/*"
+                              className="hidden"
+                              onChange={handleMediaSelect}
+                            />
+                            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                              <ImageIcon className="w-4 h-4 mr-1" />
+                              Media
+                            </Button>
+                          </div>
+
                           <Button
                             onClick={createPost}
                             disabled={!newPost.trim() || posting || !selectedCategory}

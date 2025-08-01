@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { DynamicLogo } from "@/components/dynamic-logo"
 
 export default function SignUpPage() {
@@ -24,6 +25,7 @@ export default function SignUpPage() {
   const [error, setError] = useState("")
 
   const { signUp } = useAuth()
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -49,6 +51,9 @@ export default function SignUpPage() {
       })
       if (error) {
         setError(error.message || "Failed to create account")
+      } else {
+        // Redirect to success page
+        router.push("/signup/success")
       }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred")
