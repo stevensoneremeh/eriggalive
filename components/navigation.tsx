@@ -23,6 +23,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  Target,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useTheme } from "@/contexts/theme-context"
@@ -80,6 +81,7 @@ function NavigationContent() {
 
   const navItems = [
     { name: "Home", href: "/", icon: <Home className="h-5 w-5" /> },
+    { name: "Missions", href: "/missions", icon: <Target className="h-5 w-5" /> },
     { name: "Community", href: "/community", icon: <Users className="h-5 w-5" /> },
     { name: "Chronicles", href: "/chronicles", icon: <BookOpen className="h-5 w-5" /> },
     { name: "Media Vault", href: "/vault", icon: <Music className="h-5 w-5" /> },
@@ -188,7 +190,7 @@ function NavigationContent() {
                       <UserTierBadge tier={profile.tier} />
                     </div>
                     <Link href="/dashboard">
-                      <Button variant="outline" size="sm" className="hidden md:flex">
+                      <Button variant="outline" size="sm" className="hidden md:flex bg-transparent">
                         <User className="h-4 w-4 mr-2" />
                         Dashboard
                       </Button>
@@ -206,7 +208,7 @@ function NavigationContent() {
                 ) : (
                   <>
                     <Link href="/login">
-                      <Button variant="outline" size="sm" className="hidden md:flex">
+                      <Button variant="outline" size="sm" className="hidden md:flex bg-transparent">
                         <LogIn className="h-4 w-4 mr-2" />
                         Login
                       </Button>
@@ -320,13 +322,13 @@ function NavigationContent() {
                     {isAuthenticated ? (
                       <div className="space-y-2">
                         <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
-                          <Button variant="outline" className="w-full justify-start">
+                          <Button variant="outline" className="w-full justify-start bg-transparent">
                             <User className="h-4 w-4 mr-2" />
                             Dashboard
                           </Button>
                         </Link>
                         <Link href="/coins" onClick={() => setIsMobileMenuOpen(false)}>
-                          <Button variant="outline" className="w-full justify-start">
+                          <Button variant="outline" className="w-full justify-start bg-transparent">
                             <CreditCard className="h-4 w-4 mr-2" />
                             Manage Coins
                           </Button>
@@ -346,7 +348,7 @@ function NavigationContent() {
                     ) : (
                       <div className="space-y-2">
                         <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                          <Button variant="outline" className="w-full justify-start">
+                          <Button variant="outline" className="w-full justify-start bg-transparent">
                             <LogIn className="h-4 w-4 mr-2" />
                             Login
                           </Button>

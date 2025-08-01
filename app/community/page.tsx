@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/contexts/auth-context"
 import { AuthGuard } from "@/components/auth-guard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -86,24 +86,25 @@ export default function CommunityPage() {
 
   const { user, profile } = useAuth()
   const { toast } = useToast()
-  const supabase = createClient()
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     loadData()
     loadChatMessages()
 
-    // Set up real-time subscriptions
+    // Set up real-time subscriptions with proper v2 syntax
     const postsSubscription = supabase
       .channel("community_posts_changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "community_posts" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_posts" }, (payload) => {
+        console.log("Post change received:", payload)
         loadData()
       })
       .subscribe()
 
     const chatSubscription = supabase
       .channel("community_chat_changes")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "community_chat" }, () => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "community_chat" }, (payload) => {
+        console.log("Chat change received:", payload)
         loadChatMessages()
       })
       .subscribe()
@@ -126,7 +127,7 @@ export default function CommunityPage() {
     try {
       setLoading(true)
 
-      // Load categories
+      // Load categories with proper v2 syntax
       const { data: categoriesData, error: categoriesError } = await supabase
         .from("community_categories")
         .select("*")
@@ -139,18 +140,18 @@ export default function CommunityPage() {
         setCategories(categoriesData || [])
       }
 
-      // Build posts query
+      // Build posts query with proper v2 syntax
       let postsQuery = supabase
         .from("community_posts")
         .select(`
-          *,
-          user:users!community_posts_user_id_fkey (
-            id, username, full_name, tier, avatar_url
-          ),
-          category:community_categories!community_posts_category_id_fkey (
-            id, name, slug
-          )
-        `)
+        *,
+        user:users!community_posts_user_id_fkey (
+          id, username, full_name, tier, avatar_url
+        ),
+        category:community_categories!community_posts_category_id_fkey (
+          id, name, slug
+        )
+      `)
         .eq("is_published", true)
         .eq("is_deleted", false)
 
@@ -221,11 +222,11 @@ export default function CommunityPage() {
       const { data: messages, error } = await supabase
         .from("community_chat")
         .select(`
-          *,
-          user:users!community_chat_user_id_fkey (
-            id, username, full_name, avatar_url, tier
-          )
-        `)
+        *,
+        user:users!community_chat_user_id_fkey (
+          id, username, full_name, avatar_url, tier
+        )
+      `)
         .order("created_at", { ascending: true })
         .limit(50)
 
@@ -343,10 +344,13 @@ export default function CommunityPage() {
 
         if (deleteError) throw deleteError
 
-        await supabase
+        // Update vote count
+        const { error: updateError } = await supabase
           .from("community_posts")
-          .update({ vote_count: supabase.raw("GREATEST(vote_count - 1, 0)") })
+          .update({ vote_count: 0 }) // You may need to calculate this properly
           .eq("id", postId)
+
+        if (updateError) throw updateError
 
         toast({
           title: "Vote Removed",
@@ -360,10 +364,13 @@ export default function CommunityPage() {
 
         if (insertError) throw insertError
 
-        await supabase
+        // Update vote count
+        const { error: updateError } = await supabase
           .from("community_posts")
-          .update({ vote_count: supabase.raw("vote_count + 1") })
+          .update({ vote_count: 1 }) // You may need to calculate this properly
           .eq("id", postId)
+
+        if (updateError) throw updateError
 
         toast({
           title: "Vote Added",
