@@ -1,9 +1,8 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/contexts/auth-context"
 import { AuthGuard } from "@/components/auth-guard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,12 +25,10 @@ import {
   Send,
   Phone,
   ImageIcon,
+  Reply,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatDistanceToNow } from "date-fns"
-
-// Initialize Supabase client with v2 syntax
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 interface Post {
   id: number
@@ -54,6 +51,22 @@ interface Post {
     slug: string
   }
   user_has_voted: boolean
+  comments?: Comment[]
+}
+
+interface Comment {
+  id: number
+  content: string
+  vote_count: number
+  created_at: string
+  user: {
+    id: number
+    username: string
+    full_name: string
+    tier: string
+    avatar_url?: string
+  }
+  replies?: Comment[]
 }
 
 interface Category {
@@ -103,17 +116,21 @@ export default function CommunityPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedMedia, setSelectedMedia] = useState<File | null>(null)
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
+  const [expandedComments, setExpandedComments] = useState<Set<number>>(new Set())
+  const [replyingTo, setReplyingTo] = useState<number | null>(null)
+  const [replyContent, setReplyContent] = useState("")
 
   const { user, profile } = useAuth()
   const { toast } = useToast()
   const chatEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const supabase = createClient()
 
   useEffect(() => {
     loadData()
     loadChatMessages()
 
-    // Set up real-time subscriptions using Supabase v2 syntax
+    // Set up real-time subscriptions
     const postsSubscription = supabase
       .channel("community_posts_changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "community_posts" }, (payload) => {
@@ -130,9 +147,18 @@ export default function CommunityPage() {
       })
       .subscribe()
 
+    const commentsSubscription = supabase
+      .channel("community_comments_changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_comments" }, (payload) => {
+        console.log("Comment change received:", payload)
+        loadData()
+      })
+      .subscribe()
+
     return () => {
       supabase.removeChannel(postsSubscription)
       supabase.removeChannel(chatSubscription)
+      supabase.removeChannel(commentsSubscription)
     }
   }, [sortOrder, categoryFilter, searchQuery])
 
@@ -149,7 +175,7 @@ export default function CommunityPage() {
       setLoading(true)
       setError(null)
 
-      // Load categories using Supabase v2 syntax
+      // Load categories
       const { data: categoriesData, error: categoriesError } = await supabase
         .from("community_categories")
         .select("*")
@@ -163,7 +189,7 @@ export default function CommunityPage() {
         setCategories(categoriesData || [])
       }
 
-      // Build posts query using Supabase v2 syntax
+      // Build posts query
       let postsQuery = supabase
         .from("community_posts")
         .select(`
@@ -186,7 +212,7 @@ export default function CommunityPage() {
         postsQuery = postsQuery.ilike("content", `%${searchQuery}%`)
       }
 
-      // Apply sorting using Supabase v2 syntax
+      // Apply sorting
       switch (sortOrder) {
         case "oldest":
           postsQuery = postsQuery.order("created_at", { ascending: true })
@@ -223,12 +249,31 @@ export default function CommunityPage() {
           }
         }
 
-        const formattedPosts = postsData.map((post) => ({
-          ...post,
-          user_has_voted: userVotes.includes(post.id),
-        }))
+        // Load comments for each post
+        const postsWithComments = await Promise.all(
+          postsData.map(async (post) => {
+            const { data: comments } = await supabase
+              .from("community_comments")
+              .select(`
+                *,
+                user:users!community_comments_user_id_fkey (
+                  id, username, full_name, tier, avatar_url
+                )
+              `)
+              .eq("post_id", post.id)
+              .eq("is_deleted", false)
+              .order("created_at", { ascending: true })
+              .limit(5)
 
-        setPosts(formattedPosts)
+            return {
+              ...post,
+              user_has_voted: userVotes.includes(post.id),
+              comments: comments || [],
+            }
+          }),
+        )
+
+        setPosts(postsWithComments)
       }
     } catch (error) {
       console.error("Error loading data:", error)
@@ -440,6 +485,50 @@ export default function CommunityPage() {
       toast({
         title: "Error",
         description: "Failed to vote on post. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const toggleComments = (postId: number) => {
+    const newExpanded = new Set(expandedComments)
+    if (newExpanded.has(postId)) {
+      newExpanded.delete(postId)
+    } else {
+      newExpanded.add(postId)
+    }
+    setExpandedComments(newExpanded)
+  }
+
+  const createComment = async (postId: number, content: string, parentId?: number) => {
+    if (!content.trim() || !profile) return
+
+    try {
+      const { error } = await supabase.from("community_comments").insert({
+        post_id: postId,
+        user_id: profile.id,
+        parent_id: parentId || null,
+        content: content.trim(),
+      })
+
+      if (error) throw error
+
+      // Update comment count
+      await supabase.rpc("increment_comment_count", { post_id: postId })
+
+      toast({
+        title: "Comment Added",
+        description: "Your comment has been posted.",
+      })
+
+      setReplyingTo(null)
+      setReplyContent("")
+      await loadData()
+    } catch (error) {
+      console.error("Error creating comment:", error)
+      toast({
+        title: "Error",
+        description: "Failed to post comment. Please try again.",
         variant: "destructive",
       })
     }
@@ -814,6 +903,7 @@ export default function CommunityPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => toggleComments(post.id)}
                                 className="flex items-center space-x-1 text-xs px-3 py-2 rounded-full text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
                               >
                                 <MessageCircle className="h-4 w-4" />
@@ -839,6 +929,95 @@ export default function CommunityPage() {
                               </span>
                             </div>
                           </div>
+
+                          {/* Comments Section */}
+                          {expandedComments.has(post.id) && (
+                            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                              {/* Comments List */}
+                              <div className="space-y-3 mb-4">
+                                {post.comments?.map((comment) => (
+                                  <div key={comment.id} className="flex space-x-3">
+                                    <Avatar className="h-8 w-8">
+                                      <AvatarImage src={comment.user?.avatar_url || "/placeholder-user.jpg"} />
+                                      <AvatarFallback className="text-xs">
+                                        {comment.user?.username?.[0] || "U"}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1">
+                                      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                                        <div className="flex items-center space-x-2 mb-1">
+                                          <span className="font-semibold text-sm">
+                                            {comment.user?.full_name || comment.user?.username}
+                                          </span>
+                                          <Badge
+                                            className={`text-xs ${TIER_COLORS[comment.user?.tier as keyof typeof TIER_COLORS] || "bg-gray-500 text-white"}`}
+                                          >
+                                            {comment.user?.tier}
+                                          </Badge>
+                                          <span className="text-xs text-gray-500">
+                                            {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                          </span>
+                                        </div>
+                                        <p className="text-sm">{comment.content}</p>
+                                      </div>
+                                      <div className="flex items-center space-x-2 mt-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => setReplyingTo(comment.id)}
+                                          className="text-xs text-gray-500 hover:text-blue-500"
+                                        >
+                                          <Reply className="h-3 w-3 mr-1" />
+                                          Reply
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Add Comment Form */}
+                              {profile && (
+                                <div className="flex space-x-3">
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} />
+                                    <AvatarFallback className="text-xs">{profile.username?.[0] || "U"}</AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1">
+                                    <div className="flex space-x-2">
+                                      <Input
+                                        placeholder="Write a comment..."
+                                        value={replyingTo === post.id ? replyContent : ""}
+                                        onChange={(e) => {
+                                          if (replyingTo === post.id) {
+                                            setReplyContent(e.target.value)
+                                          } else {
+                                            setReplyingTo(post.id)
+                                            setReplyContent(e.target.value)
+                                          }
+                                        }}
+                                        onKeyPress={(e) => {
+                                          if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault()
+                                            createComment(post.id, replyContent)
+                                          }
+                                        }}
+                                        className="text-sm"
+                                      />
+                                      <Button
+                                        size="sm"
+                                        onClick={() => createComment(post.id, replyContent)}
+                                        disabled={!replyContent.trim()}
+                                        className="bg-blue-500 hover:bg-blue-600"
+                                      >
+                                        <Send className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     ))}

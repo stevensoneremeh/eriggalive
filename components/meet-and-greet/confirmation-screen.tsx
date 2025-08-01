@@ -3,13 +3,14 @@
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CheckCircle, Clock, Users, Mic, Headphones, Phone } from "lucide-react"
+import { CheckCircle, Clock, Users, Mic, Headphones, Phone, Video } from "lucide-react"
 
 interface ConfirmationScreenProps {
-  bookingData: { date: string; time: string; amount: number }
+  bookingData: { date: string; time: string; amount: number; bookingId?: string }
+  onJoinCall: () => void
 }
 
-export function ConfirmationScreen({ bookingData }: ConfirmationScreenProps) {
+export function ConfirmationScreen({ bookingData, onJoinCall }: ConfirmationScreenProps) {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       weekday: "long",
@@ -27,19 +28,13 @@ export function ConfirmationScreen({ bookingData }: ConfirmationScreenProps) {
     })
   }
 
-  const handleJoinCall = () => {
-    // Get the call number from environment variables
-    const callNumber = process.env.NEXT_PUBLIC_MEET_GREET_PHONE || "+234-XXX-XXX-XXXX"
+  const isCallTime = () => {
+    const now = new Date()
+    const bookingDateTime = new Date(`${bookingData.date}T${bookingData.time}`)
+    const timeDiff = bookingDateTime.getTime() - now.getTime()
 
-    // For mobile devices, try to open the phone app
-    if (typeof window !== "undefined") {
-      if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-        window.location.href = `tel:${callNumber}`
-      } else {
-        // For desktop, show the number to call
-        alert(`Please call: ${callNumber} at your scheduled time`)
-      }
-    }
+    // Allow joining 5 minutes before scheduled time
+    return timeDiff <= 5 * 60 * 1000 && timeDiff >= -30 * 60 * 1000 // 30 minutes after
   }
 
   return (
@@ -88,7 +83,7 @@ export function ConfirmationScreen({ bookingData }: ConfirmationScreenProps) {
                   <Users className="w-4 h-4 mr-2" />
                   Session Type
                 </span>
-                <span className="font-medium text-green-900">1-on-1 Meet & Greet</span>
+                <span className="font-medium text-green-900">1-on-1 Video Meet & Greet</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="flex items-center text-green-700">
@@ -97,18 +92,36 @@ export function ConfirmationScreen({ bookingData }: ConfirmationScreenProps) {
                 </span>
                 <span className="font-medium text-green-900">₦{bookingData.amount.toLocaleString()}</span>
               </div>
+              {bookingData.bookingId && (
+                <div className="flex items-center justify-between">
+                  <span className="text-green-700">Booking ID</span>
+                  <span className="font-mono text-sm text-green-900">{bookingData.bookingId}</span>
+                </div>
+              )}
             </div>
           </motion.div>
 
           {/* Join Call Button */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-            <Button
-              onClick={handleJoinCall}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 text-lg font-semibold transition-all duration-300 transform hover:scale-105"
-            >
-              <Phone className="w-5 h-5 mr-2" />
-              Join Call at Scheduled Time
-            </Button>
+            {isCallTime() ? (
+              <Button
+                onClick={onJoinCall}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-lg font-semibold transition-all duration-300 transform hover:scale-105"
+              >
+                <Video className="w-5 h-5 mr-2" />
+                Join Video Call Now
+              </Button>
+            ) : (
+              <div className="text-center">
+                <Button disabled className="w-full py-4 text-lg font-semibold opacity-50 cursor-not-allowed">
+                  <Clock className="w-5 h-5 mr-2" />
+                  Call Available 5 Minutes Before Scheduled Time
+                </Button>
+                <p className="text-sm text-gray-500 mt-2">
+                  You can join the call starting 5 minutes before your scheduled time
+                </p>
+              </div>
+            )}
           </motion.div>
 
           {/* Setup Instructions */}
@@ -121,17 +134,17 @@ export function ConfirmationScreen({ bookingData }: ConfirmationScreenProps) {
             <h3 className="font-semibold text-blue-900">Preparation & Setup</h3>
             <div className="space-y-3">
               <div className="flex items-start space-x-3">
-                <Phone className="w-5 h-5 text-blue-600 mt-0.5" />
+                <Video className="w-5 h-5 text-blue-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-blue-900">Phone Ready</p>
-                  <p className="text-sm text-blue-600">Ensure your phone is charged and has good signal</p>
+                  <p className="font-medium text-blue-900">Camera & Microphone</p>
+                  <p className="text-sm text-blue-600">Ensure your camera and microphone are working</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
                 <Mic className="w-5 h-5 text-blue-600 mt-0.5" />
                 <div>
                   <p className="font-medium text-blue-900">Quiet Environment</p>
-                  <p className="text-sm text-blue-600">Find a quiet space for your call</p>
+                  <p className="text-sm text-blue-600">Find a quiet space for your video call</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
@@ -151,13 +164,14 @@ export function ConfirmationScreen({ bookingData }: ConfirmationScreenProps) {
             transition={{ delay: 0.6 }}
             className="bg-blue-50 p-4 rounded-lg"
           >
-            <h3 className="font-semibold text-blue-900 mb-3">Call Instructions</h3>
+            <h3 className="font-semibold text-blue-900 mb-3">Video Call Instructions</h3>
             <ul className="space-y-2 text-sm text-blue-700">
-              <li>• Call at your exact scheduled time</li>
-              <li>• Have your booking reference ready</li>
-              <li>• The call will last approximately 15-30 minutes</li>
+              <li>• Join the call at your exact scheduled time</li>
+              <li>• The video call will last approximately 15-30 minutes</li>
               <li>• Be respectful and maintain a positive attitude</li>
+              <li>• You can use the chat feature during the call</li>
               <li>• Take notes if something resonates with you</li>
+              <li>• Technical support is available if needed</li>
             </ul>
           </motion.div>
 

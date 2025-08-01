@@ -8,13 +8,15 @@ import { PhoneBoothScene } from "@/components/meet-and-greet/phone-booth-scene"
 import { BookingForm } from "@/components/meet-and-greet/booking-form"
 import { PaymentScreen } from "@/components/meet-and-greet/payment-screen"
 import { ConfirmationScreen } from "@/components/meet-and-greet/confirmation-screen"
+import { VideoCallScreen } from "@/components/meet-and-greet/video-call-screen"
 
-type Step = "booking" | "payment" | "confirmation"
+type Step = "booking" | "payment" | "confirmation" | "video-call"
 
 interface BookingData {
   date: string
   time: string
   amount: number
+  bookingId?: string
 }
 
 export default function MeetAndGreetPage() {
@@ -47,13 +49,18 @@ export default function MeetAndGreetPage() {
     setCurrentStep("payment")
   }
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = (bookingId: string) => {
+    setBookingData((prev) => (prev ? { ...prev, bookingId } : null))
     setCurrentStep("confirmation")
   }
 
   const handleBackToBooking = () => {
     setCurrentStep("booking")
     setBookingData(null)
+  }
+
+  const handleJoinCall = () => {
+    setCurrentStep("video-call")
   }
 
   if (!isLoaded) {
@@ -69,10 +76,12 @@ export default function MeetAndGreetPage() {
   return (
     <AuthGuard>
       <div className="min-h-screen bg-gradient-to-b from-sky-200 via-blue-100 to-amber-50 relative overflow-hidden">
-        {/* 3D Phone Booth Background - Always visible */}
-        <div className="absolute inset-0 z-0">
-          <PhoneBoothScene />
-        </div>
+        {/* 3D Phone Booth Background - Always visible except during video call */}
+        {currentStep !== "video-call" && (
+          <div className="absolute inset-0 z-0">
+            <PhoneBoothScene />
+          </div>
+        )}
 
         {/* Content Overlay */}
         <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
@@ -118,34 +127,49 @@ export default function MeetAndGreetPage() {
                 transition={{ duration: 0.5, ease: "easeInOut" }}
                 className="w-full max-w-lg"
               >
-                <ConfirmationScreen bookingData={bookingData} />
+                <ConfirmationScreen bookingData={bookingData} onJoinCall={handleJoinCall} />
+              </motion.div>
+            )}
+
+            {currentStep === "video-call" && bookingData && (
+              <motion.div
+                key="video-call"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.5 }}
+                className="w-full h-full"
+              >
+                <VideoCallScreen bookingData={bookingData} onEndCall={() => setCurrentStep("confirmation")} />
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
         {/* Ambient particles for atmosphere */}
-        <div className="absolute inset-0 z-5 pointer-events-none">
-          {[...Array(20)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-1 h-1 bg-white/20 rounded-full"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-              }}
-              animate={{
-                y: [0, -20, 0],
-                opacity: [0.2, 0.8, 0.2],
-              }}
-              transition={{
-                duration: 3 + Math.random() * 2,
-                repeat: Number.POSITIVE_INFINITY,
-                delay: Math.random() * 2,
-              }}
-            />
-          ))}
-        </div>
+        {currentStep !== "video-call" && (
+          <div className="absolute inset-0 z-5 pointer-events-none">
+            {[...Array(20)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-1 h-1 bg-white/20 rounded-full"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                }}
+                animate={{
+                  y: [0, -20, 0],
+                  opacity: [0.2, 0.8, 0.2],
+                }}
+                transition={{
+                  duration: 3 + Math.random() * 2,
+                  repeat: Number.POSITIVE_INFINITY,
+                  delay: Math.random() * 2,
+                }}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </AuthGuard>
   )

@@ -3,7 +3,7 @@
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import type { User, Session } from "@supabase/supabase-js"
-import { supabase } from "@/lib/supabase"
+import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
 interface UserProfile {
@@ -16,6 +16,10 @@ interface UserProfile {
   avatar_url?: string
   tier: string
   coins: number
+  level: number
+  points: number
+  is_verified: boolean
+  is_active: boolean
   created_at: string
   updated_at: string
 }
@@ -33,6 +37,8 @@ interface AuthContextType {
   ) => Promise<{ error: any }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
+  resetPassword: (email: string) => Promise<{ error: any }>
+  updatePassword: (password: string) => Promise<{ error: any }>
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -44,6 +50,8 @@ const AuthContext = createContext<AuthContextType>({
   signUp: async () => ({ error: null }),
   signOut: async () => {},
   refreshProfile: async () => {},
+  resetPassword: async () => ({ error: null }),
+  updatePassword: async () => ({ error: null }),
 })
 
 export const useAuth = () => {
@@ -60,10 +68,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+  const supabase = createClient()
 
   const fetchProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase.from("user_profiles").select("*").eq("user_id", userId).single()
+      const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
 
       if (error) {
         console.error("Error fetching profile:", error)
@@ -110,13 +119,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Create user profile
       if (data.user) {
-        const { error: profileError } = await supabase.from("user_profiles").insert({
-          user_id: data.user.id,
+        const { error: profileError } = await supabase.from("users").insert({
+          auth_user_id: data.user.id,
           email: email,
           username: userData.username,
           full_name: userData.full_name || "",
           tier: "grassroot",
           coins: 100,
+          level: 1,
+          points: 0,
+          is_verified: false,
+          is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -145,6 +158,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error("Error signing out:", error)
+    }
+  }
+
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      return { error }
+    } catch (error) {
+      return { error }
+    }
+  }
+
+  const updatePassword = async (password: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: password,
+      })
+      return { error }
+    } catch (error) {
+      return { error }
     }
   }
 
@@ -215,6 +250,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp,
     signOut,
     refreshProfile,
+    resetPassword,
+    updatePassword,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
