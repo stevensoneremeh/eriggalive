@@ -37,10 +37,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
+  const createUserProfile = async (authUser: User, userData?: { username: string; full_name: string }) => {
+    try {
+      const profileData = {
+        auth_user_id: authUser.id,
+        email: authUser.email!,
+        username: userData?.username || authUser.user_metadata?.username || authUser.email?.split("@")[0] || "user",
+        full_name: userData?.full_name || authUser.user_metadata?.full_name || null,
+        tier: "grassroot" as const,
+        coins: 100,
+        level: 1,
+        points: 0,
+        is_verified: false,
+        is_active: true,
+        is_banned: false,
+        role: "user" as const,
+        login_count: 1,
+        email_verified: authUser.email_confirmed_at ? true : false,
+        phone_verified: false,
+        two_factor_enabled: false,
+        preferences: {},
+        metadata: {},
+      }
+
+      const { data, error } = await supabase.from("users").insert(profileData).select().single()
+
+      if (error) {
+        console.error("Error creating user profile:", error)
+        return null
+      }
+
+      return data
+    } catch (error) {
+      console.error("Error in createUserProfile:", error)
+      return null
+    }
+  }
+
   const fetchProfile = async (userId: string) => {
     try {
-      // First, clean up any duplicate profiles
-      const { data: allProfiles, error: fetchError } = await supabase
+      const { data: existingProfiles, error: fetchError } = await supabase
         .from("users")
         .select("*")
         .eq("auth_user_id", userId)
@@ -50,18 +86,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return null
       }
 
-      if (!allProfiles || allProfiles.length === 0) {
+      if (!existingProfiles || existingProfiles.length === 0) {
         console.log("No profile found for user:", userId)
         return null
       }
 
       // If multiple profiles exist, keep the first one and delete the rest
-      if (allProfiles.length > 1) {
-        console.log(`Found ${allProfiles.length} profiles for user ${userId}, cleaning up...`)
-        const keepProfile = allProfiles[0]
-        const duplicateIds = allProfiles.slice(1).map((p) => p.id)
+      if (existingProfiles.length > 1) {
+        console.log(`Found ${existingProfiles.length} profiles for user ${userId}, cleaning up...`)
+        const keepProfile = existingProfiles[0]
+        const duplicateIds = existingProfiles.slice(1).map((p) => p.id)
 
-        // Delete duplicate profiles
         const { error: deleteError } = await supabase.from("users").delete().in("id", duplicateIds)
 
         if (deleteError) {
@@ -73,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return keepProfile
       }
 
-      return allProfiles[0]
+      return existingProfiles[0]
     } catch (error) {
       console.error("Error in fetchProfile:", error)
       return null
@@ -92,7 +127,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initializeAuth = async () => {
       try {
-        // Get initial session
         const {
           data: { session: initialSession },
           error,
@@ -107,7 +141,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(initialSession?.user ?? null)
 
           if (initialSession?.user) {
-            const profileData = await fetchProfile(initialSession.user.id)
+            let profileData = await fetchProfile(initialSession.user.id)
+
+            // If no profile exists, create one
+            if (!profileData) {
+              profileData = await createUserProfile(initialSession.user)
+            }
+
             if (mounted) {
               setProfile(profileData)
             }
@@ -125,7 +165,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initializeAuth()
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -136,13 +175,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null)
 
         if (session?.user) {
-          const profileData = await fetchProfile(session.user.id)
+          let profileData = await fetchProfile(session.user.id)
+
+          // If no profile exists, create one (for new signups)
+          if (!profileData && event === "SIGNED_UP") {
+            profileData = await createUserProfile(session.user)
+          }
+
           if (mounted) {
             setProfile(profileData)
           }
 
           // Only redirect on sign in, not on initial load
-          if (event === "SIGNED_IN") {
+          if (event === "SIGNED_IN" || event === "SIGNED_UP") {
             router.push("/dashboard")
           }
         } else {
@@ -183,13 +228,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         options: {
-          data: userData,
+          data: {
+            username: userData.username,
+            full_name: userData.full_name,
+          },
         },
       })
 
       if (error) return { error }
 
-      // The trigger will handle profile creation
+      // Profile will be created in the auth state change handler
       return { error: null }
     } catch (error) {
       return { error }

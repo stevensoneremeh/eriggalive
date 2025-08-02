@@ -150,14 +150,23 @@ export interface Database {
           full_name?: string | null
           email: string
           tier?: UserTier
+          role?: UserRole
           coins?: number
           level?: number
           points?: number
           avatar_url?: string | null
           bio?: string | null
+          location?: string | null
+          phone_number?: string | null
           is_verified?: boolean
           is_active?: boolean
           is_banned?: boolean
+          email_verified?: boolean
+          phone_verified?: boolean
+          two_factor_enabled?: boolean
+          login_count?: number
+          preferences?: Record<string, any>
+          metadata?: Record<string, any>
           created_at?: string
           updated_at?: string
         }
@@ -168,14 +177,23 @@ export interface Database {
           full_name?: string | null
           email?: string
           tier?: UserTier
+          role?: UserRole
           coins?: number
           level?: number
           points?: number
           avatar_url?: string | null
           bio?: string | null
+          location?: string | null
+          phone_number?: string | null
           is_verified?: boolean
           is_active?: boolean
           is_banned?: boolean
+          email_verified?: boolean
+          phone_verified?: boolean
+          two_factor_enabled?: boolean
+          login_count?: number
+          preferences?: Record<string, any>
+          metadata?: Record<string, any>
           created_at?: string
           updated_at?: string
         }
@@ -188,6 +206,9 @@ export interface Database {
           name: string
           slug: string
           description?: string | null
+          icon?: string | null
+          color?: string | null
+          display_order?: number
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -197,6 +218,9 @@ export interface Database {
           name?: string
           slug?: string
           description?: string | null
+          icon?: string | null
+          color?: string | null
+          display_order?: number
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -217,6 +241,10 @@ export interface Database {
           comment_count?: number
           is_pinned?: boolean
           is_locked?: boolean
+          tags?: string[]
+          is_published?: boolean
+          is_edited?: boolean
+          is_deleted?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -232,6 +260,10 @@ export interface Database {
           comment_count?: number
           is_pinned?: boolean
           is_locked?: boolean
+          tags?: string[]
+          is_published?: boolean
+          is_edited?: boolean
+          is_deleted?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -263,6 +295,8 @@ export interface Database {
           vote_count?: number
           like_count?: number
           reply_count?: number
+          is_edited?: boolean
+          is_deleted?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -275,6 +309,8 @@ export interface Database {
           vote_count?: number
           like_count?: number
           reply_count?: number
+          is_edited?: boolean
+          is_deleted?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -350,6 +386,54 @@ export interface Database {
             referencedColumns: ["id"]
           },
         ]
+      }
+      post_likes: {
+        Row: {
+          id: number
+          post_id: string
+          user_id: number
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          post_id: string
+          user_id: number
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          post_id?: string
+          user_id?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      post_comments: {
+        Row: {
+          id: string
+          post_id: string
+          author_id: number
+          content: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          author_id: number
+          content: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          author_id?: number
+          content?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {
