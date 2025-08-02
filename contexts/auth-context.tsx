@@ -39,14 +39,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
+      // First, clean up any duplicate profiles
+      const { data: allProfiles, error: fetchError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("auth_user_id", userId)
 
-      if (error) {
-        console.error("Error fetching profile:", error)
+      if (fetchError) {
+        console.error("Error fetching profiles:", fetchError)
         return null
       }
 
-      return data
+      if (!allProfiles || allProfiles.length === 0) {
+        console.log("No profile found for user:", userId)
+        return null
+      }
+
+      // If multiple profiles exist, keep the first one and delete the rest
+      if (allProfiles.length > 1) {
+        console.log(`Found ${allProfiles.length} profiles for user ${userId}, cleaning up...`)
+        const keepProfile = allProfiles[0]
+        const duplicateIds = allProfiles.slice(1).map((p) => p.id)
+
+        // Delete duplicate profiles
+        const { error: deleteError } = await supabase.from("users").delete().in("id", duplicateIds)
+
+        if (deleteError) {
+          console.error("Error deleting duplicate profiles:", deleteError)
+        } else {
+          console.log(`Deleted ${duplicateIds.length} duplicate profiles`)
+        }
+
+        return keepProfile
+      }
+
+      return allProfiles[0]
     } catch (error) {
       console.error("Error in fetchProfile:", error)
       return null
@@ -162,32 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) return { error }
 
-      // Create user profile
-      if (data.user && !data.user.email_confirmed_at) {
-        // User needs to confirm email first
-        return { error: null }
-      }
-
-      if (data.user) {
-        const { error: profileError } = await supabase.from("users").insert({
-          auth_user_id: data.user.id,
-          email: email,
-          username: userData.username,
-          full_name: userData.full_name,
-          tier: "grassroot",
-          coins: 100,
-          level: 1,
-          points: 0,
-          is_active: true,
-          is_verified: false,
-          is_banned: false,
-        })
-
-        if (profileError) {
-          console.error("Error creating profile:", profileError)
-        }
-      }
-
+      // The trigger will handle profile creation
       return { error: null }
     } catch (error) {
       return { error }
