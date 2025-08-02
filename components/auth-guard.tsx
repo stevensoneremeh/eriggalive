@@ -13,20 +13,20 @@ interface AuthGuardProps {
 export function AuthGuard({ children, redirectTo = "/login" }: AuthGuardProps) {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [mounted, setMounted] = useState(false)
+  const [shouldRender, setShouldRender] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  useEffect(() => {
-    if (mounted && !loading && !user) {
-      router.push(redirectTo)
+    if (!loading) {
+      if (!user) {
+        router.push(redirectTo)
+      } else {
+        setShouldRender(true)
+      }
     }
-  }, [user, loading, router, redirectTo, mounted])
+  }, [user, loading, router, redirectTo])
 
-  // Don't render anything on server or while mounting
-  if (!mounted) {
+  // Show loading while checking auth
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <div className="text-center">
@@ -37,23 +37,10 @@ export function AuthGuard({ children, redirectTo = "/login" }: AuthGuardProps) {
     )
   }
 
-  // Show loading spinner while checking auth
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg font-medium text-gray-600 dark:text-gray-400">Checking authentication...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Don't render children if not authenticated
-  if (!user) {
+  // Don't render if not authenticated or still checking
+  if (!user || !shouldRender) {
     return null
   }
 
-  // User is authenticated, render children
   return <>{children}</>
 }

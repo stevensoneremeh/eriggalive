@@ -35,25 +35,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [mounted, setMounted] = useState(false)
   const router = useRouter()
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   const fetchProfile = async (userId: string) => {
     try {
-      // Clean up duplicate profiles first
-      const { data: profiles } = await supabase.from("users").select("id").eq("auth_user_id", userId)
-
-      if (profiles && profiles.length > 1) {
-        const keepId = profiles[0].id
-        const deleteIds = profiles.slice(1).map((p) => p.id)
-        await supabase.from("users").delete().in("id", deleteIds)
-      }
-
-      const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).maybeSingle()
+      const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
 
       if (error) {
         console.error("Error fetching profile:", error)
@@ -68,64 +54,89 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const refreshProfile = async () => {
-    if (user && mounted) {
+    if (user) {
       const profileData = await fetchProfile(user.id)
       setProfile(profileData)
     }
   }
 
   useEffect(() => {
-    if (!mounted) return
+    let mounted = true
 
-    const getSession = async () => {
+    const initializeAuth = async () => {
       try {
+        // Get initial session
         const {
-          data: { session },
+          data: { session: initialSession },
+          error,
         } = await supabase.auth.getSession()
+
+        if (error) {
+          console.error("Error getting session:", error)
+        }
+
+        if (mounted) {
+          setSession(initialSession)
+          setUser(initialSession?.user ?? null)
+
+          if (initialSession?.user) {
+            const profileData = await fetchProfile(initialSession.user.id)
+            if (mounted) {
+              setProfile(profileData)
+            }
+          }
+
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error("Error initializing auth:", error)
+        if (mounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    initializeAuth()
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state change:", event, session?.user?.email)
+
+      if (mounted) {
         setSession(session)
         setUser(session?.user ?? null)
 
         if (session?.user) {
           const profileData = await fetchProfile(session.user.id)
-          setProfile(profileData)
+          if (mounted) {
+            setProfile(profileData)
+          }
+
+          // Only redirect on sign in, not on initial load
+          if (event === "SIGNED_IN") {
+            router.push("/dashboard")
+          }
+        } else {
+          if (mounted) {
+            setProfile(null)
+          }
+
+          if (event === "SIGNED_OUT") {
+            router.push("/login")
+          }
         }
-      } catch (error) {
-        console.error("Error getting session:", error)
-      } finally {
+
         setLoading(false)
       }
-    }
-
-    getSession()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state change:", event, session?.user?.email)
-      setSession(session)
-      setUser(session?.user ?? null)
-
-      if (session?.user) {
-        const profileData = await fetchProfile(session.user.id)
-        setProfile(profileData)
-        if (event === "SIGNED_IN") {
-          // Use setTimeout to ensure the redirect happens after state updates
-          setTimeout(() => {
-            router.push("/dashboard")
-          }, 100)
-        }
-      } else {
-        setProfile(null)
-        if (event === "SIGNED_OUT") {
-          router.push("/login")
-        }
-      }
-
-      setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
-  }, [router, mounted])
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [router])
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -151,32 +162,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) return { error }
 
-      // Create user profile only if it doesn't exist
+      // Create user profile
+      if (data.user && !data.user.email_confirmed_at) {
+        // User needs to confirm email first
+        return { error: null }
+      }
+
       if (data.user) {
-        const { data: existingProfile } = await supabase
-          .from("users")
-          .select("id")
-          .eq("auth_user_id", data.user.id)
-          .maybeSingle()
+        const { error: profileError } = await supabase.from("users").insert({
+          auth_user_id: data.user.id,
+          email: email,
+          username: userData.username,
+          full_name: userData.full_name,
+          tier: "grassroot",
+          coins: 100,
+          level: 1,
+          points: 0,
+          is_active: true,
+          is_verified: false,
+          is_banned: false,
+        })
 
-        if (!existingProfile) {
-          const { error: profileError } = await supabase.from("users").insert({
-            auth_user_id: data.user.id,
-            email: email,
-            username: userData.username,
-            full_name: userData.full_name,
-            tier: "grassroot",
-            coins: 100, // Starting coins
-            level: 1,
-            points: 0,
-            is_active: true,
-            is_verified: false,
-            is_banned: false,
-          })
-
-          if (profileError) {
-            console.error("Error creating profile:", profileError)
-          }
+        if (profileError) {
+          console.error("Error creating profile:", profileError)
         }
       }
 
