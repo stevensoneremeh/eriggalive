@@ -32,6 +32,13 @@ export default function SignUpPage() {
     setIsLoading(true)
     setError("")
 
+    // Validation
+    if (!email || !password || !username || !fullName) {
+      setError("Please fill in all fields")
+      setIsLoading(false)
+      return
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match")
       setIsLoading(false)
@@ -44,13 +51,31 @@ export default function SignUpPage() {
       return
     }
 
+    // Validate username (basic validation)
+    if (username.length < 3) {
+      setError("Username must be at least 3 characters long")
+      setIsLoading(false)
+      return
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      setError("Username can only contain letters, numbers, and underscores")
+      setIsLoading(false)
+      return
+    }
+
     try {
       const { error } = await signUp(email, password, {
         username,
         full_name: fullName,
       })
+
       if (error) {
-        setError(error.message || "Failed to create account")
+        if (error.message === "Supabase not configured") {
+          setError("Authentication service is not configured. Please check your environment variables.")
+        } else {
+          setError(error.message || "Failed to create account")
+        }
       } else {
         // Redirect to success page
         router.push("/signup/success")
@@ -94,7 +119,7 @@ export default function SignUpPage() {
                   type="text"
                   placeholder="Choose username"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
                   required
                   disabled={isLoading}
                 />

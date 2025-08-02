@@ -1,10 +1,8 @@
 import { createClient as supabaseCreateClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 
-// Check if we're in a browser environment
 const isBrowser = typeof window !== "undefined"
 
-// Check if we're in preview mode
 const isPreviewMode =
   isBrowser &&
   (window.location.hostname.includes("vusercontent.net") ||
@@ -12,76 +10,29 @@ const isPreviewMode =
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||
     !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
 
-// Define the mock client function for preview mode
 const createMockClient = () => {
-  const mockUser = {
-    id: "mock-user-id",
-    email: "demo@eriggalive.com",
-    user_metadata: { username: "demo_user", full_name: "Demo User" },
-    email_confirmed_at: new Date().toISOString(),
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }
-
-  const mockSession = {
-    access_token: "mock-token",
-    refresh_token: "mock-refresh",
-    expires_in: 3600,
-    token_type: "bearer" as const,
-    user: mockUser,
-  }
-
   return {
     auth: {
-      getSession: () =>
+      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+      getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+      signInWithPassword: () =>
         Promise.resolve({
-          data: { session: mockSession },
-          error: null,
+          data: { user: null, session: null },
+          error: { message: "Supabase not configured" },
         }),
-      getUser: () =>
+      signUp: () =>
         Promise.resolve({
-          data: { user: mockUser },
-          error: null,
-        }),
-      signInWithPassword: ({ email, password }: { email: string; password: string }) =>
-        Promise.resolve({
-          data: {
-            user: { ...mockUser, email },
-            session: { ...mockSession, user: { ...mockUser, email } },
-          },
-          error: null,
-        }),
-      signUp: ({ email, password, options }: any) =>
-        Promise.resolve({
-          data: {
-            user: {
-              ...mockUser,
-              email,
-              user_metadata: options?.data || mockUser.user_metadata,
-            },
-            session: {
-              ...mockSession,
-              user: {
-                ...mockUser,
-                email,
-                user_metadata: options?.data || mockUser.user_metadata,
-              },
-            },
-          },
-          error: null,
+          data: { user: null, session: null },
+          error: { message: "Supabase not configured" },
         }),
       signOut: () => Promise.resolve({ error: null }),
-      resetPasswordForEmail: (email: string, options?: any) => Promise.resolve({ error: null }),
-      updateUser: (attributes: any) =>
+      resetPasswordForEmail: () => Promise.resolve({ error: { message: "Supabase not configured" } }),
+      updateUser: () =>
         Promise.resolve({
-          data: { user: { ...mockUser, ...attributes } },
-          error: null,
+          data: { user: null },
+          error: { message: "Supabase not configured" },
         }),
       onAuthStateChange: (callback: any) => {
-        // Simulate signed in state for demo
-        setTimeout(() => {
-          callback("SIGNED_IN", mockSession)
-        }, 100)
         return {
           data: {
             subscription: {
@@ -91,145 +42,25 @@ const createMockClient = () => {
         }
       },
     },
-    from: (table: string) => ({
-      select: (columns?: string) => ({
-        eq: (column: string, value: any) => ({
-          single: () => {
-            if (table === "users" && column === "auth_user_id") {
-              return Promise.resolve({
-                data: {
-                  id: 1,
-                  auth_user_id: value,
-                  username: "demo_user",
-                  full_name: "Demo User",
-                  email: "demo@eriggalive.com",
-                  tier: "grassroot",
-                  coins: 500,
-                  level: 1,
-                  points: 100,
-                  avatar_url: null,
-                  is_verified: false,
-                  is_active: true,
-                  is_banned: false,
-                  role: "user",
-                  login_count: 1,
-                  email_verified: true,
-                  phone_verified: false,
-                  two_factor_enabled: false,
-                  preferences: {},
-                  metadata: {},
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                },
-                error: null,
-              })
-            }
-            return Promise.resolve({ data: null, error: null })
-          },
-          maybeSingle: () => Promise.resolve({ data: null, error: null }),
-        }),
-        order: (column: string, options?: { ascending: boolean }) => ({
-          limit: (limit: number) => {
-            if (table === "community_posts") {
-              return Promise.resolve({
-                data: Array(Math.min(limit, 5))
-                  .fill(0)
-                  .map((_, i) => ({
-                    id: i + 1,
-                    content: `Demo community post ${i + 1} - Join the Erigga Live community discussion!`,
-                    vote_count: Math.floor(Math.random() * 50) + 10,
-                    comment_count: Math.floor(Math.random() * 15) + 2,
-                    created_at: new Date(Date.now() - i * 3600000).toISOString(),
-                    updated_at: new Date(Date.now() - i * 3600000).toISOString(),
-                    user: {
-                      id: 1,
-                      username: `fan_${i + 1}`,
-                      full_name: `Erigga Fan ${i + 1}`,
-                      tier: ["grassroot", "pioneer", "elder", "blood"][i % 4],
-                      avatar_url: null,
-                    },
-                    category: {
-                      id: 1,
-                      name: "General Discussion",
-                      slug: "general",
-                    },
-                    user_has_voted: i % 3 === 0,
-                  })),
-                error: null,
-              })
-            }
-            if (table === "community_categories") {
-              return Promise.resolve({
-                data: [
-                  { id: 1, name: "General Discussion", slug: "general", is_active: true },
-                  { id: 2, name: "Music & Lyrics", slug: "music", is_active: true },
-                  { id: 3, name: "Events & Shows", slug: "events", is_active: true },
-                  { id: 4, name: "Fan Art", slug: "fan-art", is_active: true },
-                ],
-                error: null,
-              })
-            }
-            return Promise.resolve({ data: [], error: null })
-          },
-          range: (start: number, end: number) => Promise.resolve({ data: [], error: null }),
-        }),
-        is: (column: string, value: any) => ({
-          order: (column: string, options?: { ascending: boolean }) => ({
-            limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-          }),
-        }),
-        ilike: (column: string, value: string) => ({
-          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-        }),
-        or: (conditions: string) => ({
-          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-        }),
-      }),
-      insert: (data: any) => ({
-        select: (columns?: string) => ({
-          single: () =>
-            Promise.resolve({
-              data: {
-                ...data,
-                id: Math.floor(Math.random() * 1000),
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              },
-              error: null,
-            }),
-        }),
-      }),
-      update: (data: any) => ({
-        eq: (column: string, value: any) => ({
-          select: (columns?: string) => ({
-            single: () => Promise.resolve({ data: { ...data }, error: null }),
-          }),
-        }),
-      }),
-      delete: () => ({
-        eq: (column: string, value: any) => Promise.resolve({ error: null }),
-      }),
+    from: () => ({
+      select: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
+      insert: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      update: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      delete: () => Promise.resolve({ error: { message: "Supabase not configured" } }),
     }),
     storage: {
-      from: (bucket: string) => ({
-        upload: (path: string, file: File) =>
-          Promise.resolve({
-            data: { path: `demo/${path}` },
-            error: null,
-          }),
-        getPublicUrl: (path: string) => ({
-          data: { publicUrl: `/placeholder.svg?height=200&width=200&text=Demo` },
-        }),
+      from: () => ({
+        upload: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+        getPublicUrl: () => ({ data: { publicUrl: "" } }),
       }),
     },
-    rpc: (functionName: string, params: any) => Promise.resolve({ data: true, error: null }),
+    rpc: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
   } as any
 }
 
-// Create a Supabase client for browser usage
 export function createClient() {
   if (isPreviewMode) {
-    console.log("🔧 Using mock client for demo/development")
+    console.warn("⚠️ Using mock client - Supabase environment variables not configured")
     return createMockClient()
   }
 
@@ -249,7 +80,6 @@ export function createClient() {
   }
 }
 
-// Export a singleton instance for consistent usage
 let supabaseClient: ReturnType<typeof createClient> | null = null
 
 export function getSupabaseClient() {

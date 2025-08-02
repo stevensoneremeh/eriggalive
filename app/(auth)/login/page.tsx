@@ -35,10 +35,20 @@ export default function LoginPage() {
     setLoading(true)
     setError("")
 
+    if (!email || !password) {
+      setError("Please fill in all fields")
+      setLoading(false)
+      return
+    }
+
     const { error } = await signIn(email, password)
 
     if (error) {
-      setError(error.message || "An error occurred during login")
+      if (error.message === "Supabase not configured") {
+        setError("Authentication service is not configured. Please check your environment variables.")
+      } else {
+        setError(error.message || "An error occurred during login")
+      }
       setLoading(false)
     }
     // Don't set loading to false on success - let the auth context handle the redirect
@@ -74,6 +84,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
                   required
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -90,6 +101,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 pr-10"
                   required
+                  disabled={loading}
                 />
                 <Button
                   type="button"
@@ -97,6 +109,7 @@ export default function LoginPage() {
                   size="sm"
                   className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
+                  disabled={loading}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>

@@ -39,6 +39,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const createUserProfile = async (authUser: User, userData?: { username: string; full_name: string }) => {
     try {
+      // Check if profile already exists
+      const { data: existingProfile } = await supabase
+        .from("users")
+        .select("*")
+        .eq("auth_user_id", authUser.id)
+        .single()
+
+      if (existingProfile) {
+        return existingProfile
+      }
+
+      // Create new profile
       const profileData = {
         auth_user_id: authUser.id,
         email: authUser.email!,
@@ -64,6 +76,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error("Error creating user profile:", error)
+        // If table doesn't exist, return a basic profile structure
+        if (error.code === "42P01") {
+          return {
+            id: 1,
+            auth_user_id: authUser.id,
+            username: userData?.username || "user",
+            full_name: userData?.full_name || null,
+            email: authUser.email!,
+            tier: "grassroot" as const,
+            coins: 100,
+            level: 1,
+            points: 0,
+            avatar_url: null,
+            is_verified: false,
+            is_active: true,
+            is_banned: false,
+            role: "user" as const,
+            login_count: 1,
+            email_verified: true,
+            phone_verified: false,
+            two_factor_enabled: false,
+            preferences: {},
+            metadata: {},
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+        }
         return null
       }
 
@@ -83,11 +122,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (fetchError) {
         console.error("Error fetching profiles:", fetchError)
+        // If table doesn't exist, return null
+        if (fetchError.code === "42P01") {
+          return null
+        }
         return null
       }
 
       if (!existingProfiles || existingProfiles.length === 0) {
-        console.log("No profile found for user:", userId)
         return null
       }
 
@@ -178,7 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           let profileData = await fetchProfile(session.user.id)
 
           // If no profile exists, create one (for new signups)
-          if (!profileData && event === "SIGNED_UP") {
+          if (!profileData && (event === "SIGNED_UP" || event === "SIGNED_IN")) {
             profileData = await createUserProfile(session.user)
           }
 
@@ -186,7 +228,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setProfile(profileData)
           }
 
-          // Only redirect on sign in, not on initial load
+          // Only redirect on sign in or sign up, not on initial load
           if (event === "SIGNED_IN" || event === "SIGNED_UP") {
             router.push("/dashboard")
           }
@@ -245,7 +287,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut()
+    } catch (error) {
+      console.error("Error signing out:", error)
+    }
   }
 
   const resetPassword = async (email: string) => {
