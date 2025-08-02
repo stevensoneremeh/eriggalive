@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Eye, EyeOff } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
+import { useRouter } from "next/navigation"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -20,6 +21,7 @@ export default function LoginPage() {
   const [error, setError] = useState("")
 
   const { signIn } = useAuth()
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,8 +39,10 @@ export default function LoginPage() {
       if (error) {
         setError(error.message)
         setLoading(false)
+      } else {
+        // Success - auth context will handle redirect
+        // Don't set loading to false here to prevent flash
       }
-      // Don't set loading to false here if successful - let auth context handle redirect
     } catch (err) {
       setError("An unexpected error occurred")
       setLoading(false)

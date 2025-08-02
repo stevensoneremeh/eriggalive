@@ -17,9 +17,9 @@ export default function SignupSuccessPage() {
           <div className="flex justify-center mb-4">
             <CheckCircle className="h-16 w-16 text-green-500" />
           </div>
-          <CardTitle className="text-2xl font-bold text-green-600">Signup Successful!</CardTitle>
+          <CardTitle className="text-2xl font-bold text-green-600">Account Created Successfully!</CardTitle>
           <CardDescription className="text-lg">
-            Please check your email to verify your account before logging in.
+            Welcome to the Erigga Live community! Please verify your email to get started.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -27,9 +27,10 @@ export default function SignupSuccessPage() {
             <div className="flex items-center space-x-3">
               <Mail className="h-5 w-5 text-blue-600" />
               <div>
-                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Verification email sent</p>
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Check Your Email</p>
                 <p className="text-xs text-blue-700 dark:text-blue-300">
-                  Check your inbox and click the verification link to activate your account.
+                  We've sent you a verification email. Please click the link in the email to verify your account before
+                  logging in.
                 </p>
               </div>
             </div>

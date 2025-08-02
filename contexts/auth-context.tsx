@@ -35,7 +35,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -63,26 +68,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const refreshProfile = async () => {
-    if (user) {
+    if (user && mounted) {
       const profileData = await fetchProfile(user.id)
       setProfile(profileData)
     }
   }
 
   useEffect(() => {
+    if (!mounted) return
+
     const getSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      setSession(session)
-      setUser(session?.user ?? null)
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        setSession(session)
+        setUser(session?.user ?? null)
 
-      if (session?.user) {
-        const profileData = await fetchProfile(session.user.id)
-        setProfile(profileData)
+        if (session?.user) {
+          const profileData = await fetchProfile(session.user.id)
+          setProfile(profileData)
+        }
+      } catch (error) {
+        console.error("Error getting session:", error)
+      } finally {
+        setLoading(false)
       }
-
-      setLoading(false)
     }
 
     getSession()
@@ -98,7 +109,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const profileData = await fetchProfile(session.user.id)
         setProfile(profileData)
         if (event === "SIGNED_IN") {
-          router.push("/dashboard")
+          // Use setTimeout to ensure the redirect happens after state updates
+          setTimeout(() => {
+            router.push("/dashboard")
+          }, 100)
         }
       } else {
         setProfile(null)
@@ -111,7 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     return () => subscription.unsubscribe()
-  }, [router])
+  }, [router, mounted])
 
   const signIn = async (email: string, password: string) => {
     try {

@@ -1,212 +1,379 @@
 "use client"
-import { useState, useEffect } from "react"
+
+import { AuthGuard } from "@/components/auth-guard"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Target, Users, Music, Heart, Star, Zap, Crown, ArrowRight, Play, Volume2 } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
+import { Target, Trophy, Coins, Users, Music, Star, CheckCircle, Clock, Gift, Zap } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 
+const missions = [
+  {
+    id: 1,
+    title: "Welcome to Erigga Live",
+    description: "Complete your profile setup and join the community",
+    reward: 50,
+    progress: 100,
+    completed: true,
+    type: "onboarding",
+    tasks: [
+      { name: "Create account", completed: true },
+      { name: "Upload profile picture", completed: true },
+      { name: "Write bio", completed: true },
+    ],
+  },
+  {
+    id: 2,
+    title: "Community Contributor",
+    description: "Make your first post in the community",
+    reward: 25,
+    progress: 0,
+    completed: false,
+    type: "community",
+    tasks: [
+      { name: "Create your first post", completed: false },
+      { name: "Get 5 likes on a post", completed: false },
+    ],
+  },
+  {
+    id: 3,
+    title: "Music Explorer",
+    description: "Listen to 10 tracks in the vault",
+    reward: 30,
+    progress: 40,
+    completed: false,
+    type: "music",
+    tasks: [{ name: "Listen to 10 tracks", completed: false, current: 4, total: 10 }],
+  },
+  {
+    id: 4,
+    title: "Social Butterfly",
+    description: "Follow 5 community members",
+    reward: 20,
+    progress: 60,
+    completed: false,
+    type: "social",
+    tasks: [{ name: "Follow 5 members", completed: false, current: 3, total: 5 }],
+  },
+  {
+    id: 5,
+    title: "Daily Visitor",
+    description: "Visit Erigga Live for 7 consecutive days",
+    reward: 100,
+    progress: 71,
+    completed: false,
+    type: "daily",
+    tasks: [{ name: "Daily login streak", completed: false, current: 5, total: 7 }],
+  },
+]
+
+const achievements = [
+  {
+    id: 1,
+    title: "First Steps",
+    description: "Completed your first mission",
+    icon: Trophy,
+    unlocked: true,
+    date: "2024-01-15",
+  },
+  {
+    id: 2,
+    title: "Community Member",
+    description: "Made your first community post",
+    icon: Users,
+    unlocked: false,
+    date: null,
+  },
+  {
+    id: 3,
+    title: "Music Lover",
+    description: "Listened to 50 tracks",
+    icon: Music,
+    unlocked: false,
+    date: null,
+  },
+  {
+    id: 4,
+    title: "Coin Collector",
+    description: "Earned 500 coins",
+    icon: Coins,
+    unlocked: false,
+    date: null,
+  },
+]
+
 export default function MissionPage() {
-  const { user } = useAuth()
-  const [isVisible, setIsVisible] = useState(false)
+  const { profile } = useAuth()
 
-  useEffect(() => {
-    setIsVisible(true)
-  }, [])
-
-  const missions = [
-    {
-      icon: Music,
-      title: "SPREAD THE SOUND",
-      description: "Share Erigga's music with the world and grow the movement",
-      reward: "500 Coins",
-      color: "from-purple-500 to-pink-500",
-    },
-    {
-      icon: Users,
-      title: "BUILD THE COMMUNITY",
-      description: "Connect with fellow fans and create lasting bonds",
-      reward: "300 Coins",
-      color: "from-blue-500 to-cyan-500",
-    },
-    {
-      icon: Heart,
-      title: "SHOW LOVE",
-      description: "Support Erigga's journey and celebrate his achievements",
-      reward: "200 Coins",
-      color: "from-red-500 to-orange-500",
-    },
-    {
-      icon: Star,
-      title: "BE THE VOICE",
-      description: "Represent the Warri spirit wherever you go",
-      reward: "400 Coins",
-      color: "from-yellow-500 to-green-500",
-    },
-  ]
+  const completedMissions = missions.filter((m) => m.completed).length
+  const totalCoinsEarned = missions.filter((m) => m.completed).reduce((sum, m) => sum + m.reward, 0)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-black text-white overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-green-500 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse delay-2000"></div>
-      </div>
-
-      <div className="relative z-10 container mx-auto px-4 py-8">
-        {/* Hero Section */}
-        <div
-          className={`text-center mb-16 transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}
-        >
-          <div className="mb-8">
-            <Badge className="bg-lime-500 text-black font-bold px-4 py-2 text-lg mb-4 animate-bounce">
-              🎯 THE MISSION
-            </Badge>
+    <AuthGuard>
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4 sm:p-6 lg:p-8">
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                <Target className="w-8 h-8 text-white" />
+              </div>
+            </div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">
+              Missions & Achievements
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 text-lg">
+              Complete missions to earn coins and unlock achievements
+            </p>
           </div>
 
-          <h1 className="text-6xl md:text-8xl font-black mb-6 bg-gradient-to-r from-lime-400 via-yellow-400 to-orange-400 bg-clip-text text-transparent animate-pulse">
-            ERIGGA
-          </h1>
-
-          <div className="text-4xl md:text-6xl font-bold mb-8 transform rotate-1">
-            <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">CONTINUA</span>
-          </div>
-
-          <p className="text-xl md:text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed mb-8">
-            From the streets of <span className="text-lime-400 font-bold">WARRI</span> to the world stage - we're
-            building something bigger than music. We're building a{" "}
-            <span className="text-purple-400 font-bold">MOVEMENT</span>.
-          </p>
-
-          <div className="flex flex-wrap justify-center gap-4 mb-12">
-            <div className="flex items-center bg-black/50 rounded-full px-6 py-3 border border-lime-500/30">
-              <Volume2 className="w-5 h-5 text-lime-400 mr-2" />
-              <span className="text-lime-400 font-semibold">STREET CERTIFIED</span>
-            </div>
-            <div className="flex items-center bg-black/50 rounded-full px-6 py-3 border border-purple-500/30">
-              <Crown className="w-5 h-5 text-purple-400 mr-2" />
-              <span className="text-purple-400 font-semibold">WARRI ROYALTY</span>
-            </div>
-            <div className="flex items-center bg-black/50 rounded-full px-6 py-3 border border-blue-500/30">
-              <Zap className="w-5 h-5 text-blue-400 mr-2" />
-              <span className="text-blue-400 font-semibold">ENERGY UNLIMITED</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Mission Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
-          {missions.map((mission, index) => (
-            <Card
-              key={index}
-              className={`bg-black/40 border-gray-700 hover:border-lime-500/50 transition-all duration-500 transform hover:scale-105 hover:rotate-1 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}
-              style={{ transitionDelay: `${index * 200}ms` }}
-            >
-              <CardContent className="p-8">
-                <div
-                  className={`w-16 h-16 rounded-full bg-gradient-to-r ${mission.color} flex items-center justify-center mb-6 animate-pulse`}
-                >
-                  <mission.icon className="w-8 h-8 text-white" />
+          {/* Stats Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <Card>
+              <CardContent className="p-6 text-center">
+                <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
                 </div>
-
-                <h3 className="text-2xl font-bold mb-4 text-lime-400">{mission.title}</h3>
-
-                <p className="text-gray-300 text-lg mb-6 leading-relaxed">{mission.description}</p>
-
-                <div className="flex items-center justify-between">
-                  <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-black font-bold px-4 py-2">
-                    🪙 {mission.reward}
-                  </Badge>
-                  <Target className="w-6 h-6 text-lime-400 animate-spin" style={{ animationDuration: "3s" }} />
-                </div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">{completedMissions}</div>
+                <div className="text-sm text-gray-500">Missions Completed</div>
               </CardContent>
             </Card>
-          ))}
-        </div>
 
-        {/* Call to Action */}
-        <div
-          className={`text-center transition-all duration-1000 delay-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}
-        >
-          <div className="bg-gradient-to-r from-lime-500/20 to-purple-500/20 rounded-3xl p-12 border border-lime-500/30 backdrop-blur-sm">
-            <h2 className="text-4xl md:text-5xl font-black mb-6 bg-gradient-to-r from-lime-400 to-purple-400 bg-clip-text text-transparent">
-              READY TO JOIN THE MOVEMENT?
-            </h2>
+            <Card>
+              <CardContent className="p-6 text-center">
+                <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <Coins className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                </div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">{totalCoinsEarned}</div>
+                <div className="text-sm text-gray-500">Coins Earned</div>
+              </CardContent>
+            </Card>
 
-            <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-              Every legend starts with a single step. Your journey from the streets to stardom begins here.
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              {user ? (
-                <Button
-                  asChild
-                  size="lg"
-                  className="bg-gradient-to-r from-lime-500 to-green-500 hover:from-lime-600 hover:to-green-600 text-black font-bold px-8 py-4 text-lg transform hover:scale-105 transition-all duration-300"
-                >
-                  <Link href="/dashboard">
-                    <Play className="w-5 h-5 mr-2" />
-                    CONTINUE MISSION
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </Link>
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    asChild
-                    size="lg"
-                    className="bg-gradient-to-r from-lime-500 to-green-500 hover:from-lime-600 hover:to-green-600 text-black font-bold px-8 py-4 text-lg transform hover:scale-105 transition-all duration-300"
-                  >
-                    <Link href="/signup">
-                      <Zap className="w-5 h-5 mr-2" />
-                      START YOUR JOURNEY
-                      <ArrowRight className="w-5 h-5 ml-2" />
-                    </Link>
-                  </Button>
-
-                  <Button
-                    asChild
-                    variant="outline"
-                    size="lg"
-                    className="border-lime-500 text-lime-400 hover:bg-lime-500 hover:text-black font-bold px-8 py-4 text-lg transform hover:scale-105 transition-all duration-300 bg-transparent"
-                  >
-                    <Link href="/login">
-                      <Users className="w-5 h-5 mr-2" />
-                      ALREADY A MEMBER?
-                    </Link>
-                  </Button>
-                </>
-              )}
-            </div>
-
-            <div className="mt-8 text-sm text-gray-400">
-              <p>Join thousands of fans worldwide in the Erigga Live community</p>
-            </div>
+            <Card>
+              <CardContent className="p-6 text-center">
+                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <Trophy className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {achievements.filter((a) => a.unlocked).length}
+                </div>
+                <div className="text-sm text-gray-500">Achievements Unlocked</div>
+              </CardContent>
+            </Card>
           </div>
-        </div>
 
-        {/* Street Credibility Section */}
-        <div
-          className={`mt-16 text-center transition-all duration-1000 delay-1500 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-black/30 rounded-2xl p-6 border border-gray-700">
-              <div className="text-3xl font-bold text-lime-400 mb-2">10K+</div>
-              <p className="text-gray-300">Active Fans</p>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Active Missions */}
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Target className="w-5 h-5 mr-2" />
+                    Active Missions
+                  </CardTitle>
+                  <CardDescription>Complete these missions to earn coins and XP</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {missions.map((mission) => (
+                    <div
+                      key={mission.id}
+                      className={`p-4 rounded-lg border transition-all ${
+                        mission.completed
+                          ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                          : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-md"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <h3 className="font-semibold text-gray-900 dark:text-white">{mission.title}</h3>
+                            {mission.completed && <CheckCircle className="w-4 h-4 text-green-500" />}
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{mission.description}</p>
+
+                          {/* Progress Bar */}
+                          <div className="mb-2">
+                            <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                              <span>Progress</span>
+                              <span>{mission.progress}%</span>
+                            </div>
+                            <Progress value={mission.progress} className="h-2" />
+                          </div>
+
+                          {/* Tasks */}
+                          <div className="space-y-1">
+                            {mission.tasks.map((task, index) => (
+                              <div key={index} className="flex items-center space-x-2 text-sm">
+                                {task.completed ? (
+                                  <CheckCircle className="w-3 h-3 text-green-500" />
+                                ) : (
+                                  <Clock className="w-3 h-3 text-gray-400" />
+                                )}
+                                <span
+                                  className={
+                                    task.completed ? "text-green-600 line-through" : "text-gray-600 dark:text-gray-400"
+                                  }
+                                >
+                                  {task.name}
+                                  {task.current && task.total && ` (${task.current}/${task.total})`}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="text-right ml-4">
+                          <div className="flex items-center space-x-1 text-yellow-600">
+                            <Coins className="w-4 h-4" />
+                            <span className="font-semibold">{mission.reward}</span>
+                          </div>
+                          {mission.completed && (
+                            <Badge variant="secondary" className="mt-2 bg-green-100 text-green-800">
+                              Completed
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      {!mission.completed && (
+                        <div className="flex space-x-2">
+                          {mission.type === "community" && (
+                            <Button asChild size="sm" variant="outline">
+                              <Link href="/community">
+                                <Users className="w-4 h-4 mr-1" />
+                                Go to Community
+                              </Link>
+                            </Button>
+                          )}
+                          {mission.type === "music" && (
+                            <Button asChild size="sm" variant="outline">
+                              <Link href="/vault">
+                                <Music className="w-4 h-4 mr-1" />
+                                Open Vault
+                              </Link>
+                            </Button>
+                          )}
+                          {mission.type === "social" && (
+                            <Button asChild size="sm" variant="outline">
+                              <Link href="/community">
+                                <Users className="w-4 h-4 mr-1" />
+                                Find Members
+                              </Link>
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
             </div>
-            <div className="bg-black/30 rounded-2xl p-6 border border-gray-700">
-              <div className="text-3xl font-bold text-purple-400 mb-2">50+</div>
-              <p className="text-gray-300">Hit Tracks</p>
-            </div>
-            <div className="bg-black/30 rounded-2xl p-6 border border-gray-700">
-              <div className="text-3xl font-bold text-blue-400 mb-2">100%</div>
-              <p className="text-gray-300">Street Certified</p>
+
+            {/* Achievements Sidebar */}
+            <div className="space-y-6">
+              {/* Daily Bonus */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center text-lg">
+                    <Gift className="w-5 h-5 mr-2" />
+                    Daily Bonus
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Coins className="w-8 h-8 text-white" />
+                    </div>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">+10 Coins</div>
+                    <div className="text-sm text-gray-500 mb-4">Daily login bonus</div>
+                    <Button className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600">
+                      <Zap className="w-4 h-4 mr-2" />
+                      Claim Bonus
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Achievements */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center text-lg">
+                    <Trophy className="w-5 h-5 mr-2" />
+                    Achievements
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {achievements.map((achievement) => (
+                    <div
+                      key={achievement.id}
+                      className={`p-3 rounded-lg border transition-all ${
+                        achievement.unlocked
+                          ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800"
+                          : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-60"
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div
+                          className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                            achievement.unlocked ? "bg-yellow-100 dark:bg-yellow-900" : "bg-gray-100 dark:bg-gray-700"
+                          }`}
+                        >
+                          <achievement.icon
+                            className={`w-5 h-5 ${
+                              achievement.unlocked ? "text-yellow-600 dark:text-yellow-400" : "text-gray-400"
+                            }`}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-semibold text-sm text-gray-900 dark:text-white">{achievement.title}</div>
+                          <div className="text-xs text-gray-500">{achievement.description}</div>
+                          {achievement.unlocked && achievement.date && (
+                            <div className="text-xs text-yellow-600 mt-1">
+                              Unlocked {new Date(achievement.date).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                        {achievement.unlocked && <Star className="w-4 h-4 text-yellow-500" />}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* Quick Stats */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Your Progress</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Current Level</span>
+                    <Badge variant="secondary">{profile?.level || 1}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Total Points</span>
+                    <span className="font-semibold">{profile?.points?.toLocaleString() || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Coin Balance</span>
+                    <div className="flex items-center space-x-1">
+                      <Coins className="w-4 h-4 text-yellow-500" />
+                      <span className="font-semibold">{profile?.coins?.toLocaleString() || 0}</span>
+                    </div>
+                  </div>
+                  <div className="pt-2">
+                    <Button asChild variant="outline" className="w-full bg-transparent">
+                      <Link href="/dashboard">View Dashboard</Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </AuthGuard>
   )
 }

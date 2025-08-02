@@ -12,7 +12,6 @@
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
     "@hookform/resolvers": "^3.3.4",
-    "@next/third-parties": "^14.2.5",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "latest",
     "@radix-ui/react-aspect-ratio": "latest",
@@ -54,9 +53,6 @@
     "@tiptap/react": "latest",
     "@tiptap/starter-kit": "latest",
     "@tiptap/suggestion": "latest",
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "latest",

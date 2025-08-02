@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/contexts/auth-context"
@@ -26,9 +25,13 @@ import {
   Send,
   Phone,
   ImageIcon,
+  Edit,
+  Trash2,
+  MoreHorizontal,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatDistanceToNow } from "date-fns"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 interface Post {
   id: number
@@ -38,6 +41,8 @@ interface Post {
   vote_count: number
   comment_count: number
   created_at: string
+  updated_at: string
+  is_edited: boolean
   user: {
     id: number
     username: string
@@ -75,6 +80,21 @@ interface ChatMessage {
   }
 }
 
+interface Comment {
+  id: number
+  content: string
+  created_at: string
+  updated_at: string
+  is_edited: boolean
+  user: {
+    id: number
+    username: string
+    full_name: string
+    tier: string
+    avatar_url?: string
+  }
+}
+
 const TIER_COLORS = {
   admin: "bg-red-500 text-white",
   blood_brotherhood: "bg-red-600 text-white",
@@ -87,12 +107,15 @@ export default function CommunityPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [comments, setComments] = useState<{ [postId: number]: Comment[] }>({})
   const [newPost, setNewPost] = useState("")
   const [newMessage, setNewMessage] = useState("")
+  const [newComment, setNewComment] = useState<{ [postId: number]: string }>({})
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [posting, setPosting] = useState(false)
   const [sendingMessage, setSendingMessage] = useState(false)
+  const [commenting, setCommenting] = useState<{ [postId: number]: boolean }>({})
   const [sortOrder, setSortOrder] = useState("newest")
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<number | null>(null)
@@ -100,6 +123,9 @@ export default function CommunityPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedMedia, setSelectedMedia] = useState<File | null>(null)
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
+  const [editingPost, setEditingPost] = useState<number | null>(null)
+  const [editContent, setEditContent] = useState("")
+  const [showComments, setShowComments] = useState<{ [postId: number]: boolean }>({})
 
   const { user, profile } = useAuth()
   const { toast } = useToast()
@@ -127,9 +153,20 @@ export default function CommunityPage() {
       })
       .subscribe()
 
+    const commentsSubscription = supabase
+      .channel("community_comments_changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_comments" }, (payload) => {
+        console.log("Comment change received:", payload)
+        if (payload.new && typeof payload.new === "object" && "post_id" in payload.new) {
+          loadComments(payload.new.post_id as number)
+        }
+      })
+      .subscribe()
+
     return () => {
       supabase.removeChannel(postsSubscription)
       supabase.removeChannel(chatSubscription)
+      supabase.removeChannel(commentsSubscription)
     }
   }, [sortOrder, categoryFilter, searchQuery])
 
@@ -237,6 +274,33 @@ export default function CommunityPage() {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadComments = async (postId: number) => {
+    try {
+      const { data: commentsData, error } = await supabase
+        .from("community_comments")
+        .select(`
+          *,
+          user:users!community_comments_user_id_fkey (
+            id, username, full_name, tier, avatar_url
+          )
+        `)
+        .eq("post_id", postId)
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: true })
+
+      if (error) {
+        console.error("Comments error:", error)
+      } else {
+        setComments((prev) => ({
+          ...prev,
+          [postId]: commentsData || [],
+        }))
+      }
+    } catch (error) {
+      console.error("Error loading comments:", error)
     }
   }
 
@@ -351,6 +415,98 @@ export default function CommunityPage() {
     }
   }
 
+  const editPost = async (postId: number) => {
+    if (!editContent.trim()) return
+
+    try {
+      const { error } = await supabase
+        .from("community_posts")
+        .update({
+          content: editContent.trim(),
+          is_edited: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", postId)
+
+      if (error) throw error
+
+      toast({
+        title: "Success!",
+        description: "Your post has been updated.",
+      })
+
+      setEditingPost(null)
+      setEditContent("")
+      await loadData()
+    } catch (error) {
+      console.error("Error editing post:", error)
+      toast({
+        title: "Error",
+        description: "Failed to edit post. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const deletePost = async (postId: number) => {
+    try {
+      const { error } = await supabase
+        .from("community_posts")
+        .update({
+          is_deleted: true,
+          deleted_at: new Date().toISOString(),
+        })
+        .eq("id", postId)
+
+      if (error) throw error
+
+      toast({
+        title: "Success!",
+        description: "Your post has been deleted.",
+      })
+
+      await loadData()
+    } catch (error) {
+      console.error("Error deleting post:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete post. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const createComment = async (postId: number) => {
+    if (!newComment[postId]?.trim() || !profile) return
+
+    setCommenting((prev) => ({ ...prev, [postId]: true }))
+    try {
+      const { error } = await supabase.from("community_comments").insert({
+        post_id: postId,
+        user_id: profile.id,
+        content: newComment[postId].trim(),
+      })
+
+      if (error) throw error
+
+      // Update comment count
+      await supabase.rpc("increment_comment_count", { post_id: postId })
+
+      setNewComment((prev) => ({ ...prev, [postId]: "" }))
+      await loadComments(postId)
+      await loadData() // Refresh to update comment counts
+    } catch (error) {
+      console.error("Error creating comment:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create comment. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setCommenting((prev) => ({ ...prev, [postId]: false }))
+    }
+  }
+
   const sendChatMessage = async () => {
     if (!newMessage.trim() || !profile) {
       return
@@ -439,6 +595,17 @@ export default function CommunityPage() {
         description: "Failed to vote on post. Please try again.",
         variant: "destructive",
       })
+    }
+  }
+
+  const toggleComments = (postId: number) => {
+    setShowComments((prev) => ({
+      ...prev,
+      [postId]: !prev[postId],
+    }))
+
+    if (!comments[postId]) {
+      loadComments(postId)
     }
   }
 
@@ -726,28 +893,57 @@ export default function CommunityPage() {
                       >
                         <CardContent className="p-4">
                           {/* Post Header */}
-                          <div className="flex items-center space-x-3 mb-3">
-                            <Avatar className="h-10 w-10 ring-2 ring-primary/10">
-                              <AvatarImage src={post.user?.avatar_url || "/placeholder-user.jpg"} />
-                              <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
-                                {post.user?.full_name?.[0] || post.user?.username?.[0] || "U"}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2">
-                                <p className="font-semibold text-sm text-gray-900 dark:text-gray-100">
-                                  {post.user?.full_name || post.user?.username}
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-3">
+                              <Avatar className="h-10 w-10 ring-2 ring-primary/10">
+                                <AvatarImage src={post.user?.avatar_url || "/placeholder-user.jpg"} />
+                                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                                  {post.user?.full_name?.[0] || post.user?.username?.[0] || "U"}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2">
+                                  <p className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                                    {post.user?.full_name || post.user?.username}
+                                  </p>
+                                  <Badge
+                                    className={`text-xs px-2 py-1 ${TIER_COLORS[post.user?.tier as keyof typeof TIER_COLORS] || "bg-gray-500 text-white"}`}
+                                  >
+                                    {post.user?.tier}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                                  {post.is_edited && " (edited)"}
                                 </p>
-                                <Badge
-                                  className={`text-xs px-2 py-1 ${TIER_COLORS[post.user?.tier as keyof typeof TIER_COLORS] || "bg-gray-500 text-white"}`}
-                                >
-                                  {post.user?.tier}
-                                </Badge>
                               </div>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
-                                {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                              </p>
                             </div>
+
+                            {/* Post Actions Menu */}
+                            {profile?.id === post.user?.id && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setEditingPost(post.id)
+                                      setEditContent(post.content)
+                                    }}
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => deletePost(post.id)} className="text-red-600">
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </div>
 
                           {/* Category Badge */}
@@ -763,11 +959,37 @@ export default function CommunityPage() {
                           )}
 
                           {/* Post Content */}
-                          <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-2xl border-l-4 border-blue-400">
-                            <p className="text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap text-sm">
-                              {post.content}
-                            </p>
-                          </div>
+                          {editingPost === post.id ? (
+                            <div className="mb-4">
+                              <Textarea
+                                value={editContent}
+                                onChange={(e) => setEditContent(e.target.value)}
+                                className="mb-2"
+                                rows={3}
+                              />
+                              <div className="flex space-x-2">
+                                <Button size="sm" onClick={() => editPost(post.id)}>
+                                  Save
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setEditingPost(null)
+                                    setEditContent("")
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-2xl border-l-4 border-blue-400">
+                              <p className="text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap text-sm">
+                                {post.content}
+                              </p>
+                            </div>
+                          )}
 
                           {/* Media */}
                           {post.media_url && (
@@ -811,6 +1033,7 @@ export default function CommunityPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => toggleComments(post.id)}
                                 className="flex items-center space-x-1 text-xs px-3 py-2 rounded-full text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
                               >
                                 <MessageCircle className="h-4 w-4" />
@@ -836,6 +1059,74 @@ export default function CommunityPage() {
                               </span>
                             </div>
                           </div>
+
+                          {/* Comments Section */}
+                          {showComments[post.id] && (
+                            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                              {/* Add Comment */}
+                              {profile && (
+                                <div className="mb-4 flex space-x-2">
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} />
+                                    <AvatarFallback className="text-xs">{profile.username?.[0] || "U"}</AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1 flex space-x-2">
+                                    <Input
+                                      placeholder="Write a comment..."
+                                      value={newComment[post.id] || ""}
+                                      onChange={(e) =>
+                                        setNewComment((prev) => ({ ...prev, [post.id]: e.target.value }))
+                                      }
+                                      onKeyPress={(e) =>
+                                        e.key === "Enter" && !e.shiftKey && (e.preventDefault(), createComment(post.id))
+                                      }
+                                      disabled={commenting[post.id]}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      onClick={() => createComment(post.id)}
+                                      disabled={!newComment[post.id]?.trim() || commenting[post.id]}
+                                    >
+                                      <Send className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Comments List */}
+                              <div className="space-y-3">
+                                {comments[post.id]?.map((comment) => (
+                                  <div key={comment.id} className="flex space-x-2">
+                                    <Avatar className="h-8 w-8">
+                                      <AvatarImage src={comment.user?.avatar_url || "/placeholder-user.jpg"} />
+                                      <AvatarFallback className="text-xs">
+                                        {comment.user?.username?.[0] || "U"}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1">
+                                      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                                        <div className="flex items-center space-x-2 mb-1">
+                                          <span className="font-semibold text-sm">
+                                            {comment.user?.full_name || comment.user?.username}
+                                          </span>
+                                          <Badge
+                                            className={`text-xs ${TIER_COLORS[comment.user?.tier as keyof typeof TIER_COLORS] || "bg-gray-500 text-white"}`}
+                                          >
+                                            {comment.user?.tier}
+                                          </Badge>
+                                          <span className="text-xs text-gray-500">
+                                            {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                            {comment.is_edited && " (edited)"}
+                                          </span>
+                                        </div>
+                                        <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     ))}
