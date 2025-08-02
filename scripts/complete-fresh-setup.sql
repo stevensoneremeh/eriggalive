@@ -1351,7 +1351,6 @@ CREATE POLICY "Admins can manage all products" ON public.products
 INSERT INTO public.community_categories (name, slug, description, icon, color, display_order) VALUES
 ('General Discussion', 'general-discussion', 'General discussions about Erigga and his music', '💬', '#3B82F6', 1),
 ('Music & Lyrics', 'music-lyrics', 'Discuss Erigga''s music, lyrics, and their meanings', '🎵', '#EC4899', 2),
-('Events & Shows', 'events-shows', 'Information about upcoming events and shows', '📅', '#  2),
 ('Events & Shows', 'events-shows', 'Information about upcoming events and shows', '📅', '#10B981', 3),
 ('Freestyle Corner', 'freestyle-corner', 'Share your own freestyle lyrics and get feedback', '🎤', '#F59E0B', 4),
 ('Premium Lounge', 'premium-lounge', 'Exclusive discussions for premium members', '👑', '#8B5CF6', 5),
