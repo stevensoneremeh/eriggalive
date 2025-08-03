@@ -1,96 +1,125 @@
 "use client"
 
 import type React from "react"
+
 import { createContext, useContext, useEffect, useState } from "react"
-import type { User as SupabaseUser } from "@supabase/supabase-js"
-import { supabase } from "@/lib/supabaseClient"
-import type { User } from "@/types/database"
-import { toast } from "@/hooks/use-toast"
+import { createClient } from "@/lib/supabase/client"
+import type { User, Session } from "@supabase/supabase-js"
+import type { Database } from "@/types/database"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+
+type Profile = Database["public"]["Tables"]["users"]["Row"]
 
 interface AuthContextType {
   user: User | null
-  supabaseUser: SupabaseUser | null
+  profile: Profile | null
+  session: Session | null
   loading: boolean
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   signUp: (
     email: string,
     password: string,
     userData: { username: string; full_name: string },
-  ) => Promise<{ success: boolean; error?: string }>
+  ) => Promise<{ error: any }>
+  signIn: (email: string, password: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
-  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>
-  updateProfile: (updates: Partial<User>) => Promise<{ success: boolean; error?: string }>
+  refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const router = useRouter()
+  const supabase = createClient()
 
-  // Fetch user profile from database
-  const fetchUserProfile = async (authUser: SupabaseUser): Promise<User | null> => {
+  const fetchProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", authUser.id).single()
+      const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
 
       if (error && error.code !== "PGRST116") {
-        console.error("Error fetching user profile:", error)
+        console.error("Error fetching profile:", error)
         return null
-      }
-
-      if (!data) {
-        // Create user profile if it doesn't exist
-        const newUser = {
-          auth_user_id: authUser.id,
-          email: authUser.email || "",
-          username: authUser.user_metadata?.username || authUser.email?.split("@")[0] || "user",
-          full_name: authUser.user_metadata?.full_name || "",
-          tier: "grassroot" as const,
-          role: "user" as const,
-          coins: 100,
-          level: 1,
-          points: 0,
-          is_verified: false,
-          is_active: true,
-          is_banned: false,
-          login_count: 1,
-          email_verified: !!authUser.email_confirmed_at,
-          phone_verified: false,
-          two_factor_enabled: false,
-          preferences: {},
-          metadata: {},
-        }
-
-        const { data: createdUser, error: createError } = await supabase.from("users").insert(newUser).select().single()
-
-        if (createError) {
-          console.error("Error creating user profile:", createError)
-          return null
-        }
-
-        return createdUser
       }
 
       return data
     } catch (error) {
-      console.error("Error in fetchUserProfile:", error)
+      console.error("Error in fetchProfile:", error)
       return null
     }
   }
 
-  // Initialize auth state
+  const createProfile = async (user: User, userData?: { username: string; full_name: string }) => {
+    try {
+      const profileData = {
+        auth_user_id: user.id,
+        email: user.email!,
+        username: userData?.username || user.user_metadata?.username || user.email?.split("@")[0] || "user",
+        full_name: userData?.full_name || user.user_metadata?.full_name || null,
+        tier: "grassroot" as const,
+        role: "user" as const,
+        coins: 500, // Default 500 coins on signup
+        level: 1,
+        points: 0,
+        is_verified: false,
+        is_active: true,
+        is_banned: false,
+        login_count: 1,
+        email_verified: !!user.email_confirmed_at,
+        phone_verified: false,
+        two_factor_enabled: false,
+        preferences: {},
+        metadata: {},
+      }
+
+      const { data, error } = await supabase.from("users").insert(profileData).select().single()
+
+      if (error) {
+        console.error("Error creating profile:", error)
+        return null
+      }
+
+      // Show welcome toast for new users
+      toast.success("Welcome to Erigga Live!", {
+        description: "Your account has been created with 500 free coins!",
+      })
+
+      return data
+    } catch (error) {
+      console.error("Error in createProfile:", error)
+      return null
+    }
+  }
+
+  const refreshProfile = async () => {
+    if (user) {
+      const profileData = await fetchProfile(user.id)
+      setProfile(profileData)
+    }
+  }
+
   useEffect(() => {
     const initializeAuth = async () => {
       try {
         const {
-          data: { session },
+          data: { session: initialSession },
         } = await supabase.auth.getSession()
 
-        if (session?.user) {
-          setSupabaseUser(session.user)
-          const userProfile = await fetchUserProfile(session.user)
-          setUser(userProfile)
+        setSession(initialSession)
+        setUser(initialSession?.user ?? null)
+
+        if (initialSession?.user) {
+          let profileData = await fetchProfile(initialSession.user.id)
+
+          // Create profile if it doesn't exist
+          if (!profileData) {
+            profileData = await createProfile(initialSession.user)
+          }
+
+          setProfile(profileData)
         }
       } catch (error) {
         console.error("Error initializing auth:", error)
@@ -101,142 +130,111 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initializeAuth()
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+
       if (session?.user) {
-        setSupabaseUser(session.user)
-        const userProfile = await fetchUserProfile(session.user)
-        setUser(userProfile)
+        let profileData = await fetchProfile(session.user.id)
+
+        // Create profile for new signups
+        if (!profileData && event === "SIGNED_UP") {
+          profileData = await createProfile(session.user)
+        }
+
+        setProfile(profileData)
+
+        // Redirect to dashboard on successful auth
+        if (event === "SIGNED_IN" || event === "SIGNED_UP") {
+          router.push("/dashboard")
+        }
       } else {
-        setSupabaseUser(null)
-        setUser(null)
+        setProfile(null)
+
+        // Redirect to signin on signout
+        if (event === "SIGNED_OUT") {
+          router.push("/auth/signin")
+        }
       }
+
       setLoading(false)
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [router, supabase.auth])
 
-  const signIn = async (email: string, password: string) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+  // Real-time coins subscription
+  useEffect(() => {
+    if (!profile?.id) return
 
-      if (error) {
-        return { success: false, error: error.message }
-      }
+    const channel = supabase
+      .channel("coins-listener")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "users",
+          filter: `id=eq.${profile.id}`,
+        },
+        (payload) => {
+          setProfile((prev) => (prev ? { ...prev, coins: payload.new.coins } : null))
+          toast.success(`Coins updated: ${payload.new.coins}`)
+        },
+      )
+      .subscribe()
 
-      if (data.user) {
-        const userProfile = await fetchUserProfile(data.user)
-        setUser(userProfile)
-        setSupabaseUser(data.user)
-
-        toast({
-          title: "Welcome back!",
-          description: "You have successfully signed in.",
-        })
-      }
-
-      return { success: true }
-    } catch (error) {
-      console.error("Sign in error:", error)
-      return { success: false, error: "An unexpected error occurred" }
+    return () => {
+      supabase.removeChannel(channel)
     }
-  }
+  }, [profile?.id, supabase])
 
   const signUp = async (email: string, password: string, userData: { username: string; full_name: string }) => {
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: userData,
         },
       })
-
-      if (error) {
-        return { success: false, error: error.message }
-      }
-
-      if (data.user) {
-        toast({
-          title: "Account created!",
-          description: "Please check your email to verify your account.",
-        })
-      }
-
-      return { success: true }
+      return { error }
     } catch (error) {
-      console.error("Sign up error:", error)
-      return { success: false, error: "An unexpected error occurred" }
+      return { error }
+    }
+  }
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      return { error }
+    } catch (error) {
+      return { error }
     }
   }
 
   const signOut = async () => {
     try {
       await supabase.auth.signOut()
-      setUser(null)
-      setSupabaseUser(null)
-
-      toast({
-        title: "Signed out",
-        description: "You have been successfully signed out.",
-      })
     } catch (error) {
-      console.error("Sign out error:", error)
-    }
-  }
-
-  const resetPassword = async (email: string) => {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
-      })
-
-      if (error) {
-        return { success: false, error: error.message }
-      }
-
-      return { success: true }
-    } catch (error) {
-      console.error("Reset password error:", error)
-      return { success: false, error: "An unexpected error occurred" }
-    }
-  }
-
-  const updateProfile = async (updates: Partial<User>) => {
-    try {
-      if (!user) {
-        return { success: false, error: "No user logged in" }
-      }
-
-      const { data, error } = await supabase.from("users").update(updates).eq("id", user.id).select().single()
-
-      if (error) {
-        return { success: false, error: error.message }
-      }
-
-      setUser(data)
-      return { success: true }
-    } catch (error) {
-      console.error("Update profile error:", error)
-      return { success: false, error: "An unexpected error occurred" }
+      console.error("Error signing out:", error)
     }
   }
 
   const value = {
     user,
-    supabaseUser,
+    profile,
+    session,
     loading,
-    signIn,
     signUp,
+    signIn,
     signOut,
-    resetPassword,
-    updateProfile,
+    refreshProfile,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

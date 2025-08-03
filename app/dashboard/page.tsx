@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
+import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -21,9 +22,9 @@ import {
   Crown,
   Shield,
   Zap,
+  LogOut,
 } from "lucide-react"
 import Link from "next/link"
-import { supabase } from "@/lib/supabaseClient"
 
 interface DashboardStats {
   totalPosts: number
@@ -35,7 +36,7 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
-  const { user, loading } = useAuth()
+  const { user, profile, signOut, loading } = useAuth()
   const [stats, setStats] = useState<DashboardStats>({
     totalPosts: 0,
     totalLikes: 0,
@@ -45,28 +46,29 @@ export default function DashboardPage() {
     recentActivity: [],
   })
   const [loadingStats, setLoadingStats] = useState(true)
+  const supabase = createClient()
 
   useEffect(() => {
-    if (user) {
+    if (profile) {
       fetchDashboardStats()
     }
-  }, [user])
+  }, [profile])
 
   const fetchDashboardStats = async () => {
     try {
-      // Fetch user stats (with fallbacks for missing tables)
+      // Fetch user stats from Supabase
       const [postsResult, likesResult, commentsResult] = await Promise.allSettled([
-        supabase.from("community_posts").select("id").eq("user_id", user?.id),
-        supabase.from("post_likes").select("id").eq("user_id", user?.id),
-        supabase.from("post_comments").select("id").eq("author_id", user?.id),
+        supabase.from("community_posts").select("id").eq("author_id", profile?.id),
+        supabase.from("post_likes").select("id").eq("user_id", profile?.id),
+        supabase.from("post_comments").select("id").eq("author_id", profile?.id),
       ])
 
       setStats({
         totalPosts: postsResult.status === "fulfilled" ? postsResult.value.data?.length || 0 : 0,
         totalLikes: likesResult.status === "fulfilled" ? likesResult.value.data?.length || 0 : 0,
         totalComments: commentsResult.status === "fulfilled" ? commentsResult.value.data?.length || 0 : 0,
-        totalFollowers: Math.floor(Math.random() * 50) + 10, // Mock data
-        vaultAccess: getTierVaultAccess(user?.tier || "grassroot"),
+        totalFollowers: Math.floor(Math.random() * 50) + 10, // Mock data for now
+        vaultAccess: getTierVaultAccess(profile?.tier || "grassroot"),
         recentActivity: generateMockActivity(),
       })
     } catch (error) {
@@ -113,10 +115,14 @@ export default function DashboardPage() {
   const generateMockActivity = () => [
     { type: "post", content: "Shared a new post in General Discussion", time: "2 hours ago" },
     { type: "like", content: "Liked a post by @erigga_fan", time: "4 hours ago" },
-    { type: "comment", content: "Commented on 'Latest Track Discussion'", time: "1 day ago" },
+    { type: "comment", content: "Commented on Latest Track Discussion", time: "1 day ago" },
     { type: "vault", content: "Accessed exclusive content", time: "2 days ago" },
     { type: "level", content: "Reached level 2!", time: "3 days ago" },
   ]
+
+  const handleSignOut = async () => {
+    await signOut()
+  }
 
   if (loading) {
     return (
@@ -126,7 +132,7 @@ export default function DashboardPage() {
     )
   }
 
-  if (!user) {
+  if (!user || !profile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="w-full max-w-md">
@@ -136,7 +142,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <Button asChild className="w-full">
-              <Link href="/auth/login">Login</Link>
+              <Link href="/auth/signin">Login</Link>
             </Button>
           </CardContent>
         </Card>
@@ -152,18 +158,24 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                Welcome back, {user.full_name || user.username}!
+                Welcome back, {profile.full_name || profile.username}!
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
                 Here's what's happening in your Erigga Live community
               </p>
             </div>
-            <Avatar className="h-16 w-16">
-              <AvatarImage src={user.avatar_url || ""} alt={user.username} />
-              <AvatarFallback className="text-lg font-bold">
-                {(user.full_name || user.username).charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <div className="flex items-center space-x-4">
+              <Avatar className="h-16 w-16">
+                <AvatarImage src={profile.avatar_url || ""} alt={profile.username} />
+                <AvatarFallback className="text-lg font-bold">
+                  {(profile.full_name || profile.username).charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <Button onClick={handleSignOut} variant="outline" size="sm">
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -197,7 +209,7 @@ export default function DashboardPage() {
               <Coins className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{user.coins}</div>
+              <div className="text-2xl font-bold">{profile.coins}</div>
               <p className="text-xs text-muted-foreground">
                 <Link href="/coins" className="text-blue-600 hover:underline">
                   Buy more coins
@@ -212,9 +224,9 @@ export default function DashboardPage() {
               <Trophy className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Level {user.level}</div>
-              <Progress value={user.points % 100} className="mt-2" />
-              <p className="text-xs text-muted-foreground mt-1">{100 - (user.points % 100)} XP to next level</p>
+              <div className="text-2xl font-bold">Level {profile.level}</div>
+              <Progress value={profile.points % 100} className="mt-2" />
+              <p className="text-xs text-muted-foreground mt-1">{100 - (profile.points % 100)} XP to next level</p>
             </CardContent>
           </Card>
         </div>
@@ -276,34 +288,36 @@ export default function DashboardPage() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                          <Badge className={`${getTierColor(user.tier)} text-white`}>
-                            {getTierIcon(user.tier)}
-                            <span className="ml-1">{user.tier.replace("_", " ").toUpperCase()}</span>
+                          <Badge className={`${getTierColor(profile.tier)} text-white`}>
+                            {getTierIcon(profile.tier)}
+                            <span className="ml-1">{profile.tier.replace("_", " ").toUpperCase()}</span>
                           </Badge>
                         </div>
-                        <span className="text-sm text-muted-foreground">{getTierVaultAccess(user.tier)}% Access</span>
+                        <span className="text-sm text-muted-foreground">
+                          {getTierVaultAccess(profile.tier)}% Access
+                        </span>
                       </div>
-                      <Progress value={getTierVaultAccess(user.tier)} className="h-2" />
+                      <Progress value={getTierVaultAccess(profile.tier)} className="h-2" />
                       <div className="grid grid-cols-3 gap-4 text-center">
                         <div>
                           <Music className="h-8 w-8 mx-auto mb-2 text-green-600" />
                           <p className="text-sm font-medium">Audio</p>
                           <p className="text-xs text-muted-foreground">
-                            {user.tier === "grassroot" ? "Limited" : "Full Access"}
+                            {profile.tier === "grassroot" ? "Limited" : "Full Access"}
                           </p>
                         </div>
                         <div>
                           <Video className="h-8 w-8 mx-auto mb-2 text-blue-600" />
                           <p className="text-sm font-medium">Video</p>
                           <p className="text-xs text-muted-foreground">
-                            {["grassroot", "pioneer"].includes(user.tier) ? "Limited" : "Full Access"}
+                            {["grassroot", "pioneer"].includes(profile.tier) ? "Limited" : "Full Access"}
                           </p>
                         </div>
                         <div>
                           <ImageIcon className="h-8 w-8 mx-auto mb-2 text-purple-600" />
                           <p className="text-sm font-medium">Exclusive</p>
                           <p className="text-xs text-muted-foreground">
-                            {["blood_brotherhood", "admin"].includes(user.tier) ? "Full Access" : "Upgrade Required"}
+                            {["blood_brotherhood", "admin"].includes(profile.tier) ? "Full Access" : "Upgrade Required"}
                           </p>
                         </div>
                       </div>
@@ -390,30 +404,30 @@ export default function DashboardPage() {
               <CardContent className="space-y-4">
                 <div className="text-center">
                   <Avatar className="h-20 w-20 mx-auto mb-4">
-                    <AvatarImage src={user.avatar_url || ""} alt={user.username} />
+                    <AvatarImage src={profile.avatar_url || ""} alt={profile.username} />
                     <AvatarFallback className="text-2xl font-bold">
-                      {(user.full_name || user.username).charAt(0).toUpperCase()}
+                      {(profile.full_name || profile.username).charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <h3 className="font-semibold">{user.full_name || user.username}</h3>
-                  <p className="text-sm text-muted-foreground">@{user.username}</p>
-                  <Badge className={`${getTierColor(user.tier)} text-white mt-2`}>
-                    {getTierIcon(user.tier)}
-                    <span className="ml-1">{user.tier.replace("_", " ").toUpperCase()}</span>
+                  <h3 className="font-semibold">{profile.full_name || profile.username}</h3>
+                  <p className="text-sm text-muted-foreground">@{profile.username}</p>
+                  <Badge className={`${getTierColor(profile.tier)} text-white mt-2`}>
+                    {getTierIcon(profile.tier)}
+                    <span className="ml-1">{profile.tier.replace("_", " ").toUpperCase()}</span>
                   </Badge>
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm">Level</span>
-                    <span className="text-sm font-medium">{user.level}</span>
+                    <span className="text-sm font-medium">{profile.level}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm">Points</span>
-                    <span className="text-sm font-medium">{user.points}</span>
+                    <span className="text-sm font-medium">{profile.points}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm">Coins</span>
-                    <span className="text-sm font-medium">{user.coins}</span>
+                    <span className="text-sm font-medium">{profile.coins}</span>
                   </div>
                 </div>
                 <Button asChild className="w-full">

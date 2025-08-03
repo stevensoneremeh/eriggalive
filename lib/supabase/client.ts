@@ -1,4 +1,4 @@
-import { createClient as supabaseCreateClient } from "@supabase/supabase-js"
+import { createClientComponentClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 
 const isBrowser = typeof window !== "undefined"
@@ -86,24 +86,10 @@ const createMockClient = () => {
   } as any
 }
 
-export function createClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+export const createClient = () => createClientComponentClient<Database>()
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    if (isBrowser) {
-      console.warn("Missing Supabase environment variables, using mock client")
-    }
-    return createMockClient()
-  }
-
-  try {
-    return supabaseCreateClient<Database>(supabaseUrl, supabaseAnonKey)
-  } catch (error) {
-    console.error("Failed to create Supabase client:", error)
-    return createMockClient()
-  }
-}
+// Export a singleton instance for convenience
+export const supabase = createClient()
 
 let supabaseClient: ReturnType<typeof createClient> | null = null
 

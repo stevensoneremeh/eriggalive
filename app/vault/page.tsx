@@ -2,14 +2,14 @@
 
 import { AuthGuard } from "@/components/auth-guard"
 import { useAuth } from "@/contexts/auth-context"
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Music, Video, ImageIcon, Play, Download, Lock, Search, Star, Clock, Eye } from "lucide-react"
-import { supabase } from "@/lib/supabaseClient"
-import { useToast } from "@/hooks/use-toast"
+import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
 
 interface VaultItem {
   id: string
@@ -30,33 +30,70 @@ interface VaultItem {
   genre?: string
 }
 
+interface VaultUnlock {
+  id: string
+  user_id: string
+  vault_item_id: string
+  unlocked_at: string
+}
+
 export default function VaultPage() {
   const { user, profile } = useAuth()
-  const { toast } = useToast()
   const [vaultItems, setVaultItems] = useState<VaultItem[]>([])
+  const [unlockedItems, setUnlockedItems] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedType, setSelectedType] = useState<string>("all")
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null)
-  const [tablesExist, setTablesExist] = useState(false)
+  const supabase = createClient()
 
-  const checkTablesExist = async () => {
-    try {
-      const { error } = await supabase.from("vault").select("id").limit(1)
+  useEffect(() => {
+    if (profile) {
+      fetchVaultItems()
+      fetchUnlockedItems()
+      setupRealtimeSubscription()
+    }
+  }, [profile])
 
-      if (!error) {
-        setTablesExist(true)
-      }
-    } catch (error) {
-      console.log("Vault tables don't exist yet")
-      setTablesExist(false)
+  const setupRealtimeSubscription = () => {
+    if (!profile) return
+
+    // Real-time subscription for vault unlocks
+    const channel = supabase
+      .channel("vault-unlocks-listener")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "vault_unlocks",
+          filter: `user_id=eq.${profile.id}`,
+        },
+        (payload) => {
+          setUnlockedItems((prev) => new Set([...prev, payload.new.vault_item_id]))
+          toast.success("New content unlocked!", {
+            description: "You can now access this vault item.",
+          })
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
     }
   }
 
   const fetchVaultItems = async () => {
-    if (!tablesExist) {
-      // Create mock data for demonstration
-      const mockItems: VaultItem[] = [
+    try {
+      const { data, error } = await supabase.from("vault").select("*").order("created_at", { ascending: false })
+
+      if (error) throw error
+
+      setVaultItems(data || [])
+    } catch (error) {
+      console.error("Error fetching vault items:", error)
+      // Fallback to mock data if table doesn't exist
+      setVaultItems([
         {
           id: "1",
           title: "The Erigma",
@@ -101,32 +138,32 @@ export default function VaultPage() {
           views_count: 2100,
           created_at: new Date().toISOString(),
         },
-      ]
-      setVaultItems(mockItems)
-      setLoading(false)
-      return
-    }
-
-    try {
-      const { data, error } = await supabase.from("vault").select("*").order("created_at", { ascending: false })
-
-      if (error) throw error
-
-      setVaultItems(data || [])
-    } catch (error) {
-      console.error("Error fetching vault items:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load vault content",
-        variant: "destructive",
-      })
+      ])
     } finally {
       setLoading(false)
     }
   }
 
+  const fetchUnlockedItems = async () => {
+    if (!profile) return
+
+    try {
+      const { data, error } = await supabase.from("vault_unlocks").select("vault_item_id").eq("user_id", profile.id)
+
+      if (error) throw error
+
+      const unlocked = new Set(data?.map((item) => item.vault_item_id) || [])
+      setUnlockedItems(unlocked)
+    } catch (error) {
+      console.error("Error fetching unlocked items:", error)
+    }
+  }
+
   const canAccess = (item: VaultItem) => {
     if (!profile) return false
+
+    // Check if already unlocked
+    if (unlockedItems.has(item.id)) return true
 
     const tierLevels = {
       grassroot: 1,
@@ -141,21 +178,33 @@ export default function VaultPage() {
     return userTierLevel >= requiredTierLevel && (profile.coins || 0) >= item.coin_cost
   }
 
-  const purchaseItem = async (item: VaultItem) => {
+  const unlockItem = async (item: VaultItem) => {
     if (!profile || !canAccess(item)) return
 
     try {
-      // In a real implementation, this would handle the purchase logic
-      toast({
-        title: "Success",
-        description: `Access granted to ${item.title}`,
+      // Deduct coins if required
+      if (item.coin_cost > 0) {
+        const { error: updateError } = await supabase
+          .from("users")
+          .update({ coins: profile.coins - item.coin_cost })
+          .eq("id", profile.id)
+
+        if (updateError) throw updateError
+      }
+
+      // Add to vault_unlocks
+      const { error: unlockError } = await supabase.from("vault_unlocks").insert({
+        user_id: profile.id,
+        vault_item_id: item.id,
       })
+
+      if (unlockError) throw unlockError
+
+      setUnlockedItems((prev) => new Set([...prev, item.id]))
+      toast.success(`Access granted to ${item.title}`)
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to purchase item",
-        variant: "destructive",
-      })
+      console.error("Error unlocking item:", error)
+      toast.error("Failed to unlock item")
     }
   }
 
@@ -201,16 +250,13 @@ export default function VaultPage() {
     return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
-  useEffect(() => {
-    const initialize = async () => {
-      await checkTablesExist()
-      await fetchVaultItems()
-    }
-
-    if (profile) {
-      initialize()
-    }
-  }, [profile])
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
 
   return (
     <AuthGuard>
@@ -270,12 +316,7 @@ export default function VaultPage() {
           </div>
 
           {/* Content Grid */}
-          {loading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
-              <p className="text-gray-600 dark:text-gray-300 mt-2">Loading vault content...</p>
-            </div>
-          ) : filteredItems.length === 0 ? (
+          {filteredItems.length === 0 ? (
             <Card>
               <CardContent className="text-center py-8">
                 <Music className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -313,6 +354,7 @@ export default function VaultPage() {
                           Premium
                         </Badge>
                       )}
+                      {unlockedItems.has(item.id) && <Badge className="bg-green-500 text-white">Unlocked</Badge>}
                     </div>
 
                     {/* Duration for audio/video */}
@@ -339,7 +381,7 @@ export default function VaultPage() {
                     </div>
 
                     <div className="flex gap-2">
-                      {canAccess(item) ? (
+                      {canAccess(item) || unlockedItems.has(item.id) ? (
                         <>
                           <Button size="sm" className="flex-1">
                             <Play className="w-4 h-4 mr-1" />
@@ -353,7 +395,7 @@ export default function VaultPage() {
                         <Button
                           size="sm"
                           className="flex-1"
-                          onClick={() => purchaseItem(item)}
+                          onClick={() => unlockItem(item)}
                           disabled={!profile || (profile.coins || 0) < item.coin_cost}
                         >
                           <Lock className="w-4 h-4 mr-1" />

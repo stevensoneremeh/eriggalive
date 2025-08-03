@@ -1,4 +1,5 @@
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js"
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Database } from "@/types/database"
 import { cookies } from "next/headers"
 
@@ -69,30 +70,9 @@ export function createMockServerClient(): SupabaseClient<Database> {
   }
 }
 
-export function createServerSupabaseClient() {
-  if (isPreviewMode()) {
-    return createMockServerClient()
-  }
-
-  try {
-    const cookieStore = cookies()
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-    return createSupabaseClient<Database>(supabaseUrl, supabaseKey, {
-      auth: {
-        persistSession: false,
-      },
-      global: {
-        headers: {
-          Cookie: cookieStore.toString(),
-        },
-      },
-    })
-  } catch (error) {
-    console.warn("Failed to create real Supabase client, falling back to mock:", error)
-    return createMockServerClient()
-  }
+export const createServerClient = () => {
+  const cookieStore = cookies()
+  return createServerComponentClient<Database>({ cookies: () => cookieStore })
 }
 
 export function createServerSupabaseClientWithAuth(): SupabaseClient<Database> {
@@ -139,5 +119,5 @@ export function createAdminSupabaseClient(): SupabaseClient<Database> {
   }
 }
 
-export const createClient = createServerSupabaseClient
-export const getServerClient = createServerSupabaseClient
+export const createClient = createServerClient
+export const getServerClient = createServerClient
