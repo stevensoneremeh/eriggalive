@@ -2,36 +2,51 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { AuthProvider } from "@/contexts/auth-context"
 import { ThemeProvider } from "@/components/theme-provider"
+import { AuthProvider } from "@/contexts/auth-context"
+import { SafeThemeProvider } from "@/contexts/theme-context"
+import { MainNavigation } from "@/components/navigation/main-navigation"
 import { Toaster } from "@/components/ui/sonner"
-import { getAuthenticatedUser } from "@/lib/auth-guard"
+import { ErrorBoundary } from "@/components/error-boundary"
+import { Suspense } from "react"
+import { SimpleLoading } from "@/components/simple-loading"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Erigga Live - Community Platform",
-  description: "The official community platform for Erigga fans",
-    generator: 'v0.dev'
+  title: "Erigga Live - Official Fan Platform",
+  description: "The official fan platform for Erigga - Music, Community, and Exclusive Content",
+  generator: "v0.dev",
 }
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // Get initial auth data for hydration
-  const authData = await getAuthenticatedUser()
-
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <AuthProvider initialSession={authData?.session || null} initialProfile={authData?.profile || null}>
-            {children}
-            <Toaster />
-          </AuthProvider>
-        </ThemeProvider>
+        <ErrorBoundary>
+          <SafeThemeProvider>
+            <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+              <AuthProvider>
+                <div className="min-h-screen bg-background">
+                  {/* Main Navigation with Framer Motion */}
+                  <Suspense fallback={<SimpleLoading />}>
+                    <MainNavigation />
+                  </Suspense>
+
+                  {/* Main Content */}
+                  <main>
+                    <Suspense fallback={<SimpleLoading />}>{children}</Suspense>
+                  </main>
+                </div>
+                <Toaster />
+              </AuthProvider>
+            </ThemeProvider>
+          </SafeThemeProvider>
+        </ErrorBoundary>
       </body>
     </html>
   )

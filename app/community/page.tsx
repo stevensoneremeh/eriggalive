@@ -1,5 +1,4 @@
 "use client"
-import { requireAuth, getAuthenticatedUser } from "@/lib/auth-guard"
 import { CommunityClient } from "./community-client"
 
 interface Post {
@@ -35,15 +34,6 @@ interface Comment {
   }
 }
 
-export default async function CommunityPage() {
-  await requireAuth()
-  const authData = await getAuthenticatedUser()
-
-  if (!authData) {
-    return null
-  }
-
-  return <CommunityClient initialAuthData={authData} />
+export default function CommunityPage() {
+  return <CommunityClient />
 }
-
-// CommunityClient component remains unchanged as it is not part of the updates

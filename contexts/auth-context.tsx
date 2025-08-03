@@ -5,7 +5,7 @@ import { createContext, useContext, useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { User, Session } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { toast } from "sonner"
 
 type Profile = Database["public"]["Tables"]["users"]["Row"]
@@ -15,6 +15,7 @@ interface AuthContextType {
   profile: Profile | null
   session: Session | null
   loading: boolean
+  isAuthenticated: boolean
   signUp: (
     email: string,
     password: string,
@@ -28,21 +29,21 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({
-  children,
-  initialSession,
-  initialProfile,
-}: {
-  children: React.ReactNode
-  initialSession?: Session | null
-  initialProfile?: Profile | null
-}) {
-  const [user, setUser] = useState<User | null>(initialSession?.user || null)
-  const [profile, setProfile] = useState<Profile | null>(initialProfile || null)
-  const [session, setSession] = useState<Session | null>(initialSession || null)
-  const [loading, setLoading] = useState(!initialSession)
+// Protected routes that require authentication
+const PROTECTED_ROUTES = ["/dashboard", "/community", "/chat", "/tickets", "/vault", "/coins", "/profile"]
+// Auth routes that authenticated users shouldn't access
+const AUTH_ROUTES = ["/login", "/signup"]
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
+  const pathname = usePathname()
   const supabase = createClient()
+
+  const isAuthenticated = !!user && !!session
 
   const fetchProfile = async (userId: string): Promise<Profile | null> => {
     try {
@@ -127,13 +128,24 @@ export function AuthProvider({
     }
   }
 
+  // Handle route protection
   useEffect(() => {
-    // If we have initial data, we're already loaded
-    if (initialSession && initialProfile) {
-      setLoading(false)
-      return
-    }
+    if (loading) return
 
+    const isProtectedRoute = PROTECTED_ROUTES.some((route) => pathname.startsWith(route))
+    const isAuthRoute = AUTH_ROUTES.some((route) => pathname.startsWith(route))
+
+    if (isProtectedRoute && !isAuthenticated) {
+      // Redirect to login with return URL
+      const returnUrl = encodeURIComponent(pathname)
+      router.push(`/login?returnUrl=${returnUrl}`)
+    } else if (isAuthRoute && isAuthenticated) {
+      // Redirect authenticated users away from auth pages
+      router.push("/dashboard")
+    }
+  }, [isAuthenticated, pathname, loading, router])
+
+  useEffect(() => {
     const initializeAuth = async () => {
       try {
         const {
@@ -179,16 +191,16 @@ export function AuthProvider({
         setProfile(profileData)
 
         if (event === "SIGNED_IN" || event === "SIGNED_UP") {
-          const redirectTo = new URLSearchParams(window.location.search).get("redirectTo")
-          router.push(redirectTo || "/dashboard")
-          router.refresh()
+          // Get return URL from query params or default to dashboard
+          const urlParams = new URLSearchParams(window.location.search)
+          const returnUrl = urlParams.get("returnUrl") || "/dashboard"
+          router.push(returnUrl)
         }
       } else {
         setProfile(null)
 
         if (event === "SIGNED_OUT") {
-          router.push("/auth/signin")
-          router.refresh()
+          router.push("/login")
         }
       }
 
@@ -196,7 +208,7 @@ export function AuthProvider({
     })
 
     return () => subscription.unsubscribe()
-  }, [router, supabase.auth, initialSession, initialProfile])
+  }, [router, supabase.auth])
 
   // Real-time profile updates
   useEffect(() => {
@@ -266,6 +278,7 @@ export function AuthProvider({
     profile,
     session,
     loading,
+    isAuthenticated,
     signUp,
     signIn,
     signOut,
