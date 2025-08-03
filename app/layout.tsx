@@ -4,52 +4,20 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/contexts/auth-context"
-import { Toaster } from "@/components/ui/toaster"
+import { MainNavigation } from "@/components/navigation/main-navigation"
+import { Toaster } from "@/components/ui/sonner"
+import { ErrorBoundary } from "@/components/error-boundary"
+import { Suspense } from "react"
+import { SimpleLoading } from "@/components/simple-loading"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Erigga Live - Official Community Platform",
-  description: "Join the official Erigga community platform for exclusive content, music, and fan interactions.",
-  keywords: ["Erigga", "music", "community", "Nigerian artist", "hip hop"],
-  authors: [{ name: "Erigga Live Team" }],
-  creator: "Erigga Live",
-  publisher: "Erigga Live",
-  formatDetection: {
-    email: false,
-    address: false,
-    telephone: false,
-  },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://eriggalive.com"),
-  openGraph: {
-    title: "Erigga Live - Official Community Platform",
-    description: "Join the official Erigga community platform for exclusive content, music, and fan interactions.",
-    url: "/",
-    siteName: "Erigga Live",
-    locale: "en_US",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Erigga Live - Official Community Platform",
-    description: "Join the official Erigga community platform for exclusive content, music, and fan interactions.",
-    creator: "@erigga",
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-    },
-  },
-  verification: {
-    google: process.env.GOOGLE_SITE_VERIFICATION,
-  },
-    generator: 'v0.dev'
+  title: "Erigga Live - Official Fan Platform",
+  description: "The official fan platform for Erigga - Music, Community, and Exclusive Content",
+  generator: "Next.js",
+  applicationName: "Erigga Live",
+  keywords: ["Erigga", "Music", "Community", "Nigerian Music", "Hip Hop"],
 }
 
 export default function RootLayout({
@@ -60,13 +28,24 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <AuthProvider>
-            {children}
-            <Toaster />
-          </AuthProvider>
-        </ThemeProvider>
+        <ErrorBoundary>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+            <AuthProvider>
+              <div className="min-h-screen bg-background">
+                {/* Main Navigation with Framer Motion */}
+                <Suspense fallback={<SimpleLoading />}>
+                  <MainNavigation />
+                </Suspense>
+
+                {/* Main Content */}
+                <main>
+                  <Suspense fallback={<SimpleLoading />}>{children}</Suspense>
+                </main>
+              </div>
+              <Toaster />
+            </AuthProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
       </body>
     </html>
   )
-}
