@@ -1,16 +1,16 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Eye, EyeOff, Mail, Lock } from "lucide-react"
+import { Eye, EyeOff, Mail, Lock, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { DynamicLogo } from "@/components/dynamic-logo"
 
 export default function SignInPage() {
@@ -19,7 +19,17 @@ export default function SignInPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const { signIn } = useAuth()
+  const { signIn, user } = useAuth()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user) {
+      const redirectTo = searchParams.get("redirectTo") || "/dashboard"
+      router.push(redirectTo)
+    }
+  }, [user, router, searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,6 +48,7 @@ export default function SignInPage() {
       setError(error.message || "An error occurred during login")
       setLoading(false)
     }
+    // Success handling is done in AuthProvider
   }
 
   return (
@@ -103,7 +114,14 @@ export default function SignInPage() {
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign In"}
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                "Sign In"
+              )}
             </Button>
           </form>
 

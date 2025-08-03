@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { DynamicLogo } from "@/components/dynamic-logo"
 
 export default function SignUpPage() {
@@ -24,7 +24,15 @@ export default function SignUpPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
-  const { signUp } = useAuth()
+  const { signUp, user } = useAuth()
+  const router = useRouter()
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user) {
+      router.push("/dashboard")
+    }
+  }, [user, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,10 +78,11 @@ export default function SignUpPage() {
 
       if (error) {
         setError(error.message || "Failed to create account")
+        setIsLoading(false)
       }
+      // Success handling is done in AuthProvider
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred")
-    } finally {
       setIsLoading(false)
     }
   }

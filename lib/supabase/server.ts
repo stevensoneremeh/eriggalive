@@ -119,5 +119,4 @@ export function createAdminSupabaseClient(): SupabaseClient<Database> {
   }
 }
 
-export const createClient = createServerClient
 export const getServerClient = createServerClient

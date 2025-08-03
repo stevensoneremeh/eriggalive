@@ -12,21 +12,66 @@ export async function updateSession(request: NextRequest) {
 
   const supabase = createMiddlewareClient<Database>({ req: request, res: response })
 
+  // Refresh session if expired - required for Server Components
   const {
     data: { session },
   } = await supabase.auth.getSession()
 
-  // Protected routes
-  const protectedRoutes = ["/dashboard", "/community", "/chat", "/tickets", "/vault", "/merch", "/coins", "/settings"]
-  const isProtectedRoute = protectedRoutes.some((route) => request.nextUrl.pathname.startsWith(route))
+  const { pathname } = request.nextUrl
 
-  // If accessing protected route without session, redirect to signin
-  if (isProtectedRoute && !session) {
-    return NextResponse.redirect(new URL("/auth/signin", request.url))
+  // Define protected routes
+  const protectedRoutes = [
+    "/dashboard",
+    "/community",
+    "/vault",
+    "/chat",
+    "/tickets",
+    "/premium",
+    "/merch",
+    "/coins",
+    "/settings",
+    "/admin",
+    "/profile",
+    "/chronicles",
+    "/missions",
+    "/meet-and-greet",
+  ]
+
+  // Define public routes
+  const publicRoutes = [
+    "/",
+    "/auth/signin",
+    "/auth/signup",
+    "/auth/forgot-password",
+    "/auth/reset-password",
+    "/about",
+    "/terms",
+    "/privacy",
+  ]
+
+  // Allow API routes and static files
+  if (
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon") ||
+    pathname.includes(".")
+  ) {
+    return response
   }
 
-  // If accessing auth pages with session, redirect to dashboard
-  if (request.nextUrl.pathname.startsWith("/auth") && session) {
+  // Check if route is protected
+  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
+  const isPublicRoute = publicRoutes.includes(pathname)
+
+  // Redirect unauthenticated users from protected routes
+  if (isProtectedRoute && !session) {
+    const redirectUrl = new URL("/auth/signin", request.url)
+    redirectUrl.searchParams.set("redirectTo", pathname)
+    return NextResponse.redirect(redirectUrl)
+  }
+
+  // Redirect authenticated users from auth pages to dashboard
+  if (session && (pathname.startsWith("/auth/signin") || pathname.startsWith("/auth/signup"))) {
     return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 

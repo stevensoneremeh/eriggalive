@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { createContext, useContext, useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { User, Session } from "@supabase/supabase-js"
@@ -36,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const supabase = createClient()
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string): Promise<Profile | null> => {
     try {
       const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
 
@@ -52,7 +51,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const createProfile = async (user: User, userData?: { username: string; full_name: string }) => {
+  const createProfile = async (
+    user: User,
+    userData?: { username: string; full_name: string },
+  ): Promise<Profile | null> => {
     try {
       const profileData = {
         auth_user_id: user.id,
@@ -61,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         full_name: userData?.full_name || user.user_metadata?.full_name || null,
         tier: "grassroot" as const,
         role: "user" as const,
-        coins: 500, // Default 500 coins on signup
+        coins: 500, // Starting balance
         level: 1,
         points: 0,
         is_verified: false,
@@ -133,6 +135,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event, session?.user?.id)
+
       setSession(session)
       setUser(session?.user ?? null)
 
@@ -148,7 +152,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Redirect to dashboard on successful auth
         if (event === "SIGNED_IN" || event === "SIGNED_UP") {
-          router.push("/dashboard")
+          const redirectTo = new URLSearchParams(window.location.search).get("redirectTo")
+          router.push(redirectTo || "/dashboard")
+          router.refresh() // Refresh to update server components
         }
       } else {
         setProfile(null)
@@ -156,6 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Redirect to signin on signout
         if (event === "SIGNED_OUT") {
           router.push("/auth/signin")
+          router.refresh()
         }
       }
 
