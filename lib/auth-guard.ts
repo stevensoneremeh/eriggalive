@@ -1,3 +1,5 @@
+"use server";
+
 import { createServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { Database } from "@/types/database";
