@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { MessageCircle, Heart, Share2, Plus, TrendingUp, Crown, Send, MoreHorizontal } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { toast } from "sonner"
@@ -18,34 +19,35 @@ import type { Database } from "@/types/database"
 type Profile = Database["public"]["Tables"]["users"]["Row"]
 
 interface Post {
-  id: string
+  id: number
   content: string
   created_at: string
   updated_at: string
-  author_id: string
-  likes_count: number
-  comments_count: number
-  author: {
-    id: string
+  user_id: number
+  category_id: number
+  vote_count: number
+  comment_count: number
+  user: {
+    id: number
     username: string
-    full_name: string
-    avatar_url: string
+    full_name: string | null
+    avatar_url: string | null
     tier: string
   }
-  user_has_liked: boolean
+  user_has_voted: boolean
 }
 
 interface Comment {
-  id: string
+  id: number
   content: string
   created_at: string
-  author_id: string
-  post_id: string
-  author: {
-    id: string
+  user_id: number
+  post_id: number
+  user: {
+    id: number
     username: string
-    full_name: string
-    avatar_url: string
+    full_name: string | null
+    avatar_url: string | null
     tier: string
   }
 }
@@ -64,12 +66,11 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
   const [loading, setLoading] = useState(true)
   const [newPostContent, setNewPostContent] = useState("")
   const [isCreatingPost, setIsCreatingPost] = useState(false)
-  const [selectedPost, setSelectedPost] = useState<string | null>(null)
-  const [comments, setComments] = useState<{ [key: string]: Comment[] }>({})
-  const [newComment, setNewComment] = useState<{ [key: string]: string }>({})
+  const [selectedPost, setSelectedPost] = useState<number | null>(null)
+  const [comments, setComments] = useState<{ [key: number]: Comment[] }>({})
+  const [newComment, setNewComment] = useState<{ [key: number]: string }>({})
   const supabase = createClient()
 
-  // Use profile from context if available, otherwise use initial data
   const currentProfile = profile || initialAuthData.profile
 
   useEffect(() => {
@@ -80,13 +81,11 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
   }, [currentProfile])
 
   const setupRealtimeSubscription = () => {
-    // Real-time subscription for community posts
     const channel = supabase
       .channel("community-listener")
       .on("postgres_changes", { event: "*", schema: "public", table: "community_posts" }, (payload) => {
         if (payload.eventType === "INSERT") {
-          // Fetch the full post with author data
-          fetchPostWithAuthor(payload.new.id).then((newPost) => {
+          fetchPostWithUser(payload.new.id).then((newPost) => {
             if (newPost) {
               setPosts((prev) => [newPost, ...prev])
               toast.success("New post added!")
@@ -103,20 +102,20 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
     }
   }
 
-  const fetchPostWithAuthor = async (postId: string) => {
+  const fetchPostWithUser = async (postId: number) => {
     try {
       const { data, error } = await supabase
         .from("community_posts")
         .select(`
           *,
-          author:users!community_posts_author_id_fkey (
+          user:users!community_posts_user_id_fkey (
             id,
             username,
             full_name,
             avatar_url,
             tier
           ),
-          post_likes!left (
+          community_votes!left (
             user_id
           )
         `)
@@ -127,9 +126,7 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
 
       return {
         ...data,
-        likes_count: data.post_likes?.length || 0,
-        user_has_liked: data.post_likes?.some((like: any) => like.user_id === currentProfile?.id) || false,
-        comments_count: 0,
+        user_has_voted: data.community_votes?.some((vote: any) => vote.user_id === currentProfile?.id) || false,
       }
     } catch (error) {
       console.error("Error fetching post:", error)
@@ -143,30 +140,30 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
         .from("community_posts")
         .select(`
           *,
-          author:users!community_posts_author_id_fkey (
+          user:users!community_posts_user_id_fkey (
             id,
             username,
             full_name,
             avatar_url,
             tier
           ),
-          post_likes!left (
+          community_votes!left (
             user_id
           )
         `)
+        .eq("is_published", true)
         .order("created_at", { ascending: false })
+        .limit(20)
 
       if (error) throw error
 
-      const postsWithLikes =
+      const postsWithVotes =
         data?.map((post) => ({
           ...post,
-          likes_count: post.post_likes?.length || 0,
-          user_has_liked: post.post_likes?.some((like: any) => like.user_id === currentProfile?.id) || false,
-          comments_count: 0,
+          user_has_voted: post.community_votes?.some((vote: any) => vote.user_id === currentProfile?.id) || false,
         })) || []
 
-      setPosts(postsWithLikes)
+      setPosts(postsWithVotes)
     } catch (error) {
       console.error("Error fetching posts:", error)
       toast.error("Failed to load community posts")
@@ -175,13 +172,13 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
     }
   }
 
-  const fetchComments = async (postId: string) => {
+  const fetchComments = async (postId: number) => {
     try {
       const { data, error } = await supabase
-        .from("post_comments")
+        .from("community_comments")
         .select(`
           *,
-          author:users!post_comments_author_id_fkey (
+          user:users!community_comments_user_id_fkey (
             id,
             username,
             full_name,
@@ -212,12 +209,13 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
         .from("community_posts")
         .insert({
           content: newPostContent.trim(),
-          author_id: currentProfile.id,
-          category_id: 1, // Default category
+          user_id: currentProfile.id,
+          category_id: 1,
+          is_published: true,
         })
         .select(`
           *,
-          author:users!community_posts_author_id_fkey (
+          user:users!community_posts_user_id_fkey (
             id,
             username,
             full_name,
@@ -231,9 +229,7 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
 
       const newPost = {
         ...data,
-        likes_count: 0,
-        comments_count: 0,
-        user_has_liked: false,
+        user_has_voted: false,
       }
 
       setPosts((prev) => [newPost, ...prev])
@@ -247,16 +243,16 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
     }
   }
 
-  const toggleLike = async (postId: string) => {
+  const toggleVote = async (postId: number) => {
     if (!currentProfile) return
 
     const post = posts.find((p) => p.id === postId)
     if (!post) return
 
     try {
-      if (post.user_has_liked) {
+      if (post.user_has_voted) {
         const { error } = await supabase
-          .from("post_likes")
+          .from("community_votes")
           .delete()
           .eq("post_id", postId)
           .eq("user_id", currentProfile.id)
@@ -264,41 +260,42 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
         if (error) throw error
 
         setPosts((prev) =>
-          prev.map((p) => (p.id === postId ? { ...p, likes_count: p.likes_count - 1, user_has_liked: false } : p)),
+          prev.map((p) => (p.id === postId ? { ...p, vote_count: p.vote_count - 1, user_has_voted: false } : p)),
         )
       } else {
-        const { error } = await supabase.from("post_likes").insert({
+        const { error } = await supabase.from("community_votes").insert({
           post_id: postId,
           user_id: currentProfile.id,
+          vote_type: "up",
         })
 
         if (error) throw error
 
         setPosts((prev) =>
-          prev.map((p) => (p.id === postId ? { ...p, likes_count: p.likes_count + 1, user_has_liked: true } : p)),
+          prev.map((p) => (p.id === postId ? { ...p, vote_count: p.vote_count + 1, user_has_voted: true } : p)),
         )
       }
     } catch (error) {
-      console.error("Error toggling like:", error)
-      toast.error("Failed to update like")
+      console.error("Error toggling vote:", error)
+      toast.error("Failed to update vote")
     }
   }
 
-  const addComment = async (postId: string) => {
+  const addComment = async (postId: number) => {
     const commentContent = newComment[postId]
     if (!commentContent?.trim() || !currentProfile) return
 
     try {
       const { data, error } = await supabase
-        .from("post_comments")
+        .from("community_comments")
         .insert({
           content: commentContent.trim(),
           post_id: postId,
-          author_id: currentProfile.id,
+          user_id: currentProfile.id,
         })
         .select(`
           *,
-          author:users!post_comments_author_id_fkey (
+          user:users!community_comments_user_id_fkey (
             id,
             username,
             full_name,
@@ -320,7 +317,7 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
         [postId]: "",
       }))
 
-      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, comments_count: p.comments_count + 1 } : p)))
+      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, comment_count: p.comment_count + 1 } : p)))
 
       toast.success("Comment added!")
     } catch (error) {
@@ -344,20 +341,8 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
-
   if (!currentProfile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    )
+    return <CommunitySkeleton />
   }
 
   return (
@@ -403,7 +388,9 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
             </Card>
 
             <div className="space-y-6">
-              {posts.length === 0 ? (
+              {loading ? (
+                <PostsSkeleton />
+              ) : posts.length === 0 ? (
                 <Card>
                   <CardContent className="text-center py-8">
                     <MessageCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -419,27 +406,27 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
                     <CardContent className="p-6">
                       <div className="flex items-start space-x-3 mb-4">
                         <Avatar className="h-10 w-10">
-                          <AvatarImage src={post.author.avatar_url || "/placeholder-user.jpg"} />
+                          <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
                           <AvatarFallback>
-                            {post.author.full_name?.charAt(0) || post.author.username?.charAt(0) || "U"}
+                            {post.user.full_name?.charAt(0) || post.user.username?.charAt(0) || "U"}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
                           <div className="flex items-center space-x-2">
                             <h4 className="font-semibold text-gray-900 dark:text-white">
-                              {post.author.full_name || post.author.username}
+                              {post.user.full_name || post.user.username}
                             </h4>
-                            <Badge className={`text-xs ${getTierColor(post.author.tier)}`}>
+                            <Badge className={`text-xs ${getTierColor(post.user.tier)}`}>
                               <Crown className="w-3 h-3 mr-1" />
-                              {post.author.tier?.replace("_", " ").toUpperCase()}
+                              {post.user.tier?.replace("_", " ").toUpperCase()}
                             </Badge>
                           </div>
                           <p className="text-sm text-gray-500 dark:text-gray-400">
-                            @{post.author.username} •{" "}
+                            @{post.user.username} •{" "}
                             {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
                           </p>
                         </div>
-                        {post.author_id === currentProfile?.id && (
+                        {post.user_id === currentProfile?.id && (
                           <Button variant="ghost" size="sm">
                             <MoreHorizontal className="w-4 h-4" />
                           </Button>
@@ -454,13 +441,13 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => toggleLike(post.id)}
+                          onClick={() => toggleVote(post.id)}
                           className={`flex items-center space-x-2 ${
-                            post.user_has_liked ? "text-red-500" : "text-gray-500"
+                            post.user_has_voted ? "text-red-500" : "text-gray-500"
                           }`}
                         >
-                          <Heart className={`w-4 h-4 ${post.user_has_liked ? "fill-current" : ""}`} />
-                          <span>{post.likes_count}</span>
+                          <Heart className={`w-4 h-4 ${post.user_has_voted ? "fill-current" : ""}`} />
+                          <span>{post.vote_count}</span>
                         </Button>
                         <Button
                           variant="ghost"
@@ -478,7 +465,7 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
                           className="flex items-center space-x-2 text-gray-500"
                         >
                           <MessageCircle className="w-4 h-4" />
-                          <span>{post.comments_count}</span>
+                          <span>{post.comment_count}</span>
                         </Button>
                         <Button variant="ghost" size="sm" className="flex items-center space-x-2 text-gray-500">
                           <Share2 className="w-4 h-4" />
@@ -526,19 +513,19 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
                             {comments[post.id]?.map((comment) => (
                               <div key={comment.id} className="flex space-x-3">
                                 <Avatar className="h-8 w-8">
-                                  <AvatarImage src={comment.author.avatar_url || "/placeholder-user.jpg"} />
+                                  <AvatarImage src={comment.user.avatar_url || "/placeholder-user.jpg"} />
                                   <AvatarFallback>
-                                    {comment.author.full_name?.charAt(0) || comment.author.username?.charAt(0) || "U"}
+                                    {comment.user.full_name?.charAt(0) || comment.user.username?.charAt(0) || "U"}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div className="flex-1">
                                   <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3">
                                     <div className="flex items-center space-x-2 mb-1">
                                       <span className="font-semibold text-sm text-gray-900 dark:text-white">
-                                        {comment.author.full_name || comment.author.username}
+                                        {comment.user.full_name || comment.user.username}
                                       </span>
-                                      <Badge className={`text-xs ${getTierColor(comment.author.tier)}`}>
-                                        {comment.author.tier?.replace("_", " ").toUpperCase()}
+                                      <Badge className={`text-xs ${getTierColor(comment.user.tier)}`}>
+                                        {comment.user.tier?.replace("_", " ").toUpperCase()}
                                       </Badge>
                                     </div>
                                     <p className="text-gray-900 dark:text-white text-sm">{comment.content}</p>
@@ -626,6 +613,93 @@ export function CommunityClient({ initialAuthData }: CommunityClientProps) {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function CommunitySkeleton() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
+        <div className="mb-8">
+          <Skeleton className="h-9 w-48 mb-2" />
+          <Skeleton className="h-5 w-96" />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          <div className="lg:col-span-3 space-y-6">
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-48" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex space-x-3">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <Skeleton className="flex-1 h-24" />
+                </div>
+                <div className="flex justify-end">
+                  <Skeleton className="h-9 w-16" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <PostsSkeleton />
+          </div>
+
+          <div className="space-y-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <Skeleton className="h-6 w-32" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {Array.from({ length: 3 }).map((_, j) => (
+                    <div key={j} className="flex justify-between items-center">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-4 w-8" />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PostsSkeleton() {
+  return (
+    <div className="space-y-6">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <Card key={i}>
+          <CardContent className="p-6">
+            <div className="flex items-start space-x-3 mb-4">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-1">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-16" />
+                </div>
+                <Skeleton className="h-3 w-48" />
+              </div>
+              <Skeleton className="h-8 w-8" />
+            </div>
+
+            <div className="mb-4">
+              <Skeleton className="h-4 w-full mb-2" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
+
+            <div className="flex items-center space-x-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-8 w-20" />
+              <Skeleton className="h-8 w-16" />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   )
 }

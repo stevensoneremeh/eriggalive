@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Coins,
   Trophy,
@@ -36,7 +37,11 @@ interface DashboardStats {
   totalComments: number
   totalFollowers: number
   vaultAccess: number
-  recentActivity: any[]
+  recentActivity: Array<{
+    type: string
+    content: string
+    time: string
+  }>
 }
 
 interface DashboardClientProps {
@@ -48,7 +53,7 @@ interface DashboardClientProps {
 }
 
 export function DashboardClient({ initialAuthData }: DashboardClientProps) {
-  const { profile, signOut, loading } = useAuth()
+  const { profile, signOut } = useAuth()
   const [stats, setStats] = useState<DashboardStats>({
     totalPosts: 0,
     totalLikes: 0,
@@ -60,7 +65,6 @@ export function DashboardClient({ initialAuthData }: DashboardClientProps) {
   const [loadingStats, setLoadingStats] = useState(true)
   const supabase = createClient()
 
-  // Use profile from context if available, otherwise use initial data
   const currentProfile = profile || initialAuthData.profile
 
   useEffect(() => {
@@ -70,21 +74,28 @@ export function DashboardClient({ initialAuthData }: DashboardClientProps) {
   }, [currentProfile])
 
   const fetchDashboardStats = async () => {
+    if (!currentProfile) return
+
     try {
-      // Fetch user stats from Supabase
       const [postsResult, likesResult, commentsResult] = await Promise.allSettled([
-        supabase.from("community_posts").select("id").eq("author_id", currentProfile?.id),
-        supabase.from("post_likes").select("id").eq("user_id", currentProfile?.id),
-        supabase.from("post_comments").select("id").eq("author_id", currentProfile?.id),
+        supabase.from("community_posts").select("id", { count: "exact" }).eq("user_id", currentProfile.id),
+        supabase.from("post_likes").select("id", { count: "exact" }).eq("user_id", currentProfile.id),
+        supabase.from("post_comments").select("id", { count: "exact" }).eq("author_id", currentProfile.id),
       ])
 
       setStats({
-        totalPosts: postsResult.status === "fulfilled" ? postsResult.value.data?.length || 0 : 0,
-        totalLikes: likesResult.status === "fulfilled" ? likesResult.value.data?.length || 0 : 0,
-        totalComments: commentsResult.status === "fulfilled" ? commentsResult.value.data?.length || 0 : 0,
-        totalFollowers: Math.floor(Math.random() * 50) + 10, // Mock data for now
-        vaultAccess: getTierVaultAccess(currentProfile?.tier || "grassroot"),
-        recentActivity: generateMockActivity(),
+        totalPosts: postsResult.status === "fulfilled" ? postsResult.value.count || 0 : 0,
+        totalLikes: likesResult.status === "fulfilled" ? likesResult.value.count || 0 : 0,
+        totalComments: commentsResult.status === "fulfilled" ? commentsResult.value.count || 0 : 0,
+        totalFollowers: Math.floor(Math.random() * 50) + 10,
+        vaultAccess: getTierVaultAccess(currentProfile.tier),
+        recentActivity: [
+          { type: "post", content: "Shared a new post in General Discussion", time: "2 hours ago" },
+          { type: "like", content: "Liked a post by @erigga_fan", time: "4 hours ago" },
+          { type: "comment", content: "Commented on Latest Track Discussion", time: "1 day ago" },
+          { type: "vault", content: "Accessed exclusive content", time: "2 days ago" },
+          { type: "level", content: "Reached level 2!", time: "3 days ago" },
+        ],
       })
     } catch (error) {
       console.error("Error fetching dashboard stats:", error)
@@ -127,24 +138,12 @@ export function DashboardClient({ initialAuthData }: DashboardClientProps) {
     return <Icon className="w-4 h-4" />
   }
 
-  const generateMockActivity = () => [
-    { type: "post", content: "Shared a new post in General Discussion", time: "2 hours ago" },
-    { type: "like", content: "Liked a post by @erigga_fan", time: "4 hours ago" },
-    { type: "comment", content: "Commented on Latest Track Discussion", time: "1 day ago" },
-    { type: "vault", content: "Accessed exclusive content", time: "2 days ago" },
-    { type: "level", content: "Reached level 2!", time: "3 days ago" },
-  ]
-
   const handleSignOut = async () => {
     await signOut()
   }
 
   if (!currentProfile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    )
+    return <DashboardSkeleton />
   }
 
   return (
@@ -184,7 +183,11 @@ export function DashboardClient({ initialAuthData }: DashboardClientProps) {
               <MessageSquare className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalPosts}</div>
+              {loadingStats ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <div className="text-2xl font-bold">{stats.totalPosts}</div>
+              )}
               <p className="text-xs text-muted-foreground">+2 from last week</p>
             </CardContent>
           </Card>
@@ -195,7 +198,11 @@ export function DashboardClient({ initialAuthData }: DashboardClientProps) {
               <Heart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalLikes}</div>
+              {loadingStats ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <div className="text-2xl font-bold">{stats.totalLikes}</div>
+              )}
               <p className="text-xs text-muted-foreground">+12% from last week</p>
             </CardContent>
           </Card>
@@ -335,18 +342,31 @@ export function DashboardClient({ initialAuthData }: DashboardClientProps) {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {stats.recentActivity.map((activity, index) => (
-                        <div
-                          key={index}
-                          className="flex items-start space-x-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800"
-                        >
-                          <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
-                          <div className="flex-1">
-                            <p className="text-sm">{activity.content}</p>
-                            <p className="text-xs text-muted-foreground">{activity.time}</p>
-                          </div>
-                        </div>
-                      ))}
+                      {loadingStats
+                        ? Array.from({ length: 5 }).map((_, i) => (
+                            <div
+                              key={i}
+                              className="flex items-start space-x-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800"
+                            >
+                              <Skeleton className="w-2 h-2 rounded-full mt-2" />
+                              <div className="flex-1 space-y-2">
+                                <Skeleton className="h-4 w-3/4" />
+                                <Skeleton className="h-3 w-1/2" />
+                              </div>
+                            </div>
+                          ))
+                        : stats.recentActivity.map((activity, index) => (
+                            <div
+                              key={index}
+                              className="flex items-start space-x-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800"
+                            >
+                              <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
+                              <div className="flex-1">
+                                <p className="text-sm">{activity.content}</p>
+                                <p className="text-xs text-muted-foreground">{activity.time}</p>
+                              </div>
+                            </div>
+                          ))}
                     </div>
                   </CardContent>
                 </Card>
@@ -432,7 +452,7 @@ export function DashboardClient({ initialAuthData }: DashboardClientProps) {
                   </div>
                 </div>
                 <Button asChild className="w-full">
-                  <Link href="/settings">Edit Profile</Link>
+                  <Link href="/profile">Edit Profile</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -445,23 +465,75 @@ export function DashboardClient({ initialAuthData }: DashboardClientProps) {
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Posts</span>
-                  <span className="font-medium">{stats.totalPosts}</span>
+                  {loadingStats ? (
+                    <Skeleton className="h-4 w-8" />
+                  ) : (
+                    <span className="font-medium">{stats.totalPosts}</span>
+                  )}
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Comments</span>
-                  <span className="font-medium">{stats.totalComments}</span>
+                  {loadingStats ? (
+                    <Skeleton className="h-4 w-8" />
+                  ) : (
+                    <span className="font-medium">{stats.totalComments}</span>
+                  )}
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Likes Given</span>
-                  <span className="font-medium">{stats.totalLikes}</span>
+                  {loadingStats ? (
+                    <Skeleton className="h-4 w-8" />
+                  ) : (
+                    <span className="font-medium">{stats.totalLikes}</span>
+                  )}
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Followers</span>
-                  <span className="font-medium">{stats.totalFollowers}</span>
+                  {loadingStats ? (
+                    <Skeleton className="h-4 w-8" />
+                  ) : (
+                    <span className="font-medium">{stats.totalFollowers}</span>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <Skeleton className="h-9 w-96 mb-2" />
+              <Skeleton className="h-5 w-80" />
+            </div>
+            <div className="flex items-center space-x-4">
+              <Skeleton className="h-16 w-16 rounded-full" />
+              <Skeleton className="h-9 w-24" />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-4" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16 mb-2" />
+                <Skeleton className="h-3 w-32" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     </div>

@@ -23,15 +23,24 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
+  updateProfile: (updates: Partial<Profile>) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+export function AuthProvider({
+  children,
+  initialSession,
+  initialProfile,
+}: {
+  children: React.ReactNode
+  initialSession?: Session | null
+  initialProfile?: Profile | null
+}) {
+  const [user, setUser] = useState<User | null>(initialSession?.user || null)
+  const [profile, setProfile] = useState<Profile | null>(initialProfile || null)
+  const [session, setSession] = useState<Session | null>(initialSession || null)
+  const [loading, setLoading] = useState(!initialSession)
   const router = useRouter()
   const supabase = createClient()
 
@@ -63,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         full_name: userData?.full_name || user.user_metadata?.full_name || null,
         tier: "grassroot" as const,
         role: "user" as const,
-        coins: 500, // Starting balance
+        coins: 500,
         level: 1,
         points: 0,
         is_verified: false,
@@ -84,7 +93,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return null
       }
 
-      // Show welcome toast for new users
       toast.success("Welcome to Erigga Live!", {
         description: "Your account has been created with 500 free coins!",
       })
@@ -103,22 +111,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const updateProfile = async (updates: Partial<Profile>) => {
+    if (!profile) return
+
+    try {
+      const { data, error } = await supabase.from("users").update(updates).eq("id", profile.id).select().single()
+
+      if (error) throw error
+
+      setProfile(data)
+      toast.success("Profile updated successfully!")
+    } catch (error) {
+      console.error("Error updating profile:", error)
+      toast.error("Failed to update profile")
+    }
+  }
+
   useEffect(() => {
+    // If we have initial data, we're already loaded
+    if (initialSession && initialProfile) {
+      setLoading(false)
+      return
+    }
+
     const initializeAuth = async () => {
       try {
         const {
-          data: { session: initialSession },
+          data: { session: currentSession },
         } = await supabase.auth.getSession()
 
-        setSession(initialSession)
-        setUser(initialSession?.user ?? null)
+        setSession(currentSession)
+        setUser(currentSession?.user ?? null)
 
-        if (initialSession?.user) {
-          let profileData = await fetchProfile(initialSession.user.id)
+        if (currentSession?.user) {
+          let profileData = await fetchProfile(currentSession.user.id)
 
-          // Create profile if it doesn't exist
           if (!profileData) {
-            profileData = await createProfile(initialSession.user)
+            profileData = await createProfile(currentSession.user)
           }
 
           setProfile(profileData)
@@ -143,23 +172,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         let profileData = await fetchProfile(session.user.id)
 
-        // Create profile for new signups
         if (!profileData && event === "SIGNED_UP") {
           profileData = await createProfile(session.user)
         }
 
         setProfile(profileData)
 
-        // Redirect to dashboard on successful auth
         if (event === "SIGNED_IN" || event === "SIGNED_UP") {
           const redirectTo = new URLSearchParams(window.location.search).get("redirectTo")
           router.push(redirectTo || "/dashboard")
-          router.refresh() // Refresh to update server components
+          router.refresh()
         }
       } else {
         setProfile(null)
 
-        // Redirect to signin on signout
         if (event === "SIGNED_OUT") {
           router.push("/auth/signin")
           router.refresh()
@@ -170,14 +196,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     return () => subscription.unsubscribe()
-  }, [router, supabase.auth])
+  }, [router, supabase.auth, initialSession, initialProfile])
 
-  // Real-time coins subscription
+  // Real-time profile updates
   useEffect(() => {
     if (!profile?.id) return
 
     const channel = supabase
-      .channel("coins-listener")
+      .channel("profile-listener")
       .on(
         "postgres_changes",
         {
@@ -187,8 +213,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           filter: `id=eq.${profile.id}`,
         },
         (payload) => {
-          setProfile((prev) => (prev ? { ...prev, coins: payload.new.coins } : null))
-          toast.success(`Coins updated: ${payload.new.coins}`)
+          setProfile(payload.new as Profile)
+          if (payload.new.coins !== profile.coins) {
+            toast.success(`Coins updated: ${payload.new.coins}`)
+          }
         },
       )
       .subscribe()
@@ -242,6 +270,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signIn,
     signOut,
     refreshProfile,
+    updateProfile,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

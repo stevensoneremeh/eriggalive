@@ -36,10 +36,7 @@ interface Comment {
 }
 
 export default async function CommunityPage() {
-  // Server-side auth check - redirects if not authenticated
   await requireAuth()
-
-  // Get authenticated user data
   const authData = await getAuthenticatedUser()
 
   if (!authData) {
