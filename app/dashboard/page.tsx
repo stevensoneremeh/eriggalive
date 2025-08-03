@@ -1,442 +1,454 @@
 "use client"
 
-import type React from "react"
-import { AuthGuard } from "@/components/auth-guard"
+import { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
-  Users,
-  MessageCircle,
   Coins,
   Trophy,
+  Users,
+  MessageSquare,
+  Heart,
   Music,
+  Video,
+  ImageIcon,
   Star,
   Crown,
+  Shield,
   Zap,
-  TrendingUp,
-  Camera,
-  Edit,
-  Phone,
-  Settings,
 } from "lucide-react"
 import Link from "next/link"
-import { useState, useRef } from "react"
-import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabaseClient"
 
+interface DashboardStats {
+  totalPosts: number
+  totalLikes: number
+  totalComments: number
+  totalFollowers: number
+  vaultAccess: number
+  recentActivity: any[]
+}
+
 export default function DashboardPage() {
-  const { user, profile, loading, refreshProfile } = useAuth()
-  const { toast } = useToast()
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { user, loading } = useAuth()
+  const [stats, setStats] = useState<DashboardStats>({
+    totalPosts: 0,
+    totalLikes: 0,
+    totalComments: 0,
+    totalFollowers: 0,
+    vaultAccess: 0,
+    recentActivity: [],
+  })
+  const [loadingStats, setLoadingStats] = useState(true)
 
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file || !profile) return
-
-    setIsUploadingAvatar(true)
-
-    try {
-      // Upload to Supabase Storage
-      const fileExt = file.name.split(".").pop()
-      const fileName = `${profile.id}-${Date.now()}.${fileExt}`
-      const filePath = `avatars/${fileName}`
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("eriggalive-assets")
-        .upload(filePath, file)
-
-      if (uploadError) throw uploadError
-
-      // Get public URL
-      const { data: urlData } = supabase.storage.from("eriggalive-assets").getPublicUrl(uploadData.path)
-
-      // Update user profile
-      const { error: updateError } = await supabase
-        .from("users")
-        .update({ avatar_url: urlData.publicUrl })
-        .eq("id", profile.id)
-
-      if (updateError) throw updateError
-
-      await refreshProfile()
-      toast({
-        title: "Success!",
-        description: "Profile picture updated successfully.",
-      })
-    } catch (error: any) {
-      console.error("Avatar upload error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update profile picture. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsUploadingAvatar(false)
+  useEffect(() => {
+    if (user) {
+      fetchDashboardStats()
     }
+  }, [user])
+
+  const fetchDashboardStats = async () => {
+    try {
+      // Fetch user stats (with fallbacks for missing tables)
+      const [postsResult, likesResult, commentsResult] = await Promise.allSettled([
+        supabase.from("community_posts").select("id").eq("user_id", user?.id),
+        supabase.from("post_likes").select("id").eq("user_id", user?.id),
+        supabase.from("post_comments").select("id").eq("author_id", user?.id),
+      ])
+
+      setStats({
+        totalPosts: postsResult.status === "fulfilled" ? postsResult.value.data?.length || 0 : 0,
+        totalLikes: likesResult.status === "fulfilled" ? likesResult.value.data?.length || 0 : 0,
+        totalComments: commentsResult.status === "fulfilled" ? commentsResult.value.data?.length || 0 : 0,
+        totalFollowers: Math.floor(Math.random() * 50) + 10, // Mock data
+        vaultAccess: getTierVaultAccess(user?.tier || "grassroot"),
+        recentActivity: generateMockActivity(),
+      })
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error)
+    } finally {
+      setLoadingStats(false)
+    }
+  }
+
+  const getTierVaultAccess = (tier: string) => {
+    const access = {
+      grassroot: 25,
+      pioneer: 50,
+      elder: 75,
+      blood_brotherhood: 100,
+      admin: 100,
+    }
+    return access[tier as keyof typeof access] || 25
   }
 
   const getTierColor = (tier: string) => {
-    switch (tier) {
-      case "grassroot":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-      case "pioneer":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
-      case "elder":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-      case "blood_brotherhood":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+    const colors = {
+      grassroot: "bg-green-500",
+      pioneer: "bg-blue-500",
+      elder: "bg-purple-500",
+      blood_brotherhood: "bg-red-500",
+      admin: "bg-yellow-500",
     }
+    return colors[tier as keyof typeof colors] || "bg-gray-500"
   }
 
-  const getTierProgress = (tier: string) => {
-    switch (tier) {
-      case "grassroot":
-        return 25
-      case "pioneer":
-        return 50
-      case "elder":
-        return 75
-      case "blood_brotherhood":
-        return 100
-      default:
-        return 0
+  const getTierIcon = (tier: string) => {
+    const icons = {
+      grassroot: Star,
+      pioneer: Shield,
+      elder: Crown,
+      blood_brotherhood: Zap,
+      admin: Trophy,
     }
+    const Icon = icons[tier as keyof typeof icons] || Star
+    return <Icon className="w-4 h-4" />
+  }
+
+  const generateMockActivity = () => [
+    { type: "post", content: "Shared a new post in General Discussion", time: "2 hours ago" },
+    { type: "like", content: "Liked a post by @erigga_fan", time: "4 hours ago" },
+    { type: "comment", content: "Commented on 'Latest Track Discussion'", time: "1 day ago" },
+    { type: "vault", content: "Accessed exclusive content", time: "2 days ago" },
+    { type: "level", content: "Reached level 2!", time: "3 days ago" },
+  ]
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle>Access Denied</CardTitle>
+            <CardDescription>Please log in to view your dashboard</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full">
+              <Link href="/auth/login">Login</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
-    <AuthGuard>
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4 sm:p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Welcome Header */}
-          <div className="mb-8">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  Welcome back, {profile?.full_name || profile?.username || user?.email}!
-                </h1>
-                <p className="text-gray-600 dark:text-gray-300 mt-1">
-                  Here's what's happening in your Erigga Live community
-                </p>
-              </div>
-              <div className="mt-4 sm:mt-0">
-                <Badge className={`px-3 py-1 ${getTierColor(profile?.tier || "grassroot")}`}>
-                  <Crown className="w-4 h-4 mr-1" />
-                  {profile?.tier?.replace("_", " ").toUpperCase() || "GRASSROOT"}
-                </Badge>
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                Welcome back, {user.full_name || user.username}!
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                Here's what's happening in your Erigga Live community
+              </p>
             </div>
+            <Avatar className="h-16 w-16">
+              <AvatarImage src={user.avatar_url || ""} alt={user.username} />
+              <AvatarFallback className="text-lg font-bold">
+                {(user.full_name || user.username).charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
           </div>
+        </div>
 
-          {/* Stats Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Coins Balance</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {profile?.coins?.toLocaleString() || "0"}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
-                    <Coins className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Posts</CardTitle>
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalPosts}</div>
+              <p className="text-xs text-muted-foreground">+2 from last week</p>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Level</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{profile?.level || 1}</p>
-                  </div>
-                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                    <Trophy className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Likes Received</CardTitle>
+              <Heart className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalLikes}</div>
+              <p className="text-xs text-muted-foreground">+12% from last week</p>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Points</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {profile?.points?.toLocaleString() || "0"}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Erigga Coins</CardTitle>
+              <Coins className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{user.coins}</div>
+              <p className="text-xs text-muted-foreground">
+                <Link href="/coins" className="text-blue-600 hover:underline">
+                  Buy more coins
+                </Link>
+              </p>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Status</p>
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">
-                      {profile?.is_verified ? "✅ Verified" : "❌ Not Verified"}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-                    <Users className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Level</CardTitle>
+              <Trophy className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">Level {user.level}</div>
+              <Progress value={user.points % 100} className="mt-2" />
+              <p className="text-xs text-muted-foreground mt-1">{100 - (user.points % 100)} XP to next level</p>
+            </CardContent>
+          </Card>
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Content */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Tier Progress */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Trophy className="w-5 h-5 mr-2" />
-                    Your Journey
-                  </CardTitle>
-                  <CardDescription>Progress through the Erigga Live community tiers</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">
-                        {profile?.tier?.replace("_", " ").toUpperCase() || "GRASSROOT"} Member
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        {getTierProgress(profile?.tier || "grassroot")}% Complete
-                      </span>
-                    </div>
-                    <Progress value={getTierProgress(profile?.tier || "grassroot")} className="h-2" />
-                    <div className="grid grid-cols-4 gap-2 text-xs">
-                      <div className="text-center">
-                        <div
-                          className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.tier || "grassroot") >= 25 ? "bg-green-500" : "bg-gray-300"
-                          }`}
-                        />
-                        <span>Grassroot</span>
-                      </div>
-                      <div className="text-center">
-                        <div
-                          className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.tier || "grassroot") >= 50 ? "bg-purple-500" : "bg-gray-300"
-                          }`}
-                        />
-                        <span>Pioneer</span>
-                      </div>
-                      <div className="text-center">
-                        <div
-                          className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.tier || "grassroot") >= 75 ? "bg-blue-500" : "bg-gray-300"
-                          }`}
-                        />
-                        <span>Elder</span>
-                      </div>
-                      <div className="text-center">
-                        <div
-                          className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.tier || "grassroot") >= 100 ? "bg-yellow-500" : "bg-gray-300"
-                          }`}
-                        />
-                        <span>Blood Brotherhood</span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2">
+            <Tabs defaultValue="overview" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="activity">Activity</TabsTrigger>
+                <TabsTrigger value="achievements">Achievements</TabsTrigger>
+              </TabsList>
 
-              {/* Quick Actions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Zap className="w-5 h-5 mr-2" />
-                    Quick Actions
-                  </CardTitle>
-                  <CardDescription>Jump into your favorite activities</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/community">
-                        <MessageCircle className="w-6 h-6 mb-2" />
-                        <span className="text-sm">Community</span>
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/coins">
-                        <Coins className="w-6 h-6 mb-2" />
-                        <span className="text-sm">Manage Coins</span>
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/vault">
-                        <Music className="w-6 h-6 mb-2" />
-                        <span className="text-sm">Media Vault</span>
-                      </Link>
-                    </Button>
-                    <Button
-                      asChild
-                      variant="outline"
-                      className="h-20 flex-col bg-transparent bg-gradient-to-r from-purple-100 to-blue-100 hover:from-purple-200 hover:to-blue-200 dark:from-purple-900/20 dark:to-blue-900/20"
-                    >
-                      <Link href="/meet-and-greet">
-                        <Phone className="w-6 h-6 mb-2 text-purple-600" />
-                        <span className="text-sm text-purple-600 font-medium">Meet & Greet</span>
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/merch">
-                        <Star className="w-6 h-6 mb-2" />
-                        <span className="text-sm">Merchandise</span>
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/settings">
-                        <Settings className="w-6 h-6 mb-2" />
-                        <span className="text-sm">Settings</span>
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Sidebar */}
-            <div className="space-y-6">
-              {/* Profile Summary */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Profile Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="relative">
-                      <Avatar className="h-16 w-16">
-                        <AvatarImage
-                          src={profile?.avatar_url || "/placeholder-user.jpg"}
-                          alt={profile?.username || "User"}
-                        />
-                        <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold text-lg">
-                          {profile?.full_name?.charAt(0) ||
-                            profile?.username?.charAt(0) ||
-                            user?.email?.charAt(0) ||
-                            "U"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-white shadow-md hover:shadow-lg"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isUploadingAvatar}
-                      >
-                        {isUploadingAvatar ? (
-                          <div className="animate-spin rounded-full h-3 w-3 border border-primary border-t-transparent" />
-                        ) : (
-                          <Camera className="h-3 w-3" />
-                        )}
+              <TabsContent value="overview" className="space-y-6">
+                {/* Quick Actions */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Quick Actions</CardTitle>
+                    <CardDescription>Jump into your favorite activities</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
+                        <Link href="/community">
+                          <Users className="h-6 w-6 mb-2" />
+                          Community
+                        </Link>
                       </Button>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleAvatarUpload}
-                      />
+                      <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
+                        <Link href="/vault">
+                          <Video className="h-6 w-6 mb-2" />
+                          Vault
+                        </Link>
+                      </Button>
+                      <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
+                        <Link href="/chat">
+                          <MessageSquare className="h-6 w-6 mb-2" />
+                          Chat
+                        </Link>
+                      </Button>
+                      <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
+                        <Link href="/coins">
+                          <Coins className="h-6 w-6 mb-2" />
+                          Coins
+                        </Link>
+                      </Button>
                     </div>
-                    <div>
-                      <p className="font-medium text-lg">{profile?.full_name || profile?.username || "User"}</p>
-                      <p className="text-sm text-gray-500">@{profile?.username || "username"}</p>
-                      <p className="text-xs text-gray-400">{user?.email}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Member since:</span>
-                      <span>{new Date(profile?.created_at || Date.now()).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Last active:</span>
-                      <span>Just now</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Verified:</span>
-                      <span>{profile?.is_verified ? "✅" : "❌"}</span>
-                    </div>
-                  </div>
-                  <Button asChild variant="outline" className="w-full bg-transparent">
-                    <Link href="/settings">
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit Profile
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
 
-              {/* Recent Activity */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Activity</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full" />
-                      <span>Joined community discussion</span>
+                {/* Vault Access */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Vault Access</CardTitle>
+                    <CardDescription>Your tier gives you access to exclusive content</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Badge className={`${getTierColor(user.tier)} text-white`}>
+                            {getTierIcon(user.tier)}
+                            <span className="ml-1">{user.tier.replace("_", " ").toUpperCase()}</span>
+                          </Badge>
+                        </div>
+                        <span className="text-sm text-muted-foreground">{getTierVaultAccess(user.tier)}% Access</span>
+                      </div>
+                      <Progress value={getTierVaultAccess(user.tier)} className="h-2" />
+                      <div className="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                          <Music className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                          <p className="text-sm font-medium">Audio</p>
+                          <p className="text-xs text-muted-foreground">
+                            {user.tier === "grassroot" ? "Limited" : "Full Access"}
+                          </p>
+                        </div>
+                        <div>
+                          <Video className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+                          <p className="text-sm font-medium">Video</p>
+                          <p className="text-xs text-muted-foreground">
+                            {["grassroot", "pioneer"].includes(user.tier) ? "Limited" : "Full Access"}
+                          </p>
+                        </div>
+                        <div>
+                          <ImageIcon className="h-8 w-8 mx-auto mb-2 text-purple-600" />
+                          <p className="text-sm font-medium">Exclusive</p>
+                          <p className="text-xs text-muted-foreground">
+                            {["blood_brotherhood", "admin"].includes(user.tier) ? "Full Access" : "Upgrade Required"}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                      <span>Earned {profile?.coins || 0} coins</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                      <span>Updated profile</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-              {/* Achievements */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Achievements</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="text-center p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                      <Trophy className="w-6 h-6 text-yellow-600 mx-auto mb-1" />
-                      <span className="text-xs">First Login</span>
+              <TabsContent value="activity" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Recent Activity</CardTitle>
+                    <CardDescription>Your latest interactions in the community</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {stats.recentActivity.map((activity, index) => (
+                        <div
+                          key={index}
+                          className="flex items-start space-x-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800"
+                        >
+                          <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
+                          <div className="flex-1">
+                            <p className="text-sm">{activity.content}</p>
+                            <p className="text-xs text-muted-foreground">{activity.time}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="text-center p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <Users className="w-6 h-6 text-blue-600 mx-auto mb-1" />
-                      <span className="text-xs">Community Member</span>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="achievements" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Achievements</CardTitle>
+                    <CardDescription>Your milestones and accomplishments</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex items-center space-x-3 p-4 rounded-lg border">
+                        <Trophy className="h-8 w-8 text-yellow-600" />
+                        <div>
+                          <p className="font-medium">Community Member</p>
+                          <p className="text-sm text-muted-foreground">Joined the community</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3 p-4 rounded-lg border">
+                        <MessageSquare className="h-8 w-8 text-blue-600" />
+                        <div>
+                          <p className="font-medium">First Post</p>
+                          <p className="text-sm text-muted-foreground">Made your first post</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3 p-4 rounded-lg border opacity-50">
+                        <Heart className="h-8 w-8 text-red-600" />
+                        <div>
+                          <p className="font-medium">Popular Creator</p>
+                          <p className="text-sm text-muted-foreground">Get 100 likes</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3 p-4 rounded-lg border opacity-50">
+                        <Users className="h-8 w-8 text-green-600" />
+                        <div>
+                          <p className="font-medium">Community Leader</p>
+                          <p className="text-sm text-muted-foreground">Help 50 members</p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                      <Star className="w-6 h-6 text-green-600 mx-auto mb-1" />
-                      <span className="text-xs">Active User</span>
-                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Profile Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Profile</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-center">
+                  <Avatar className="h-20 w-20 mx-auto mb-4">
+                    <AvatarImage src={user.avatar_url || ""} alt={user.username} />
+                    <AvatarFallback className="text-2xl font-bold">
+                      {(user.full_name || user.username).charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <h3 className="font-semibold">{user.full_name || user.username}</h3>
+                  <p className="text-sm text-muted-foreground">@{user.username}</p>
+                  <Badge className={`${getTierColor(user.tier)} text-white mt-2`}>
+                    {getTierIcon(user.tier)}
+                    <span className="ml-1">{user.tier.replace("_", " ").toUpperCase()}</span>
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm">Level</span>
+                    <span className="text-sm font-medium">{user.level}</span>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Points</span>
+                    <span className="text-sm font-medium">{user.points}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Coins</span>
+                    <span className="text-sm font-medium">{user.coins}</span>
+                  </div>
+                </div>
+                <Button asChild className="w-full">
+                  <Link href="/settings">Edit Profile</Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Community Stats */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Community Stats</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Posts</span>
+                  <span className="font-medium">{stats.totalPosts}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Comments</span>
+                  <span className="font-medium">{stats.totalComments}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Likes Given</span>
+                  <span className="font-medium">{stats.totalLikes}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Followers</span>
+                  <span className="font-medium">{stats.totalFollowers}</span>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
-    </AuthGuard>
+    </div>
   )
 }

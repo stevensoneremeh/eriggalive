@@ -6,6 +6,26 @@ const isBrowser = typeof window !== "undefined"
 const createMockClient = () => {
   console.warn("⚠️ Using mock client - Supabase environment variables not configured")
 
+  const mockQueryBuilder = {
+    eq: (column: string, value: any) => ({
+      ...mockQueryBuilder,
+      single: () => Promise.resolve({ data: null, error: null }),
+      maybeSingle: () => Promise.resolve({ data: null, error: null }),
+    }),
+    order: (column: string, options?: { ascending: boolean }) => ({
+      ...mockQueryBuilder,
+      limit: (limit: number) => Promise.resolve({ data: [], error: null }),
+      range: (start: number, end: number) => Promise.resolve({ data: [], error: null }),
+    }),
+    limit: (limit: number) => Promise.resolve({ data: [], error: null }),
+    range: (start: number, end: number) => Promise.resolve({ data: [], error: null }),
+    is: (column: string, value: any) => mockQueryBuilder,
+    ilike: (column: string, value: string) => mockQueryBuilder,
+    or: (conditions: string) => mockQueryBuilder,
+    single: () => Promise.resolve({ data: null, error: null }),
+    maybeSingle: () => Promise.resolve({ data: null, error: null }),
+  }
+
   return {
     auth: {
       getSession: () => Promise.resolve({ data: { session: null }, error: null }),
@@ -38,27 +58,7 @@ const createMockClient = () => {
       },
     },
     from: (table: string) => ({
-      select: (columns?: string) => ({
-        eq: (column: string, value: any) => ({
-          single: () => Promise.resolve({ data: null, error: null }),
-          maybeSingle: () => Promise.resolve({ data: null, error: null }),
-        }),
-        order: (column: string, options?: { ascending: boolean }) => ({
-          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-          range: (start: number, end: number) => Promise.resolve({ data: [], error: null }),
-        }),
-        is: (column: string, value: any) => ({
-          order: (column: string, options?: { ascending: boolean }) => ({
-            limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-          }),
-        }),
-        ilike: (column: string, value: string) => ({
-          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-        }),
-        or: (conditions: string) => ({
-          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-        }),
-      }),
+      select: (columns?: string) => mockQueryBuilder,
       insert: (data: any) => ({
         select: (columns?: string) => ({
           single: () => Promise.resolve({ data: null, error: null }),

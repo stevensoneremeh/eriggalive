@@ -13,30 +13,30 @@ export const isPreviewMode = () =>
 export function createMockServerClient(): SupabaseClient<Database> {
   console.warn("⚠️ Using mock server client - Supabase environment variables not configured")
 
+  const mockQueryBuilder = {
+    eq: (column: string, value: any) => ({
+      ...mockQueryBuilder,
+      single: () => Promise.resolve({ data: null, error: null }),
+      maybeSingle: () => Promise.resolve({ data: null, error: null }),
+    }),
+    order: (column: string, options?: { ascending: boolean }) => ({
+      ...mockQueryBuilder,
+      limit: (limit: number) => Promise.resolve({ data: [], error: null }),
+      range: (start: number, end: number) => Promise.resolve({ data: [], error: null }),
+    }),
+    limit: (limit: number) => Promise.resolve({ data: [], error: null }),
+    range: (start: number, end: number) => Promise.resolve({ data: [], error: null }),
+    is: (column: string, value: any) => mockQueryBuilder,
+    ilike: (column: string, value: string) => mockQueryBuilder,
+    or: (conditions: string) => mockQueryBuilder,
+    single: () => Promise.resolve({ data: null, error: null }),
+    maybeSingle: () => Promise.resolve({ data: null, error: null }),
+  }
+
   // @ts-expect-error – minimal mock implementation for server-side operations
   return {
     from: (table: string) => ({
-      select: (columns?: string) => ({
-        eq: (column: string, value: any) => ({
-          single: () => Promise.resolve({ data: null, error: null }),
-          maybeSingle: () => Promise.resolve({ data: null, error: null }),
-        }),
-        order: (column: string, options?: { ascending: boolean }) => ({
-          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-          range: (start: number, end: number) => Promise.resolve({ data: [], error: null }),
-        }),
-        is: (column: string, value: any) => ({
-          order: (column: string, options?: { ascending: boolean }) => ({
-            limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-          }),
-        }),
-        ilike: (column: string, value: string) => ({
-          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-        }),
-        or: (conditions: string) => ({
-          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-        }),
-      }),
+      select: (columns?: string) => mockQueryBuilder,
       insert: (data: any) => ({
         select: (columns?: string) => ({
           single: () => Promise.resolve({ data: null, error: null }),
@@ -54,19 +54,6 @@ export function createMockServerClient(): SupabaseClient<Database> {
         eq: (column: string, value: any) => Promise.resolve({ data: null, error: null }),
         in: (column: string, values: any[]) => Promise.resolve({ error: null }),
       }),
-      eq: function (column: string, value: any) {
-        return this
-      },
-      single: () => Promise.resolve({ data: null, error: null }),
-      order: function (column: string, options?: { ascending: boolean }) {
-        return this
-      },
-      limit: function (limit: number) {
-        return this
-      },
-      range: function (start: number, end: number) {
-        return this
-      },
     }),
     auth: {
       getUser: async () => ({ data: { user: null }, error: null }),
