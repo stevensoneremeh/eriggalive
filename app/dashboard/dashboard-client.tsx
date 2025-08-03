@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Users, MessageSquare, Heart, Coins, Trophy, Music, Calendar, Crown } from "lucide-react"
+import { Users, MessageSquare, Heart, Coins, Trophy, Music, Calendar, Crown, TrendingUp } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 
@@ -122,7 +122,7 @@ export function DashboardClient() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center pt-20">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
       </div>
     )
@@ -130,7 +130,7 @@ export function DashboardClient() {
 
   if (!user || !profile) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center pt-20">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
           <p className="text-muted-foreground mb-4">Please log in to access your dashboard.</p>
@@ -143,7 +143,11 @@ export function DashboardClient() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 pt-20 pb-8">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 pt-20 pb-8"
+    >
       <div className="container mx-auto px-4">
         <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-8">
           {/* Welcome Header */}
@@ -207,61 +211,69 @@ export function DashboardClient() {
               ))
             ) : (
               <>
-                <Card className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-center space-x-2">
-                      <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                        <MessageSquare className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                <motion.div whileHover={{ scale: 1.02 }}>
+                  <Card className="hover:shadow-lg transition-shadow">
+                    <CardContent className="p-6">
+                      <div className="flex items-center space-x-2">
+                        <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                          <MessageSquare className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Posts</p>
+                          <p className="text-2xl font-bold">{stats?.totalPosts || 0}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Posts</p>
-                        <p className="text-2xl font-bold">{stats?.totalPosts || 0}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </motion.div>
 
-                <Card className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-center space-x-2">
-                      <div className="p-2 bg-red-100 dark:bg-red-900 rounded-lg">
-                        <Heart className="h-6 w-6 text-red-600 dark:text-red-400" />
+                <motion.div whileHover={{ scale: 1.02 }}>
+                  <Card className="hover:shadow-lg transition-shadow">
+                    <CardContent className="p-6">
+                      <div className="flex items-center space-x-2">
+                        <div className="p-2 bg-red-100 dark:bg-red-900 rounded-lg">
+                          <Heart className="h-6 w-6 text-red-600 dark:text-red-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Likes Given</p>
+                          <p className="text-2xl font-bold">{stats?.totalLikes || 0}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Likes Given</p>
-                        <p className="text-2xl font-bold">{stats?.totalLikes || 0}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </motion.div>
 
-                <Card className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-center space-x-2">
-                      <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-                        <MessageSquare className="h-6 w-6 text-green-600 dark:text-green-400" />
+                <motion.div whileHover={{ scale: 1.02 }}>
+                  <Card className="hover:shadow-lg transition-shadow">
+                    <CardContent className="p-6">
+                      <div className="flex items-center space-x-2">
+                        <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                          <MessageSquare className="h-6 w-6 text-green-600 dark:text-green-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Comments</p>
+                          <p className="text-2xl font-bold">{stats?.totalComments || 0}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Comments</p>
-                        <p className="text-2xl font-bold">{stats?.totalComments || 0}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </motion.div>
 
-                <Card className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-center space-x-2">
-                      <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-                        <Music className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                <motion.div whileHover={{ scale: 1.02 }}>
+                  <Card className="hover:shadow-lg transition-shadow">
+                    <CardContent className="p-6">
+                      <div className="flex items-center space-x-2">
+                        <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
+                          <Music className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Vault Access</p>
+                          <p className="text-2xl font-bold">Level {stats?.vaultAccess || 1}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Vault Access</p>
-                        <p className="text-2xl font-bold">Level {stats?.vaultAccess || 1}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </motion.div>
               </>
             )}
           </motion.div>
@@ -275,30 +287,38 @@ export function DashboardClient() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Link href="/community">
-                    <Button variant="outline" className="w-full h-20 flex flex-col space-y-2 bg-transparent">
-                      <Users className="h-6 w-6" />
-                      <span>Community</span>
-                    </Button>
-                  </Link>
-                  <Link href="/chat">
-                    <Button variant="outline" className="w-full h-20 flex flex-col space-y-2 bg-transparent">
-                      <MessageSquare className="h-6 w-6" />
-                      <span>Chat</span>
-                    </Button>
-                  </Link>
-                  <Link href="/vault">
-                    <Button variant="outline" className="w-full h-20 flex flex-col space-y-2 bg-transparent">
-                      <Music className="h-6 w-6" />
-                      <span>Vault</span>
-                    </Button>
-                  </Link>
-                  <Link href="/tickets">
-                    <Button variant="outline" className="w-full h-20 flex flex-col space-y-2 bg-transparent">
-                      <Calendar className="h-6 w-6" />
-                      <span>Tickets</span>
-                    </Button>
-                  </Link>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Link href="/community">
+                      <Button variant="outline" className="w-full h-20 flex flex-col space-y-2 bg-transparent">
+                        <Users className="h-6 w-6" />
+                        <span>Community</span>
+                      </Button>
+                    </Link>
+                  </motion.div>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Link href="/chat">
+                      <Button variant="outline" className="w-full h-20 flex flex-col space-y-2 bg-transparent">
+                        <MessageSquare className="h-6 w-6" />
+                        <span>Chat</span>
+                      </Button>
+                    </Link>
+                  </motion.div>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Link href="/vault">
+                      <Button variant="outline" className="w-full h-20 flex flex-col space-y-2 bg-transparent">
+                        <Music className="h-6 w-6" />
+                        <span>Vault</span>
+                      </Button>
+                    </Link>
+                  </motion.div>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Link href="/tickets">
+                      <Button variant="outline" className="w-full h-20 flex flex-col space-y-2 bg-transparent">
+                        <Calendar className="h-6 w-6" />
+                        <span>Tickets</span>
+                      </Button>
+                    </Link>
+                  </motion.div>
                 </div>
               </CardContent>
             </Card>
@@ -308,7 +328,10 @@ export function DashboardClient() {
           <motion.div variants={cardVariants}>
             <Card>
               <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
+                <CardTitle className="flex items-center space-x-2">
+                  <TrendingUp className="h-5 w-5" />
+                  <span>Recent Activity</span>
+                </CardTitle>
                 <CardDescription>Your latest posts and interactions</CardDescription>
               </CardHeader>
               <CardContent>
@@ -327,7 +350,13 @@ export function DashboardClient() {
                 ) : stats?.recentActivity && stats.recentActivity.length > 0 ? (
                   <div className="space-y-4">
                     {stats.recentActivity.map((activity, index) => (
-                      <div key={activity.id} className="flex items-start space-x-4 p-4 bg-muted/50 rounded-lg">
+                      <motion.div
+                        key={activity.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className="flex items-start space-x-4 p-4 bg-muted/50 rounded-lg"
+                      >
                         <div className="p-2 bg-primary/10 rounded-lg">
                           <MessageSquare className="h-4 w-4 text-primary" />
                         </div>
@@ -347,7 +376,7 @@ export function DashboardClient() {
                             </span>
                           </div>
                         </div>
-                      </div>
+                      </motion.div>
                     ))}
                   </div>
                 ) : (
@@ -364,6 +393,6 @@ export function DashboardClient() {
           </motion.div>
         </motion.div>
       </div>
-    </div>
+    </motion.div>
   )
 }

@@ -25,14 +25,15 @@ interface AuthContextType {
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   updateProfile: (updates: Partial<Profile>) => Promise<void>
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 // Protected routes that require authentication
-const PROTECTED_ROUTES = ["/dashboard", "/community", "/chat", "/tickets", "/vault", "/coins", "/profile"]
+const PROTECTED_ROUTES = ["/dashboard", "/community", "/chat", "/tickets", "/vault", "/coins", "/settings"]
 // Auth routes that authenticated users shouldn't access
-const AUTH_ROUTES = ["/login", "/signup"]
+const AUTH_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password"]
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -125,6 +126,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Error updating profile:", error)
       toast.error("Failed to update profile")
+    }
+  }
+
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: "An unexpected error occurred" }
     }
   }
 
@@ -284,6 +301,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
     refreshProfile,
     updateProfile,
+    resetPassword,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

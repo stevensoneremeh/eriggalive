@@ -34,7 +34,7 @@ export function createMockServerClient(): SupabaseClient<Database> {
     maybeSingle: () => Promise.resolve({ data: null, error: null }),
   }
 
-  // @ts-expect-error – minimal mock implementation for server-side operations
+  // @ts-expect-error - minimal mock implementation for server-side operations
   return {
     from: (table: string) => ({
       select: (columns?: string) => mockQueryBuilder,

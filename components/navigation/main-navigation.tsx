@@ -22,7 +22,6 @@ import {
   Music,
   Coins,
   MessageCircle,
-  User,
   Settings,
   LogOut,
   Crown,
@@ -33,25 +32,30 @@ import {
   Ticket,
   Info,
   X,
+  LayoutDashboard,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
-const navigationItems = [
+const publicNavigationItems = [
   { name: "Home", href: "/", icon: Home },
+  { name: "About", href: "/about", icon: Info },
   { name: "Mission", href: "/mission", icon: Target },
+]
+
+const authenticatedNavigationItems = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Community", href: "/community", icon: Users },
+  { name: "Chat", href: "/chat", icon: MessageCircle },
   { name: "Vault", href: "/vault", icon: Music },
   { name: "Coins", href: "/coins", icon: Coins },
-  { name: "Chat", href: "/chat", icon: MessageCircle },
+  { name: "Tickets", href: "/tickets", icon: Ticket },
   { name: "Meet & Greet", href: "/meet-and-greet", icon: Phone },
   { name: "Merch", href: "/merch", icon: ShoppingBag },
   { name: "Chronicles", href: "/chronicles", icon: Calendar },
   { name: "Radio", href: "/rooms/freebies", icon: Radio },
-  { name: "Tickets", href: "/tickets", icon: Ticket },
-  { name: "About", href: "/about", icon: Info },
 ]
 
 const navVariants = {
@@ -112,7 +116,7 @@ const mobileMenuVariants = {
 }
 
 export function MainNavigation() {
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, signOut, isAuthenticated } = useAuth()
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -144,6 +148,8 @@ export function MainNavigation() {
         return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
     }
   }
+
+  const navigationItems = isAuthenticated ? authenticatedNavigationItems : publicNavigationItems
 
   if (!mounted) {
     return (
@@ -208,7 +214,7 @@ export function MainNavigation() {
 
           {/* User Menu / Auth Buttons */}
           <div className="flex items-center space-x-4">
-            {user ? (
+            {isAuthenticated ? (
               <div className="flex items-center space-x-3">
                 {/* Coins Display */}
                 {profile?.coins !== undefined && (
@@ -252,7 +258,7 @@ export function MainNavigation() {
                     >
                       <div className="flex flex-col space-y-1 leading-none">
                         <p className="font-medium">{profile?.full_name || profile?.username || "User"}</p>
-                        <p className="w-[200px] truncate text-sm text-muted-foreground">{user.email}</p>
+                        <p className="w-[200px] truncate text-sm text-muted-foreground">{user?.email}</p>
                         {profile?.tier && (
                           <Badge className={`w-fit text-xs ${getTierColor(profile.tier)}`}>
                             <Crown className="w-3 h-3 mr-1" />
@@ -264,12 +270,12 @@ export function MainNavigation() {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
                       <Link href="/dashboard" className="flex items-center">
-                        <User className="mr-2 h-4 w-4" />
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
                         <span>Dashboard</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/profile" className="flex items-center">
+                      <Link href="/settings" className="flex items-center">
                         <Settings className="mr-2 h-4 w-4" />
                         <span>Settings</span>
                       </Link>
@@ -327,7 +333,7 @@ export function MainNavigation() {
 
                       <div className="flex flex-col space-y-4 mt-4 px-4">
                         {/* User Info in Mobile */}
-                        {user && (
+                        {isAuthenticated && (
                           <motion.div
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
@@ -348,7 +354,7 @@ export function MainNavigation() {
                             </Avatar>
                             <div className="flex flex-col">
                               <p className="font-medium">{profile?.full_name || profile?.username || "User"}</p>
-                              <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                              <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
                               {profile?.tier && (
                                 <Badge className={`w-fit text-xs mt-1 ${getTierColor(profile.tier)}`}>
                                   <Crown className="w-3 h-3 mr-1" />
@@ -390,16 +396,10 @@ export function MainNavigation() {
 
                         {/* Auth Buttons for Mobile */}
                         <div className="space-y-2 pt-4 border-t">
-                          {user ? (
+                          {isAuthenticated ? (
                             <>
                               <Button asChild variant="outline" className="w-full justify-start bg-transparent">
-                                <Link href="/dashboard" onClick={() => setIsOpen(false)}>
-                                  <User className="mr-2 h-4 w-4" />
-                                  Dashboard
-                                </Link>
-                              </Button>
-                              <Button asChild variant="outline" className="w-full justify-start bg-transparent">
-                                <Link href="/profile" onClick={() => setIsOpen(false)}>
+                                <Link href="/settings" onClick={() => setIsOpen(false)}>
                                   <Settings className="mr-2 h-4 w-4" />
                                   Settings
                                 </Link>

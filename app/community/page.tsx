@@ -1,4 +1,5 @@
 "use client"
+import { AuthGuard } from "@/components/auth-guard"
 import { CommunityClient } from "./community-client"
 
 interface Post {
@@ -35,5 +36,9 @@ interface Comment {
 }
 
 export default function CommunityPage() {
-  return <CommunityClient />
+  return (
+    <AuthGuard>
+      <CommunityClient />
+    </AuthGuard>
+  )
 }

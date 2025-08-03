@@ -1,14 +1,10 @@
-"use client"
-import { requireAuth, getAuthenticatedUser } from "@/lib/auth-guard"
+import { AuthGuard } from "@/components/auth-guard"
 import { ChatClient } from "./chat-client"
 
-export default async function ChatPage() {
-  await requireAuth()
-  const authData = await getAuthenticatedUser()
-
-  if (!authData) {
-    return null
-  }
-
-  return <ChatClient initialAuthData={authData} />
+export default function ChatPage() {
+  return (
+    <AuthGuard>
+      <ChatClient />
+    </AuthGuard>
+  )
 }

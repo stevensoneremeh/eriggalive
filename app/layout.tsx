@@ -4,7 +4,6 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/contexts/auth-context"
-import { SafeThemeProvider } from "@/contexts/theme-context"
 import { MainNavigation } from "@/components/navigation/main-navigation"
 import { Toaster } from "@/components/ui/sonner"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -16,7 +15,9 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Erigga Live - Official Fan Platform",
   description: "The official fan platform for Erigga - Music, Community, and Exclusive Content",
-  generator: "v0.dev",
+  generator: "Next.js",
+  applicationName: "Erigga Live",
+  keywords: ["Erigga", "Music", "Community", "Nigerian Music", "Hip Hop"],
 }
 
 export default function RootLayout({
@@ -28,24 +29,22 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ErrorBoundary>
-          <SafeThemeProvider>
-            <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-              <AuthProvider>
-                <div className="min-h-screen bg-background">
-                  {/* Main Navigation with Framer Motion */}
-                  <Suspense fallback={<SimpleLoading />}>
-                    <MainNavigation />
-                  </Suspense>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+            <AuthProvider>
+              <div className="min-h-screen bg-background">
+                {/* Main Navigation with Framer Motion */}
+                <Suspense fallback={<SimpleLoading />}>
+                  <MainNavigation />
+                </Suspense>
 
-                  {/* Main Content */}
-                  <main>
-                    <Suspense fallback={<SimpleLoading />}>{children}</Suspense>
-                  </main>
-                </div>
-                <Toaster />
-              </AuthProvider>
-            </ThemeProvider>
-          </SafeThemeProvider>
+                {/* Main Content */}
+                <main>
+                  <Suspense fallback={<SimpleLoading />}>{children}</Suspense>
+                </main>
+              </div>
+              <Toaster />
+            </AuthProvider>
+          </ThemeProvider>
         </ErrorBoundary>
       </body>
     </html>
