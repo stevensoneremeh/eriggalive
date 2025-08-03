@@ -40,11 +40,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const createUserProfile = async (authUser: User, userData?: { username: string; full_name: string }) => {
     try {
       // Check if profile already exists
-      const { data: existingProfile } = await supabase
+      const { data: existingProfile, error: fetchError } = await supabase
         .from("users")
         .select("*")
         .eq("auth_user_id", authUser.id)
-        .single()
+        .maybeSingle()
+
+      if (fetchError && fetchError.code !== "PGRST116") {
+        console.error("Error checking existing profile:", fetchError)
+      }
 
       if (existingProfile) {
         return existingProfile
@@ -76,34 +80,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error("Error creating user profile:", error)
-        // If table doesn't exist, return a basic profile structure
-        if (error.code === "42P01") {
-          return {
-            id: 1,
-            auth_user_id: authUser.id,
-            username: userData?.username || "user",
-            full_name: userData?.full_name || null,
-            email: authUser.email!,
-            tier: "grassroot" as const,
-            coins: 100,
-            level: 1,
-            points: 0,
-            avatar_url: null,
-            is_verified: false,
-            is_active: true,
-            is_banned: false,
-            role: "user" as const,
-            login_count: 1,
-            email_verified: true,
-            phone_verified: false,
-            two_factor_enabled: false,
-            preferences: {},
-            metadata: {},
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }
-        }
-        return null
+        // Return a basic profile structure if database insert fails
+        return {
+          id: Date.now(), // temporary ID
+          auth_user_id: authUser.id,
+          username: userData?.username || "user",
+          full_name: userData?.full_name || null,
+          email: authUser.email!,
+          tier: "grassroot" as const,
+          coins: 100,
+          level: 1,
+          points: 0,
+          avatar_url: null,
+          is_verified: false,
+          is_active: true,
+          is_banned: false,
+          role: "user" as const,
+          login_count: 1,
+          email_verified: true,
+          phone_verified: false,
+          two_factor_enabled: false,
+          preferences: {},
+          metadata: {},
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as UserProfile
       }
 
       return data
@@ -122,10 +123,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (fetchError) {
         console.error("Error fetching profiles:", fetchError)
-        // If table doesn't exist, return null
-        if (fetchError.code === "42P01") {
-          return null
-        }
         return null
       }
 

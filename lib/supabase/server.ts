@@ -11,25 +11,60 @@ export const isPreviewMode = () =>
   process.env.NEXT_PUBLIC_VERCEL_ENV === "preview"
 
 export function createMockServerClient(): SupabaseClient<Database> {
-  // @ts-expect-error – minimal mock implementation
+  console.warn("⚠️ Using mock server client - Supabase environment variables not configured")
+
+  // @ts-expect-error – minimal mock implementation for server-side operations
   return {
     from: (table: string) => ({
-      select: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
-      insert: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-      upsert: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
-      update: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
-      delete: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-      eq: function () {
+      select: (columns?: string) => ({
+        eq: (column: string, value: any) => ({
+          single: () => Promise.resolve({ data: null, error: null }),
+          maybeSingle: () => Promise.resolve({ data: null, error: null }),
+        }),
+        order: (column: string, options?: { ascending: boolean }) => ({
+          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
+          range: (start: number, end: number) => Promise.resolve({ data: [], error: null }),
+        }),
+        is: (column: string, value: any) => ({
+          order: (column: string, options?: { ascending: boolean }) => ({
+            limit: (limit: number) => Promise.resolve({ data: [], error: null }),
+          }),
+        }),
+        ilike: (column: string, value: string) => ({
+          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
+        }),
+        or: (conditions: string) => ({
+          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
+        }),
+      }),
+      insert: (data: any) => ({
+        select: (columns?: string) => ({
+          single: () => Promise.resolve({ data: null, error: null }),
+        }),
+      }),
+      upsert: (data: any) => Promise.resolve({ data: [], error: null }),
+      update: (data: any) => ({
+        eq: (column: string, value: any) => ({
+          select: (columns?: string) => ({
+            single: () => Promise.resolve({ data: null, error: null }),
+          }),
+        }),
+      }),
+      delete: () => ({
+        eq: (column: string, value: any) => Promise.resolve({ data: null, error: null }),
+        in: (column: string, values: any[]) => Promise.resolve({ error: null }),
+      }),
+      eq: function (column: string, value: any) {
         return this
       },
-      single: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-      order: function () {
+      single: () => Promise.resolve({ data: null, error: null }),
+      order: function (column: string, options?: { ascending: boolean }) {
         return this
       },
-      limit: function () {
+      limit: function (limit: number) {
         return this
       },
-      range: function () {
+      range: function (start: number, end: number) {
         return this
       },
     }),
@@ -37,11 +72,11 @@ export function createMockServerClient(): SupabaseClient<Database> {
       getUser: async () => ({ data: { user: null }, error: null }),
       getSession: async () => ({ data: { session: null }, error: null }),
     },
-    rpc: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+    rpc: (functionName: string, params: any) => Promise.resolve({ data: null, error: null }),
     storage: {
-      from: () => ({
-        upload: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-        getPublicUrl: () => ({ data: { publicUrl: "" } }),
+      from: (bucket: string) => ({
+        upload: (path: string, file: any) => Promise.resolve({ data: null, error: null }),
+        getPublicUrl: (path: string) => ({ data: { publicUrl: "" } }),
       }),
     },
   }
@@ -49,7 +84,6 @@ export function createMockServerClient(): SupabaseClient<Database> {
 
 export function createServerSupabaseClient() {
   if (isPreviewMode()) {
-    console.warn("⚠️ Using mock server Supabase client - environment variables not configured")
     return createMockServerClient()
   }
 

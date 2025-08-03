@@ -3,14 +3,9 @@ import type { Database } from "@/types/database"
 
 const isBrowser = typeof window !== "undefined"
 
-const isPreviewMode =
-  isBrowser &&
-  (window.location.hostname.includes("vusercontent.net") ||
-    window.location.hostname.includes("v0.dev") ||
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-
 const createMockClient = () => {
+  console.warn("⚠️ Using mock client - Supabase environment variables not configured")
+
   return {
     auth: {
       getSession: () => Promise.resolve({ data: { session: null }, error: null }),
@@ -42,33 +37,63 @@ const createMockClient = () => {
         }
       },
     },
-    from: () => ({
-      select: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
-      insert: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-      update: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-      delete: () => Promise.resolve({ error: { message: "Supabase not configured" } }),
+    from: (table: string) => ({
+      select: (columns?: string) => ({
+        eq: (column: string, value: any) => ({
+          single: () => Promise.resolve({ data: null, error: null }),
+          maybeSingle: () => Promise.resolve({ data: null, error: null }),
+        }),
+        order: (column: string, options?: { ascending: boolean }) => ({
+          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
+          range: (start: number, end: number) => Promise.resolve({ data: [], error: null }),
+        }),
+        is: (column: string, value: any) => ({
+          order: (column: string, options?: { ascending: boolean }) => ({
+            limit: (limit: number) => Promise.resolve({ data: [], error: null }),
+          }),
+        }),
+        ilike: (column: string, value: string) => ({
+          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
+        }),
+        or: (conditions: string) => ({
+          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
+        }),
+      }),
+      insert: (data: any) => ({
+        select: (columns?: string) => ({
+          single: () => Promise.resolve({ data: null, error: null }),
+        }),
+      }),
+      update: (data: any) => ({
+        eq: (column: string, value: any) => ({
+          select: (columns?: string) => ({
+            single: () => Promise.resolve({ data: null, error: null }),
+          }),
+        }),
+      }),
+      delete: () => ({
+        eq: (column: string, value: any) => Promise.resolve({ error: null }),
+        in: (column: string, values: any[]) => Promise.resolve({ error: null }),
+      }),
     }),
     storage: {
-      from: () => ({
-        upload: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-        getPublicUrl: () => ({ data: { publicUrl: "" } }),
+      from: (bucket: string) => ({
+        upload: (path: string, file: File) => Promise.resolve({ data: null, error: null }),
+        getPublicUrl: (path: string) => ({ data: { publicUrl: "" } }),
       }),
     },
-    rpc: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+    rpc: (functionName: string, params: any) => Promise.resolve({ data: null, error: null }),
   } as any
 }
 
 export function createClient() {
-  if (isPreviewMode) {
-    console.warn("⚠️ Using mock client - Supabase environment variables not configured")
-    return createMockClient()
-  }
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn("Missing Supabase environment variables, using mock client")
+    if (isBrowser) {
+      console.warn("Missing Supabase environment variables, using mock client")
+    }
     return createMockClient()
   }
 
