@@ -601,5 +601,3 @@ export function ProfileClient({ initialAuthData }: ProfileClientProps) {
     </div>
   )
 }
-
-
