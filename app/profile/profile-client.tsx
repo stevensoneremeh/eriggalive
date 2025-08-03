@@ -82,6 +82,7 @@ export function ProfileClient({ initialAuthData }: ProfileClientProps) {
         phone: formData.phone,
         date_of_birth: formData.date_of_birth,
       })
+
       setIsEditing(false)
     } catch (error) {
       console.error("Profile update error:", error)
@@ -264,6 +265,7 @@ export function ProfileClient({ initialAuthData }: ProfileClientProps) {
                   </div>
                 </div>
 
+                {/* Action Button */}
                 <Button
                   onClick={() => setIsEditing(!isEditing)}
                   className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
@@ -274,9 +276,8 @@ export function ProfileClient({ initialAuthData }: ProfileClientProps) {
               </div>
             </div>
           </CardContent>
-        </Card>
-
-        {/* Tabs Section */}
+        </Card>  
+      {/* Profile Content */}
         <Tabs defaultValue="details" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="details">Profile Details</TabsTrigger>
@@ -284,22 +285,321 @@ export function ProfileClient({ initialAuthData }: ProfileClientProps) {
             <TabsTrigger value="activity">Activity</TabsTrigger>
           </TabsList>
 
-          {/* Details Tab */}
+          {/* Profile Details Tab */}
           <TabsContent value="details">
-            {/** ... Full details form exactly as you sent ... */}
+            <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle>Personal Information</CardTitle>
+                <CardDescription>
+                  {isEditing
+                    ? "Update your personal information below."
+                    : "Your personal information and contact details."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {isEditing ? (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="full_name">Full Name</Label>
+                        <Input
+                          id="full_name"
+                          value={formData.full_name}
+                          onChange={(e) => handleInputChange("full_name", e.target.value)}
+                          placeholder="Your full name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="username">Username</Label>
+                        <Input
+                          id="username"
+                          value={formData.username}
+                          onChange={(e) => handleInputChange("username", e.target.value)}
+                          placeholder="Your username"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">Phone Number</Label>
+                        <Input
+                          id="phone"
+                          value={formData.phone}
+                          onChange={(e) => handleInputChange("phone", e.target.value)}
+                          placeholder="+234 xxx xxx xxxx"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="location">Location</Label>
+                        <Input
+                          id="location"
+                          value={formData.location}
+                          onChange={(e) => handleInputChange("location", e.target.value)}
+                          placeholder="Your location"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="website">Website</Label>
+                        <Input
+                          id="website"
+                          value={formData.website}
+                          onChange={(e) => handleInputChange("website", e.target.value)}
+                          placeholder="https://yourwebsite.com"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="date_of_birth">Date of Birth</Label>
+                        <Input
+                          id="date_of_birth"
+                          type="date"
+                          value={formData.date_of_birth}
+                          onChange={(e) => handleInputChange("date_of_birth", e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bio">Bio</Label>
+                      <Textarea
+                        id="bio"
+                        value={formData.bio}
+                        onChange={(e) => handleInputChange("bio", e.target.value)}
+                        placeholder="Tell us about yourself..."
+                        rows={4}
+                      />
+                    </div>
+                    <div className="flex space-x-4">
+                      <Button onClick={handleSaveProfile} disabled={loading}>
+                        <Save className="w-4 h-4 mr-2" />
+                        {loading ? "Saving..." : "Save Changes"}
+                      </Button>
+                      <Button variant="outline" onClick={() => setIsEditing(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div className="flex items-center space-x-3">
+                          <Mail className="w-5 h-5 text-gray-400" />
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
+                            <p className="font-medium">{initialAuthData.user?.email}</p>
+                          </div>
+                        </div>
+                        {currentProfile?.phone && (
+                          <div className="flex items-center space-x-3">
+                            <Phone className="w-5 h-5 text-gray-400" />
+                            <div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Phone</p>
+                              <p className="font-medium">{currentProfile.phone}</p>
+                            </div>
+                          </div>
+                        )}
+                        {currentProfile?.location && (
+                          <div className="flex items-center space-x-3">
+                            <MapPin className="w-5 h-5 text-gray-400" />
+                            <div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Location</p>
+                              <p className="font-medium">{currentProfile.location}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-4">
+                        {currentProfile?.website && (
+                          <div className="flex items-center space-x-3">
+                            <LinkIcon className="w-5 h-5 text-gray-400" />
+                            <div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Website</p>
+                              <a
+                                href={currentProfile.website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-blue-600 hover:text-blue-800"
+                              >
+                                {currentProfile.website}
+                              </a>
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex items-center space-x-3">
+                          <Calendar className="w-5 h-5 text-gray-400" />
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Member since</p>
+                            <p className="font-medium">
+                              {new Date(currentProfile?.created_at || Date.now()).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        {currentProfile?.date_of_birth && (
+                          <div className="flex items-center space-x-3">
+                            <Calendar className="w-5 h-5 text-gray-400" />
+                            <div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Date of Birth</p>
+                              <p className="font-medium">
+                                {new Date(currentProfile.date_of_birth).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Progress Tab */}
           <TabsContent value="progress">
-            {/** ... Progress content exactly as you sent ... */}
+            <div className="space-y-6">
+              {/* Tier Progress */}
+              <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Crown className="w-5 h-5 mr-2" />
+                    Tier Progress
+                  </CardTitle>
+                  <CardDescription>Your journey through the Erigga Live community tiers</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    <div className="text-center">
+                      <div className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+                        {currentProfile?.tier?.replace("_", " ").toUpperCase() || "GRASSROOT"}
+                      </div>
+                      <p className="text-gray-600 dark:text-gray-400">Current Tier</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Progress to next tier</span>
+                        <span className="text-sm text-gray-500">
+                          {getTierProgress(currentProfile?.tier || "grassroot")}%
+                        </span>
+                      </div>
+                      <Progress value={getTierProgress(currentProfile?.tier || "grassroot")} className="h-3" />
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <div
+                          className={`w-4 h-4 rounded-full mx-auto mb-2 ${
+                            getTierProgress(currentProfile?.tier || "grassroot") >= 25 ? "bg-green-500" : "bg-gray-300"
+                          }`}
+                        />
+                        <p className="text-sm font-medium">Grassroot</p>
+                        <p className="text-xs text-gray-500">Entry Level</p>
+                      </div>
+                      <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                        <div
+                          className={`w-4 h-4 rounded-full mx-auto mb-2 ${
+                            getTierProgress(currentProfile?.tier || "grassroot") >= 50 ? "bg-purple-500" : "bg-gray-300"
+                          }`}
+                        />
+                        <p className="text-sm font-medium">Pioneer</p>
+                        <p className="text-xs text-gray-500">Active Member</p>
+                      </div>
+                      <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <div
+                          className={`w-4 h-4 rounded-full mx-auto mb-2 ${
+                            getTierProgress(currentProfile?.tier || "grassroot") >= 75 ? "bg-blue-500" : "bg-gray-300"
+                          }`}
+                        />
+                        <p className="text-sm font-medium">Elder</p>
+                        <p className="text-xs text-gray-500">Respected</p>
+                      </div>
+                      <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                        <div
+                          className={`w-4 h-4 rounded-full mx-auto mb-2 ${
+                            getTierProgress(currentProfile?.tier || "grassroot") >= 100
+                              ? "bg-yellow-500"
+                              : "bg-gray-300"
+                          }`}
+                        />
+                        <p className="text-sm font-medium">Blood Brotherhood</p>
+                        <p className="text-xs text-gray-500">Elite</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Achievements */}
+              <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Trophy className="w-5 h-5 mr-2" />
+                    Achievements
+                  </CardTitle>
+                  <CardDescription>Your accomplishments in the community</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                      <Trophy className="w-8 h-8 text-yellow-600 mx-auto mb-2" />
+                      <p className="font-medium text-sm">First Login</p>
+                      <p className="text-xs text-gray-500">Welcome to the community!</p>
+                    </div>
+                    <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <MessageCircle className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                      <p className="font-medium text-sm">Community Member</p>
+                      <p className="text-xs text-gray-500">Joined the discussion</p>
+                    </div>
+                    <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <Star className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                      <p className="font-medium text-sm">Active User</p>
+                      <p className="text-xs text-gray-500">Regular participation</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Activity Tab */}
           <TabsContent value="activity">
-            {/** ... Activity list exactly as you sent ... */}
+            <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle>Recent Activity</CardTitle>
+                <CardDescription>Your recent actions and interactions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                    <div className="flex-1">
+                      <p className="font-medium">Profile Updated</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Updated your profile information</p>
+                    </div>
+                    <span className="text-xs text-gray-500">Just now</span>
+                  </div>
+                  <div className="flex items-center space-x-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                    <div className="flex-1">
+                      <p className="font-medium">Joined Community</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Became a member of Erigga Live</p>
+                    </div>
+                    <span className="text-xs text-gray-500">2 hours ago</span>
+                  </div>
+                  <div className="flex items-center space-x-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                    <div className="flex-1">
+                      <p className="font-medium">Earned Coins</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Received {currentProfile?.coins || 100} coins for joining
+                      </p>
+                    </div>
+                    <span className="text-xs text-gray-500">1 day ago</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
     </div>
   )
 }
+
+
