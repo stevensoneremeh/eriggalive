@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Eye, EyeOff, CheckCircle } from "lucide-react"
+import { Loader2, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
@@ -21,11 +21,10 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState("")
-  const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
 
-  const { signUp, isAuthenticated, loading: authLoading } = useAuth()
+  const { signUp, signIn, isAuthenticated, loading: authLoading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -40,7 +39,7 @@ export default function SignupPage() {
 
   const validateForm = () => {
     if (!email || !password || !confirmPassword) {
-      setError("All fields are required")
+      setError("Email, password, and confirm password are required")
       return false
     }
 
@@ -60,7 +59,6 @@ export default function SignupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
-    setSuccess(false)
 
     if (!validateForm()) {
       return
@@ -69,18 +67,29 @@ export default function SignupPage() {
     setLoading(true)
 
     try {
-      const { error } = await signUp(email, password, {
-        full_name: fullName,
+      // Sign up the user
+      const { error: signUpError } = await signUp(email, password, {
+        full_name: fullName || null,
       })
 
-      if (error) {
-        setError(error.message || "Failed to create account")
-      } else {
-        setSuccess(true)
+      if (signUpError) {
+        setError(signUpError.message || "Failed to create account")
+        setLoading(false)
+        return
       }
+
+      // Immediately sign in the user after successful signup
+      const { error: signInError } = await signIn(email, password)
+
+      if (signInError) {
+        setError("Account created but failed to sign in. Please try logging in manually.")
+        setLoading(false)
+        return
+      }
+
+      // Success - user will be redirected by the auth context
     } catch (err) {
       setError("An unexpected error occurred")
-    } finally {
       setLoading(false)
     }
   }
@@ -97,30 +106,6 @@ export default function SignupPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    )
-  }
-
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <CardTitle className="text-2xl font-bold">Check your email</CardTitle>
-            <CardDescription>We've sent you a confirmation link at {email}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Click the link in the email to verify your account and complete the signup process.
-              </p>
-              <Button asChild className="w-full">
-                <Link href="/login">Back to Sign In</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     )
   }

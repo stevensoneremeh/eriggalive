@@ -65,9 +65,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error && error.code === "PGRST116") {
         // Profile doesn't exist, create one
+        const username = userEmail?.split("@")[0] || `user_${Date.now()}`
+
         const newProfile = {
           auth_user_id: userId,
-          username: userEmail?.split("@")[0] || `user_${Date.now()}`,
+          username: username,
           full_name: user?.user_metadata?.full_name || null,
           email: userEmail || "",
           tier: "grassroot" as const,
@@ -78,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           is_verified: false,
           is_active: true,
           is_banned: false,
-          email_verified: !!user?.email_confirmed_at,
+          email_verified: true, // Set to true to skip email verification
           phone_verified: false,
           two_factor_enabled: false,
           login_count: 1,
@@ -94,11 +96,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (!createError && createdProfile) {
           setProfile(createdProfile)
+          console.log("Profile created successfully:", createdProfile)
         } else {
           console.error("Error creating profile:", createError)
         }
       } else if (!error && data) {
         setProfile(data)
+        console.log("Profile fetched successfully:", data)
       } else if (error) {
         console.error("Error fetching profile:", error)
       }
@@ -221,11 +225,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       setLoading(true)
+      // Sign up without email confirmation
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: userData,
+          emailRedirectTo: undefined, // Remove email confirmation
         },
       })
       return { error }
