@@ -1,7 +1,7 @@
--- Disable email verification requirements in Supabase Auth
--- This script configures Supabase to skip email confirmation during signup
+-- Complete script to disable all verification requirements
+-- This adds missing columns and configures immediate access
 
--- First, let's add the missing columns to the users table
+-- First, add all missing columns to the users table
 DO $$ 
 BEGIN
     -- Add email_verified column if it doesn't exist
@@ -12,7 +12,9 @@ BEGIN
         ALTER TABLE public.users ADD COLUMN email_verified boolean DEFAULT true;
         RAISE NOTICE 'Added email_verified column to users table';
     ELSE
-        RAISE NOTICE 'email_verified column already exists';
+        -- Update existing column to default true
+        ALTER TABLE public.users ALTER COLUMN email_verified SET DEFAULT true;
+        RAISE NOTICE 'Updated email_verified column default to true';
     END IF;
 
     -- Add phone_verified column if it doesn't exist
@@ -20,10 +22,12 @@ BEGIN
                    WHERE table_schema = 'public' 
                    AND table_name = 'users' 
                    AND column_name = 'phone_verified') THEN
-        ALTER TABLE public.users ADD COLUMN phone_verified boolean DEFAULT false;
+        ALTER TABLE public.users ADD COLUMN phone_verified boolean DEFAULT true;
         RAISE NOTICE 'Added phone_verified column to users table';
     ELSE
-        RAISE NOTICE 'phone_verified column already exists';
+        -- Update existing column to default true (no verification needed)
+        ALTER TABLE public.users ALTER COLUMN phone_verified SET DEFAULT true;
+        RAISE NOTICE 'Updated phone_verified column default to true';
     END IF;
 
     -- Add two_factor_enabled column if it doesn't exist
@@ -33,8 +37,6 @@ BEGIN
                    AND column_name = 'two_factor_enabled') THEN
         ALTER TABLE public.users ADD COLUMN two_factor_enabled boolean DEFAULT false;
         RAISE NOTICE 'Added two_factor_enabled column to users table';
-    ELSE
-        RAISE NOTICE 'two_factor_enabled column already exists';
     END IF;
 
     -- Add login_count column if it doesn't exist
@@ -42,10 +44,8 @@ BEGIN
                    WHERE table_schema = 'public' 
                    AND table_name = 'users' 
                    AND column_name = 'login_count') THEN
-        ALTER TABLE public.users ADD COLUMN login_count integer DEFAULT 0;
+        ALTER TABLE public.users ADD COLUMN login_count integer DEFAULT 1;
         RAISE NOTICE 'Added login_count column to users table';
-    ELSE
-        RAISE NOTICE 'login_count column already exists';
     END IF;
 
     -- Add preferences column if it doesn't exist
@@ -55,8 +55,6 @@ BEGIN
                    AND column_name = 'preferences') THEN
         ALTER TABLE public.users ADD COLUMN preferences jsonb DEFAULT '{}';
         RAISE NOTICE 'Added preferences column to users table';
-    ELSE
-        RAISE NOTICE 'preferences column already exists';
     END IF;
 
     -- Add metadata column if it doesn't exist
@@ -66,59 +64,66 @@ BEGIN
                    AND column_name = 'metadata') THEN
         ALTER TABLE public.users ADD COLUMN metadata jsonb DEFAULT '{}';
         RAISE NOTICE 'Added metadata column to users table';
-    ELSE
-        RAISE NOTICE 'metadata column already exists';
+    END IF;
+
+    -- Make full_name nullable
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_schema = 'public' 
+               AND table_name = 'users' 
+               AND column_name = 'full_name' 
+               AND is_nullable = 'NO') THEN
+        ALTER TABLE public.users ALTER COLUMN full_name DROP NOT NULL;
+        RAISE NOTICE 'Made full_name column nullable';
     END IF;
 END $$;
 
--- Update existing users to have email_verified = true
-UPDATE public.users 
-SET email_verified = true 
-WHERE email_verified IS NULL OR email_verified = false;
-
--- Update existing users to have default values for new columns
+-- Update all existing users to be verified (no verification needed)
 UPDATE public.users 
 SET 
-    phone_verified = COALESCE(phone_verified, false),
-    two_factor_enabled = COALESCE(two_factor_enabled, false),
-    login_count = COALESCE(login_count, 0),
+    email_verified = true,
+    phone_verified = true,
+    login_count = COALESCE(login_count, 1),
     preferences = COALESCE(preferences, '{}'),
     metadata = COALESCE(metadata, '{}')
-WHERE phone_verified IS NULL 
-   OR two_factor_enabled IS NULL 
+WHERE email_verified IS NULL 
+   OR phone_verified IS NULL 
    OR login_count IS NULL 
    OR preferences IS NULL 
    OR metadata IS NULL;
 
--- Configure Supabase Auth to disable email confirmation
--- Note: These settings may need to be configured in the Supabase dashboard as well
+-- Auto-confirm all auth.users (remove email confirmation requirement)
+UPDATE auth.users 
+SET 
+    email_confirmed_at = COALESCE(email_confirmed_at, NOW()),
+    phone_confirmed_at = COALESCE(phone_confirmed_at, NOW()),
+    confirmed_at = COALESCE(confirmed_at, NOW())
+WHERE email_confirmed_at IS NULL 
+   OR phone_confirmed_at IS NULL 
+   OR confirmed_at IS NULL;
 
--- Create or update auth configuration
-INSERT INTO auth.config (parameter, value) 
-VALUES ('GOTRUE_MAILER_AUTOCONFIRM', 'true')
-ON CONFLICT (parameter) 
-DO UPDATE SET value = 'true';
+-- Create function to auto-confirm new auth users
+CREATE OR REPLACE FUNCTION auth.auto_confirm_user()
+RETURNS trigger AS $$
+BEGIN
+    -- Auto-confirm everything immediately
+    NEW.email_confirmed_at = NOW();
+    NEW.phone_confirmed_at = NOW();
+    NEW.confirmed_at = NOW();
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
-INSERT INTO auth.config (parameter, value) 
-VALUES ('GOTRUE_DISABLE_SIGNUP', 'false')
-ON CONFLICT (parameter) 
-DO UPDATE SET value = 'false';
+-- Create trigger to auto-confirm users on signup
+DROP TRIGGER IF EXISTS auto_confirm_user_trigger ON auth.users;
+CREATE TRIGGER auto_confirm_user_trigger
+    BEFORE INSERT ON auth.users
+    FOR EACH ROW
+    EXECUTE FUNCTION auth.auto_confirm_user();
 
-INSERT INTO auth.config (parameter, value) 
-VALUES ('GOTRUE_EXTERNAL_EMAIL_DISABLED', 'false')
-ON CONFLICT (parameter) 
-DO UPDATE SET value = 'false';
+-- Grant permissions
+GRANT EXECUTE ON FUNCTION auth.auto_confirm_user() TO supabase_auth_admin;
+GRANT EXECUTE ON FUNCTION auth.auto_confirm_user() TO postgres;
 
--- Refresh the schema cache
-NOTIFY pgrst, 'reload schema';
-
--- Display current table structure for verification
-SELECT 
-    column_name, 
-    data_type, 
-    is_nullable, 
-    column_default
-FROM information_schema.columns 
-WHERE table_schema = 'public' 
-  AND table_name = 'users'
-ORDER BY ordinal_position;
+RAISE NOTICE '✅ All verification requirements disabled';
+RAISE NOTICE '✅ Users will have immediate access after signup/signin';

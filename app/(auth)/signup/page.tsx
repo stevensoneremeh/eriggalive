@@ -24,7 +24,7 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
 
-  const { signUp, signIn, isAuthenticated, loading: authLoading } = useAuth()
+  const { signUp, isAuthenticated, loading: authLoading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -32,7 +32,9 @@ export default function SignupPage() {
   }, [])
 
   useEffect(() => {
+    // Redirect authenticated users immediately to dashboard
     if (mounted && isAuthenticated && !authLoading) {
+      console.log("✅ User is authenticated, redirecting to dashboard")
       router.push("/dashboard")
     }
   }, [isAuthenticated, authLoading, mounted, router])
@@ -53,6 +55,12 @@ export default function SignupPage() {
       return false
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email address")
+      return false
+    }
+
     return true
   }
 
@@ -67,29 +75,24 @@ export default function SignupPage() {
     setLoading(true)
 
     try {
-      // Sign up the user
+      console.log("🚀 Starting signup process for:", email)
+
+      // Sign up the user - they will get immediate access
       const { error: signUpError } = await signUp(email, password, {
         full_name: fullName || null,
       })
 
       if (signUpError) {
+        console.error("❌ Signup error:", signUpError)
         setError(signUpError.message || "Failed to create account")
-        setLoading(false)
-        return
+      } else {
+        console.log("✅ Signup successful! User will be redirected to dashboard automatically.")
+        // The auth context will handle the redirect to dashboard
       }
-
-      // Immediately sign in the user after successful signup
-      const { error: signInError } = await signIn(email, password)
-
-      if (signInError) {
-        setError("Account created but failed to sign in. Please try logging in manually.")
-        setLoading(false)
-        return
-      }
-
-      // Success - user will be redirected by the auth context
     } catch (err) {
-      setError("An unexpected error occurred")
+      console.error("❌ Unexpected signup error:", err)
+      setError("An unexpected error occurred. Please try again.")
+    } finally {
       setLoading(false)
     }
   }
@@ -105,7 +108,10 @@ export default function SignupPage() {
   if (isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-sm text-muted-foreground">Redirecting to dashboard...</p>
+        </div>
       </div>
     )
   }
@@ -115,7 +121,9 @@ export default function SignupPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Create account</CardTitle>
-          <CardDescription className="text-center">Enter your information to create your account</CardDescription>
+          <CardDescription className="text-center">
+            Get instant access to your dashboard - no email verification required!
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -156,11 +164,12 @@ export default function SignupPage() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Create a password"
+                  placeholder="Create a password (min 6 characters)"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={loading}
+                  minLength={6}
                 />
                 <Button
                   type="button"
@@ -207,10 +216,17 @@ export default function SignupPage() {
                   Creating account...
                 </>
               ) : (
-                "Create account"
+                "Create account & access dashboard"
               )}
             </Button>
           </form>
+
+          <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-md">
+            <p className="text-sm text-green-700 dark:text-green-300 text-center">
+              🚀 <strong>Instant Access:</strong> No email verification needed! You'll be taken directly to your
+              dashboard.
+            </p>
+          </div>
 
           <div className="mt-6 text-center text-sm">
             Already have an account?{" "}

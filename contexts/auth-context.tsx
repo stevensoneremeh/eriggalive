@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
 
       if (error && error.code === "PGRST116") {
-        // Profile doesn't exist, create one
+        // Profile doesn't exist, create one with all verifications enabled
         const username = userEmail?.split("@")[0] || `user_${Date.now()}`
 
         const newProfile = {
@@ -80,8 +80,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           is_verified: false,
           is_active: true,
           is_banned: false,
-          email_verified: true, // Set to true to skip email verification
-          phone_verified: false,
+          email_verified: true, // Always true - no verification needed
+          phone_verified: true, // Always true - no verification needed
           two_factor_enabled: false,
           login_count: 1,
           preferences: {},
@@ -96,63 +96,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (!createError && createdProfile) {
           setProfile(createdProfile)
-          console.log("Profile created successfully:", createdProfile)
+          console.log("✅ Profile created with immediate access:", createdProfile.username)
         } else {
-          console.error("Error creating profile:", createError)
-          // If creation fails due to missing columns, create a minimal profile
-          if (createError?.message?.includes("column") && createError?.message?.includes("does not exist")) {
-            console.log("Attempting to create minimal profile due to missing columns...")
-            const minimalProfile = {
-              auth_user_id: userId,
-              username: username,
-              full_name: user?.user_metadata?.full_name || null,
-              email: userEmail || "",
-            }
-            
-            const { data: minimalCreated, error: minimalError } = await supabase
-              .from("users")
-              .insert(minimalProfile)
-              .select()
-              .single()
-              
-            if (!minimalError && minimalCreated) {
-              setProfile(minimalCreated)
-              console.log("Minimal profile created successfully:", minimalCreated)
-            }
+          console.error("❌ Error creating profile:", createError)
+
+          // Fallback: try creating with minimal required fields
+          const minimalProfile = {
+            auth_user_id: userId,
+            username: username,
+            email: userEmail || "",
+            full_name: user?.user_metadata?.full_name || null,
           }
-        }
-      } else if (!error && data) {
-        setProfile(data)
-        console.log("Profile fetched successfully:", data)
-      } else if (error) {
-        console.error("Error fetching profile:", error)
-        // If error is due to missing columns, still try to fetch basic profile
-        if (error.message?.includes("column") && error.message?.includes("does not exist")) {
-          console.log("Attempting to fetch basic profile due to missing columns...")
-          const { data: basicData, error: basicError } = await supabase
+
+          const { data: fallbackProfile, error: fallbackError } = await supabase
             .from("users")
-            .select("id, auth_user_id, username, full_name, email, tier, role, level, points, coins, is_verified, is_active, is_banned, created_at, updated_at")
-            .eq("auth_user_id", userId)
+            .insert(minimalProfile)
+            .select()
             .single()
-            
-          if (!basicError && basicData) {
+
+          if (!fallbackError && fallbackProfile) {
             // Add default values for missing columns
             const profileWithDefaults = {
-              ...basicData,
+              ...fallbackProfile,
               email_verified: true,
-              phone_verified: false,
+              phone_verified: true,
               two_factor_enabled: false,
               login_count: 1,
               preferences: {},
               metadata: {},
+              tier: "grassroot" as const,
+              role: "user" as const,
+              level: 1,
+              points: 0,
+              coins: 500,
+              is_verified: false,
+              is_active: true,
+              is_banned: false,
             }
             setProfile(profileWithDefaults)
-            console.log("Basic profile fetched with defaults:", profileWithDefaults)
+            console.log("✅ Fallback profile created:", profileWithDefaults.username)
           }
         }
+      } else if (!error && data) {
+        // Ensure existing profiles have verification flags set to true
+        const profileWithVerification = {
+          ...data,
+          email_verified: data.email_verified ?? true,
+          phone_verified: data.phone_verified ?? true,
+          two_factor_enabled: data.two_factor_enabled ?? false,
+          login_count: data.login_count ?? 1,
+          preferences: data.preferences ?? {},
+          metadata: data.metadata ?? {},
+        }
+        setProfile(profileWithVerification)
+        console.log("✅ Profile loaded with immediate access:", profileWithVerification.username)
+      } else if (error) {
+        console.error("❌ Error fetching profile:", error)
       }
     } catch (error) {
-      console.error("Error in fetchProfile:", error)
+      console.error("❌ Unexpected error in fetchProfile:", error)
     }
   }
 
@@ -184,7 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } = await supabase.auth.getSession()
 
         if (error) {
-          console.error("Error getting session:", error)
+          console.error("❌ Error getting session:", error)
         } else {
           setSession(session)
           setUser(session?.user ?? null)
@@ -194,7 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (error) {
-        console.error("Error in getInitialSession:", error)
+        console.error("❌ Error in getInitialSession:", error)
       } finally {
         setLoading(false)
       }
@@ -206,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, session?.user?.email)
+      console.log("🔄 Auth state changed:", event, session?.user?.email)
 
       setSession(session)
       setUser(session?.user ?? null)
@@ -219,16 +221,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setLoading(false)
 
-      // Handle auth events with proper routing
+      // Handle auth events with immediate dashboard access
       if (event === "SIGNED_IN" && session?.user) {
+        console.log("✅ User signed in, redirecting to dashboard")
         const redirectTo = new URLSearchParams(window.location.search).get("redirectTo")
         const targetPath = redirectTo || "/dashboard"
 
-        // Only redirect if we're not already on the target path
+        // Always redirect to dashboard for immediate access
         if (window.location.pathname !== targetPath) {
           router.push(targetPath)
         }
       } else if (event === "SIGNED_OUT") {
+        console.log("👋 User signed out")
         // Only redirect to home if we're on a protected route
         const currentPath = window.location.pathname
         const protectedRoutes = ["/dashboard", "/profile", "/settings", "/community", "/coins", "/vault", "/premium"]
@@ -251,12 +255,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       setLoading(true)
+      console.log("🔐 Attempting to sign in:", email)
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
+
+      if (!error) {
+        console.log("✅ Sign in successful")
+      }
+
       return { error }
     } catch (error) {
+      console.error("❌ Sign in error:", error)
       return { error }
     } finally {
       setLoading(false)
@@ -270,17 +282,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       setLoading(true)
-      // Sign up without email confirmation
+      console.log("📝 Attempting to sign up:", email)
+
+      // Sign up without any email confirmation requirements
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: userData,
-          emailRedirectTo: undefined, // Remove email confirmation
+          emailRedirectTo: undefined, // No email confirmation needed
         },
       })
+
+      if (!error) {
+        console.log("✅ Sign up successful - user will have immediate access")
+      }
+
       return { error }
     } catch (error) {
+      console.error("❌ Sign up error:", error)
       return { error }
     } finally {
       setLoading(false)
@@ -294,10 +314,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       setLoading(true)
+      console.log("👋 Signing out user")
+
       await supabase.auth.signOut()
       setProfile(null)
+
+      console.log("✅ Sign out successful")
     } catch (error) {
-      console.error("Error signing out:", error)
+      console.error("❌ Error signing out:", error)
     } finally {
       setLoading(false)
     }
@@ -309,11 +333,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
+      console.log("🔄 Sending password reset email:", email)
+
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       })
+
+      if (!error) {
+        console.log("✅ Password reset email sent")
+      }
+
       return { error }
     } catch (error) {
+      console.error("❌ Password reset error:", error)
       return { error }
     }
   }
