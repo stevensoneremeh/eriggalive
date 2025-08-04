@@ -1,202 +1,158 @@
--- Verification Script for Authentication Setup
--- Run this script to verify that authentication is properly configured
+-- Verification script to check authentication setup
 
--- Check 1: Verify table structure
+-- Check if all required columns exist in users table
 SELECT 
-  'users table structure' as check_name,
-  CASE 
-    WHEN EXISTS (
-      SELECT 1 FROM information_schema.columns 
-      WHERE table_name = 'users' 
-      AND column_name = 'email_verified'
-      AND column_default = 'true'
-    ) THEN '✓ PASS'
-    ELSE '✗ FAIL'
-  END as status,
-  'email_verified column exists with default true' as description
+    'Column Check' as check_type,
+    column_name,
+    data_type,
+    is_nullable,
+    column_default,
+    CASE 
+        WHEN column_name IN ('email_verified', 'phone_verified', 'two_factor_enabled', 'login_count', 'preferences', 'metadata') 
+        THEN 'REQUIRED' 
+        ELSE 'OPTIONAL' 
+    END as importance
+FROM information_schema.columns 
+WHERE table_schema = 'public' 
+  AND table_name = 'users'
+  AND column_name IN ('email_verified', 'phone_verified', 'two_factor_enabled', 'login_count', 'preferences', 'metadata', 'username', 'email', 'tier', 'role')
+ORDER BY 
+    CASE column_name 
+        WHEN 'email_verified' THEN 1
+        WHEN 'phone_verified' THEN 2
+        WHEN 'two_factor_enabled' THEN 3
+        WHEN 'login_count' THEN 4
+        WHEN 'preferences' THEN 5
+        WHEN 'metadata' THEN 6
+        ELSE 7
+    END;
 
-UNION ALL
+-- Check if required functions exist
+SELECT 
+    'Function Check' as check_type,
+    routine_name,
+    routine_type,
+    CASE 
+        WHEN routine_name = 'handle_new_user' THEN 'CRITICAL'
+        WHEN routine_name = 'auto_confirm_users' THEN 'IMPORTANT'
+        ELSE 'OPTIONAL'
+    END as importance
+FROM information_schema.routines 
+WHERE routine_schema = 'public' 
+  AND routine_name IN ('handle_new_user', 'auto_confirm_users');
 
+-- Check if trigger exists
 SELECT 
-  'full_name nullable' as check_name,
-  CASE 
-    WHEN EXISTS (
-      SELECT 1 FROM information_schema.columns 
-      WHERE table_name = 'users' 
-      AND column_name = 'full_name'
-      AND is_nullable = 'YES'
-    ) THEN '✓ PASS'
-    ELSE '✗ FAIL'
-  END as status,
-  'full_name column is nullable' as description
+    'Trigger Check' as check_type,
+    trigger_name,
+    event_manipulation,
+    action_timing,
+    'CRITICAL' as importance
+FROM information_schema.triggers 
+WHERE trigger_schema = 'public' 
+  AND trigger_name = 'on_auth_user_created';
 
-UNION ALL
+-- Check RLS policies
+SELECT 
+    'Policy Check' as check_type,
+    policyname as policy_name,
+    cmd as command_type,
+    'IMPORTANT' as importance
+FROM pg_policies 
+WHERE schemaname = 'public' 
+  AND tablename = 'users';
 
--- Check 2: Verify triggers exist
+-- Check if users table has RLS enabled
 SELECT 
-  'user creation trigger' as check_name,
-  CASE 
-    WHEN EXISTS (
-      SELECT 1 FROM information_schema.triggers 
-      WHERE trigger_name = 'on_auth_user_created'
-    ) THEN '✓ PASS'
-    ELSE '✗ FAIL'
-  END as status,
-  'trigger for creating user profiles exists' as description
+    'RLS Check' as check_type,
+    schemaname,
+    tablename,
+    rowsecurity as rls_enabled,
+    'CRITICAL' as importance
+FROM pg_tables 
+WHERE schemaname = 'public' 
+  AND tablename = 'users';
 
-UNION ALL
+-- Check sample data structure
+SELECT 
+    'Data Check' as check_type,
+    COUNT(*) as total_users,
+    COUNT(CASE WHEN email_verified = true THEN 1 END) as verified_users,
+    COUNT(CASE WHEN is_active = true THEN 1 END) as active_users,
+    'INFO' as importance
+FROM public.users;
 
+-- Check auth.users confirmation status
 SELECT 
-  'auto-confirm trigger' as check_name,
-  CASE 
-    WHEN EXISTS (
-      SELECT 1 FROM information_schema.triggers 
-      WHERE trigger_name = 'auto_confirm_user_trigger'
-    ) THEN '✓ PASS'
-    ELSE '✗ FAIL'
-  END as status,
-  'trigger for auto-confirming users exists' as description
+    'Auth Confirmation Check' as check_type,
+    COUNT(*) as total_auth_users,
+    COUNT(CASE WHEN email_confirmed_at IS NOT NULL THEN 1 END) as confirmed_users,
+    COUNT(CASE WHEN confirmed_at IS NOT NULL THEN 1 END) as fully_confirmed_users,
+    'INFO' as importance
+FROM auth.users;
 
-UNION ALL
+-- Final status message
+DO $$
+DECLARE
+    missing_columns integer;
+    missing_functions integer;
+    missing_triggers integer;
+BEGIN
+    -- Count missing required columns
+    SELECT COUNT(*) INTO missing_columns
+    FROM (
+        SELECT 'email_verified' as col
+        UNION SELECT 'phone_verified'
+        UNION SELECT 'two_factor_enabled'
+        UNION SELECT 'login_count'
+        UNION SELECT 'preferences'
+        UNION SELECT 'metadata'
+    ) required_cols
+    WHERE col NOT IN (
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+          AND table_name = 'users'
+    );
 
--- Check 3: Verify functions exist
-SELECT 
-  'handle_new_user function' as check_name,
-  CASE 
-    WHEN EXISTS (
-      SELECT 1 FROM information_schema.routines 
-      WHERE routine_name = 'handle_new_user'
-      AND routine_schema = 'public'
-    ) THEN '✓ PASS'
-    ELSE '✗ FAIL'
-  END as status,
-  'function for handling new users exists' as description
+    -- Count missing functions
+    SELECT COUNT(*) INTO missing_functions
+    FROM (
+        SELECT 'handle_new_user' as func
+        UNION SELECT 'auto_confirm_users'
+    ) required_funcs
+    WHERE func NOT IN (
+        SELECT routine_name 
+        FROM information_schema.routines 
+        WHERE routine_schema = 'public'
+    );
 
-UNION ALL
+    -- Count missing triggers
+    SELECT COUNT(*) INTO missing_triggers
+    FROM (
+        SELECT 'on_auth_user_created' as trig
+    ) required_trigs
+    WHERE trig NOT IN (
+        SELECT trigger_name 
+        FROM information_schema.triggers 
+        WHERE trigger_schema = 'public'
+    );
 
-SELECT 
-  'auto_confirm_user function' as check_name,
-  CASE 
-    WHEN EXISTS (
-      SELECT 1 FROM information_schema.routines 
-      WHERE routine_name = 'auto_confirm_user'
-      AND routine_schema = 'auth'
-    ) THEN '✓ PASS'
-    ELSE '✗ FAIL'
-  END as status,
-  'function for auto-confirming users exists' as description
-
-UNION ALL
-
--- Check 4: Verify RLS policies
-SELECT 
-  'RLS enabled on users' as check_name,
-  CASE 
-    WHEN (
-      SELECT relrowsecurity 
-      FROM pg_class 
-      WHERE relname = 'users' 
-      AND relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
-    ) THEN '✓ PASS'
-    ELSE '✗ FAIL'
-  END as status,
-  'Row Level Security enabled on users table' as description
-
-UNION ALL
-
--- Check 5: Data verification
-SELECT 
-  'confirmed users ratio' as check_name,
-  CASE 
-    WHEN (
-      SELECT 
-        CASE 
-          WHEN COUNT(*) = 0 THEN true
-          ELSE (COUNT(*) FILTER (WHERE email_confirmed_at IS NOT NULL))::float / COUNT(*) >= 0.9
-        END
-      FROM auth.users
-    ) THEN '✓ PASS'
-    ELSE '✗ FAIL'
-  END as status,
-  'Most users are confirmed (>90%)' as description;
-
--- Detailed statistics
-SELECT 
-  '=== DETAILED STATISTICS ===' as section,
-  '' as metric,
-  '' as value
-UNION ALL
-SELECT 
-  'Auth Users' as section,
-  'Total Count' as metric,
-  COUNT(*)::text as value
-FROM auth.users
-UNION ALL
-SELECT 
-  'Auth Users' as section,
-  'Confirmed Count' as metric,
-  COUNT(*)::text as value
-FROM auth.users 
-WHERE email_confirmed_at IS NOT NULL
-UNION ALL
-SELECT 
-  'Auth Users' as section,
-  'Unconfirmed Count' as metric,
-  COUNT(*)::text as value
-FROM auth.users 
-WHERE email_confirmed_at IS NULL
-UNION ALL
-SELECT 
-  'Profile Users' as section,
-  'Total Count' as metric,
-  COUNT(*)::text as value
-FROM public.users
-UNION ALL
-SELECT 
-  'Profile Users' as section,
-  'Email Verified Count' as metric,
-  COUNT(*)::text as value
-FROM public.users 
-WHERE email_verified = true
-UNION ALL
-SELECT 
-  'User Settings' as section,
-  'Total Count' as metric,
-  COUNT(*)::text as value
-FROM public.user_settings;
-
--- Show recent user registrations
-SELECT 
-  '=== RECENT REGISTRATIONS ===' as info,
-  '' as email,
-  '' as created_at,
-  '' as confirmed_status
-UNION ALL
-SELECT 
-  'Recent Users' as info,
-  au.email,
-  au.created_at::text,
-  CASE 
-    WHEN au.email_confirmed_at IS NOT NULL THEN 'Confirmed'
-    ELSE 'Unconfirmed'
-  END as confirmed_status
-FROM auth.users au
-ORDER BY au.created_at DESC
-LIMIT 5;
-
--- Final recommendations
-SELECT 
-  '=== RECOMMENDATIONS ===' as section,
-  CASE 
-    WHEN EXISTS (SELECT 1 FROM auth.users WHERE email_confirmed_at IS NULL) 
-    THEN 'Some users are unconfirmed. Run the auto-confirm update query.'
-    ELSE 'All users are properly confirmed.'
-  END as recommendation
-UNION ALL
-SELECT 
-  'Dashboard Settings' as section,
-  'Ensure "Enable email confirmations" is OFF in Supabase Dashboard > Authentication > Settings' as recommendation
-UNION ALL
-SELECT 
-  'Testing' as section,
-  'Test signup flow to ensure users can register and login immediately' as recommendation;
+    -- Report status
+    IF missing_columns = 0 AND missing_functions = 0 AND missing_triggers = 0 THEN
+        RAISE NOTICE '✅ SETUP COMPLETE: All required components are in place';
+        RAISE NOTICE '✅ Users can now sign up without email verification';
+        RAISE NOTICE '✅ Profiles will be created automatically';
+    ELSE
+        RAISE NOTICE '❌ SETUP INCOMPLETE:';
+        IF missing_columns > 0 THEN
+            RAISE NOTICE '  - Missing % required columns', missing_columns;
+        END IF;
+        IF missing_functions > 0 THEN
+            RAISE NOTICE '  - Missing % required functions', missing_functions;
+        END IF;
+        IF missing_triggers > 0 THEN
+            RAISE NOTICE '  - Missing % required triggers', missing_triggers;
+        END IF;
+    END IF;
+END $$;

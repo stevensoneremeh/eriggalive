@@ -99,12 +99,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log("Profile created successfully:", createdProfile)
         } else {
           console.error("Error creating profile:", createError)
+          // If creation fails due to missing columns, create a minimal profile
+          if (createError?.message?.includes("column") && createError?.message?.includes("does not exist")) {
+            console.log("Attempting to create minimal profile due to missing columns...")
+            const minimalProfile = {
+              auth_user_id: userId,
+              username: username,
+              full_name: user?.user_metadata?.full_name || null,
+              email: userEmail || "",
+            }
+            
+            const { data: minimalCreated, error: minimalError } = await supabase
+              .from("users")
+              .insert(minimalProfile)
+              .select()
+              .single()
+              
+            if (!minimalError && minimalCreated) {
+              setProfile(minimalCreated)
+              console.log("Minimal profile created successfully:", minimalCreated)
+            }
+          }
         }
       } else if (!error && data) {
         setProfile(data)
         console.log("Profile fetched successfully:", data)
       } else if (error) {
         console.error("Error fetching profile:", error)
+        // If error is due to missing columns, still try to fetch basic profile
+        if (error.message?.includes("column") && error.message?.includes("does not exist")) {
+          console.log("Attempting to fetch basic profile due to missing columns...")
+          const { data: basicData, error: basicError } = await supabase
+            .from("users")
+            .select("id, auth_user_id, username, full_name, email, tier, role, level, points, coins, is_verified, is_active, is_banned, created_at, updated_at")
+            .eq("auth_user_id", userId)
+            .single()
+            
+          if (!basicError && basicData) {
+            // Add default values for missing columns
+            const profileWithDefaults = {
+              ...basicData,
+              email_verified: true,
+              phone_verified: false,
+              two_factor_enabled: false,
+              login_count: 1,
+              preferences: {},
+              metadata: {},
+            }
+            setProfile(profileWithDefaults)
+            console.log("Basic profile fetched with defaults:", profileWithDefaults)
+          }
+        }
       }
     } catch (error) {
       console.error("Error in fetchProfile:", error)
