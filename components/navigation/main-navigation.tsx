@@ -2,123 +2,59 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { motion, AnimatePresence } from "framer-motion"
+import { usePathname, useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
   Menu,
   Home,
-  Target,
   Users,
-  Music,
+  Vault,
   Coins,
-  MessageCircle,
-  Settings,
-  LogOut,
+  Calendar,
+  MessageSquare,
+  ShoppingBag,
   Crown,
   Phone,
-  ShoppingBag,
-  Calendar,
-  Radio,
-  Ticket,
-  Info,
-  X,
-  LayoutDashboard,
+  BookOpen,
+  Settings,
+  LogOut,
+  User,
+  Moon,
+  Sun,
 } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
-import { DynamicLogo } from "@/components/dynamic-logo"
-import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
+import { useTheme } from "next-themes"
 
-const publicNavigationItems = [
+const navigationItems = [
   { name: "Home", href: "/", icon: Home },
-  { name: "About", href: "/about", icon: Info },
-  { name: "Mission", href: "/mission", icon: Target },
+  { name: "Dashboard", href: "/dashboard", icon: User, requireAuth: true },
+  { name: "Community", href: "/community", icon: Users, requireAuth: true },
+  { name: "Vault", href: "/vault", icon: Vault, requireAuth: true },
+  { name: "Coins", href: "/coins", icon: Coins, requireAuth: true },
+  { name: "Chronicles", href: "/chronicles", icon: BookOpen, requireAuth: true },
+  { name: "Tickets", href: "/tickets", icon: Calendar, requireAuth: true },
+  { name: "Chat", href: "/chat", icon: MessageSquare, requireAuth: true },
+  { name: "Merch", href: "/merch", icon: ShoppingBag, requireAuth: true },
+  { name: "Premium", href: "/premium", icon: Crown },
+  { name: "Meet & Greet", href: "/meet-and-greet", icon: Phone, requireAuth: true },
 ]
-
-const authenticatedNavigationItems = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Community", href: "/community", icon: Users },
-  { name: "Chat", href: "/chat", icon: MessageCircle },
-  { name: "Vault", href: "/vault", icon: Music },
-  { name: "Coins", href: "/coins", icon: Coins },
-  { name: "Tickets", href: "/tickets", icon: Ticket },
-  { name: "Meet & Greet", href: "/meet-and-greet", icon: Phone },
-  { name: "Merch", href: "/merch", icon: ShoppingBag },
-  { name: "Chronicles", href: "/chronicles", icon: Calendar },
-  { name: "Radio", href: "/rooms/freebies", icon: Radio },
-]
-
-const navVariants = {
-  hidden: { y: -100, opacity: 0 },
-  visible: {
-    y: 0,
-    opacity: 1,
-    transition: {
-      type: "spring",
-      stiffness: 100,
-      damping: 20,
-      duration: 0.6,
-    },
-  },
-}
-
-const itemVariants = {
-  hidden: { opacity: 0, x: -20 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: {
-      type: "spring",
-      stiffness: 100,
-      damping: 15,
-    },
-  },
-  hover: {
-    scale: 1.05,
-    transition: {
-      type: "spring",
-      stiffness: 400,
-      damping: 10,
-    },
-  },
-}
-
-const mobileMenuVariants = {
-  hidden: { x: "100%", opacity: 0 },
-  visible: {
-    x: 0,
-    opacity: 1,
-    transition: {
-      type: "spring",
-      stiffness: 100,
-      damping: 20,
-    },
-  },
-  exit: {
-    x: "100%",
-    opacity: 0,
-    transition: {
-      type: "spring",
-      stiffness: 100,
-      damping: 20,
-    },
-  },
-}
 
 export function MainNavigation() {
-  const { user, profile, signOut, isAuthenticated } = useAuth()
+  const { user, profile, signOut, loading, isAuthenticated } = useAuth()
   const pathname = usePathname()
-  const [isOpen, setIsOpen] = useState(false)
+  const router = useRouter()
+  const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -126,38 +62,42 @@ export function MainNavigation() {
   }, [])
 
   const handleSignOut = async () => {
-    try {
-      await signOut()
-      setIsOpen(false)
-    } catch (error) {
-      console.error("Error signing out:", error)
-    }
+    await signOut()
+    router.push("/")
   }
 
   const getTierColor = (tier: string) => {
     switch (tier) {
-      case "grassroot":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-      case "pioneer":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+      case "blood":
+        return "bg-red-500 text-white"
       case "elder":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-      case "blood_brotherhood":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+        return "bg-yellow-500 text-black"
+      case "pioneer":
+        return "bg-orange-500 text-white"
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+        return "bg-gray-500 text-white"
     }
   }
 
-  const navigationItems = isAuthenticated ? authenticatedNavigationItems : publicNavigationItems
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+  }
 
-  if (!mounted) {
+  const filteredNavItems = navigationItems.filter((item) => !item.requireAuth || isAuthenticated)
+
+  if (loading) {
     return (
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+      <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <div className="h-8 w-32 bg-muted animate-pulse rounded" />
-            <div className="h-8 w-24 bg-muted animate-pulse rounded" />
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="h-8 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            </div>
+            <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
           </div>
         </div>
       </nav>
@@ -165,283 +105,150 @@ export function MainNavigation() {
   }
 
   return (
-    <motion.nav
-      variants={navVariants}
-      initial="hidden"
-      animate="visible"
-      className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b"
-    >
+    <nav className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Link href="/" className="flex items-center space-x-2">
-              <DynamicLogo className="h-8 w-auto" />
-            </Link>
-          </motion.div>
+          <Link href="/" className="flex items-center space-x-2">
+            <div className="h-8 w-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">EL</span>
+            </div>
+            <span className="font-bold text-xl bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+              Erigga Live
+            </span>
+          </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-1">
-            {navigationItems.slice(0, 6).map((item, index) => {
+            {filteredNavItems.slice(0, 6).map((item) => {
+              const Icon = item.icon
               const isActive = pathname === item.href
+
               return (
-                <motion.div
-                  key={item.name}
-                  variants={itemVariants}
-                  initial="hidden"
-                  animate="visible"
-                  whileHover="hover"
-                  transition={{ delay: index * 0.1 }}
-                >
+                <Link key={item.name} href={item.href}>
                   <Button
-                    asChild
                     variant={isActive ? "default" : "ghost"}
                     size="sm"
-                    className={cn(
-                      "transition-all duration-200",
-                      isActive && "bg-lime-500 text-teal-900 hover:bg-lime-600",
-                    )}
+                    className={`flex items-center space-x-2 ${
+                      isActive
+                        ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                    }`}
                   >
-                    <Link href={item.href} className="flex items-center space-x-2">
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.name}</span>
-                    </Link>
+                    <Icon className="h-4 w-4" />
+                    <span>{item.name}</span>
                   </Button>
-                </motion.div>
+                </Link>
               )
             })}
           </div>
 
-          {/* User Menu / Auth Buttons */}
+          {/* Right Side */}
           <div className="flex items-center space-x-4">
-            {isAuthenticated ? (
-              <div className="flex items-center space-x-3">
-                {/* Coins Display */}
-                {profile?.coins !== undefined && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="hidden sm:flex items-center space-x-1 bg-yellow-100 dark:bg-yellow-900/20 px-3 py-1 rounded-full"
-                  >
-                    <Coins className="h-4 w-4 text-yellow-600" />
-                    <span className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
-                      {profile.coins.toLocaleString()}
-                    </span>
-                  </motion.div>
-                )}
+            {/* Theme Toggle */}
+            {mounted && (
+              <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
+            )}
 
-                {/* User Dropdown */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage
-                            src={profile?.avatar_url || "/placeholder-user.jpg"}
-                            alt={profile?.username || "User"}
-                          />
-                          <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold">
-                            {profile?.full_name?.charAt(0) ||
-                              profile?.username?.charAt(0) ||
-                              user?.email?.charAt(0) ||
-                              "U"}
-                          </AvatarFallback>
-                        </Avatar>
-                      </Button>
-                    </motion.div>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56" align="end" forceMount>
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center justify-start gap-2 p-2"
-                    >
-                      <div className="flex flex-col space-y-1 leading-none">
-                        <p className="font-medium">{profile?.full_name || profile?.username || "User"}</p>
-                        <p className="w-[200px] truncate text-sm text-muted-foreground">{user?.email}</p>
-                        {profile?.tier && (
-                          <Badge className={`w-fit text-xs ${getTierColor(profile.tier)}`}>
-                            <Crown className="w-3 h-3 mr-1" />
-                            {profile.tier.replace("_", " ").toUpperCase()}
-                          </Badge>
-                        )}
-                      </div>
-                    </motion.div>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href="/dashboard" className="flex items-center">
-                        <LayoutDashboard className="mr-2 h-4 w-4" />
-                        <span>Dashboard</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/settings" className="flex items-center">
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Settings</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Log out</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+            {/* User Menu or Auth Buttons */}
+            {isAuthenticated ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={profile?.avatar_url || ""} alt={profile?.username || ""} />
+                      <AvatarFallback>
+                        {getInitials(profile?.full_name || profile?.username || user?.email || "U")}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{profile?.full_name || profile?.username}</p>
+                      <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                      <Badge className={`w-fit text-xs ${getTierColor(profile?.tier || "grassroot")}`}>
+                        {profile?.tier?.toUpperCase() || "GRASSROOT"}
+                      </Badge>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard">
+                      <User className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Profile
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Settings
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
-              <div className="hidden md:flex items-center space-x-2">
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Button asChild variant="ghost" size="sm">
-                    <Link href="/login">Sign In</Link>
+              <div className="flex items-center space-x-2">
+                <Link href="/login">
+                  <Button variant="ghost" size="sm">
+                    Sign In
                   </Button>
-                </motion.div>
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Button asChild size="sm" className="bg-lime-500 text-teal-900 hover:bg-lime-600">
-                    <Link href="/signup">Join Now</Link>
+                </Link>
+                <Link href="/signup">
+                  <Button size="sm" className="bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+                    Sign Up
                   </Button>
-                </motion.div>
+                </Link>
               </div>
             )}
 
             {/* Mobile Menu */}
-            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+            <Sheet>
               <SheetTrigger asChild>
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Button variant="ghost" size="icon" className="md:hidden">
-                    <Menu className="h-5 w-5" />
-                    <span className="sr-only">Toggle menu</span>
-                  </Button>
-                </motion.div>
+                <Button variant="ghost" size="sm" className="md:hidden">
+                  <Menu className="h-5 w-5" />
+                </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px] p-0">
-                <AnimatePresence>
-                  {isOpen && (
-                    <motion.div
-                      variants={mobileMenuVariants}
-                      initial="hidden"
-                      animate="visible"
-                      exit="exit"
-                      className="flex flex-col h-full"
-                    >
-                      {/* Mobile Header */}
-                      <div className="flex items-center justify-between p-4 border-b">
-                        <DynamicLogo className="h-8 w-auto" />
-                        <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
-                          <X className="h-5 w-5" />
+              <SheetContent side="right" className="w-80">
+                <div className="flex flex-col space-y-4 mt-8">
+                  {filteredNavItems.map((item) => {
+                    const Icon = item.icon
+                    const isActive = pathname === item.href
+
+                    return (
+                      <Link key={item.name} href={item.href}>
+                        <Button
+                          variant={isActive ? "default" : "ghost"}
+                          className={`w-full justify-start ${
+                            isActive ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white" : ""
+                          }`}
+                        >
+                          <Icon className="mr-2 h-4 w-4" />
+                          {item.name}
                         </Button>
-                      </div>
-
-                      <div className="flex flex-col space-y-4 mt-4 px-4">
-                        {/* User Info in Mobile */}
-                        {isAuthenticated && (
-                          <motion.div
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.1 }}
-                            className="flex items-center space-x-3 p-4 bg-muted rounded-lg"
-                          >
-                            <Avatar className="h-12 w-12">
-                              <AvatarImage
-                                src={profile?.avatar_url || "/placeholder-user.jpg"}
-                                alt={profile?.username || "User"}
-                              />
-                              <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold">
-                                {profile?.full_name?.charAt(0) ||
-                                  profile?.username?.charAt(0) ||
-                                  user?.email?.charAt(0) ||
-                                  "U"}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col">
-                              <p className="font-medium">{profile?.full_name || profile?.username || "User"}</p>
-                              <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
-                              {profile?.tier && (
-                                <Badge className={`w-fit text-xs mt-1 ${getTierColor(profile.tier)}`}>
-                                  <Crown className="w-3 h-3 mr-1" />
-                                  {profile.tier.replace("_", " ").toUpperCase()}
-                                </Badge>
-                              )}
-                            </div>
-                          </motion.div>
-                        )}
-
-                        {/* Navigation Items */}
-                        <div className="space-y-2">
-                          {navigationItems.map((item, index) => {
-                            const isActive = pathname === item.href
-                            return (
-                              <motion.div
-                                key={item.name}
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: 0.1 + index * 0.05 }}
-                              >
-                                <Button
-                                  asChild
-                                  variant={isActive ? "default" : "ghost"}
-                                  className={`w-full justify-start ${
-                                    isActive ? "bg-lime-500 text-teal-900 hover:bg-lime-600" : ""
-                                  }`}
-                                  onClick={() => setIsOpen(false)}
-                                >
-                                  <Link href={item.href} className="flex items-center space-x-2">
-                                    <item.icon className="h-4 w-4" />
-                                    <span>{item.name}</span>
-                                  </Link>
-                                </Button>
-                              </motion.div>
-                            )
-                          })}
-                        </div>
-
-                        {/* Auth Buttons for Mobile */}
-                        <div className="space-y-2 pt-4 border-t">
-                          {isAuthenticated ? (
-                            <>
-                              <Button asChild variant="outline" className="w-full justify-start bg-transparent">
-                                <Link href="/settings" onClick={() => setIsOpen(false)}>
-                                  <Settings className="mr-2 h-4 w-4" />
-                                  Settings
-                                </Link>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                className="w-full justify-start text-red-600 hover:text-red-600 bg-transparent"
-                                onClick={handleSignOut}
-                              >
-                                <LogOut className="mr-2 h-4 w-4" />
-                                Log out
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <Button
-                                asChild
-                                variant="outline"
-                                className="w-full bg-transparent"
-                                onClick={() => setIsOpen(false)}
-                              >
-                                <Link href="/login">Sign In</Link>
-                              </Button>
-                              <Button
-                                asChild
-                                className="w-full bg-lime-500 text-teal-900 hover:bg-lime-600"
-                                onClick={() => setIsOpen(false)}
-                              >
-                                <Link href="/signup">Join Now</Link>
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      </Link>
+                    )
+                  })}
+                </div>
               </SheetContent>
             </Sheet>
           </div>
         </div>
       </div>
-    </motion.nav>
+    </nav>
   )
 }

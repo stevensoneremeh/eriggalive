@@ -1,101 +1,71 @@
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
-import type { Database } from "@/types/database"
+import { createServerClient } from "@supabase/ssr"
+import { NextResponse, type NextRequest } from "next/server"
 
 export async function updateSession(request: NextRequest) {
-  // Check if Supabase environment variables are available
+  let supabaseResponse = NextResponse.next({
+    request,
+  })
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn("⚠️ Supabase environment variables not configured, skipping auth middleware")
-    return NextResponse.next({
-      request: {
-        headers: request.headers,
-      },
-    })
+    return supabaseResponse
   }
 
-  const response = NextResponse.next({
-    request: {
-      headers: request.headers,
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll()
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+        supabaseResponse = NextResponse.next({
+          request,
+        })
+        cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
+      },
     },
   })
 
-  try {
-    const supabase = createMiddlewareClient<Database>({ req: request, res: response })
+  // IMPORTANT: Avoid writing any logic between createServerClient and
+  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
+  // issues with users being randomly logged out.
 
-    // Refresh session if expired - required for Server Components
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-    const { pathname } = request.nextUrl
+  // Protected routes that require authentication
+  const protectedRoutes = [
+    "/dashboard",
+    "/community",
+    "/vault",
+    "/coins",
+    "/chronicles",
+    "/tickets",
+    "/chat",
+    "/merch",
+    "/meet-and-greet",
+    "/profile",
+    "/settings",
+  ]
 
-    // Define protected routes
-    const protectedRoutes = [
-      "/dashboard",
-      "/community",
-      "/vault",
-      "/chat",
-      "/tickets",
-      "/premium",
-      "/merch",
-      "/coins",
-      "/settings",
-      "/admin",
-      "/profile",
-      "/chronicles",
-      "/missions",
-      "/meet-and-greet",
-    ]
+  const isProtectedRoute = protectedRoutes.some((route) => request.nextUrl.pathname.startsWith(route))
 
-    // Define public routes
-    const publicRoutes = [
-      "/",
-      "/auth/signin",
-      "/auth/signup",
-      "/auth/forgot-password",
-      "/auth/reset-password",
-      "/about",
-      "/terms",
-      "/privacy",
-    ]
-
-    // Allow API routes and static files
-    if (
-      pathname.startsWith("/api") ||
-      pathname.startsWith("/_next") ||
-      pathname.startsWith("/favicon") ||
-      pathname.includes(".")
-    ) {
-      return response
-    }
-
-    // Check if route is protected
-    const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
-    const isPublicRoute = publicRoutes.includes(pathname)
-
-    // Redirect unauthenticated users from protected routes
-    if (isProtectedRoute && !session) {
-      const redirectUrl = new URL("/auth/signin", request.url)
-      redirectUrl.searchParams.set("redirectTo", pathname)
-      return NextResponse.redirect(redirectUrl)
-    }
-
-    // Redirect authenticated users from auth pages to dashboard
-    if (session && (pathname.startsWith("/auth/signin") || pathname.startsWith("/auth/signup"))) {
-      return NextResponse.redirect(new URL("/dashboard", request.url))
-    }
-
-    return response
-  } catch (error) {
-    console.error("Middleware error:", error)
-    return NextResponse.next({
-      request: {
-        headers: request.headers,
-      },
-    })
+  if (isProtectedRoute && !user) {
+    // Redirect to login with return URL
+    const redirectUrl = new URL("/login", request.url)
+    redirectUrl.searchParams.set("redirectTo", request.nextUrl.pathname)
+    return NextResponse.redirect(redirectUrl)
   }
+
+  // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're
+  // creating a new response object with NextResponse.next() make sure to:
+  // 1. Pass the request in it, like so:
+  //    const myNewResponse = NextResponse.next({ request })
+  // 2. Copy over the cookies, like so:
+  //    myNewResponse.cookies.set(name, value)
+
+  return supabaseResponse
 }

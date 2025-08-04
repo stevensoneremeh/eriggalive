@@ -1,454 +1,210 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import { useTheme } from "@/contexts/theme-context"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Music, Video, Newspaper, Users, ShoppingBag, Calendar } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { SafeHeroVideoCarousel } from "@/components/safe-hero-video-carousel"
-import { getOptimizedVideoSources } from "@/utils/video-utils"
-import EriggaRadio from "@/components/erigga-radio"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import Link from "next/link"
+import { Play, Users, Music, Star, ArrowRight, Calendar, MessageSquare, Crown, Coins } from "lucide-react"
+import { motion } from "framer-motion"
+import { useEffect, useState } from "react"
 
 export default function HomePage() {
-  const { theme } = useTheme()
-  const [currentSlide, setCurrentSlide] = useState(0)
+  const { isAuthenticated, profile, loading } = useAuth()
   const [mounted, setMounted] = useState(false)
-  const videoSources = getOptimizedVideoSources()
-  const primaryVideoUrl = videoSources[0]?.src || "/videoshttps://hebbkx1anhila5yf.public.blob.vercel-storage.com/git-blob/prj_87iLY6t51DXvy0yPJ00SYhwlKXWl/K6Q-Lit6vuzvhNfoGXuTFB/public/erigga-hero-video.mp4"
 
-  // Hero images
-  const heroImages = [
-    "/images/hero/erigga1.jpeg",
-    "/images/hero/erigga2.jpeg",
-    "/images/hero/erigga3.jpeg",
-    "/images/hero/erigga4.jpeg",
-  ]
-
-  // Features data
-  const features = [
-    {
-      title: "Media Vault",
-      description: "Access Erigga's complete discography, music videos, and exclusive content.",
-      icon: Music,
-      href: "/vault",
-      color: "from-brand-lime to-brand-teal dark:from-white dark:to-harkonnen-gray",
-    },
-    {
-      title: "Erigga Chronicles",
-      description: "Follow Erigga's journey through animated stories and documentaries.",
-      icon: Video,
-      href: "/chronicles",
-      color: "from-brand-teal to-brand-lime-dark dark:from-harkonnen-gray dark:to-white",
-    },
-    {
-      title: "Community",
-      description: "Connect with other fans, share content, and participate in discussions.",
-      icon: Users,
-      href: "/community",
-      color: "from-brand-lime-dark to-brand-teal-light dark:from-white dark:to-harkonnen-light-gray",
-    },
-    {
-      title: "Merch Store",
-      description: "Shop exclusive Erigga merchandise and limited edition items.",
-      icon: ShoppingBag,
-      href: "/merch",
-      color: "from-brand-teal-light to-brand-lime dark:from-harkonnen-light-gray dark:to-white",
-    },
-    {
-      title: "Events & Tickets",
-      description: "Get early access to concert tickets and exclusive events.",
-      icon: Calendar,
-      href: "/tickets",
-      color: "from-brand-lime to-brand-teal-dark dark:from-white dark:to-harkonnen-dark-gray",
-    },
-    {
-      title: "Premium Tiers",
-      description: "Upgrade your experience with exclusive perks and content.",
-      icon: Newspaper,
-      href: "/premium",
-      color: "from-brand-teal-dark to-brand-lime-light dark:from-harkonnen-dark-gray dark:to-white",
-    },
-  ]
-
-  // Testimonials data
-  const testimonials = [
-    {
-      quote: "Erigga's platform connects me directly with real fans. The community here is authentic.",
-      author: "WarriKing23",
-      tier: "Blood Brotherhood",
-    },
-    {
-      quote: "The exclusive content in the vault is worth every coin. Can't get this anywhere else!",
-      author: "PaperBoi99",
-      tier: "Elder",
-    },
-    {
-      quote: "Chronicles series tells Erigga's story in a way I've never seen before. Pure street wisdom.",
-      author: "LagosHustler",
-      tier: "Pioneer",
-    },
-  ]
-
-  // Tier plans data
-  const tierPlans = [
-    {
-      name: "Grassroot",
-      price: "Free",
-      description: "Basic access to the platform",
-      features: ["Community access", "Public content", "Event announcements", "Basic profile"],
-      color: "border-grassroot-primary dark:border-grassroot-primary",
-      bgColor: "bg-grassroot-secondary/20 dark:bg-grassroot-secondary",
-      href: "/signup",
-    },
-    {
-      name: "Pioneer",
-      price: "₦2,000",
-      period: "monthly",
-      description: "Enhanced access with exclusive content",
-      features: [
-        "All Grassroot features",
-        "Early music releases",
-        "Exclusive interviews",
-        "Discounted merch",
-        "Pioneer badge",
-      ],
-      color: "border-pioneer-primary dark:border-pioneer-primary",
-      bgColor: "bg-pioneer-secondary/20 dark:bg-pioneer-secondary",
-      href: "/premium",
-      popular: true,
-    },
-    {
-      name: "Elder",
-      price: "₦5,000",
-      period: "monthly",
-      description: "Premium access with VIP benefits",
-      features: [
-        "All Pioneer features",
-        "Behind-the-scenes content",
-        "Studio session videos",
-        "Priority event access",
-        "Monthly Erigga coins",
-        "Elder badge",
-      ],
-      color: "border-elder-primary dark:border-elder-primary",
-      bgColor: "bg-elder-secondary/20 dark:bg-elder-secondary",
-      href: "/premium",
-    },
-    {
-      name: "Blood Brotherhood",
-      price: "₦10,000",
-      period: "monthly",
-      description: "Ultimate fan experience",
-      features: [
-        "All Elder features",
-        "Direct messaging with Erigga",
-        "Virtual meet & greets",
-        "Exclusive merchandise",
-        "Blood Brotherhood badge",
-        "Voting rights on new content",
-      ],
-      color: "border-blood-primary dark:border-blood-primary",
-      bgColor: "bg-blood-secondary/20 dark:bg-blood-secondary",
-      href: "/premium",
-    },
-  ]
-
-  // Auto-advance carousel
   useEffect(() => {
     setMounted(true)
-    const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % heroImages.length)
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [heroImages.length])
+  }, [])
 
   if (!mounted) {
-    return null
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="container mx-auto px-4 py-16">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-300">Loading...</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Erigga Radio Widget - Only on home page */}
-      <EriggaRadio />
-
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       {/* Hero Section */}
-      <section className="relative h-[80vh] w-full">
-        <SafeHeroVideoCarousel images={heroImages} videoUrl={primaryVideoUrl} className="absolute inset-0" />
-
-        <div className="absolute inset-0 flex items-center justify-center z-10">
-          <div className="text-center max-w-3xl px-4">
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 drop-shadow-lg">
-              Welcome to the Official Erigga Live Platform
-            </h1>
-            <p className="text-xl md:text-2xl text-white/90 mb-8 drop-shadow-md">
-              Join the community and get exclusive access to music, videos, and events
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/signup" className="inline-block">
-                <div
-                  className={cn(
-                    "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
-                    "transform hover:scale-105 hover:shadow-xl",
-                    theme === "dark"
-                      ? "bg-white text-harkonnen-black hover:bg-gray-200"
-                      : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
-                  )}
-                >
-                  Join Now
-                </div>
-              </Link>
-              <Link href="/vault" className="inline-block">
-                <div
-                  className={cn(
-                    "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
-                    "transform hover:scale-105 hover:shadow-xl",
-                    theme === "dark"
-                      ? "bg-transparent border-2 border-white text-white hover:bg-white/10"
-                      : "bg-brand-teal text-white hover:bg-brand-teal-dark",
-                  )}
-                >
-                  Explore Content
-                </div>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Rest of the home page content */}
-      <section className="py-12 px-4 bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12 text-gray-900 dark:text-white">Explore the Platform</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Media Vault</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Access exclusive music, videos, and behind-the-scenes content
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/vault">Explore Vault</Link>
-                </Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Community</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Connect with others, share content, and join discussions
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/community">Join Community</Link>
-                </Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Chronicles</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Follow Erigga's journey through exclusive stories and updates
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/chronicles">Read Chronicles</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-20 bg-background">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Platform Features</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Everything you need to connect with Erigga and fellow fans in one place.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <Link key={index} href={feature.href}>
-                <Card
-                  className={cn(
-                    "h-full transition-all duration-300 hover:scale-105 overflow-hidden",
-                    theme === "dark" ? "harkonnen-card" : "border border-gray-200",
-                  )}
-                >
-                  <CardContent className="p-6 flex flex-col h-full">
-                    <div
-                      className={cn(
-                        "w-12 h-12 rounded-full mb-4 flex items-center justify-center bg-gradient-to-br",
-                        feature.color,
-                      )}
-                    >
-                      <feature.icon className={cn("h-6 w-6", theme === "dark" ? "text-black" : "text-white")} />
-                    </div>
-                    <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
-                    <p className="text-muted-foreground flex-grow">{feature.description}</p>
-                    <div className="mt-4 flex items-center text-sm font-medium text-brand-teal dark:text-white">
-                      Learn more
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4 ml-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials Section */}
-      <section className="py-20 bg-accent">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Fan Testimonials</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Hear what the community has to say about the Erigga fan platform.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <Card
-                key={index}
-                className={cn("h-full", theme === "dark" ? "harkonnen-card" : "border border-gray-200")}
-              >
-                <CardContent className="p-6 flex flex-col h-full">
-                  <div className="mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <svg
-                        key={i}
-                        className="inline-block w-5 h-5 text-yellow-500"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                    ))}
-                  </div>
-                  <p className="text-lg italic mb-6 flex-grow">"{testimonial.quote}"</p>
-                  <div>
-                    <p className="font-bold">{testimonial.author}</p>
-                    <p className="text-sm text-muted-foreground">{testimonial.tier} Member</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section className="py-20 bg-background">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Membership Tiers</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Choose the tier that fits your level of fandom and unlock exclusive perks.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {tierPlans.map((plan, index) => (
-              <div key={index} className="relative">
-                {plan.popular && (
-                  <div className="absolute -top-4 left-0 right-0 flex justify-center">
-                    <span className="bg-brand-lime text-brand-teal dark:bg-white dark:text-black px-3 py-1 rounded-full text-sm font-medium">
-                      Most Popular
-                    </span>
-                  </div>
-                )}
-                <Card
-                  className={cn(
-                    "h-full border-2 transition-all duration-300",
-                    plan.color,
-                    plan.popular ? "transform scale-105" : "",
-                    theme === "dark" ? "harkonnen-card" : "",
-                  )}
-                >
-                  <CardContent className={cn("p-6", plan.bgColor)}>
-                    <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
-                    <div className="mb-4">
-                      <span className="text-3xl font-bold">{plan.price}</span>
-                      {plan.period && <span className="text-muted-foreground">/{plan.period}</span>}
-                    </div>
-                    <p className="text-muted-foreground mb-6">{plan.description}</p>
-                    <ul className="space-y-2 mb-6">
-                      {plan.features.map((feature, i) => (
-                        <li key={i} className="flex items-start">
-                          <svg
-                            className="h-5 w-5 text-green-500 mr-2 mt-0.5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M5 13l4 4L19 7"
-                            ></path>
-                          </svg>
-                          <span>{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Button
-                      className={cn(
-                        "w-full",
-                        plan.name === "Grassroot"
-                          ? "bg-grassroot-primary text-white hover:bg-opacity-90"
-                          : plan.name === "Pioneer"
-                            ? "bg-pioneer-primary text-white hover:bg-opacity-90"
-                            : plan.name === "Elder"
-                              ? "bg-elder-primary text-white hover:bg-opacity-90"
-                              : "bg-blood-primary text-white hover:bg-opacity-90",
-                      )}
-                      asChild
-                    >
-                      <Link href={plan.href}>{plan.name === "Grassroot" ? "Sign Up Free" : "Subscribe Now"}</Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 bg-brand-teal dark:bg-harkonnen-black text-white">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Join the Movement?</h2>
-          <p className="text-lg max-w-2xl mx-auto mb-8 text-white/80">
-            Get access to exclusive content, connect with other fans, and be part of Erigga's journey.
+      <section className="container mx-auto px-4 py-16">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          className="text-center mb-16"
+        >
+          <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+            Welcome to Erigga Live
+          </h1>
+          <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
+            The official fan platform for Erigga - Connect with the community, access exclusive content, and experience
+            Nigerian hip-hop like never before.
           </p>
-          <Link href="/signup" className="inline-block">
-            <div
-              className={cn(
-                "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
-                "transform hover:scale-105 hover:shadow-xl",
-                theme === "dark"
-                  ? "bg-white text-harkonnen-black hover:bg-gray-200"
-                  : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
-              )}
-            >
-              Join Now
+
+          {isAuthenticated ? (
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Link href="/dashboard">
+                <Button size="lg" className="bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+                  <Play className="mr-2 h-5 w-5" />
+                  Go to Dashboard
+                </Button>
+              </Link>
+              <Link href="/community">
+                <Button size="lg" variant="outline">
+                  <Users className="mr-2 h-5 w-5" />
+                  Join Community
+                </Button>
+              </Link>
             </div>
-          </Link>
-        </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Link href="/signup">
+                <Button size="lg" className="bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+                  <Star className="mr-2 h-5 w-5" />
+                  Join the Community
+                </Button>
+              </Link>
+              <Link href="/login">
+                <Button size="lg" variant="outline">
+                  Sign In
+                </Button>
+              </Link>
+            </div>
+          )}
+        </motion.div>
+
+        {/* Features Grid */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16"
+        >
+          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mb-4">
+                <Music className="h-6 w-6 text-purple-600" />
+              </div>
+              <CardTitle>Exclusive Content</CardTitle>
+              <CardDescription>
+                Access unreleased tracks, behind-the-scenes footage, and exclusive interviews
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mb-4">
+                <Users className="h-6 w-6 text-blue-600" />
+              </div>
+              <CardTitle>Community</CardTitle>
+              <CardDescription>
+                Connect with fellow fans, share your thoughts, and participate in discussions
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg flex items-center justify-center mb-4">
+                <Coins className="h-6 w-6 text-yellow-600" />
+              </div>
+              <CardTitle>Erigga Coins</CardTitle>
+              <CardDescription>
+                Earn coins through engagement and use them for exclusive content and merchandise
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center mb-4">
+                <Calendar className="h-6 w-6 text-green-600" />
+              </div>
+              <CardTitle>Live Events</CardTitle>
+              <CardDescription>
+                Get early access to concert tickets and exclusive meet & greet opportunities
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center mb-4">
+                <MessageSquare className="h-6 w-6 text-red-600" />
+              </div>
+              <CardTitle>Direct Chat</CardTitle>
+              <CardDescription>
+                Participate in live chats and Q&A sessions with Erigga and the community
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center mb-4">
+                <Crown className="h-6 w-6 text-orange-600" />
+              </div>
+              <CardTitle>Tier System</CardTitle>
+              <CardDescription>Progress through tiers to unlock exclusive benefits and premium content</CardDescription>
+            </CardHeader>
+          </Card>
+        </motion.div>
+
+        {/* Stats Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.4 }}
+          className="text-center mb-16"
+        >
+          <h2 className="text-3xl font-bold mb-8 text-gray-900 dark:text-white">Join the Growing Community</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="text-4xl font-bold text-purple-600 mb-2">10K+</div>
+              <div className="text-gray-600 dark:text-gray-300">Active Members</div>
+            </div>
+            <div className="text-center">
+              <div className="text-4xl font-bold text-blue-600 mb-2">500+</div>
+              <div className="text-gray-600 dark:text-gray-300">Exclusive Tracks</div>
+            </div>
+            <div className="text-center">
+              <div className="text-4xl font-bold text-green-600 mb-2">50+</div>
+              <div className="text-gray-600 dark:text-gray-300">Live Events</div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* CTA Section */}
+        {!isAuthenticated && (
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.6 }}
+            className="text-center"
+          >
+            <Card className="bg-gradient-to-r from-purple-600 to-blue-600 text-white max-w-2xl mx-auto">
+              <CardContent className="p-8">
+                <h3 className="text-2xl font-bold mb-4">Ready to Join?</h3>
+                <p className="mb-6 opacity-90">
+                  Start your journey with Erigga Live today and become part of the culture
+                </p>
+                <Link href="/signup">
+                  <Button size="lg" variant="secondary" className="bg-white text-purple-600 hover:bg-gray-100">
+                    Get Started Now
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
       </section>
     </div>
   )

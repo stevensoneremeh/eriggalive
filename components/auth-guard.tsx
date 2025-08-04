@@ -5,54 +5,31 @@ import type React from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
-import { Loader2 } from "lucide-react"
+import { SimpleLoading } from "@/components/simple-loading"
 
 interface AuthGuardProps {
   children: React.ReactNode
-  fallback?: React.ReactNode
+  redirectTo?: string
 }
 
-export function AuthGuard({ children, fallback }: AuthGuardProps) {
-  const { user, loading, isConfigured } = useAuth()
+export function AuthGuard({ children, redirectTo = "/login" }: AuthGuardProps) {
+  const { user, loading, isAuthenticated } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading && !user && isConfigured) {
+    if (!loading && !isAuthenticated) {
       const currentPath = window.location.pathname
-      const redirectUrl = `/auth/signin?redirectTo=${encodeURIComponent(currentPath)}`
+      const redirectUrl = `${redirectTo}?redirectTo=${encodeURIComponent(currentPath)}`
       router.push(redirectUrl)
     }
-  }, [user, loading, router, isConfigured])
+  }, [loading, isAuthenticated, router, redirectTo])
 
   if (loading) {
-    return (
-      fallback || (
-        <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      )
-    )
+    return <SimpleLoading />
   }
 
-  if (!isConfigured) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Configuration Required</h2>
-          <p className="text-muted-foreground">Supabase environment variables are not configured.</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return (
-      fallback || (
-        <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      )
-    )
+  if (!isAuthenticated) {
+    return <SimpleLoading />
   }
 
   return <>{children}</>

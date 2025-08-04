@@ -1,7 +1,5 @@
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createBrowserClient } from "@supabase/ssr"
 import type { Database } from "@/types/database"
-
-const isBrowser = typeof window !== "undefined"
 
 const createMockClient = () => {
   console.warn("⚠️ Using mock client - Supabase environment variables not configured")
@@ -24,6 +22,23 @@ const createMockClient = () => {
     or: (conditions: string) => mockQueryBuilder,
     single: () => Promise.resolve({ data: null, error: null }),
     maybeSingle: () => Promise.resolve({ data: null, error: null }),
+    select: (columns?: string) => mockQueryBuilder,
+    insert: (data: any) => ({
+      select: (columns?: string) => ({
+        single: () => Promise.resolve({ data: null, error: null }),
+      }),
+    }),
+    update: (data: any) => ({
+      eq: (column: string, value: any) => ({
+        select: (columns?: string) => ({
+          single: () => Promise.resolve({ data: null, error: null }),
+        }),
+      }),
+    }),
+    delete: () => ({
+      eq: (column: string, value: any) => Promise.resolve({ error: null }),
+      in: (column: string, values: any[]) => Promise.resolve({ error: null }),
+    }),
   }
 
   return {
@@ -86,7 +101,7 @@ const createMockClient = () => {
   } as any
 }
 
-export const createClient = () => {
+export function createClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -95,7 +110,7 @@ export const createClient = () => {
   }
 
   try {
-    return createClientComponentClient<Database>()
+    return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
   } catch (error) {
     console.error("Failed to create Supabase client:", error)
     return createMockClient()
@@ -104,12 +119,3 @@ export const createClient = () => {
 
 // Export a singleton instance for convenience
 export const supabase = createClient()
-
-let supabaseClient: ReturnType<typeof createClient> | null = null
-
-export function getSupabaseClient() {
-  if (!supabaseClient) {
-    supabaseClient = createClient()
-  }
-  return supabaseClient
-}

@@ -1,34 +1,39 @@
-import { createClient } from "@supabase/supabase-js"
-import type { Database } from "@/types/database"
+import { createClient } from "@/lib/supabase/client"
 
-// Get environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+// Export the client for use throughout the app
+export const supabase = createClient()
 
-// Create the Supabase client
-function createSupabaseClient() {
-  // Check if we have the required environment variables
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("❌ Missing Supabase environment variables:")
-    console.error("- NEXT_PUBLIC_SUPABASE_URL:", supabaseUrl ? "✅ Set" : "❌ Missing")
-    console.error("- NEXT_PUBLIC_SUPABASE_ANON_KEY:", supabaseAnonKey ? "✅ Set" : "❌ Missing")
-
-    // Throw an error to make it clear what's wrong
-    throw new Error(
-      "Supabase environment variables are not configured. Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment variables.",
-    )
-  }
-
-  // Create and return the real Supabase client
-  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-    },
-  })
+// Helper function to check if Supabase is configured
+export const isSupabaseConfigured = () => {
+  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
 }
 
-// Export the client
-export const supabase = createSupabaseClient()
-export default supabase
+// Helper function to get user profile
+export const getUserProfile = async (authUserId: string) => {
+  if (!isSupabaseConfigured()) {
+    return { data: null, error: { message: "Supabase not configured" } }
+  }
+
+  try {
+    const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", authUserId).single()
+
+    return { data, error }
+  } catch (error) {
+    return { data: null, error }
+  }
+}
+
+// Helper function to create user profile
+export const createUserProfile = async (userData: any) => {
+  if (!isSupabaseConfigured()) {
+    return { data: null, error: { message: "Supabase not configured" } }
+  }
+
+  try {
+    const { data, error } = await supabase.from("users").insert(userData).select().single()
+
+    return { data, error }
+  } catch (error) {
+    return { data: null, error }
+  }
+}
