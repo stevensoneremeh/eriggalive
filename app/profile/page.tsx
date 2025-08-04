@@ -1,14 +1,17 @@
-"use client"
-import { requireAuth, getAuthenticatedUser } from "@/lib/auth-guard"
-import { ProfileClient } from "./profile-client"
+import { requireAuth, getAuthenticatedUser } from "@/lib/auth-guard";
+import { ProfileClient } from "./profile-client";
 
 export default async function ProfilePage() {
-  await requireAuth()
-  const authData = await getAuthenticatedUser()
+  // Ensure the user is authenticated (server-side redirect if not)
+  await requireAuth();
+
+  // Fetch authenticated user data + profile
+  const authData = await getAuthenticatedUser();
 
   if (!authData) {
-    return null
+    return null; // Fallback if no session
   }
 
-  return <ProfileClient initialAuthData={authData} />
+  // Pass the data to a client component for rendering
+  return <ProfileClient initialAuthData={authData} />;
 }
