@@ -4,174 +4,192 @@ import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Users, FileText, Settings, Coins, Calendar, TrendingUp, Star, Music, MessageSquare } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
+import {
+  Coins,
+  Trophy,
+  Users,
+  Music,
+  Video,
+  Calendar,
+  MessageSquare,
+  ShoppingBag,
+  Crown,
+  Star,
+  TrendingUp,
+} from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 
 export function DashboardClient() {
-  const { user, profile } = useAuth()
-  const [stats, setStats] = useState({
-    postsCount: 0,
-    commentsCount: 0,
-    likesReceived: 0,
-    coinsEarned: 0,
-  })
+  const { user, profile, loading } = useAuth()
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    // Mock stats - in real app, fetch from API
-    setStats({
-      postsCount: 12,
-      commentsCount: 45,
-      likesReceived: 128,
-      coinsEarned: 350,
-    })
+    setMounted(true)
   }, [])
+
+  if (!mounted || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
 
   const getTierColor = (tier: string) => {
     switch (tier) {
-      case "blood":
-        return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300"
-      case "elder":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300"
+      case "grassroot":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
       case "pioneer":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300"
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+      case "elder":
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+      case "blood":
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300"
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
     }
   }
 
+  const getNextLevelXP = (level: number) => level * 100
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Welcome back, {profile?.full_name || profile?.username || user?.email}
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Badge className={getTierColor(profile?.tier || "grassroot")}>
-              {profile?.tier?.toUpperCase() || "GRASSROOT"}
-            </Badge>
-            <Link href="/settings">
-              <Button variant="outline">
-                <Settings className="w-4 h-4 mr-2" />
-                Settings
-              </Button>
-            </Link>
-          </div>
+        {/* Welcome Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Welcome back, {profile?.full_name || profile?.username || user?.email?.split("@")[0] || "Fan"}!
+          </h1>
+          <p className="text-gray-600 dark:text-gray-300">Here's what's happening in your Erigga Live experience</p>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Erigga Coins</CardTitle>
-              <Coins className="h-4 w-4 text-yellow-500" />
+              <Coins className="h-4 w-4 text-yellow-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{profile?.coins?.toLocaleString() || 0}</div>
-              <p className="text-xs text-muted-foreground">Your current balance</p>
+              <div className="text-2xl font-bold">{profile?.coins || 0}</div>
+              <p className="text-xs text-muted-foreground">+20 from last week</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Community Posts</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.postsCount}</div>
-              <p className="text-xs text-muted-foreground">Posts you've created</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Level</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <Trophy className="h-4 w-4 text-orange-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{profile?.level || 1}</div>
-              <p className="text-xs text-muted-foreground">{profile?.points || 0} points</p>
+              <div className="mt-2">
+                <Progress
+                  value={((profile?.points || 0) / getNextLevelXP(profile?.level || 1)) * 100}
+                  className="h-2"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {profile?.points || 0} / {getNextLevelXP(profile?.level || 1)} XP
+                </p>
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Likes Received</CardTitle>
-              <Star className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Tier</CardTitle>
+              <Crown className="h-4 w-4 text-purple-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.likesReceived}</div>
-              <p className="text-xs text-muted-foreground">From your content</p>
+              <Badge className={getTierColor(profile?.tier || "grassroot")}>
+                {profile?.tier?.toUpperCase() || "GRASSROOT"}
+              </Badge>
+              <p className="text-xs text-muted-foreground mt-2">
+                {profile?.is_verified ? "Verified Member" : "Unverified"}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Activity</CardTitle>
+              <TrendingUp className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{profile?.login_count || 1}</div>
+              <p className="text-xs text-muted-foreground">Total logins</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <Card>
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Common tasks and shortcuts</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Star className="h-5 w-5" />
+                Quick Actions
+              </CardTitle>
+              <CardDescription>Jump into your favorite activities</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <Link href="/community">
-                <Button className="w-full justify-start bg-transparent" variant="outline">
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  Join Community Discussion
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
+                  <Link href="/community">
+                    <Users className="h-6 w-6 mb-2" />
+                    Community
+                  </Link>
                 </Button>
-              </Link>
-              <Link href="/vault">
-                <Button className="w-full justify-start bg-transparent" variant="outline">
-                  <Music className="w-4 h-4 mr-2" />
-                  Explore Vault Content
+                <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
+                  <Link href="/vault">
+                    <Music className="h-6 w-6 mb-2" />
+                    Music Vault
+                  </Link>
                 </Button>
-              </Link>
-              <Link href="/coins">
-                <Button className="w-full justify-start bg-transparent" variant="outline">
-                  <Coins className="w-4 h-4 mr-2" />
-                  Manage Coins
+                <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
+                  <Link href="/chronicles">
+                    <Video className="h-6 w-6 mb-2" />
+                    Chronicles
+                  </Link>
                 </Button>
-              </Link>
-              <Link href="/tickets">
-                <Button className="w-full justify-start bg-transparent" variant="outline">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  View Events & Tickets
+                <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
+                  <Link href="/chat">
+                    <MessageSquare className="h-6 w-6 mb-2" />
+                    Live Chat
+                  </Link>
                 </Button>
-              </Link>
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+          <Card>
             <CardHeader>
               <CardTitle>Recent Activity</CardTitle>
-              <CardDescription>Your latest actions and updates</CardDescription>
+              <CardDescription>Your latest interactions on the platform</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center gap-3">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <div>
-                    <p className="text-sm font-medium">Welcome to Erigga Live!</p>
-                    <p className="text-xs text-muted-foreground">Account created successfully</p>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Joined the community</p>
+                    <p className="text-xs text-muted-foreground">Welcome to Erigga Live!</p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center gap-3">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <div>
-                    <p className="text-sm font-medium">Received welcome bonus</p>
-                    <p className="text-xs text-muted-foreground">500 Erigga Coins added</p>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Earned 500 coins</p>
+                    <p className="text-xs text-muted-foreground">Sign-up bonus</p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center gap-3">
                   <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                  <div>
-                    <p className="text-sm font-medium">Tier: {profile?.tier?.toUpperCase() || "GRASSROOT"}</p>
-                    <p className="text-xs text-muted-foreground">Your current membership level</p>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Profile created</p>
+                    <p className="text-xs text-muted-foreground">Complete your profile for more rewards</p>
                   </div>
                 </div>
               </div>
@@ -179,40 +197,57 @@ export function DashboardClient() {
           </Card>
         </div>
 
-        {/* Tier Benefits */}
-        <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle>Your Tier Benefits</CardTitle>
-            <CardDescription>You are currently a {profile?.tier?.toUpperCase() || "GRASSROOT"} member</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <Users className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-                <h3 className="font-semibold">Community Access</h3>
-                <p className="text-sm text-muted-foreground">Full access to community features</p>
-              </div>
-              <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <Music className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-                <h3 className="font-semibold">Content Library</h3>
-                <p className="text-sm text-muted-foreground">Access to exclusive content</p>
-              </div>
-              <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <Coins className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
-                <h3 className="font-semibold">Earn Coins</h3>
-                <p className="text-sm text-muted-foreground">Earn coins through engagement</p>
-              </div>
-            </div>
-            <div className="mt-6 text-center">
-              <Link href="/premium">
-                <Button>
-                  <TrendingUp className="w-4 h-4 mr-2" />
-                  Upgrade Your Tier
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Feature Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-blue-600" />
+                Upcoming Events
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Stay updated with Erigga's latest concerts and events
+              </p>
+              <Button asChild className="w-full">
+                <Link href="/tickets">View Events</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingBag className="h-5 w-5 text-green-600" />
+                Exclusive Merch
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Get exclusive Erigga merchandise and limited edition items
+              </p>
+              <Button asChild className="w-full">
+                <Link href="/merch">Shop Now</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Crown className="h-5 w-5 text-purple-600" />
+                Premium Access
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">Upgrade your tier for exclusive content and benefits</p>
+              <Button asChild className="w-full">
+                <Link href="/premium">Upgrade Now</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

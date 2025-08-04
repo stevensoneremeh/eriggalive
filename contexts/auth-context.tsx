@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
 interface Profile {
-  id: number
+  id?: number
   auth_user_id: string
   username: string
   full_name: string | null
@@ -29,8 +29,8 @@ interface Profile {
   login_count: number
   preferences: Record<string, any>
   metadata: Record<string, any>
-  created_at: string
-  updated_at: string
+  created_at?: string
+  updated_at?: string
 }
 
 interface AuthContextType {
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const supabase = createClient()
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, userEmail?: string) => {
     try {
       const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
 
@@ -67,9 +67,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Profile doesn't exist, create one
         const newProfile = {
           auth_user_id: userId,
-          username: user?.email?.split("@")[0] || "user",
+          username: userEmail?.split("@")[0] || `user_${Date.now()}`,
           full_name: user?.user_metadata?.full_name || null,
-          email: user?.email || "",
+          email: userEmail || "",
           tier: "grassroot" as const,
           role: "user" as const,
           level: 1,
@@ -94,18 +94,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (!createError && createdProfile) {
           setProfile(createdProfile)
+        } else {
+          console.error("Error creating profile:", createError)
         }
       } else if (!error && data) {
         setProfile(data)
+      } else if (error) {
+        console.error("Error fetching profile:", error)
       }
     } catch (error) {
-      console.error("Error fetching profile:", error)
+      console.error("Error in fetchProfile:", error)
     }
   }
 
   const refreshProfile = async () => {
     if (user) {
-      await fetchProfile(user.id)
+      await fetchProfile(user.id, user.email || undefined)
     }
   }
 
@@ -113,9 +117,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check if Supabase is properly configured
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    setIsConfigured(!!(supabaseUrl && supabaseAnonKey))
+    const configured = !!(supabaseUrl && supabaseAnonKey)
+    setIsConfigured(configured)
 
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!configured) {
       console.warn("⚠️ Supabase environment variables not configured")
       setLoading(false)
       return
@@ -136,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(session?.user ?? null)
 
           if (session?.user) {
-            await fetchProfile(session.user.id)
+            await fetchProfile(session.user.id, session.user.email || undefined)
           }
         }
       } catch (error) {
@@ -153,35 +158,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state changed:", event, session?.user?.email)
+
       setSession(session)
       setUser(session?.user ?? null)
 
       if (session?.user) {
-        await fetchProfile(session.user.id)
+        await fetchProfile(session.user.id, session.user.email || undefined)
       } else {
         setProfile(null)
       }
 
       setLoading(false)
 
-      // Handle auth events
-      if (event === "SIGNED_IN") {
-        // Check for redirect URL
+      // Handle auth events with proper routing
+      if (event === "SIGNED_IN" && session?.user) {
         const redirectTo = new URLSearchParams(window.location.search).get("redirectTo")
-        if (redirectTo) {
-          router.push(redirectTo)
-        } else {
-          router.push("/dashboard")
+        const targetPath = redirectTo || "/dashboard"
+
+        // Only redirect if we're not already on the target path
+        if (window.location.pathname !== targetPath) {
+          router.push(targetPath)
         }
       } else if (event === "SIGNED_OUT") {
-        router.push("/")
+        // Only redirect to home if we're on a protected route
+        const currentPath = window.location.pathname
+        const protectedRoutes = ["/dashboard", "/profile", "/settings", "/community", "/coins", "/vault", "/premium"]
+
+        if (protectedRoutes.some((route) => currentPath.startsWith(route))) {
+          router.push("/")
+        }
       }
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [router, supabase.auth])
+  }, [router, supabase.auth, user])
 
   const signIn = async (email: string, password: string) => {
     if (!isConfigured) {
@@ -189,6 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
+      setLoading(true)
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -196,6 +209,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error }
     } catch (error) {
       return { error }
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -205,6 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
+      setLoading(true)
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -215,6 +231,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error }
     } catch (error) {
       return { error }
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -224,10 +242,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
+      setLoading(true)
       await supabase.auth.signOut()
       setProfile(null)
     } catch (error) {
       console.error("Error signing out:", error)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -251,7 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     profile,
     loading,
-    isAuthenticated: !!user,
+    isAuthenticated: !!user && !!session,
     signIn,
     signUp,
     signOut,

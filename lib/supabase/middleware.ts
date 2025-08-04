@@ -10,62 +10,73 @@ export async function updateSession(request: NextRequest) {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn("Supabase environment variables not configured in middleware")
     return supabaseResponse
   }
 
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll()
+  try {
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({
+            request,
+          })
+          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
+        },
       },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-        supabaseResponse = NextResponse.next({
-          request,
-        })
-        cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
-      },
-    },
-  })
+    })
 
-  // IMPORTANT: Avoid writing any logic between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
+    // Refresh session if expired - required for Server Components
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    if (error) {
+      console.error("Middleware auth error:", error)
+    }
 
-  // Protected routes that require authentication
-  const protectedRoutes = [
-    "/dashboard",
-    "/community",
-    "/vault",
-    "/coins",
-    "/chronicles",
-    "/tickets",
-    "/chat",
-    "/merch",
-    "/meet-and-greet",
-    "/profile",
-    "/settings",
-  ]
+    // Protected routes
+    const protectedRoutes = [
+      "/dashboard",
+      "/profile",
+      "/settings",
+      "/community",
+      "/coins",
+      "/vault",
+      "/premium",
+      "/chat",
+      "/tickets",
+      "/meet-and-greet",
+      "/merch",
+      "/chronicles",
+      "/admin",
+    ]
 
-  const isProtectedRoute = protectedRoutes.some((route) => request.nextUrl.pathname.startsWith(route))
+    const isProtectedRoute = protectedRoutes.some((route) => request.nextUrl.pathname.startsWith(route))
 
-  if (isProtectedRoute && !user) {
-    // Redirect to login with return URL
-    const redirectUrl = new URL("/login", request.url)
-    redirectUrl.searchParams.set("redirectTo", request.nextUrl.pathname)
-    return NextResponse.redirect(redirectUrl)
+    // If accessing a protected route without a session, redirect to login
+    if (isProtectedRoute && !session) {
+      const redirectUrl = new URL("/login", request.url)
+      redirectUrl.searchParams.set("redirectTo", request.nextUrl.pathname)
+      return NextResponse.redirect(redirectUrl)
+    }
+
+    // If accessing auth pages while logged in, redirect to dashboard
+    const authRoutes = ["/login", "/signup", "/auth/signin", "/auth/signup"]
+    const isAuthRoute = authRoutes.some((route) => request.nextUrl.pathname.startsWith(route))
+
+    if (isAuthRoute && session) {
+      return NextResponse.redirect(new URL("/dashboard", request.url))
+    }
+
+    return supabaseResponse
+  } catch (error) {
+    console.error("Middleware error:", error)
+    return supabaseResponse
   }
-
-  // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're
-  // creating a new response object with NextResponse.next() make sure to:
-  // 1. Pass the request in it, like so:
-  //    const myNewResponse = NextResponse.next({ request })
-  // 2. Copy over the cookies, like so:
-  //    myNewResponse.cookies.set(name, value)
-
-  return supabaseResponse
 }
