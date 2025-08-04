@@ -54,6 +54,7 @@ export function ProfileClient({ initialAuthData }: ProfileClientProps) {
 
   const currentProfile = profile || initialAuthData.profile
 
+  // Form state
   const [formData, setFormData] = useState({
     full_name: currentProfile?.full_name || "",
     username: currentProfile?.username || "",
@@ -97,6 +98,7 @@ export function ProfileClient({ initialAuthData }: ProfileClientProps) {
 
     setIsUploadingAvatar(true)
     try {
+      // Upload to Supabase Storage
       const fileExt = file.name.split(".").pop()
       const fileName = `${currentProfile.id}-${Date.now()}.${fileExt}`
       const filePath = `avatars/${fileName}`
@@ -107,8 +109,10 @@ export function ProfileClient({ initialAuthData }: ProfileClientProps) {
 
       if (uploadError) throw uploadError
 
+      // Get public URL
       const { data: urlData } = supabase.storage.from("eriggalive-assets").getPublicUrl(uploadData.path)
 
+      // Update user profile
       await updateProfile({ avatar_url: urlData.publicUrl })
 
       toast.success("Profile picture updated successfully!")
@@ -276,8 +280,9 @@ export function ProfileClient({ initialAuthData }: ProfileClientProps) {
               </div>
             </div>
           </CardContent>
-        </Card>  
-      {/* Profile Content */}
+        </Card>
+
+        {/* Profile Content */}
         <Tabs defaultValue="details" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="details">Profile Details</TabsTrigger>
@@ -298,6 +303,7 @@ export function ProfileClient({ initialAuthData }: ProfileClientProps) {
               </CardHeader>
               <CardContent className="space-y-6">
                 {isEditing ? (
+                  // Edit Mode
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
@@ -376,6 +382,7 @@ export function ProfileClient({ initialAuthData }: ProfileClientProps) {
                     </div>
                   </div>
                 ) : (
+                  // View Mode
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-4">
