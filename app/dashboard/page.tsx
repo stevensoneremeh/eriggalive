@@ -3,7 +3,7 @@ import { DashboardClient } from "./dashboard-client"
 
 export default function DashboardPage() {
   return (
-    <AuthGuard>
+    <AuthGuard requireAuth={true}>
       <DashboardClient />
     </AuthGuard>
   )

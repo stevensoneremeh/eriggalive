@@ -12,25 +12,15 @@ interface Profile {
   username: string
   full_name: string | null
   email: string
+  phone: string | null
   avatar_url: string | null
   tier: "grassroot" | "pioneer" | "elder" | "blood"
   role: "user" | "moderator" | "admin"
-  level: number
-  points: number
-  coins: number
-  bio: string | null
-  location: string | null
-  is_verified: boolean
-  is_active: boolean
-  is_banned: boolean
-  email_verified: boolean
-  phone_verified: boolean
-  two_factor_enabled: boolean
-  login_count: number
-  preferences: Record<string, any>
-  metadata: Record<string, any>
+  coins_balance: number
+  referral_code: string | null
   created_at?: string
   updated_at?: string
+  last_login?: string
 }
 
 interface AuthContextType {
@@ -61,31 +51,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = async (userId: string, userEmail?: string) => {
     try {
+      console.log("🔍 Fetching profile for user:", userId)
+
       const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
 
       if (error && error.code === "PGRST116") {
-        // Profile doesn't exist, create one with all verifications enabled
-        const username = userEmail?.split("@")[0] || `user_${Date.now()}`
+        // Profile doesn't exist, create one
+        console.log("👤 Creating new profile for user:", userEmail)
 
+        const username = userEmail?.split("@")[0] || `user_${Date.now()}`
         const newProfile = {
           auth_user_id: userId,
           username: username,
           full_name: user?.user_metadata?.full_name || null,
           email: userEmail || "",
+          phone: null,
+          avatar_url: null,
           tier: "grassroot" as const,
           role: "user" as const,
-          level: 1,
-          points: 0,
-          coins: 500,
-          is_verified: false,
-          is_active: true,
-          is_banned: false,
-          email_verified: true, // Always true - no verification needed
-          phone_verified: true, // Always true - no verification needed
-          two_factor_enabled: false,
-          login_count: 1,
-          preferences: {},
-          metadata: {},
+          coins_balance: 500,
+          referral_code: null,
         }
 
         const { data: createdProfile, error: createError } = await supabase
@@ -96,65 +81,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (!createError && createdProfile) {
           setProfile(createdProfile)
-          console.log("✅ Profile created with immediate access:", createdProfile.username)
+          console.log("✅ Profile created successfully:", createdProfile.username)
         } else {
           console.error("❌ Error creating profile:", createError)
-
-          // Fallback: try creating with minimal required fields
-          const minimalProfile = {
+          // Set a minimal profile to allow access
+          setProfile({
             auth_user_id: userId,
             username: username,
-            email: userEmail || "",
             full_name: user?.user_metadata?.full_name || null,
-          }
-
-          const { data: fallbackProfile, error: fallbackError } = await supabase
-            .from("users")
-            .insert(minimalProfile)
-            .select()
-            .single()
-
-          if (!fallbackError && fallbackProfile) {
-            // Add default values for missing columns
-            const profileWithDefaults = {
-              ...fallbackProfile,
-              email_verified: true,
-              phone_verified: true,
-              two_factor_enabled: false,
-              login_count: 1,
-              preferences: {},
-              metadata: {},
-              tier: "grassroot" as const,
-              role: "user" as const,
-              level: 1,
-              points: 0,
-              coins: 500,
-              is_verified: false,
-              is_active: true,
-              is_banned: false,
-            }
-            setProfile(profileWithDefaults)
-            console.log("✅ Fallback profile created:", profileWithDefaults.username)
-          }
+            email: userEmail || "",
+            phone: null,
+            avatar_url: null,
+            tier: "grassroot" as const,
+            role: "user" as const,
+            coins_balance: 500,
+            referral_code: null,
+          })
         }
       } else if (!error && data) {
-        // Ensure existing profiles have verification flags set to true
-        const profileWithVerification = {
-          ...data,
-          email_verified: data.email_verified ?? true,
-          phone_verified: data.phone_verified ?? true,
-          two_factor_enabled: data.two_factor_enabled ?? false,
-          login_count: data.login_count ?? 1,
-          preferences: data.preferences ?? {},
-          metadata: data.metadata ?? {},
-        }
-        setProfile(profileWithVerification)
-        console.log("✅ Profile loaded with immediate access:", profileWithVerification.username)
+        setProfile(data)
+        console.log("✅ Profile loaded:", data.username)
       } else if (error) {
         console.error("❌ Error fetching profile:", error)
+        // Set a fallback profile to prevent blocking access
+        setProfile({
+          auth_user_id: userId,
+          username: userEmail?.split("@")[0] || "user",
+          full_name: user?.user_metadata?.full_name || null,
+          email: userEmail || "",
+          phone: null,
+          avatar_url: null,
+          tier: "grassroot" as const,
+          role: "user" as const,
+          coins_balance: 500,
+          referral_code: null,
+        })
       }
     } catch (error) {
       console.error("❌ Unexpected error in fetchProfile:", error)
+      // Always set a fallback profile to prevent blocking
+      setProfile({
+        auth_user_id: userId,
+        username: userEmail?.split("@")[0] || "user",
+        full_name: user?.user_metadata?.full_name || null,
+        email: userEmail || "",
+        phone: null,
+        avatar_url: null,
+        tier: "grassroot" as const,
+        role: "user" as const,
+        coins_balance: 500,
+        referral_code: null,
+      })
     }
   }
 
@@ -221,19 +198,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setLoading(false)
 
-      // Handle auth events with immediate dashboard access
+      // Handle auth events
       if (event === "SIGNED_IN" && session?.user) {
-        console.log("✅ User signed in, redirecting to dashboard")
-        const redirectTo = new URLSearchParams(window.location.search).get("redirectTo")
-        const targetPath = redirectTo || "/dashboard"
-
-        // Always redirect to dashboard for immediate access
-        if (window.location.pathname !== targetPath) {
-          router.push(targetPath)
-        }
+        console.log("✅ User signed in, allowing dashboard access")
+        // Don't force redirect here, let the user navigate naturally
       } else if (event === "SIGNED_OUT") {
         console.log("👋 User signed out")
-        // Only redirect to home if we're on a protected route
         const currentPath = window.location.pathname
         const protectedRoutes = ["/dashboard", "/profile", "/settings", "/community", "/coins", "/vault", "/premium"]
 
@@ -284,18 +254,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true)
       console.log("📝 Attempting to sign up:", email)
 
-      // Sign up without any email confirmation requirements
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: userData,
-          emailRedirectTo: undefined, // No email confirmation needed
+          emailRedirectTo: undefined,
         },
       })
 
       if (!error) {
-        console.log("✅ Sign up successful - user will have immediate access")
+        console.log("✅ Sign up successful")
       }
 
       return { error }

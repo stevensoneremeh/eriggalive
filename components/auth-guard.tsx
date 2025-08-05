@@ -9,12 +9,12 @@ import { Loader2 } from "lucide-react"
 
 interface AuthGuardProps {
   children: React.ReactNode
-  fallback?: React.ReactNode
+  requireAuth?: boolean
   redirectTo?: string
 }
 
-export function AuthGuard({ children, fallback, redirectTo = "/login" }: AuthGuardProps) {
-  const { isAuthenticated, loading, isConfigured } = useAuth()
+export function AuthGuard({ children, requireAuth = true, redirectTo = "/login" }: AuthGuardProps) {
+  const { isAuthenticated, loading, user, isConfigured } = useAuth()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
 
@@ -23,58 +23,59 @@ export function AuthGuard({ children, fallback, redirectTo = "/login" }: AuthGua
   }, [])
 
   useEffect(() => {
-    if (mounted && !loading && isConfigured && !isAuthenticated) {
+    if (!mounted || loading || !isConfigured) return
+
+    console.log("🛡️ AuthGuard check:", {
+      requireAuth,
+      isAuthenticated,
+      user: user?.email,
+      mounted,
+      loading,
+    })
+
+    if (requireAuth && !isAuthenticated) {
+      console.log("🚫 Access denied, redirecting to:", redirectTo)
       const currentPath = window.location.pathname
       const redirectUrl = `${redirectTo}?redirectTo=${encodeURIComponent(currentPath)}`
       router.push(redirectUrl)
+      return
     }
-  }, [isAuthenticated, loading, mounted, router, redirectTo, isConfigured])
 
-  // Show loading state
-  if (!mounted || loading) {
-    return (
-      fallback || (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p className="text-muted-foreground">Loading...</p>
-          </div>
-        </div>
-      )
-    )
-  }
+    if (!requireAuth && isAuthenticated) {
+      console.log("✅ User is authenticated, allowing access to public route")
+    }
 
-  // If Supabase is not configured, show a warning but allow access
-  if (!isConfigured) {
+    if (requireAuth && isAuthenticated) {
+      console.log("✅ User is authenticated, allowing access to protected route")
+    }
+  }, [isAuthenticated, loading, mounted, requireAuth, redirectTo, router, user, isConfigured])
+
+  // Show loading while checking auth or if not configured
+  if (!mounted || loading || !isConfigured) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
-            <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">Configuration Required</h3>
-            <p className="text-yellow-700 dark:text-yellow-300 text-sm">
-              Supabase environment variables are not configured. Please set up your environment variables to enable
-              authentication.
-            </p>
-          </div>
-          {children}
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-sm text-muted-foreground">{!isConfigured ? "Configuring..." : "Loading..."}</p>
         </div>
       </div>
     )
   }
 
-  // If not authenticated, don't render children (redirect will happen)
-  if (!isAuthenticated) {
+  // If auth is required but user is not authenticated, show loading
+  // (the redirect will happen in the useEffect)
+  if (requireAuth && !isAuthenticated) {
     return (
-      fallback || (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p className="text-muted-foreground">Redirecting to login...</p>
-          </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-sm text-muted-foreground">Redirecting to login...</p>
         </div>
-      )
+      </div>
     )
   }
 
+  // If no auth is required and user is authenticated, still show content
+  // If auth is required and user is authenticated, show content
   return <>{children}</>
 }
