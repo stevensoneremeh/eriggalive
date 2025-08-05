@@ -1,113 +1,61 @@
-"use server"
-
-import { createServerClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 
-/**
- * Ensures the user is authenticated. Redirects to sign-in if not.
- */
 export async function requireAuth() {
-  const supabase = createServerClient()
+  const supabase = await createClient()
 
   try {
     const {
-      data: { session },
+      data: { user },
       error,
-    } = await supabase.auth.getSession()
+    } = await supabase.auth.getUser()
 
-    if (error) {
-      console.error("Error getting session:", error)
-    }
-
-    if (!session) {
+    if (error || !user) {
       redirect("/login")
     }
 
-    return session
+    return user
   } catch (error) {
-    console.error("Auth check failed:", error)
+    console.error("Auth guard error:", error)
     redirect("/login")
   }
 }
 
-/**
- * Returns the authenticated user along with their profile.
- * Creates a default profile if one doesn't exist.
- */
-export async function getAuthenticatedUser() {
-  const supabase = createServerClient()
+export async function getServerUser() {
+  const supabase = await createClient()
 
   try {
     const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession()
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
 
-    if (sessionError) {
-      console.error("Error getting session:", sessionError)
+    if (error) {
+      console.error("Error getting server user:", error)
       return null
     }
 
-    if (!session) {
-      return null
-    }
-
-    // Try to fetch the user's profile
-    let { data: profile, error: profileError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("auth_user_id", session.user.id)
-      .single()
-
-    // If no profile exists, create one
-    if (profileError && profileError.code === "PGRST116") {
-      const newProfile = {
-        auth_user_id: session.user.id,
-        email: session.user.email!,
-        username: session.user.user_metadata?.username || session.user.email?.split("@")[0] || "user",
-        full_name: session.user.user_metadata?.full_name || null,
-        phone: null,
-        avatar_url: null,
-        tier: "grassroot" as const,
-        role: "user" as const,
-        coins_balance: 500,
-        referral_code: null,
-      }
-
-      const { data: createdProfile, error: insertError } = await supabase
-        .from("users")
-        .insert(newProfile)
-        .select()
-        .single()
-
-      if (insertError) {
-        console.error("Error creating profile:", insertError)
-        // Return session with null profile rather than failing
-        return {
-          session,
-          user: session.user,
-          profile: null,
-        }
-      }
-
-      profile = createdProfile
-    } else if (profileError) {
-      console.error("Error fetching profile:", profileError)
-      // Return session with null profile rather than failing
-      return {
-        session,
-        user: session.user,
-        profile: null,
-      }
-    }
-
-    return {
-      session,
-      user: session.user,
-      profile,
-    }
+    return user
   } catch (error) {
-    console.error("Unexpected error in getAuthenticatedUser:", error)
+    console.error("Server user error:", error)
+    return null
+  }
+}
+
+export async function getServerProfile(userId: string) {
+  const supabase = await createClient()
+
+  try {
+    const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
+
+    if (error) {
+      console.error("Error getting server profile:", error)
+      return null
+    }
+
+    return data
+  } catch (error) {
+    console.error("Server profile error:", error)
     return null
   }
 }

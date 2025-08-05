@@ -53,14 +53,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log("🔍 Fetching profile for user:", userId)
 
+      // First try to get existing profile
       const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
 
       if (error && error.code === "PGRST116") {
-        // Profile doesn't exist, create one
-        console.log("👤 Creating new profile for user:", userEmail)
+        // Profile doesn't exist, but it should have been created by trigger
+        // Wait a moment and try again
+        console.log("⏳ Profile not found, waiting for trigger...")
+        await new Promise((resolve) => setTimeout(resolve, 1000))
 
+        const { data: retryData, error: retryError } = await supabase
+          .from("users")
+          .select("*")
+          .eq("auth_user_id", userId)
+          .single()
+
+        if (!retryError && retryData) {
+          setProfile(retryData)
+          console.log("✅ Profile found after retry:", retryData.username)
+          return
+        }
+
+        // If still no profile, create a fallback one
+        console.log("🔧 Creating fallback profile...")
         const username = userEmail?.split("@")[0] || `user_${Date.now()}`
-        const newProfile = {
+        const fallbackProfile: Profile = {
           auth_user_id: userId,
           username: username,
           full_name: user?.user_metadata?.full_name || null,
@@ -73,40 +90,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           referral_code: null,
         }
 
-        const { data: createdProfile, error: createError } = await supabase
-          .from("users")
-          .insert(newProfile)
-          .select()
-          .single()
-
-        if (!createError && createdProfile) {
-          setProfile(createdProfile)
-          console.log("✅ Profile created successfully:", createdProfile.username)
-        } else {
-          console.error("❌ Error creating profile:", createError)
-          // Set a minimal profile to allow access
-          setProfile({
-            auth_user_id: userId,
-            username: username,
-            full_name: user?.user_metadata?.full_name || null,
-            email: userEmail || "",
-            phone: null,
-            avatar_url: null,
-            tier: "grassroot" as const,
-            role: "user" as const,
-            coins_balance: 500,
-            referral_code: null,
-          })
-        }
+        setProfile(fallbackProfile)
+        console.log("✅ Fallback profile set:", fallbackProfile.username)
       } else if (!error && data) {
         setProfile(data)
         console.log("✅ Profile loaded:", data.username)
       } else if (error) {
         console.error("❌ Error fetching profile:", error)
-        // Set a fallback profile to prevent blocking access
-        setProfile({
+        // Create fallback profile to prevent blocking
+        const username = userEmail?.split("@")[0] || "user"
+        const fallbackProfile: Profile = {
           auth_user_id: userId,
-          username: userEmail?.split("@")[0] || "user",
+          username: username,
           full_name: user?.user_metadata?.full_name || null,
           email: userEmail || "",
           phone: null,
@@ -115,14 +110,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: "user" as const,
           coins_balance: 500,
           referral_code: null,
-        })
+        }
+        setProfile(fallbackProfile)
+        console.log("✅ Fallback profile created due to error")
       }
     } catch (error) {
       console.error("❌ Unexpected error in fetchProfile:", error)
       // Always set a fallback profile to prevent blocking
-      setProfile({
+      const username = userEmail?.split("@")[0] || "user"
+      const fallbackProfile: Profile = {
         auth_user_id: userId,
-        username: userEmail?.split("@")[0] || "user",
+        username: username,
         full_name: user?.user_metadata?.full_name || null,
         email: userEmail || "",
         phone: null,
@@ -131,7 +129,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: "user" as const,
         coins_balance: 500,
         referral_code: null,
-      })
+      }
+      setProfile(fallbackProfile)
+      console.log("✅ Emergency fallback profile created")
     }
   }
 
@@ -200,8 +200,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Handle auth events
       if (event === "SIGNED_IN" && session?.user) {
-        console.log("✅ User signed in, allowing dashboard access")
-        // Don't force redirect here, let the user navigate naturally
+        console.log("✅ User signed in successfully")
+        // Redirect to dashboard after successful login
+        const redirectTo = new URLSearchParams(window.location.search).get("redirectTo")
+        const targetPath = redirectTo || "/dashboard"
+
+        if (window.location.pathname !== targetPath) {
+          router.push(targetPath)
+        }
       } else if (event === "SIGNED_OUT") {
         console.log("👋 User signed out")
         const currentPath = window.location.pathname
@@ -234,11 +240,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!error) {
         console.log("✅ Sign in successful")
+      } else {
+        console.error("❌ Sign in error:", error)
       }
 
       return { error }
     } catch (error) {
-      console.error("❌ Sign in error:", error)
+      console.error("❌ Sign in exception:", error)
       return { error }
     } finally {
       setLoading(false)
@@ -265,11 +273,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!error) {
         console.log("✅ Sign up successful")
+      } else {
+        console.error("❌ Sign up error:", error)
       }
 
       return { error }
     } catch (error) {
-      console.error("❌ Sign up error:", error)
+      console.error("❌ Sign up exception:", error)
       return { error }
     } finally {
       setLoading(false)
