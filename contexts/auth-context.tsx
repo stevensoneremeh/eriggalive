@@ -29,10 +29,11 @@ interface AuthContextType {
   profile: Profile | null
   loading: boolean
   isAuthenticated: boolean
-  signIn: (email: string, password: string) => Promise<{ error: any }>
   signUp: (email: string, password: string, userData?: any) => Promise<{ error: any }>
+  signIn: (email: string, password: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error: any }>
+  refreshSession: () => Promise<void>
   refreshProfile: () => Promise<void>
   isConfigured: boolean
 }
@@ -271,10 +272,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       })
 
-      if (!error) {
-        console.log("✅ Sign up successful")
-      } else {
+      if (error) {
         console.error("❌ Sign up error:", error)
+      } else {
+        console.log("✅ User signed up successfully")
       }
 
       return { error }
@@ -335,8 +336,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profile,
     loading,
     isAuthenticated: !!user && !!session,
-    signIn,
     signUp,
+    signIn,
     signOut,
     resetPassword,
     refreshProfile,

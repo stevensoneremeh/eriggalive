@@ -39,6 +39,11 @@ CREATE POLICY "Users can update their own profile" ON public.users
 CREATE POLICY "Public profiles are viewable" ON public.users
     FOR SELECT USING (is_active = true AND is_banned = false);
 
+-- Allow authenticated users to insert their own profile
+CREATE POLICY "Allow authenticated users to insert their own profile" ON public.users
+    FOR INSERT
+    WITH CHECK (auth.uid() = auth_user_id);
+
 -- User permissions policies
 CREATE POLICY "Users can view their own permissions" ON public.user_permissions
     FOR SELECT USING (auth.uid() = (SELECT auth_user_id FROM public.users WHERE id = user_id));
@@ -92,18 +97,6 @@ CREATE POLICY "Users can create their own content access" ON public.content_acce
 -- Social policies
 CREATE POLICY "Posts are viewable by everyone" ON public.posts
     FOR SELECT USING (is_published = true AND is_deleted = false);
-
-CREATE POLICY "Users can create posts" ON public.posts
-    FOR INSERT WITH CHECK (auth.uid() = (SELECT auth_user_id FROM public.users WHERE id = user_id));
-
-CREATE POLICY "Users can update their own posts" ON public.posts
-    FOR UPDATE USING (auth.uid() = (SELECT auth_user_id FROM public.users WHERE id = user_id));
-
-CREATE POLICY "Users can delete their own posts" ON public.posts
-    FOR DELETE USING (auth.uid() = (SELECT auth_user_id FROM public.users WHERE id = user_id));
-
-CREATE POLICY "Comments are viewable by everyone" ON public.comments
-    FOR SELECT USING (is_deleted = false);
 
 CREATE POLICY "Users can create comments" ON public.comments
     FOR INSERT WITH CHECK (auth.uid() = (SELECT auth_user_id FROM public.users WHERE id = user_id));
@@ -164,15 +157,6 @@ CREATE POLICY "Users can view their own orders" ON public.orders
 
 CREATE POLICY "Users can create orders" ON public.orders
     FOR INSERT WITH CHECK (auth.uid() = (SELECT auth_user_id FROM public.users WHERE id = user_id));
-
-CREATE POLICY "Order items are viewable with orders" ON public.order_items
-    FOR SELECT USING (
-        EXISTS (
-            SELECT 1 FROM public.orders 
-            WHERE orders.id = order_items.order_id 
-            AND auth.uid() = (SELECT auth_user_id FROM public.users WHERE id = orders.user_id)
-        )
-    );
 
 -- Notification policies
 CREATE POLICY "Users can view their own notifications" ON public.notifications
