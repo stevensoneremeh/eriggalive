@@ -1,489 +1,539 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabaseClient'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Progress } from '@/components/ui/progress'
-import { User, Coins, Trophy, Calendar, ShoppingBag, Eye, MessageSquare, Heart, Users, TrendingUp, Star, Upload } from 'lucide-react'
-import { toast } from 'sonner'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { useToast } from '@/hooks/use-toast'
+import { User, Trophy, Coins, MessageSquare, Heart, Eye, Calendar, ShoppingBag, Upload, Settings, TrendingUp } from 'lucide-react'
+import { AuthGuard } from '@/components/auth-guard'
 
-const supabase = createClient()
+interface UserStats {
+  tickets: number
+  purchases: number
+  vaultViews: number
+  communityPosts: number
+  communityVotes: number
+  followers: number
+  following: number
+  totalSpent: number
+}
 
 interface UserProfile {
-  id: number
-  auth_user_id: string
+  id: string
   username: string
   full_name: string
   email: string
+  bio: string
+  avatar_url: string
   tier: string
   coins: number
   level: number
   points: number
-  avatar_url: string | null
-  is_verified: boolean
-  posts_count?: number
-  followers_count?: number
-  following_count?: number
-  reputation_score?: number
-}
-
-interface UserStats {
-  totalTickets: number
-  totalPurchases: number
-  totalVaultViews: number
-  communityPosts: number
-  communityVotes: number
-  recentActivity: any[]
-}
-
-async function fetchProfile() {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (user) {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('auth_user_id', user.id)
-      .single()
-        
-    if (error) {
-      console.error('Error fetching profile:', error)
-      return null
-    }
-        
-    return data
-  }
-  return null
-}
-
-async function fetchUserStats(userId: string): Promise<UserStats> {
-  try {
-    // Fetch tickets count
-    const { count: ticketsCount } = await supabase
-      .from('tickets')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-
-    // Fetch purchases count
-    const { count: purchasesCount } = await supabase
-      .from('store_purchases')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-
-    // Fetch vault views count
-    const { count: vaultViewsCount } = await supabase
-      .from('vault_views')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-
-    // Fetch community posts count
-    const { count: postsCount } = await supabase
-      .from('community_posts')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-
-    // Fetch community votes count
-    const { count: votesCount } = await supabase
-      .from('community_post_votes')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-
-    // Fetch recent activity
-    const { data: recentActivity } = await supabase
-      .from('community_posts')
-      .select('id, content, created_at, vote_count, comment_count')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(5)
-
-    return {
-      totalTickets: ticketsCount || 0,
-      totalPurchases: purchasesCount || 0,
-      totalVaultViews: vaultViewsCount || 0,
-      communityPosts: postsCount || 0,
-      communityVotes: votesCount || 0,
-      recentActivity: recentActivity || []
-    }
-  } catch (error) {
-    console.error('Error fetching user stats:', error)
-    return {
-      totalTickets: 0,
-      totalPurchases: 0,
-      totalVaultViews: 0,
-      communityPosts: 0,
-      communityVotes: 0,
-      recentActivity: []
-    }
-  }
+  reputation_score: number
+  posts_count: number
+  followers_count: number
+  following_count: number
+  created_at: string
 }
 
 export default function DashboardPage() {
-  const { user, profile: authProfile, loading } = useAuth()
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [stats, setStats] = useState<UserStats | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const { user, profile, loading } = useAuth()
+  const { toast } = useToast()
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [userStats, setUserStats] = useState<UserStats>({
+    tickets: 0,
+    purchases: 0,
+    vaultViews: 0,
+    communityPosts: 0,
+    communityVotes: 0,
+    followers: 0,
+    following: 0,
+    totalSpent: 0
+  })
+  const [isEditing, setIsEditing] = useState(false)
+  const [editForm, setEditForm] = useState({
+    username: '',
+    full_name: '',
+    bio: ''
+  })
+  const [uploading, setUploading] = useState(false)
 
-  useEffect(() => {
-    async function loadUserData() {
-      if (!user) return
-
-      setIsLoading(true)
-      try {
-        // Fetch profile using the Supabase AI suggested function
-        const profileData = await fetchProfile()
-        if (profileData) {
-          setProfile(profileData)
-        }
-
-        // Fetch user stats
-        const statsData = await fetchUserStats(user.id)
-        setStats(statsData)
-      } catch (error) {
-        console.error('Error loading user data:', error)
-        toast.error('Failed to load dashboard data')
-      } finally {
-        setIsLoading(false)
+  // Fetch user profile using Supabase AI suggested method
+  async function fetchProfile() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_user_id', user.id)
+        .single()
+          
+      if (error) {
+        console.error('Error fetching profile:', error)
+        return null
       }
+          
+      return data
     }
+    return null
+  }
 
-    if (!loading) {
-      loadUserData()
-    }
-  }, [user, loading])
-
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Fetch user statistics
+  async function fetchUserStats() {
     if (!user) return
 
-    // Upload avatar - using exact Supabase AI suggestion
-    const avatarFile = event.target.files?.[0]
-    if (!avatarFile) return
+    try {
+      // Fetch tickets count
+      const { count: ticketsCount } = await supabase
+        .from('tickets')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
 
-    const fileExt = avatarFile.name.split('.').pop()
-    const fileName = `${user.id}.${fileExt}`
-    const filePath = `${user.id}/${fileName}`
+      // Fetch purchases count and total spent
+      const { data: purchases } = await supabase
+        .from('store_purchases')
+        .select('amount')
+        .eq('user_id', user.id)
 
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, avatarFile)
+      // Fetch vault views count
+      const { count: vaultViewsCount } = await supabase
+        .from('vault_views')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
 
-    if (uploadError) {
-      console.error('Error uploading avatar', uploadError)
-      return
-    }
+      // Fetch community posts count
+      const { count: communityPostsCount } = await supabase
+        .from('community_posts')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userProfile?.id)
 
-    // Update profile with avatar URL
-    const { data: updateData, error: updateError } = await supabase
-      .from('users')
-      .update({ avatar_url: filePath })
-      .eq('auth_user_id', user.id)
+      // Fetch community votes count
+      const { count: communityVotesCount } = await supabase
+        .from('community_post_votes')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userProfile?.id)
 
-    if (updateError) {
-      console.error('Error updating profile:', updateError)
-      toast.error('Failed to update avatar')
-      return
-    }
+      // Fetch followers count
+      const { count: followersCount } = await supabase
+        .from('user_follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('following_id', userProfile?.id)
 
-    // Update local state
-    setProfile(prev => prev ? { ...prev, avatar_url: filePath } : null)
-    toast.success('Avatar updated successfully!')
-  }
+      // Fetch following count
+      const { count: followingCount } = await supabase
+        .from('user_follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('follower_id', userProfile?.id)
 
-  if (loading || isLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(8)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader className="space-y-2">
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-              </CardHeader>
-            </Card>
-          ))}
-        </div>
-      </div>
-    )
-  }
+      const totalSpent = purchases?.reduce((sum, purchase) => sum + (purchase.amount || 0), 0) || 0
 
-  if (!user || !profile) {
-    return (
-      <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="p-6 text-center">
-            <p>Please log in to view your dashboard.</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  const getTierColor = (tier: string) => {
-    switch (tier?.toLowerCase()) {
-      case 'vip': return 'bg-yellow-500'
-      case 'premium': return 'bg-purple-500'
-      case 'grassroot': return 'bg-green-500'
-      default: return 'bg-gray-500'
+      setUserStats({
+        tickets: ticketsCount || 0,
+        purchases: purchases?.length || 0,
+        vaultViews: vaultViewsCount || 0,
+        communityPosts: communityPostsCount || 0,
+        communityVotes: communityVotesCount || 0,
+        followers: followersCount || 0,
+        following: followingCount || 0,
+        totalSpent
+      })
+    } catch (error) {
+      console.error('Error fetching user stats:', error)
     }
   }
 
-  const getNextLevelProgress = () => {
-    const currentLevel = profile.level || 1
-    const currentPoints = profile.points || 0
-    const pointsForNextLevel = currentLevel * 1000
-    return Math.min((currentPoints / pointsForNextLevel) * 100, 100)
-  }
-
-  // Get avatar URL from storage
-  const getAvatarUrl = () => {
-    if (!profile.avatar_url) return undefined
-    const { data } = supabase.storage.from('avatars').getPublicUrl(profile.avatar_url)
+  // Get avatar URL from Supabase storage
+  function getAvatarUrl(filePath: string) {
+    if (!filePath) return null
+    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath)
     return data.publicUrl
   }
 
-  return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row gap-6">
-        <Card className="flex-1">
-          <CardHeader>
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <Avatar className="h-20 w-20">
-                  <AvatarImage src={getAvatarUrl() || "/placeholder.svg"} />
-                  <AvatarFallback className="text-lg">
-                    {profile.full_name?.charAt(0) || profile.username?.charAt(0) || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <label htmlFor="avatar-upload" className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-1 cursor-pointer hover:bg-primary/90">
-                  <Upload className="h-3 w-3" />
-                </label>
-                <input
-                  id="avatar-upload"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleAvatarUpload}
-                />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <CardTitle className="text-2xl">{profile.full_name}</CardTitle>
-                  {profile.is_verified && (
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                      <Star className="h-3 w-3 mr-1" />
-                      Verified
-                    </Badge>
-                  )}
-                </div>
-                <CardDescription className="text-lg">@{profile.username}</CardDescription>
-                <div className="flex items-center gap-4 mt-2">
-                  <Badge className={getTierColor(profile.tier)}>
-                    {profile.tier?.toUpperCase() || 'GRASSROOT'}
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">Level {profile.level || 1}</span>
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Progress to Level {(profile.level || 1) + 1}</span>
-                <span>{profile.points || 0} / {(profile.level || 1) * 1000} XP</span>
-              </div>
-              <Progress value={getNextLevelProgress()} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
+  // Handle avatar upload using Supabase AI suggested method
+  async function handleAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user || !event.target.files || event.target.files.length === 0) return
 
+    setUploading(true)
+
+    try {
+      // Upload avatar
+      const avatarFile = event.target.files[0]
+      const fileExt = avatarFile.name.split('.').pop()
+      const fileName = `${user.id}.${fileExt}`
+      const filePath = `${user.id}/${fileName}`
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, avatarFile)
+
+      if (uploadError) {
+        console.error('Error uploading avatar', uploadError)
+        toast({
+          title: "Upload Failed",
+          description: "Failed to upload avatar. Please try again.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // Update profile with avatar URL
+      const { data: updateData, error: updateError } = await supabase
+        .from('users')
+        .update({ avatar_url: filePath })
+        .eq('auth_user_id', user.id)
+
+      if (updateError) {
+        console.error('Error updating profile:', updateError)
+        toast({
+          title: "Update Failed",
+          description: "Failed to update profile. Please try again.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // Refresh profile data
+      const updatedProfile = await fetchProfile()
+      setUserProfile(updatedProfile)
+
+      toast({
+        title: "Avatar Updated",
+        description: "Your avatar has been updated successfully!"
+      })
+    } catch (error) {
+      console.error('Error in avatar upload:', error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive"
+      })
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  // Handle profile update
+  async function handleProfileUpdate() {
+    if (!user) return
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          username: editForm.username,
+          full_name: editForm.full_name,
+          bio: editForm.bio
+        })
+        .eq('auth_user_id', user.id)
+
+      if (error) {
+        console.error('Error updating profile:', error)
+        toast({
+          title: "Update Failed",
+          description: "Failed to update profile. Please try again.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // Refresh profile data
+      const updatedProfile = await fetchProfile()
+      setUserProfile(updatedProfile)
+      setIsEditing(false)
+
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been updated successfully!"
+      })
+    } catch (error) {
+      console.error('Error updating profile:', error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  useEffect(() => {
+    if (user) {
+      fetchProfile().then(profileData => {
+        if (profileData) {
+          setUserProfile(profileData)
+          setEditForm({
+            username: profileData.username || '',
+            full_name: profileData.full_name || '',
+            bio: profileData.bio || ''
+          })
+        }
+      })
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (userProfile) {
+      fetchUserStats()
+    }
+  }, [userProfile, user])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  return (
+    <AuthGuard>
+      <div className="container mx-auto px-4 py-8 space-y-8">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <p className="text-muted-foreground">Welcome back, {userProfile?.username || 'Fan'}!</p>
+          </div>
+          <Badge variant="secondary" className="text-lg px-4 py-2">
+            {userProfile?.tier || 'Grassroot'} Member
+          </Badge>
+        </div>
+
+        {/* Profile Section */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Coins className="h-5 w-5 text-yellow-500" />
-              Erigga Coins
+              <User className="h-5 w-5" />
+              Profile Information
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-yellow-600">
-              {profile.coins?.toLocaleString() || 0}
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">Available Balance</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Event Tickets</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalTickets || 0}</div>
-            <p className="text-xs text-muted-foreground">Total purchased</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Store Purchases</CardTitle>
-            <ShoppingBag className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalPurchases || 0}</div>
-            <p className="text-xs text-muted-foreground">Items bought</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Vault Views</CardTitle>
-            <Eye className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalVaultViews || 0}</div>
-            <p className="text-xs text-muted-foreground">Content viewed</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Community Posts</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.communityPosts || 0}</div>
-            <p className="text-xs text-muted-foreground">Posts created</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Detailed Stats */}
-      <Tabs defaultValue="community" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="community">Community</TabsTrigger>
-          <TabsTrigger value="activity">Recent Activity</TabsTrigger>
-          <TabsTrigger value="achievements">Achievements</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="community" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Posts</CardTitle>
-                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{profile.posts_count || 0}</div>
-                <p className="text-xs text-muted-foreground">Total posts</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Followers</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{profile.followers_count || 0}</div>
-                <p className="text-xs text-muted-foreground">People following you</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Reputation</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{profile.reputation_score || 0}</div>
-                <p className="text-xs text-muted-foreground">Community score</p>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="activity" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Posts</CardTitle>
-              <CardDescription>Your latest community activity</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {stats?.recentActivity && stats.recentActivity.length > 0 ? (
-                <div className="space-y-4">
-                  {stats.recentActivity.map((activity, index) => (
-                    <div key={index} className="flex items-start gap-3 p-3 border rounded-lg">
-                      <MessageSquare className="h-4 w-4 mt-1 text-muted-foreground" />
-                      <div className="flex-1">
-                        <p className="text-sm">{activity.content.substring(0, 100)}...</p>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Heart className="h-3 w-3" />
-                            {activity.vote_count}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <MessageSquare className="h-3 w-3" />
-                            {activity.comment_count}
-                          </span>
-                          <span>{new Date(activity.created_at).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+          <CardContent className="space-y-6">
+            <div className="flex items-start gap-6">
+              <div className="flex flex-col items-center space-y-4">
+                <Avatar className="h-24 w-24">
+                  <AvatarImage 
+                    src={userProfile?.avatar_url ? getAvatarUrl(userProfile.avatar_url) : undefined} 
+                    alt={userProfile?.username || 'User'} 
+                  />
+                  <AvatarFallback className="text-lg">
+                    {userProfile?.username?.charAt(0)?.toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col items-center space-y-2">
+                  <Label htmlFor="avatar-upload" className="cursor-pointer">
+                    <Button variant="outline" size="sm" disabled={uploading}>
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploading ? 'Uploading...' : 'Change Avatar'}
+                    </Button>
+                  </Label>
+                  <Input
+                    id="avatar-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    className="hidden"
+                  />
                 </div>
-              ) : (
-                <p className="text-muted-foreground text-center py-8">No recent activity</p>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+              </div>
 
-        <TabsContent value="achievements" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Achievements</CardTitle>
-              <CardDescription>Your milestones and badges</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="flex items-center gap-3 p-3 border rounded-lg">
-                  <Trophy className="h-8 w-8 text-yellow-500" />
-                  <div>
-                    <h4 className="font-medium">Community Member</h4>
-                    <p className="text-sm text-muted-foreground">Joined the community</p>
-                  </div>
-                </div>
-                
-                {(profile.posts_count || 0) >= 5 && (
-                  <div className="flex items-center gap-3 p-3 border rounded-lg">
-                    <MessageSquare className="h-8 w-8 text-blue-500" />
+              <div className="flex-1 space-y-4">
+                {!isEditing ? (
+                  <div className="space-y-3">
                     <div>
-                      <h4 className="font-medium">Active Poster</h4>
-                      <p className="text-sm text-muted-foreground">Created 5+ posts</p>
+                      <Label className="text-sm font-medium">Username</Label>
+                      <p className="text-lg">{userProfile?.username || 'Not set'}</p>
                     </div>
-                  </div>
-                )}
-
-                {profile.is_verified && (
-                  <div className="flex items-center gap-3 p-3 border rounded-lg">
-                    <Star className="h-8 w-8 text-purple-500" />
                     <div>
-                      <h4 className="font-medium">Verified User</h4>
-                      <p className="text-sm text-muted-foreground">Account verified</p>
+                      <Label className="text-sm font-medium">Full Name</Label>
+                      <p className="text-lg">{userProfile?.full_name || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Email</Label>
+                      <p className="text-lg">{user?.email}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Bio</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {userProfile?.bio || 'No bio added yet'}
+                      </p>
+                    </div>
+                    <Button onClick={() => setIsEditing(true)} variant="outline">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Edit Profile
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="username">Username</Label>
+                      <Input
+                        id="username"
+                        value={editForm.username}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, username: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="full_name">Full Name</Label>
+                      <Input
+                        id="full_name"
+                        value={editForm.full_name}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, full_name: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="bio">Bio</Label>
+                      <Textarea
+                        id="bio"
+                        value={editForm.bio}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, bio: e.target.value }))}
+                        placeholder="Tell us about yourself..."
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={handleProfileUpdate}>Save Changes</Button>
+                      <Button variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
                     </div>
                   </div>
                 )}
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Erigga Coins</CardTitle>
+              <Coins className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{userProfile?.coins || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                Level {userProfile?.level || 1} • {userProfile?.points || 0} points
+              </p>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Community Activity</CardTitle>
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{userStats.communityPosts}</div>
+              <p className="text-xs text-muted-foreground">
+                {userStats.communityVotes} votes given
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Followers</CardTitle>
+              <Heart className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{userStats.followers}</div>
+              <p className="text-xs text-muted-foreground">
+                Following {userStats.following}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Reputation</CardTitle>
+              <Trophy className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{userProfile?.reputation_score || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                Community reputation
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Activity Overview */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Platform Activity
+              </CardTitle>
+              <CardDescription>Your engagement across the platform</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Event Tickets</span>
+                <Badge variant="outline">{userStats.tickets}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Store Purchases</span>
+                <Badge variant="outline">{userStats.purchases}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Vault Content Viewed</span>
+                <Badge variant="outline">{userStats.vaultViews}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Total Spent</span>
+                <Badge variant="outline">₦{userStats.totalSpent.toLocaleString()}</Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Progress & Achievements
+              </CardTitle>
+              <CardDescription>Your journey as an Erigga fan</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm">Fan Level Progress</span>
+                  <span className="text-sm text-muted-foreground">
+                    {userProfile?.points || 0} / {((userProfile?.level || 1) * 1000)} XP
+                  </span>
+                </div>
+                <div className="w-full bg-secondary rounded-full h-2">
+                  <div 
+                    className="bg-primary h-2 rounded-full transition-all duration-300" 
+                    style={{ 
+                      width: `${Math.min(((userProfile?.points || 0) / ((userProfile?.level || 1) * 1000)) * 100, 100)}%` 
+                    }}
+                  ></div>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Member Since</span>
+                  <span className="text-sm text-muted-foreground">
+                    {userProfile?.created_at ? new Date(userProfile.created_at).toLocaleDateString() : 'Recently'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Current Tier</span>
+                  <Badge className="capitalize">{userProfile?.tier || 'grassroot'}</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </AuthGuard>
   )
 }

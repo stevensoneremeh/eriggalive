@@ -59,6 +59,7 @@ export async function middleware(request: NextRequest) {
 
   // For protected paths, check authentication
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    console.warn('Supabase environment variables not found, allowing access')
     return NextResponse.next()
   }
 
@@ -69,9 +70,29 @@ export async function middleware(request: NextRequest) {
       },
     })
 
+    // Get the session token from cookies
+    const sessionToken = request.cookies.get('sb-access-token')?.value || 
+                        request.cookies.get('supabase-auth-token')?.value ||
+                        request.headers.get('authorization')?.replace('Bearer ', '')
+
+    if (sessionToken) {
+      // Set the session for this request
+      await supabase.auth.setSession({
+        access_token: sessionToken,
+        refresh_token: request.cookies.get('sb-refresh-token')?.value || ''
+      })
+    }
+
     const {
       data: { user },
+      error
     } = await supabase.auth.getUser()
+
+    // If there's an error getting the user, allow access (let client handle auth)
+    if (error) {
+      console.warn('Middleware auth error:', error.message)
+      return NextResponse.next()
+    }
 
     // If no user and path requires auth, redirect to login
     if (!user && requiresAuth) {
@@ -86,7 +107,8 @@ export async function middleware(request: NextRequest) {
     }
   } catch (error) {
     console.error("Middleware auth error:", error)
-    // Continue without auth checks if there's an error
+    // Continue without auth checks if there's an error - let client handle it
+    return NextResponse.next()
   }
 
   return NextResponse.next()
