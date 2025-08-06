@@ -1,5 +1,6 @@
 import { createClient as supabaseCreateClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
+import { createClient } from '@supabase/supabase-js'
 
 // Check if we're in a browser environment
 const isBrowser = typeof window !== "undefined"
@@ -214,20 +215,22 @@ const createMockClient = () => {
 }
 
 // Create a Supabase client for browser usage
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
 export function createClient() {
   if (isPreviewMode) {
     return createMockClient()
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Missing Supabase environment variables")
-    return createMockClient()
-  }
-
-  return supabaseCreateClient<Database>(supabaseUrl, supabaseAnonKey)
+  return supabaseCreateClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    },
+  })
 }
 
 // Export a singleton instance for consistent usage

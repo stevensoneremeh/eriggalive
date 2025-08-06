@@ -1,10 +1,8 @@
-"use client"
+'use client'
 
-import type React from "react"
-
-import { useAuth } from "@/contexts/auth-context"
-import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useAuth } from '@/contexts/auth-context'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 
 interface AuthGuardProps {
   children: React.ReactNode
@@ -13,20 +11,14 @@ interface AuthGuardProps {
 export function AuthGuard({ children }: AuthGuardProps) {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  useEffect(() => {
-    if (mounted && !loading && !user) {
-      router.push("/login")
+    if (!loading && !user) {
+      router.push('/login')
     }
-  }, [user, loading, router, mounted])
+  }, [user, loading, router])
 
-  // Show loading spinner while checking auth
-  if (!mounted || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <div className="text-center">
@@ -37,9 +29,14 @@ export function AuthGuard({ children }: AuthGuardProps) {
     )
   }
 
-  // Don't render children if not authenticated
   if (!user) {
-    return null
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="text-center">
+          <p className="text-gray-600 dark:text-gray-300">Redirecting to login...</p>
+        </div>
+      </div>
+    )
   }
 
   return <>{children}</>

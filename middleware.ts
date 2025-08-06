@@ -59,23 +59,7 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    // Create Supabase client with request-specific configuration
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        auth: {
-          persistSession: false,
-        },
-        global: {
-          headers: {
-            Authorization: request.headers.get('authorization') || ''
-          }
-        }
-      }
-    )
-
-    // Extract session tokens
+    // Extract session tokens with multiple fallback methods
     const accessToken =
       request.cookies.get('sb-access-token')?.value ||
       request.cookies.get('supabase-auth-token')?.value ||
@@ -90,33 +74,54 @@ export async function middleware(request: NextRequest) {
       return redirectToLogin(request, pathname)
     }
 
+    // Create Supabase client with explicit token handling
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        auth: {
+          persistSession: false,
+        },
+        global: {
+          headers: {
+            // Explicitly set Authorization header if token exists
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+          }
+        }
+      }
+    )
+
     // If tokens exist, attempt to set session
     if (accessToken && refreshToken) {
-      const { data, error } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken
-      })
+      try {
+        const { data, error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken
+        })
 
-      // Handle session setting errors
-      if (error) {
-        console.warn('Session setting error:', error.message)
-        
-        // If session cannot be set and path requires auth, redirect to login
-        if (requiresAuth) {
-          return redirectToLogin(request, pathname)
+        // Log any session setting errors without blocking
+        if (error) {
+          console.warn('Session setting error:', error.message)
         }
+      } catch (sessionError) {
+        console.error('Session setting exception:', sessionError)
       }
     }
 
-    // Get user information
+    // Get user information with more robust error handling
     const {
       data: { user },
       error: userError
     } = await supabase.auth.getUser()
 
-    // Handle user retrieval errors
+    // Detailed logging for user retrieval
     if (userError) {
-      console.warn('User retrieval error:', userError.message)
+      console.warn('User retrieval error details:', {
+        message: userError.message,
+        status: userError.status,
+        accessToken: !!accessToken,
+        refreshToken: !!refreshToken
+      })
       
       // If path requires auth and no user, redirect to login
       if (requiresAuth) {
@@ -135,7 +140,11 @@ export async function middleware(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error("Middleware authentication error:", error)
+    console.error("Comprehensive middleware authentication error:", {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      pathname,
+      requiresAuth
+    })
     
     // If an unexpected error occurs and path requires auth, handle auth error
     if (requiresAuth) {
