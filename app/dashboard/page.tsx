@@ -8,31 +8,204 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  Users,
-  MessageCircle,
-  Coins,
-  Trophy,
-  Music,
-  Star,
-  Crown,
-  Zap,
-  TrendingUp,
-  Camera,
-  Edit,
-  Phone,
-  Settings,
-} from "lucide-react"
+import { Users, MessageCircle, Coins, Trophy, Music, Star, Crown, Zap, TrendingUp, Camera, Edit, Phone, Settings, Calendar, Ticket, ShoppingBag, Eye, Heart, BookOpen } from 'lucide-react'
 import Link from "next/link"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabaseClient"
+import { createClient } from "@/lib/supabase/client"
+
+interface UserStats {
+  totalPosts: number
+  totalComments: number
+  totalVotes: number
+  totalTickets: number
+  totalPurchases: number
+  vaultViews: number
+  followersCount: number
+  followingCount: number
+  reputationScore: number
+}
 
 export default function DashboardPage() {
   const { user, profile, loading, refreshProfile } = useAuth()
   const { toast } = useToast()
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [userStats, setUserStats] = useState<UserStats>({
+    totalPosts: 0,
+    totalComments: 0,
+    totalVotes: 0,
+    totalTickets: 0,
+    totalPurchases: 0,
+    vaultViews: 0,
+    followersCount: 0,
+    followingCount: 0,
+    reputationScore: 0,
+  })
+  const [recentActivity, setRecentActivity] = useState<any[]>([])
+  const [loadingStats, setLoadingStats] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const supabase = createClient()
+
+  // Load user statistics
+  useEffect(() => {
+    if (user && profile) {
+      loadUserStats()
+      loadRecentActivity()
+    }
+  }, [user, profile])
+
+  const loadUserStats = async () => {
+    if (!profile) return
+
+    try {
+      setLoadingStats(true)
+
+      // Get community posts count
+      const { count: postsCount } = await supabase
+        .from("community_posts")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", profile.id)
+        .eq("is_deleted", false)
+
+      // Get community comments count
+      const { count: commentsCount } = await supabase
+        .from("community_comments")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", profile.id)
+        .eq("is_deleted", false)
+
+      // Get votes given count
+      const { count: votesCount } = await supabase
+        .from("community_post_votes")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", profile.id)
+
+      // Get tickets count
+      const { count: ticketsCount } = await supabase
+        .from("tickets")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+
+      // Get purchases count
+      const { count: purchasesCount } = await supabase
+        .from("store_purchases")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+
+      // Get vault views count
+      const { count: vaultViewsCount } = await supabase
+        .from("vault_views")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+
+      // Get followers count
+      const { count: followersCount } = await supabase
+        .from("user_follows")
+        .select("*", { count: "exact", head: true })
+        .eq("following_id", profile.id)
+
+      // Get following count
+      const { count: followingCount } = await supabase
+        .from("user_follows")
+        .select("*", { count: "exact", head: true })
+        .eq("follower_id", profile.id)
+
+      setUserStats({
+        totalPosts: postsCount || 0,
+        totalComments: commentsCount || 0,
+        totalVotes: votesCount || 0,
+        totalTickets: ticketsCount || 0,
+        totalPurchases: purchasesCount || 0,
+        vaultViews: vaultViewsCount || 0,
+        followersCount: followersCount || 0,
+        followingCount: followingCount || 0,
+        reputationScore: profile.reputation_score || 0,
+      })
+    } catch (error) {
+      console.error("Error loading user stats:", error)
+    } finally {
+      setLoadingStats(false)
+    }
+  }
+
+  const loadRecentActivity = async () => {
+    if (!profile) return
+
+    try {
+      // Get recent posts
+      const { data: recentPosts } = await supabase
+        .from("community_posts")
+        .select("id, content, created_at")
+        .eq("user_id", profile.id)
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: false })
+        .limit(3)
+
+      // Get recent comments
+      const { data: recentComments } = await supabase
+        .from("community_comments")
+        .select("id, content, created_at")
+        .eq("user_id", profile.id)
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: false })
+        .limit(3)
+
+      // Get recent tickets
+      const { data: recentTickets } = await supabase
+        .from("tickets")
+        .select("id, ticket_number, created_at, events(title)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(2)
+
+      const activities = []
+
+      // Add posts to activity
+      if (recentPosts) {
+        recentPosts.forEach((post) => {
+          activities.push({
+            type: "post",
+            content: `Created post: ${post.content.substring(0, 50)}...`,
+            timestamp: post.created_at,
+            icon: MessageCircle,
+            color: "text-blue-500",
+          })
+        })
+      }
+
+      // Add comments to activity
+      if (recentComments) {
+        recentComments.forEach((comment) => {
+          activities.push({
+            type: "comment",
+            content: `Commented: ${comment.content.substring(0, 50)}...`,
+            timestamp: comment.created_at,
+            icon: MessageCircle,
+            color: "text-green-500",
+          })
+        })
+      }
+
+      // Add tickets to activity
+      if (recentTickets) {
+        recentTickets.forEach((ticket) => {
+          activities.push({
+            type: "ticket",
+            content: `Got ticket for ${ticket.events?.title || "Event"}`,
+            timestamp: ticket.created_at,
+            icon: Ticket,
+            color: "text-purple-500",
+          })
+        })
+      }
+
+      // Sort by timestamp and take latest 5
+      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      setRecentActivity(activities.slice(0, 5))
+    } catch (error) {
+      console.error("Error loading recent activity:", error)
+    }
+  }
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -108,6 +281,35 @@ export default function DashboardPage() {
       default:
         return 0
     }
+  }
+
+  if (loading || loadingStats) {
+    return (
+      <AuthGuard>
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4 sm:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto">
+            <div className="animate-pulse space-y-8">
+              <div className="h-8 bg-gray-300 rounded w-1/3"></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-32 bg-gray-300 rounded"></div>
+                ))}
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-6">
+                  <div className="h-64 bg-gray-300 rounded"></div>
+                  <div className="h-48 bg-gray-300 rounded"></div>
+                </div>
+                <div className="space-y-6">
+                  <div className="h-80 bg-gray-300 rounded"></div>
+                  <div className="h-48 bg-gray-300 rounded"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </AuthGuard>
+    )
   }
 
   return (
@@ -186,13 +388,13 @@ export default function DashboardPage() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Status</p>
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">
-                      {profile?.is_verified ? "✅ Verified" : "❌ Not Verified"}
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Reputation</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {userStats.reputationScore.toLocaleString()}
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-                    <Users className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                    <Star className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                   </div>
                 </div>
               </CardContent>
@@ -202,6 +404,41 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
+              {/* Activity Stats */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <TrendingUp className="w-5 h-5 mr-2" />
+                    Your Activity
+                  </CardTitle>
+                  <CardDescription>Your engagement across the platform</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <MessageCircle className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-blue-600">{userStats.totalPosts}</div>
+                      <div className="text-sm text-gray-500">Posts</div>
+                    </div>
+                    <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <MessageCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-green-600">{userStats.totalComments}</div>
+                      <div className="text-sm text-gray-500">Comments</div>
+                    </div>
+                    <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                      <Heart className="w-8 h-8 text-red-600 mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-red-600">{userStats.totalVotes}</div>
+                      <div className="text-sm text-gray-500">Votes Given</div>
+                    </div>
+                    <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                      <Users className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-purple-600">{userStats.followersCount}</div>
+                      <div className="text-sm text-gray-500">Followers</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Tier Progress */}
               <Card>
                 <CardHeader>
@@ -289,6 +526,12 @@ export default function DashboardPage() {
                         <span className="text-sm">Media Vault</span>
                       </Link>
                     </Button>
+                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
+                      <Link href="/tickets">
+                        <Ticket className="w-6 h-6 mb-2" />
+                        <span className="text-sm">My Tickets</span>
+                      </Link>
+                    </Button>
                     <Button
                       asChild
                       variant="outline"
@@ -297,12 +540,6 @@ export default function DashboardPage() {
                       <Link href="/meet-and-greet">
                         <Phone className="w-6 h-6 mb-2 text-purple-600" />
                         <span className="text-sm text-purple-600 font-medium">Meet & Greet</span>
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/merch">
-                        <Star className="w-6 h-6 mb-2" />
-                        <span className="text-sm">Merchandise</span>
                       </Link>
                     </Button>
                     <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
@@ -388,6 +625,45 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
 
+              {/* Platform Stats */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Platform Stats</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Ticket className="w-4 h-4 text-blue-500" />
+                        <span className="text-sm">Tickets</span>
+                      </div>
+                      <span className="font-medium">{userStats.totalTickets}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <ShoppingBag className="w-4 h-4 text-green-500" />
+                        <span className="text-sm">Purchases</span>
+                      </div>
+                      <span className="font-medium">{userStats.totalPurchases}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Eye className="w-4 h-4 text-purple-500" />
+                        <span className="text-sm">Vault Views</span>
+                      </div>
+                      <span className="font-medium">{userStats.vaultViews}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-orange-500" />
+                        <span className="text-sm">Following</span>
+                      </div>
+                      <span className="font-medium">{userStats.followingCount}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Recent Activity */}
               <Card>
                 <CardHeader>
@@ -395,18 +671,24 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3 text-sm">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full" />
-                      <span>Joined community discussion</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                      <span>Earned {profile?.coins || 0} coins</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                      <span>Updated profile</span>
-                    </div>
+                    {recentActivity.length > 0 ? (
+                      recentActivity.map((activity, index) => {
+                        const Icon = activity.icon
+                        return (
+                          <div key={index} className="flex items-start space-x-2">
+                            <Icon className={`w-4 h-4 mt-0.5 ${activity.color}`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm truncate">{activity.content}</p>
+                              <p className="text-xs text-gray-500">
+                                {new Date(activity.timestamp).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })
+                    ) : (
+                      <p className="text-gray-500 text-center py-4">No recent activity</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
