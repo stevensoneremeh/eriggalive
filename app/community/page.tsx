@@ -1,137 +1,88 @@
-"use client"
+'use client'
 
-import { AuthGuard } from "@/components/auth-guard"
-import { useAuth } from "@/contexts/auth-context"
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { MessageCircle, Heart, Share2, Plus, TrendingUp, Crown, Send, MoreHorizontal } from 'lucide-react'
-import { supabase } from "@/lib/supabaseClient"
-import { useToast } from "@/hooks/use-toast"
-import { formatDistanceToNow } from "date-fns"
-import { CompleteWorkingCommunityClient } from "./complete-working/complete-working-client"
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
+import { useAuth } from '@/contexts/auth-context'
+import { CompleteWorkingClient } from './complete-working/complete-working-client'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
+import { MessageSquare, Users, TrendingUp } from 'lucide-react'
 
-interface Post {
-  id: string
-  content: string
-  created_at: string
-  updated_at: string
-  author_id: string
-  likes_count: number
-  comments_count: number
-  user_profiles: {
-    id: string
-    username: string
-    full_name: string
-    avatar_url: string
-    tier: string
-    coins: number
-    reputation_score: number
-  }
-  community_categories: {
-    id: string
-    name: string
-    slug: string
-    icon: string
-    color: string
-  }
-  user_has_liked: boolean
-}
+export default function CommunityPage() {
+  const { user, loading } = useAuth()
 
-interface Comment {
-  id: string
-  content: string
-  created_at: string
-  author_id: string
-  post_id: string
-  author: {
-    id: string
-    username: string
-    full_name: string
-    avatar_url: string
-    tier: string
-  }
-}
-
-async function getCurrentUser() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-  
-  if (authError || !user) {
-    redirect("/login")
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="grid gap-6 md:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-6">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
   }
 
-  // Get user profile
-  const { data: profile, error: profileError } = await supabase
-    .from("users")
-    .select("*")
-    .eq("auth_user_id", user.id)
-    .single()
-
-  if (profileError) {
-    console.error("Profile error:", profileError)
-    // Profile might not exist yet, let the client handle it
-    return { user, profile: null }
+  if (!user) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card className="max-w-md mx-auto">
+          <CardContent className="p-6 text-center space-y-4">
+            <div className="flex justify-center">
+              <MessageSquare className="h-12 w-12 text-muted-foreground" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold mb-2">Join the Community</h2>
+              <p className="text-muted-foreground mb-4">
+                Connect with other fans, share your thoughts, and be part of the Erigga community.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Button asChild className="w-full">
+                <Link href="/login">Sign In</Link>
+              </Button>
+              <Button variant="outline" asChild className="w-full">
+                <Link href="/signup">Create Account</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
-
-  return { user, profile: { ...profile, email: user.email } }
-}
-
-async function getCommunityData() {
-  const supabase = await createClient()
-
-  // Get categories
-  const { data: categories } = await supabase
-    .from("community_categories")
-    .select("*")
-    .eq("is_active", true)
-    .order("display_order")
-
-  // Get initial posts with user data and vote status
-  const { data: posts } = await supabase
-    .from("community_posts")
-    .select(`
-      *,
-      user_profiles!inner (
-        id, username, full_name, avatar_url, tier, coins, reputation_score
-      ),
-      community_categories!inner (
-        id, name, slug, icon, color
-      )
-    `)
-    .eq("is_published", true)
-    .eq("is_deleted", false)
-    .order("created_at", { ascending: false })
-    .limit(20)
-
-  return {
-    categories: categories || [],
-    posts: posts || [],
-  }
-}
-
-export default async function CommunityPage() {
-  const { user, profile } = await getCurrentUser()
-  const { categories, posts } = await getCommunityData()
 
   return (
-    <AuthGuard>
-      <CompleteWorkingCommunityClient 
-        user={user} 
-        profile={profile} 
-        initialPosts={posts} 
-        categories={categories} 
-      />
-    </AuthGuard>
+    <div className="min-h-screen bg-background">
+      {/* Community Header */}
+      <div className="border-b bg-card">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">Community</h1>
+              <p className="text-muted-foreground mt-1">
+                Connect, share, and engage with fellow fans
+              </p>
+            </div>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <Users className="h-4 w-4" />
+                <span>Active Community</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <TrendingUp className="h-4 w-4" />
+                <span>Growing Daily</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Community Content */}
+      <CompleteWorkingClient />
+    </div>
   )
 }
