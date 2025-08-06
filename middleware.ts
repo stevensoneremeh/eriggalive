@@ -52,68 +52,115 @@ export async function middleware(request: NextRequest) {
   // Check if path requires authentication
   const requiresAuth = PROTECTED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
 
-  // If it's a public path or doesn't require auth, allow access
-  if (isPublicPath || !requiresAuth) {
-    return NextResponse.next()
-  }
-
-  // For protected paths, check authentication
+  // Validate Supabase environment variables
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    console.warn('Supabase environment variables not found, allowing access')
-    return NextResponse.next()
+    console.error('Missing Supabase environment variables')
+    return handleAuthError(request, 'Configuration Error')
   }
 
   try {
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-      auth: {
-        persistSession: false,
-      },
-    })
+    // Create Supabase client with request-specific configuration
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        auth: {
+          persistSession: false,
+        },
+        global: {
+          headers: {
+            Authorization: request.headers.get('authorization') || ''
+          }
+        }
+      }
+    )
 
-    // Get the session token from cookies
-    const sessionToken = request.cookies.get('sb-access-token')?.value || 
-                        request.cookies.get('supabase-auth-token')?.value ||
-                        request.headers.get('authorization')?.replace('Bearer ', '')
+    // Extract session tokens
+    const accessToken =
+      request.cookies.get('sb-access-token')?.value ||
+      request.cookies.get('supabase-auth-token')?.value ||
+      request.headers.get('authorization')?.replace('Bearer ', '')
 
-    if (sessionToken) {
-      // Set the session for this request
-      await supabase.auth.setSession({
-        access_token: sessionToken,
-        refresh_token: request.cookies.get('sb-refresh-token')?.value || ''
-      })
+    const refreshToken =
+      request.cookies.get('sb-refresh-token')?.value ||
+      request.cookies.get('supabase-refresh-token')?.value
+
+    // If no tokens and path requires auth, redirect to login
+    if ((!accessToken || !refreshToken) && requiresAuth) {
+      return redirectToLogin(request, pathname)
     }
 
+    // If tokens exist, attempt to set session
+    if (accessToken && refreshToken) {
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      })
+
+      // Handle session setting errors
+      if (error) {
+        console.warn('Session setting error:', error.message)
+        
+        // If session cannot be set and path requires auth, redirect to login
+        if (requiresAuth) {
+          return redirectToLogin(request, pathname)
+        }
+      }
+    }
+
+    // Get user information
     const {
       data: { user },
-      error
+      error: userError
     } = await supabase.auth.getUser()
 
-    // If there's an error getting the user, allow access (let client handle auth)
-    if (error) {
-      console.warn('Middleware auth error:', error.message)
-      return NextResponse.next()
-    }
-
-    // If no user and path requires auth, redirect to login
-    if (!user && requiresAuth) {
-      const redirectUrl = new URL("/login", request.url)
-      redirectUrl.searchParams.set("redirect", pathname)
-      return NextResponse.redirect(redirectUrl)
+    // Handle user retrieval errors
+    if (userError) {
+      console.warn('User retrieval error:', userError.message)
+      
+      // If path requires auth and no user, redirect to login
+      if (requiresAuth) {
+        return redirectToLogin(request, pathname)
+      }
     }
 
     // If user exists and trying to access auth pages, redirect to dashboard
     if (user && (pathname === "/login" || pathname === "/signup")) {
       return NextResponse.redirect(new URL("/dashboard", request.url))
     }
+
+    // If no user and path requires auth, redirect to login
+    if (!user && requiresAuth) {
+      return redirectToLogin(request, pathname)
+    }
+
   } catch (error) {
-    console.error("Middleware auth error:", error)
-    // Continue without auth checks if there's an error - let client handle it
-    return NextResponse.next()
+    console.error("Middleware authentication error:", error)
+    
+    // If an unexpected error occurs and path requires auth, handle auth error
+    if (requiresAuth) {
+      return handleAuthError(request, 'Unexpected Error')
+    }
   }
 
   return NextResponse.next()
 }
 
+// Helper function to redirect to login with optional redirect path
+function redirectToLogin(request: NextRequest, redirectPath: string) {
+  const redirectUrl = new URL("/login", request.url)
+  redirectUrl.searchParams.set("redirect", redirectPath)
+  return NextResponse.redirect(redirectUrl)
+}
+
+// Helper function to handle authentication errors
+function handleAuthError(request: NextRequest, errorType: string) {
+  const errorUrl = new URL("/login", request.url)
+  errorUrl.searchParams.set("error", errorType)
+  return NextResponse.redirect(errorUrl)
+}
+
 export const config = {
-  matcher: ["/((?!api/|_next/static|_next/image|favicon.ico|images/|videos/|fonts/|placeholder|.*\\.).*)"],
+  matcher: [
+    "/((?!api/|_next/static|_next/image|favicon.ico|images/|videos/|fonts/|placeholder|.*\\.).*)"],
 }
