@@ -156,37 +156,40 @@ export default function DashboardPage() {
   }, [user, loading])
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file || !user) return
+    if (!user) return
 
-    try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${user.id}.${fileExt}`
-      const filePath = `avatars/${fileName}`
+    // Upload avatar - using exact Supabase AI suggestion
+    const avatarFile = event.target.files?.[0]
+    if (!avatarFile) return
 
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file, { upsert: true })
+    const fileExt = avatarFile.name.split('.').pop()
+    const fileName = `${user.id}.${fileExt}`
+    const filePath = `${user.id}/${fileName}`
 
-      if (uploadError) throw uploadError
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, avatarFile)
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath)
-
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ avatar_url: publicUrl })
-        .eq('auth_user_id', user.id)
-
-      if (updateError) throw updateError
-
-      setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : null)
-      toast.success('Avatar updated successfully!')
-    } catch (error) {
-      console.error('Error uploading avatar:', error)
-      toast.error('Failed to update avatar')
+    if (uploadError) {
+      console.error('Error uploading avatar', uploadError)
+      return
     }
+
+    // Update profile with avatar URL
+    const { data: updateData, error: updateError } = await supabase
+      .from('users')
+      .update({ avatar_url: filePath })
+      .eq('auth_user_id', user.id)
+
+    if (updateError) {
+      console.error('Error updating profile:', updateError)
+      toast.error('Failed to update avatar')
+      return
+    }
+
+    // Update local state
+    setProfile(prev => prev ? { ...prev, avatar_url: filePath } : null)
+    toast.success('Avatar updated successfully!')
   }
 
   if (loading || isLoading) {
@@ -234,6 +237,13 @@ export default function DashboardPage() {
     return Math.min((currentPoints / pointsForNextLevel) * 100, 100)
   }
 
+  // Get avatar URL from storage
+  const getAvatarUrl = () => {
+    if (!profile.avatar_url) return undefined
+    const { data } = supabase.storage.from('avatars').getPublicUrl(profile.avatar_url)
+    return data.publicUrl
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header Section */}
@@ -243,7 +253,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-4">
               <div className="relative">
                 <Avatar className="h-20 w-20">
-                  <AvatarImage src={profile.avatar_url || undefined} />
+                  <AvatarImage src={getAvatarUrl() || "/placeholder.svg"} />
                   <AvatarFallback className="text-lg">
                     {profile.full_name?.charAt(0) || profile.username?.charAt(0) || 'U'}
                   </AvatarFallback>
