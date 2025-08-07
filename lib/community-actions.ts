@@ -167,6 +167,10 @@ export async function createCommunityPost(formData: FormData) {
   }
 }
 
+export async function createCommunityPostAction(formData: FormData) {
+  return createCommunityPost(formData)
+}
+
 export async function editPostAction(postId: number, formData: FormData) {
   try {
     const supabase = await createClient()
@@ -549,7 +553,6 @@ export async function createReportAction(
       return { success: false, error: error.message }
     }
 
-    // We don't need to revalidate a specific path, but you can do so if you show reports somewhere
     return { success: true }
   } catch (error: any) {
     console.error("Create report action error:", error)
@@ -727,78 +730,6 @@ export async function searchUsersForMention(query: string) {
     console.error("Search users error:", error)
     return []
   }
-}
-
-export async function getDummyPosts() {
-  return [
-    {
-      id: 1,
-      user_id: 1,
-      category_id: 1,
-      content: "Welcome to the Erigga community! 🎵 Share your bars, stories, and connect with fellow fans.",
-      media_url: null,
-      media_type: null,
-      media_metadata: null,
-      vote_count: 12,
-      comment_count: 5,
-      tags: ["welcome", "community"],
-      mentions: null,
-      is_published: true,
-      is_edited: false,
-      is_deleted: false,
-      deleted_at: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      user: {
-        id: 1,
-        auth_user_id: "dummy-auth-id-1",
-        username: "eriggaofficial",
-        full_name: "Erigga",
-        avatar_url: "/placeholder-user.jpg",
-        tier: "blood" as const,
-      },
-      category: {
-        id: 1,
-        name: "General",
-        slug: "general",
-      },
-      has_voted: false,
-    },
-    {
-      id: 2,
-      user_id: 2,
-      category_id: 2,
-      content:
-        "Just dropped some fire bars 🔥\n\n*They say I'm the king of my city*\n*But I tell them I'm just getting started*\n*Paper boy flow, now I'm paper rich*\n*From the streets to the studio, never departed*",
-      media_url: null,
-      media_type: null,
-      media_metadata: null,
-      vote_count: 8,
-      comment_count: 3,
-      tags: ["bars", "rap", "fire"],
-      mentions: null,
-      is_published: true,
-      is_edited: false,
-      is_deleted: false,
-      deleted_at: null,
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-      updated_at: new Date(Date.now() - 3600000).toISOString(),
-      user: {
-        id: 2,
-        auth_user_id: "dummy-auth-id-2",
-        username: "warriking",
-        full_name: "Warri King",
-        avatar_url: "/placeholder-user.jpg",
-        tier: "pioneer" as const,
-      },
-      category: {
-        id: 2,
-        name: "Bars",
-        slug: "bars",
-      },
-      has_voted: false,
-    },
-  ]
 }
 
 export async function fetchCommunityCategories() {

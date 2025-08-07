@@ -37,18 +37,20 @@ export async function updateSession(request: NextRequest) {
       error,
     } = await supabase.auth.getUser()
 
-    // Only log actual errors, not missing sessions (which is normal for unauthenticated users)
-    if (error && !error.message?.includes('Auth session missing')) {
+    // Only log actual errors, not missing sessions
+    if (error && !error.message.includes('Auth session missing')) {
       console.error('Auth error in middleware:', error.message)
     }
 
-    // Don't redirect if user is null - this is normal for public pages
+    // Allow all requests to continue - we'll handle auth at the component level
     return supabaseResponse
   } catch (error: any) {
     // Only log unexpected errors
     if (!error.message?.includes('Auth session missing')) {
-      console.error('Middleware error:', error)
+      console.error('Unexpected auth error in middleware:', error)
     }
+    
+    // Always allow the request to continue
     return supabaseResponse
   }
 }
