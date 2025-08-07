@@ -16,7 +16,6 @@ function CommunityWelcome() {
   const handleJoinCommunity = () => {
     executeWithAuth(
       () => {
-        // This will be handled by the auth success callback
         window.location.reload()
       },
       {
@@ -30,7 +29,6 @@ function CommunityWelcome() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="container mx-auto px-4 py-8">
-        {/* Welcome Header */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-center mb-6">
             <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
@@ -58,7 +56,6 @@ function CommunityWelcome() {
           </div>
         </div>
 
-        {/* Community Features */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
           <Card className="text-center">
             <CardHeader>
@@ -103,7 +100,6 @@ function CommunityWelcome() {
           </Card>
         </div>
 
-        {/* Community Stats */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="text-center">Community Stats</CardTitle>
@@ -130,7 +126,6 @@ function CommunityWelcome() {
           </CardContent>
         </Card>
 
-        {/* Recent Activity Preview */}
         <Card>
           <CardHeader>
             <CardTitle>Recent Community Activity</CardTitle>
@@ -180,7 +175,6 @@ function CommunityWelcome() {
         </Card>
       </div>
 
-      {/* Login Prompt Modal */}
       <LoginPromptModal
         isOpen={showLoginPrompt}
         onClose={handleLoginCancel}

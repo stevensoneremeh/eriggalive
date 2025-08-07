@@ -10,24 +10,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import {
-  Activity,
-  AlertCircle,
-  Crown,
-  Eye,
-  Hash,
-  Heart,
-  MessageSquare,
-  RefreshCw,
-  TrendingUp,
-  Users,
-} from "lucide-react"
+import { Activity, AlertCircle, Crown, Eye, Hash, Heart, MessageSquare, RefreshCw, TrendingUp, Users } from 'lucide-react'
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
-// ─────────────────────────────────────────────────────────
-// Type definitions
-// ─────────────────────────────────────────────────────────
 interface Category {
   id: number
   name: string
@@ -45,9 +31,6 @@ interface CommunityStats {
   totalComments: number
 }
 
-// ─────────────────────────────────────────────────────────
-// Small skeleton while we load data
-// ─────────────────────────────────────────────────────────
 function LoadingSkeleton() {
   return (
     <div className="space-y-6">
@@ -75,9 +58,6 @@ function LoadingSkeleton() {
   )
 }
 
-// ─────────────────────────────────────────────────────────
-// Sidebar w/ fake community stats (replace w/ real API later)
-// ─────────────────────────────────────────────────────────
 function TrendingSidebar() {
   const [stats, setStats] = useState<CommunityStats>({
     totalMembers: 12_450,
@@ -92,7 +72,6 @@ function TrendingSidebar() {
   const refreshStats = useCallback(async () => {
     setLoading(true)
     try {
-      // Simulate network
       await new Promise((res) => setTimeout(res, 1_000))
       setStats((prev) => ({
         ...prev,
@@ -108,7 +87,6 @@ function TrendingSidebar() {
 
   return (
     <div className="space-y-6">
-      {/* Stats */}
       <Card>
         <CardHeader className="flex items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center text-lg">
@@ -151,7 +129,6 @@ function TrendingSidebar() {
         </CardContent>
       </Card>
 
-      {/* Trending Topics */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center text-lg">
@@ -186,7 +163,6 @@ function TrendingSidebar() {
         </CardContent>
       </Card>
 
-      {/* Top Contributors */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center text-lg">
@@ -238,7 +214,6 @@ function TrendingSidebar() {
         </CardContent>
       </Card>
 
-      {/* Quick Actions */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Quick Actions</CardTitle>
@@ -265,9 +240,6 @@ function TrendingSidebar() {
   )
 }
 
-// ─────────────────────────────────────────────────────────
-// Main client page
-// ─────────────────────────────────────────────────────────
 export function CommunityPageClient() {
   const supabase = createClient()
   const [categories, setCategories] = useState<Category[]>([])
@@ -275,7 +247,6 @@ export function CommunityPageClient() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch active categories once on mount
   useEffect(() => {
     async function loadCategories() {
       try {
@@ -290,7 +261,6 @@ export function CommunityPageClient() {
       } catch (e) {
         console.error("loadCategories", e)
         setError("Could not load categories. Showing defaults.")
-        // simple fallback set
         setCategories([
           { id: 1, name: "General Discussion", slug: "general", is_active: true },
           { id: 2, name: "Music & Lyrics", slug: "music", is_active: true },
@@ -303,7 +273,6 @@ export function CommunityPageClient() {
     loadCategories()
   }, [supabase])
 
-  // When a post is created from the form
   const handlePostCreated = useCallback((newPost: any) => {
     setPosts((prev) => [newPost, ...prev])
     toast.success("Post created successfully! 🎉")
@@ -322,7 +291,6 @@ export function CommunityPageClient() {
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
         <header className="mb-8">
           <h1 className="text-4xl font-bold mb-2">Community</h1>
           <p className="text-lg text-gray-600 max-w-2xl">
@@ -338,26 +306,22 @@ export function CommunityPageClient() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Posts + create form */}
           <section className="lg:col-span-3 space-y-8">
             <EnhancedCreatePostForm categories={categories} onPostCreated={handlePostCreated} />
             <Suspense fallback={<LoadingSkeleton />}>
               <EnhancedPostFeed
                 categories={categories}
                 initialPosts={posts}
-                /** extra prop in case component expects `posts` */
                 posts={posts}
               />
             </Suspense>
           </section>
 
-          {/* Right sidebar (hidden on mobile) */}
           <aside className="hidden lg:block sticky top-24 space-y-8">
             <TrendingSidebar />
           </aside>
         </div>
 
-        {/* Mobile sidebar */}
         <div className="lg:hidden mt-8">
           <TrendingSidebar />
         </div>
