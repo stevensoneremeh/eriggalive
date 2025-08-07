@@ -21,6 +21,10 @@ const createMockClient = () => {
                 email: "mock@example.com",
                 user_metadata: { username: "mockuser", full_name: "Mock User" },
               },
+              access_token: "mock-token",
+              refresh_token: "mock-refresh-token",
+              expires_at: Date.now() + 3600000,
+              token_type: "bearer",
             },
           },
           error: null,
@@ -32,6 +36,10 @@ const createMockClient = () => {
               id: "mock-user-id",
               email: "mock@example.com",
               user_metadata: { username: "mockuser", full_name: "Mock User" },
+              aud: "authenticated",
+              role: "authenticated",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
             },
           },
           error: null,
@@ -43,9 +51,16 @@ const createMockClient = () => {
               id: "mock-user-id",
               email: "mock@example.com",
               user_metadata: { username: "mockuser", full_name: "Mock User" },
+              aud: "authenticated",
+              role: "authenticated",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
             },
             session: {
               access_token: "mock-token",
+              refresh_token: "mock-refresh-token",
+              expires_at: Date.now() + 3600000,
+              token_type: "bearer",
               user: {
                 id: "mock-user-id",
                 email: "mock@example.com",
@@ -61,9 +76,16 @@ const createMockClient = () => {
               id: "mock-user-id",
               email: "mock@example.com",
               user_metadata: { username: "mockuser", full_name: "Mock User" },
+              aud: "authenticated",
+              role: "authenticated",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
             },
             session: {
               access_token: "mock-token",
+              refresh_token: "mock-refresh-token",
+              expires_at: Date.now() + 3600000,
+              token_type: "bearer",
               user: {
                 id: "mock-user-id",
                 email: "mock@example.com",
@@ -73,16 +95,30 @@ const createMockClient = () => {
           error: null,
         }),
       signOut: () => Promise.resolve({ error: null }),
+      resetPasswordForEmail: () => Promise.resolve({ error: null }),
+      updateUser: () => Promise.resolve({ 
+        data: { user: null },
+        error: null 
+      }),
+      exchangeCodeForSession: () => Promise.resolve({ 
+        data: { session: null, user: null },
+        error: null 
+      }),
       onAuthStateChange: (callback: any) => {
-        callback("SIGNED_IN", {
-          session: {
+        // Simulate initial auth state
+        setTimeout(() => {
+          callback("SIGNED_IN", {
+            access_token: "mock-token",
+            refresh_token: "mock-refresh-token",
+            expires_at: Date.now() + 3600000,
+            token_type: "bearer",
             user: {
               id: "mock-user-id",
               email: "mock@example.com",
               user_metadata: { username: "mockuser", full_name: "Mock User" },
             },
-          },
-        })
+          })
+        }, 100)
         return { data: { subscription: { unsubscribe: () => {} } } }
       },
     },
@@ -102,6 +138,7 @@ const createMockClient = () => {
                   coins: 500,
                   level: 1,
                   points: 0,
+                  reputation_score: 100,
                   avatar_url: null,
                   is_verified: false,
                   is_active: true,
@@ -209,7 +246,6 @@ const createMockClient = () => {
       }),
     },
     rpc: (functionName: string, params: any) => Promise.resolve({ data: true, error: null }),
-    raw: (sql: string) => sql,
   } as any
 }
 
@@ -219,10 +255,33 @@ export function createClient() {
     return createMockClient()
   }
 
-  return createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  // Validate environment variables
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    console.error('Missing Supabase environment variables')
+    return createMockClient()
+  }
+
+  try {
+    return createBrowserClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+        },
+        global: {
+          headers: {
+            'X-Client-Info': 'eriggalive-web',
+          },
+        },
+      }
+    )
+  } catch (error) {
+    console.error('Failed to create Supabase client:', error)
+    return createMockClient()
+  }
 }
 
 // Export a singleton instance for consistent usage

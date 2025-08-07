@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import type { User, Session } from "@supabase/supabase-js"
@@ -35,10 +35,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [initialized, setInitialized] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
     try {
       const { data, error } = await supabase
         .from("users")
@@ -56,14 +57,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Error in fetchProfile:", error)
       return null
     }
-  }
+  }, [supabase])
 
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (user) {
       const profileData = await fetchProfile(user.id)
       setProfile(profileData)
     }
-  }
+  }, [user, fetchProfile])
+
+  const handleAuthStateChange = useCallback(async (event: string, session: Session | null) => {
+    console.log("Auth state change:", event, session?.user?.email)
+
+    setSession(session)
+    setUser(session?.user ?? null)
+
+    if (session?.user) {
+      const profileData = await fetchProfile(session.user.id)
+      setProfile(profileData)
+
+      // Only redirect on sign in, not on initial load or token refresh
+      if (event === "SIGNED_IN" && initialized) {
+        // Check if there's a redirect parameter in the URL
+        const urlParams = new URLSearchParams(window.location.search)
+        const redirectTo = urlParams.get('redirect')
+        
+        if (redirectTo && redirectTo.startsWith('/')) {
+          // Clear the redirect parameter from URL
+          const newUrl = new URL(window.location.href)
+          newUrl.searchParams.delete('redirect')
+          window.history.replaceState({}, '', newUrl.toString())
+          router.push(redirectTo)
+        } else {
+          router.push('/dashboard')
+        }
+      }
+    } else {
+      setProfile(null)
+
+      if (event === "SIGNED_OUT" && initialized) {
+        router.push("/login")
+      }
+    }
+
+    if (!initialized) {
+      setInitialized(true)
+    }
+    setLoading(false)
+  }, [fetchProfile, router, initialized])
 
   useEffect(() => {
     let mounted = true
@@ -81,22 +122,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (mounted) {
-          setSession(initialSession)
-          setUser(initialSession?.user ?? null)
-
-          if (initialSession?.user) {
-            const profileData = await fetchProfile(initialSession.user.id)
-            if (mounted) {
-              setProfile(profileData)
-            }
-          }
-
-          setLoading(false)
+          await handleAuthStateChange("INITIAL_SESSION", initialSession)
         }
       } catch (error) {
         console.error("Error initializing auth:", error)
         if (mounted) {
           setLoading(false)
+          setInitialized(true)
         }
       }
     }
@@ -106,48 +138,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state change:", event, session?.user?.email)
-
-      if (mounted) {
-        setSession(session)
-        setUser(session?.user ?? null)
-
-        if (session?.user) {
-          const profileData = await fetchProfile(session.user.id)
-          if (mounted) {
-            setProfile(profileData)
-          }
-
-          // Only redirect on sign in, not on initial load
-          if (event === "SIGNED_IN") {
-            // Check if there's a redirect parameter
-            const urlParams = new URLSearchParams(window.location.search)
-            const redirectTo = urlParams.get('redirect') || '/dashboard'
-            router.push(redirectTo)
-          }
-        } else {
-          if (mounted) {
-            setProfile(null)
-          }
-
-          if (event === "SIGNED_OUT") {
-            router.push("/login")
-          }
-        }
-
-        setLoading(false)
-      }
-    })
+    } = supabase.auth.onAuthStateChange(handleAuthStateChange)
 
     return () => {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [router, supabase.auth])
+  }, [supabase.auth, handleAuthStateChange])
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     try {
+      setLoading(true)
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -155,11 +156,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error }
     } catch (error) {
       return { error }
+    } finally {
+      setLoading(false)
     }
-  }
+  }, [supabase.auth])
 
-  const signUp = async (email: string, password: string, userData: { username: string; full_name: string }) => {
+  const signUp = useCallback(async (email: string, password: string, userData: { username: string; full_name: string }) => {
     try {
+      setLoading(true)
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -174,14 +178,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: null }
     } catch (error) {
       return { error }
+    } finally {
+      setLoading(false)
     }
-  }
+  }, [supabase.auth])
 
-  const signOut = async () => {
-    await supabase.auth.signOut()
-  }
+  const signOut = useCallback(async () => {
+    try {
+      setLoading(true)
+      await supabase.auth.signOut()
+    } catch (error) {
+      console.error("Error signing out:", error)
+    } finally {
+      setLoading(false)
+    }
+  }, [supabase.auth])
 
-  const resetPassword = async (email: string) => {
+  const resetPassword = useCallback(async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
@@ -190,9 +203,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       return { error }
     }
-  }
+  }, [supabase.auth])
 
-  const updatePassword = async (password: string) => {
+  const updatePassword = useCallback(async (password: string) => {
     try {
       const { error } = await supabase.auth.updateUser({
         password: password,
@@ -201,7 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       return { error }
     }
-  }
+  }, [supabase.auth])
 
   const value = {
     user,

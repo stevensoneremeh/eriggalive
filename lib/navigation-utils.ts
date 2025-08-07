@@ -28,10 +28,29 @@ export const PROTECTED_ROUTES = [
   ROUTES.MERCH,
   ROUTES.COINS,
   ROUTES.ADMIN,
+  "/chronicles",
+  "/settings",
+  "/mission",
+  "/meet-and-greet",
+  "/profile",
+  "/rooms",
+  "/chat",
 ]
 
 // Define public routes that don't require authentication
-export const PUBLIC_ROUTES = [ROUTES.HOME, ROUTES.LOGIN, ROUTES.SIGNUP]
+export const PUBLIC_ROUTES = [
+  ROUTES.HOME, 
+  ROUTES.LOGIN, 
+  ROUTES.SIGNUP,
+  "/forgot-password",
+  "/reset-password",
+  "/signup/success",
+  "/terms",
+  "/privacy",
+  "/about",
+  "/auth/callback",
+  "/auth/auth-code-error",
+]
 
 // Define auth routes that authenticated users shouldn't access
 export const AUTH_ROUTES = [ROUTES.LOGIN, ROUTES.SIGNUP]
@@ -203,6 +222,11 @@ export class NavigationManager {
   isAuthRoute(path: string = this.currentPath): boolean {
     return AUTH_ROUTES.some((route) => path === route || path.startsWith(`${route}/`))
   }
+
+  // Check if current path is public
+  isPublicRoute(path: string = this.currentPath): boolean {
+    return PUBLIC_ROUTES.some((route) => path === route || path.startsWith(`${route}/`))
+  }
 }
 
 // Hook to use navigation manager
@@ -240,4 +264,17 @@ export function getRedirectPath(searchParams?: URLSearchParams): string {
   }
 
   return ROUTES.DASHBOARD
+}
+
+// Utility function to clear redirect paths
+export function clearRedirectPaths() {
+  if (typeof window === "undefined") return
+
+  try {
+    localStorage.removeItem("erigga_redirect_path")
+    sessionStorage.removeItem("erigga_redirect_path")
+    document.cookie = "erigga_redirect_path=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+  } catch (error) {
+    console.warn("Failed to clear redirect paths:", error)
+  }
 }
