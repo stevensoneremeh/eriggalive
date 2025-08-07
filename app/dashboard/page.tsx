@@ -1,546 +1,722 @@
-'use client'
+"use client"
 
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { toast } from '@/hooks/use-toast'
-import { User, Coins, Trophy, Calendar, ShoppingBag, Eye, MessageSquare, Heart, Upload, Settings, BarChart3, Users, Star } from 'lucide-react'
-import { AuthGuard } from '@/components/auth-guard'
-
-interface UserProfile {
-  id: number
-  auth_user_id: string
-  username: string
-  full_name: string
-  email: string
-  bio: string
-  avatar_url: string
-  tier: string
-  coins: number
-  level: number
-  points: number
-  reputation_score: number
-  posts_count: number
-  followers_count: number
-  following_count: number
-  created_at: string
-}
+import type React from "react"
+import { AuthGuard } from "@/components/auth-guard"
+import { useAuth } from "@/contexts/auth-context"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Users, MessageCircle, Coins, Trophy, Music, Star, Crown, Zap, TrendingUp, Camera, Edit, Phone, Settings, Calendar, Ticket, ShoppingBag, Eye, Heart, BookOpen } from 'lucide-react'
+import Link from "next/link"
+import { useState, useRef, useEffect } from "react"
+import { useToast } from "@/hooks/use-toast"
+import { createClient } from "@/lib/supabase/client"
 
 interface UserStats {
-  tickets: number
-  purchases: number
+  totalPosts: number
+  totalComments: number
+  totalVotes: number
+  totalTickets: number
+  totalPurchases: number
   vaultViews: number
-  communityPosts: number
-  communityVotes: number
+  followersCount: number
+  followingCount: number
+  reputationScore: number
 }
 
-export default function Dashboard() {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [stats, setStats] = useState<UserStats>({
-    tickets: 0,
-    purchases: 0,
+export default function DashboardPage() {
+  const { user, profile, loading, refreshProfile } = useAuth()
+  const { toast } = useToast()
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [userStats, setUserStats] = useState<UserStats>({
+    totalPosts: 0,
+    totalComments: 0,
+    totalVotes: 0,
+    totalTickets: 0,
+    totalPurchases: 0,
     vaultViews: 0,
-    communityPosts: 0,
-    communityVotes: 0
+    followersCount: 0,
+    followingCount: 0,
+    reputationScore: 0,
   })
-  const [loading, setLoading] = useState(true)
-  const [uploading, setUploading] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [formData, setFormData] = useState({
-    username: '',
-    full_name: '',
-    bio: ''
-  })
-
+  const [recentActivity, setRecentActivity] = useState<any[]>([])
+  const [loadingStats, setLoadingStats] = useState(true)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
-  // Fetch user profile - using exact Supabase AI suggestion
-  async function fetchProfile() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('auth_user_id', user.id)
-        .single()
-        
-      if (error) {
-        console.error('Error fetching profile:', error)
-        return null
-      }
-        
-      return data
+  // Load user statistics
+  useEffect(() => {
+    if (user && profile) {
+      loadUserStats()
+      loadRecentActivity()
     }
-    return null
-  }
+  }, [user, profile])
 
-  // Fetch user statistics
-  async function fetchUserStats(userId: string) {
+  const loadUserStats = async () => {
+    if (!profile) return
+
     try {
-      // Fetch tickets
-      const { data: tickets } = await supabase
-        .from('tickets')
-        .select('id')
-        .eq('user_id', userId)
+      setLoadingStats(true)
 
-      // Fetch store purchases
-      const { data: purchases } = await supabase
-        .from('store_purchases')
-        .select('id')
-        .eq('user_id', userId)
+      // Get community posts count
+      const { count: postsCount } = await supabase
+        .from("community_posts")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", profile.id)
+        .eq("is_deleted", false)
 
-      // Fetch vault views
-      const { data: vaultViews } = await supabase
-        .from('vault_views')
-        .select('id')
-        .eq('user_id', userId)
+      // Get community comments count
+      const { count: commentsCount } = await supabase
+        .from("community_comments")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", profile.id)
+        .eq("is_deleted", false)
 
-      // Fetch community posts
-      const { data: communityPosts } = await supabase
-        .from('community_posts')
-        .select('id')
-        .eq('user_id', profile?.id)
+      // Get votes given count
+      const { count: votesCount } = await supabase
+        .from("community_post_votes")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", profile.id)
 
-      // Fetch community votes
-      const { data: communityVotes } = await supabase
-        .from('community_post_votes')
-        .select('post_id')
-        .eq('user_id', profile?.id)
+      // Get tickets count
+      const { count: ticketsCount } = await supabase
+        .from("tickets")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
 
-      return {
-        tickets: tickets?.length || 0,
-        purchases: purchases?.length || 0,
-        vaultViews: vaultViews?.length || 0,
-        communityPosts: communityPosts?.length || 0,
-        communityVotes: communityVotes?.length || 0
-      }
+      // Get purchases count
+      const { count: purchasesCount } = await supabase
+        .from("store_purchases")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+
+      // Get vault views count
+      const { count: vaultViewsCount } = await supabase
+        .from("vault_views")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+
+      // Get followers count
+      const { count: followersCount } = await supabase
+        .from("user_follows")
+        .select("*", { count: "exact", head: true })
+        .eq("following_id", profile.id)
+
+      // Get following count
+      const { count: followingCount } = await supabase
+        .from("user_follows")
+        .select("*", { count: "exact", head: true })
+        .eq("follower_id", profile.id)
+
+      setUserStats({
+        totalPosts: postsCount || 0,
+        totalComments: commentsCount || 0,
+        totalVotes: votesCount || 0,
+        totalTickets: ticketsCount || 0,
+        totalPurchases: purchasesCount || 0,
+        vaultViews: vaultViewsCount || 0,
+        followersCount: followersCount || 0,
+        followingCount: followingCount || 0,
+        reputationScore: profile.reputation_score || 0,
+      })
     } catch (error) {
-      console.error('Error fetching stats:', error)
-      return {
-        tickets: 0,
-        purchases: 0,
-        vaultViews: 0,
-        communityPosts: 0,
-        communityVotes: 0
-      }
+      console.error("Error loading user stats:", error)
+    } finally {
+      setLoadingStats(false)
     }
   }
 
-  // Get avatar URL from storage
-  async function getAvatarUrl(path: string) {
-    if (!path) return null
-    const { data } = await supabase.storage
-      .from('avatars')
-      .getPublicUrl(path)
-    return data.publicUrl
-  }
+  const loadRecentActivity = async () => {
+    if (!profile) return
 
-  // Upload avatar - using exact Supabase AI suggestion
-  async function uploadAvatar(event: React.ChangeEvent<HTMLInputElement>) {
     try {
-      setUploading(true)
-      
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('No user found')
+      // Get recent posts
+      const { data: recentPosts } = await supabase
+        .from("community_posts")
+        .select("id, content, created_at")
+        .eq("user_id", profile.id)
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: false })
+        .limit(3)
 
-      if (!event.target.files || event.target.files.length === 0) {
-        throw new Error('You must select an image to upload.')
+      // Get recent comments
+      const { data: recentComments } = await supabase
+        .from("community_comments")
+        .select("id, content, created_at")
+        .eq("user_id", profile.id)
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: false })
+        .limit(3)
+
+      // Get recent tickets
+      const { data: recentTickets } = await supabase
+        .from("tickets")
+        .select("id, ticket_number, created_at, events(title)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(2)
+
+      const activities = []
+
+      // Add posts to activity
+      if (recentPosts) {
+        recentPosts.forEach((post) => {
+          activities.push({
+            type: "post",
+            content: `Created post: ${post.content.substring(0, 50)}...`,
+            timestamp: post.created_at,
+            icon: MessageCircle,
+            color: "text-blue-500",
+          })
+        })
       }
 
-      // Upload avatar - exact Supabase AI code
-      const avatarFile = event.target.files[0]
-      const fileExt = avatarFile.name.split('.').pop()
-      const fileName = `${user.id}.${fileExt}`
-      const filePath = `${user.id}/${fileName}`
+      // Add comments to activity
+      if (recentComments) {
+        recentComments.forEach((comment) => {
+          activities.push({
+            type: "comment",
+            content: `Commented: ${comment.content.substring(0, 50)}...`,
+            timestamp: comment.created_at,
+            icon: MessageCircle,
+            color: "text-green-500",
+          })
+        })
+      }
+
+      // Add tickets to activity
+      if (recentTickets) {
+        recentTickets.forEach((ticket) => {
+          activities.push({
+            type: "ticket",
+            content: `Got ticket for ${ticket.events?.title || "Event"}`,
+            timestamp: ticket.created_at,
+            icon: Ticket,
+            color: "text-purple-500",
+          })
+        })
+      }
+
+      // Sort by timestamp and take latest 5
+      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      setRecentActivity(activities.slice(0, 5))
+    } catch (error) {
+      console.error("Error loading recent activity:", error)
+    }
+  }
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !profile) return
+
+    setIsUploadingAvatar(true)
+
+    try {
+      // Upload to Supabase Storage
+      const fileExt = file.name.split(".").pop()
+      const fileName = `${profile.id}-${Date.now()}.${fileExt}`
+      const filePath = `avatars/${fileName}`
 
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, avatarFile)
+        .from("eriggalive-assets")
+        .upload(filePath, file)
 
-      if (uploadError) {
-        console.error('Error uploading avatar', uploadError)
-        return
-      }
+      if (uploadError) throw uploadError
 
-      // Update profile with avatar URL
-      const { data: updateData, error: updateError } = await supabase
-        .from('users')
-        .update({ avatar_url: filePath })
-        .eq('auth_user_id', user.id)
+      // Get public URL
+      const { data: urlData } = supabase.storage.from("eriggalive-assets").getPublicUrl(uploadData.path)
 
-      if (updateError) {
-        throw updateError
-      }
+      // Update user profile
+      const { error: updateError } = await supabase
+        .from("users")
+        .update({ avatar_url: urlData.publicUrl })
+        .eq("id", profile.id)
 
-      // Refresh profile
-      const updatedProfile = await fetchProfile()
-      if (updatedProfile) {
-        setProfile(updatedProfile)
-      }
+      if (updateError) throw updateError
 
+      await refreshProfile()
       toast({
-        title: "Success",
-        description: "Avatar updated successfully!",
+        title: "Success!",
+        description: "Profile picture updated successfully.",
       })
     } catch (error: any) {
+      console.error("Avatar upload error:", error)
       toast({
         title: "Error",
-        description: error.message,
+        description: "Failed to update profile picture. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setUploading(false)
+      setIsUploadingAvatar(false)
     }
-  }
-
-  // Update profile
-  async function updateProfile() {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('No user found')
-
-      const { error } = await supabase
-        .from('users')
-        .update({
-          username: formData.username,
-          full_name: formData.full_name,
-          bio: formData.bio
-        })
-        .eq('auth_user_id', user.id)
-
-      if (error) throw error
-
-      // Refresh profile
-      const updatedProfile = await fetchProfile()
-      if (updatedProfile) {
-        setProfile(updatedProfile)
-      }
-
-      setEditing(false)
-      toast({
-        title: "Success",
-        description: "Profile updated successfully!",
-      })
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      })
-    }
-  }
-
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const profileData = await fetchProfile()
-        if (profileData) {
-          setProfile(profileData)
-          setFormData({
-            username: profileData.username || '',
-            full_name: profileData.full_name || '',
-            bio: profileData.bio || ''
-          })
-
-          // Fetch user stats
-          const userStats = await fetchUserStats(profileData.auth_user_id)
-          setStats(userStats)
-        }
-      } catch (error) {
-        console.error('Error loading dashboard data:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadData()
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading dashboard...</div>
-      </div>
-    )
-  }
-
-  if (!profile) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <div className="text-white text-xl">Unable to load profile</div>
-      </div>
-    )
   }
 
   const getTierColor = (tier: string) => {
     switch (tier) {
-      case 'vip': return 'bg-yellow-500'
-      case 'premium': return 'bg-purple-500'
-      case 'grassroot': return 'bg-green-500'
-      default: return 'bg-gray-500'
+      case "grassroot":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+      case "pioneer":
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+      case "elder":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+      case "blood_brotherhood":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
     }
   }
 
-  const getProgressToNextLevel = () => {
-    const pointsForNextLevel = profile.level * 1000
-    const currentLevelPoints = (profile.level - 1) * 1000
-    const progress = ((profile.points - currentLevelPoints) / (pointsForNextLevel - currentLevelPoints)) * 100
-    return Math.min(Math.max(progress, 0), 100)
+  const getTierProgress = (tier: string) => {
+    switch (tier) {
+      case "grassroot":
+        return 25
+      case "pioneer":
+        return 50
+      case "elder":
+        return 75
+      case "blood_brotherhood":
+        return 100
+      default:
+        return 0
+    }
+  }
+
+  if (loading || loadingStats) {
+    return (
+      <AuthGuard>
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4 sm:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto">
+            <div className="animate-pulse space-y-8">
+              <div className="h-8 bg-gray-300 rounded w-1/3"></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-32 bg-gray-300 rounded"></div>
+                ))}
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-6">
+                  <div className="h-64 bg-gray-300 rounded"></div>
+                  <div className="h-48 bg-gray-300 rounded"></div>
+                </div>
+                <div className="space-y-6">
+                  <div className="h-80 bg-gray-300 rounded"></div>
+                  <div className="h-48 bg-gray-300 rounded"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </AuthGuard>
+    )
   }
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-white mb-2">Welcome back, {profile.full_name || profile.username}!</h1>
-            <p className="text-blue-200">Your Erigga Live Dashboard</p>
-          </div>
-
-          {/* Profile Overview */}
-          <Card className="bg-white/10 backdrop-blur-md border-white/20">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Profile Overview
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex flex-col md:flex-row items-center gap-6">
-                <div className="relative">
-                  <Avatar className="h-24 w-24">
-                    <AvatarImage 
-                      src={profile.avatar_url ? `${supabase.storage.from('avatars').getPublicUrl(profile.avatar_url).data.publicUrl}` : undefined} 
-                      alt={profile.username} 
-                    />
-                    <AvatarFallback className="text-2xl">
-                      {profile.full_name?.charAt(0) || profile.username?.charAt(0) || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <Label htmlFor="avatar-upload" className="absolute -bottom-2 -right-2 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full cursor-pointer">
-                    <Upload className="h-4 w-4" />
-                  </Label>
-                  <Input
-                    id="avatar-upload"
-                    type="file"
-                    accept="image/*"
-                    onChange={uploadAvatar}
-                    disabled={uploading}
-                    className="hidden"
-                  />
-                </div>
-                
-                <div className="flex-1 space-y-4">
-                  <div className="flex flex-wrap items-center gap-4">
-                    <Badge className={`${getTierColor(profile.tier)} text-white`}>
-                      {profile.tier.toUpperCase()} TIER
-                    </Badge>
-                    <div className="flex items-center gap-2 text-white">
-                      <Coins className="h-4 w-4 text-yellow-400" />
-                      <span className="font-semibold">{profile.coins} Coins</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-white">
-                      <Trophy className="h-4 w-4 text-orange-400" />
-                      <span className="font-semibold">Level {profile.level}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-white">
-                      <Star className="h-4 w-4 text-blue-400" />
-                      <span className="font-semibold">{profile.reputation_score} Rep</span>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm text-blue-200">
-                      <span>Progress to Level {profile.level + 1}</span>
-                      <span>{profile.points} / {profile.level * 1000} points</span>
-                    </div>
-                    <Progress value={getProgressToNextLevel()} className="h-2" />
-                  </div>
-                </div>
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4 sm:p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Welcome Header */}
+          <div className="mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                  Welcome back, {profile?.full_name || profile?.username || user?.email}!
+                </h1>
+                <p className="text-gray-600 dark:text-gray-300 mt-1">
+                  Here's what's happening in your Erigga Live community
+                </p>
               </div>
-            </CardContent>
-          </Card>
+              <div className="mt-4 sm:mt-0">
+                <Badge className={`px-3 py-1 ${getTierColor(profile?.tier || "grassroot")}`}>
+                  <Crown className="w-4 h-4 mr-1" />
+                  {profile?.tier?.replace("_", " ").toUpperCase() || "GRASSROOT"}
+                </Badge>
+              </div>
+            </div>
+          </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <Card className="bg-white/10 backdrop-blur-md border-white/20">
-              <CardContent className="p-4">
+          {/* Stats Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <Card>
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-blue-200 text-sm">Tickets</p>
-                    <p className="text-2xl font-bold text-white">{stats.tickets}</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Coins Balance</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {profile?.coins?.toLocaleString() || "0"}
+                    </p>
                   </div>
-                  <Calendar className="h-8 w-8 text-blue-400" />
+                  <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
+                    <Coins className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white/10 backdrop-blur-md border-white/20">
-              <CardContent className="p-4">
+            <Card>
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-blue-200 text-sm">Purchases</p>
-                    <p className="text-2xl font-bold text-white">{stats.purchases}</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Level</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{profile?.level || 1}</p>
                   </div>
-                  <ShoppingBag className="h-8 w-8 text-green-400" />
+                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                    <Trophy className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white/10 backdrop-blur-md border-white/20">
-              <CardContent className="p-4">
+            <Card>
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-blue-200 text-sm">Vault Views</p>
-                    <p className="text-2xl font-bold text-white">{stats.vaultViews}</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Points</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {profile?.points?.toLocaleString() || "0"}
+                    </p>
                   </div>
-                  <Eye className="h-8 w-8 text-purple-400" />
+                  <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                    <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white/10 backdrop-blur-md border-white/20">
-              <CardContent className="p-4">
+            <Card>
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-blue-200 text-sm">Posts</p>
-                    <p className="text-2xl font-bold text-white">{stats.communityPosts}</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Reputation</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {userStats.reputationScore.toLocaleString()}
+                    </p>
                   </div>
-                  <MessageSquare className="h-8 w-8 text-orange-400" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/10 backdrop-blur-md border-white/20">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-blue-200 text-sm">Votes</p>
-                    <p className="text-2xl font-bold text-white">{stats.communityVotes}</p>
+                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+                    <Star className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                   </div>
-                  <Heart className="h-8 w-8 text-red-400" />
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Profile Management */}
-          <Card className="bg-white/10 backdrop-blur-md border-white/20">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Profile Management
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="view" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="view">View Profile</TabsTrigger>
-                  <TabsTrigger value="edit">Edit Profile</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="view" className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-blue-200">Username</Label>
-                      <p className="text-white font-medium">{profile.username}</p>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main Content */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Activity Stats */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <TrendingUp className="w-5 h-5 mr-2" />
+                    Your Activity
+                  </CardTitle>
+                  <CardDescription>Your engagement across the platform</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <MessageCircle className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-blue-600">{userStats.totalPosts}</div>
+                      <div className="text-sm text-gray-500">Posts</div>
                     </div>
-                    <div>
-                      <Label className="text-blue-200">Full Name</Label>
-                      <p className="text-white font-medium">{profile.full_name}</p>
+                    <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <MessageCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-green-600">{userStats.totalComments}</div>
+                      <div className="text-sm text-gray-500">Comments</div>
                     </div>
-                    <div>
-                      <Label className="text-blue-200">Email</Label>
-                      <p className="text-white font-medium">{profile.email}</p>
+                    <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                      <Heart className="w-8 h-8 text-red-600 mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-red-600">{userStats.totalVotes}</div>
+                      <div className="text-sm text-gray-500">Votes Given</div>
                     </div>
-                    <div>
-                      <Label className="text-blue-200">Member Since</Label>
-                      <p className="text-white font-medium">
-                        {new Date(profile.created_at).toLocaleDateString()}
-                      </p>
+                    <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                      <Users className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-purple-600">{userStats.followersCount}</div>
+                      <div className="text-sm text-gray-500">Followers</div>
                     </div>
                   </div>
-                  {profile.bio && (
-                    <div>
-                      <Label className="text-blue-200">Bio</Label>
-                      <p className="text-white">{profile.bio}</p>
+                </CardContent>
+              </Card>
+
+              {/* Tier Progress */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Trophy className="w-5 h-5 mr-2" />
+                    Your Journey
+                  </CardTitle>
+                  <CardDescription>Progress through the Erigga Live community tiers</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">
+                        {profile?.tier?.replace("_", " ").toUpperCase() || "GRASSROOT"} Member
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        {getTierProgress(profile?.tier || "grassroot")}% Complete
+                      </span>
                     </div>
-                  )}
-                </TabsContent>
-                
-                <TabsContent value="edit" className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="username" className="text-blue-200">Username</Label>
-                      <Input
-                        id="username"
-                        value={formData.username}
-                        onChange={(e) => setFormData({...formData, username: e.target.value})}
-                        className="bg-white/10 border-white/20 text-white"
+                    <Progress value={getTierProgress(profile?.tier || "grassroot")} className="h-2" />
+                    <div className="grid grid-cols-4 gap-2 text-xs">
+                      <div className="text-center">
+                        <div
+                          className={`w-3 h-3 rounded-full mx-auto mb-1 ${
+                            getTierProgress(profile?.tier || "grassroot") >= 25 ? "bg-green-500" : "bg-gray-300"
+                          }`}
+                        />
+                        <span>Grassroot</span>
+                      </div>
+                      <div className="text-center">
+                        <div
+                          className={`w-3 h-3 rounded-full mx-auto mb-1 ${
+                            getTierProgress(profile?.tier || "grassroot") >= 50 ? "bg-purple-500" : "bg-gray-300"
+                          }`}
+                        />
+                        <span>Pioneer</span>
+                      </div>
+                      <div className="text-center">
+                        <div
+                          className={`w-3 h-3 rounded-full mx-auto mb-1 ${
+                            getTierProgress(profile?.tier || "grassroot") >= 75 ? "bg-blue-500" : "bg-gray-300"
+                          }`}
+                        />
+                        <span>Elder</span>
+                      </div>
+                      <div className="text-center">
+                        <div
+                          className={`w-3 h-3 rounded-full mx-auto mb-1 ${
+                            getTierProgress(profile?.tier || "grassroot") >= 100 ? "bg-yellow-500" : "bg-gray-300"
+                          }`}
+                        />
+                        <span>Blood Brotherhood</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Actions */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Zap className="w-5 h-5 mr-2" />
+                    Quick Actions
+                  </CardTitle>
+                  <CardDescription>Jump into your favorite activities</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
+                      <Link href="/community">
+                        <MessageCircle className="w-6 h-6 mb-2" />
+                        <span className="text-sm">Community</span>
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
+                      <Link href="/coins">
+                        <Coins className="w-6 h-6 mb-2" />
+                        <span className="text-sm">Manage Coins</span>
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
+                      <Link href="/vault">
+                        <Music className="w-6 h-6 mb-2" />
+                        <span className="text-sm">Media Vault</span>
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
+                      <Link href="/tickets">
+                        <Ticket className="w-6 h-6 mb-2" />
+                        <span className="text-sm">My Tickets</span>
+                      </Link>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="h-20 flex-col bg-transparent bg-gradient-to-r from-purple-100 to-blue-100 hover:from-purple-200 hover:to-blue-200 dark:from-purple-900/20 dark:to-blue-900/20"
+                    >
+                      <Link href="/meet-and-greet">
+                        <Phone className="w-6 h-6 mb-2 text-purple-600" />
+                        <span className="text-sm text-purple-600 font-medium">Meet & Greet</span>
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
+                      <Link href="/settings">
+                        <Settings className="w-6 h-6 mb-2" />
+                        <span className="text-sm">Settings</span>
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Profile Summary */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Profile Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="relative">
+                      <Avatar className="h-16 w-16">
+                        <AvatarImage
+                          src={profile?.avatar_url || "/placeholder-user.jpg"}
+                          alt={profile?.username || "User"}
+                        />
+                        <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold text-lg">
+                          {profile?.full_name?.charAt(0) ||
+                            profile?.username?.charAt(0) ||
+                            user?.email?.charAt(0) ||
+                            "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-white shadow-md hover:shadow-lg"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingAvatar}
+                      >
+                        {isUploadingAvatar ? (
+                          <div className="animate-spin rounded-full h-3 w-3 border border-primary border-t-transparent" />
+                        ) : (
+                          <Camera className="h-3 w-3" />
+                        )}
+                      </Button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleAvatarUpload}
                       />
                     </div>
                     <div>
-                      <Label htmlFor="full_name" className="text-blue-200">Full Name</Label>
-                      <Input
-                        id="full_name"
-                        value={formData.full_name}
-                        onChange={(e) => setFormData({...formData, full_name: e.target.value})}
-                        className="bg-white/10 border-white/20 text-white"
-                      />
+                      <p className="font-medium text-lg">{profile?.full_name || profile?.username || "User"}</p>
+                      <p className="text-sm text-gray-500">@{profile?.username || "username"}</p>
+                      <p className="text-xs text-gray-400">{user?.email}</p>
                     </div>
                   </div>
-                  <div>
-                    <Label htmlFor="bio" className="text-blue-200">Bio</Label>
-                    <Textarea
-                      id="bio"
-                      value={formData.bio}
-                      onChange={(e) => setFormData({...formData, bio: e.target.value})}
-                      className="bg-white/10 border-white/20 text-white"
-                      rows={3}
-                    />
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Member since:</span>
+                      <span>{new Date(profile?.created_at || Date.now()).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Last active:</span>
+                      <span>Just now</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Verified:</span>
+                      <span>{profile?.is_verified ? "✅" : "❌"}</span>
+                    </div>
                   </div>
-                  <Button onClick={updateProfile} className="bg-blue-600 hover:bg-blue-700">
-                    Update Profile
+                  <Button asChild variant="outline" className="w-full bg-transparent">
+                    <Link href="/settings">
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Profile
+                    </Link>
                   </Button>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
-          {/* Community Stats */}
-          <Card className="bg-white/10 backdrop-blur-md border-white/20">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Community Activity
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-white">{profile.posts_count}</div>
-                  <div className="text-blue-200">Posts Created</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-white">{profile.followers_count}</div>
-                  <div className="text-blue-200">Followers</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-white">{profile.following_count}</div>
-                  <div className="text-blue-200">Following</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              {/* Platform Stats */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Platform Stats</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Ticket className="w-4 h-4 text-blue-500" />
+                        <span className="text-sm">Tickets</span>
+                      </div>
+                      <span className="font-medium">{userStats.totalTickets}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <ShoppingBag className="w-4 h-4 text-green-500" />
+                        <span className="text-sm">Purchases</span>
+                      </div>
+                      <span className="font-medium">{userStats.totalPurchases}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Eye className="w-4 h-4 text-purple-500" />
+                        <span className="text-sm">Vault Views</span>
+                      </div>
+                      <span className="font-medium">{userStats.vaultViews}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-orange-500" />
+                        <span className="text-sm">Following</span>
+                      </div>
+                      <span className="font-medium">{userStats.followingCount}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Recent Activity */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Activity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3 text-sm">
+                    {recentActivity.length > 0 ? (
+                      recentActivity.map((activity, index) => {
+                        const Icon = activity.icon
+                        return (
+                          <div key={index} className="flex items-start space-x-2">
+                            <Icon className={`w-4 h-4 mt-0.5 ${activity.color}`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm truncate">{activity.content}</p>
+                              <p className="text-xs text-gray-500">
+                                {new Date(activity.timestamp).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })
+                    ) : (
+                      <p className="text-gray-500 text-center py-4">No recent activity</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Achievements */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Achievements</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="text-center p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                      <Trophy className="w-6 h-6 text-yellow-600 mx-auto mb-1" />
+                      <span className="text-xs">First Login</span>
+                    </div>
+                    <div className="text-center p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <Users className="w-6 h-6 text-blue-600 mx-auto mb-1" />
+                      <span className="text-xs">Community Member</span>
+                    </div>
+                    <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <Star className="w-6 h-6 text-green-600 mx-auto mb-1" />
+                      <span className="text-xs">Active User</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
       </div>
     </AuthGuard>

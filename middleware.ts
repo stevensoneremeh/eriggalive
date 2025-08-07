@@ -1,6 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse, type NextRequest } from "next/server"
-import { updateSession } from '@/lib/supabase/middleware'
 
 // Define public paths that don't require authentication
 const PUBLIC_PATHS = [
@@ -35,32 +34,64 @@ const PROTECTED_PATHS = [
 ]
 
 export async function middleware(request: NextRequest) {
-  return await updateSession(request)
-}
+  const { pathname } = request.nextUrl
 
-// Helper function to redirect to login with optional redirect path
-function redirectToLogin(request: NextRequest, redirectPath: string) {
-  const redirectUrl = new URL("/login", request.url)
-  redirectUrl.searchParams.set("redirect", redirectPath)
-  return NextResponse.redirect(redirectUrl)
-}
+  // Skip middleware for always accessible paths and static files
+  if (
+    ALWAYS_ACCESSIBLE.some((path) => pathname.startsWith(path)) ||
+    pathname.includes(".") ||
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/api/")
+  ) {
+    return NextResponse.next()
+  }
 
-// Helper function to handle authentication errors
-function handleAuthError(request: NextRequest, errorType: string) {
-  const errorUrl = new URL("/login", request.url)
-  errorUrl.searchParams.set("error", errorType)
-  return NextResponse.redirect(errorUrl)
+  // Check if path is public
+  const isPublicPath = PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+
+  // Check if path requires authentication
+  const requiresAuth = PROTECTED_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+
+  // If it's a public path or doesn't require auth, allow access
+  if (isPublicPath || !requiresAuth) {
+    return NextResponse.next()
+  }
+
+  // For protected paths, check authentication
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return NextResponse.next()
+  }
+
+  try {
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+      auth: {
+        persistSession: false,
+      },
+    })
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    // If no user and path requires auth, redirect to login
+    if (!user && requiresAuth) {
+      const redirectUrl = new URL("/login", request.url)
+      redirectUrl.searchParams.set("redirect", pathname)
+      return NextResponse.redirect(redirectUrl)
+    }
+
+    // If user exists and trying to access auth pages, redirect to dashboard
+    if (user && (pathname === "/login" || pathname === "/signup")) {
+      return NextResponse.redirect(new URL("/dashboard", request.url))
+    }
+  } catch (error) {
+    console.error("Middleware auth error:", error)
+    // Continue without auth checks if there's an error
+  }
+
+  return NextResponse.next()
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ["/((?!api/|_next/static|_next/image|favicon.ico|images/|videos/|fonts/|placeholder|.*\\.).*)"],
 }
