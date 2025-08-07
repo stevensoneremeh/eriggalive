@@ -3,11 +3,11 @@
 import { useEffect, useState, useCallback } from "react"
 import { PostCard, PostCardSkeleton } from "./post-card-fixed"
 import type { CommunityPost } from "@/types/database"
-import { fetchCommunityPosts } from "@/lib/community-actions-fixed"
+import { fetchCommunityPosts } from "@/lib/community-actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Search } from "lucide-react"
+import { Loader2, Search } from 'lucide-react'
 import { useDebounce } from "@/hooks/use-debounce"
 
 interface PostFeedProps {

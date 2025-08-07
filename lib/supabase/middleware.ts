@@ -1,13 +1,12 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import type { Database } from '@/types/database'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   })
 
-  const supabase = createServerClient<Database>(
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -16,7 +15,7 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({
             request,
           })
@@ -28,91 +27,28 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  try {
-    // IMPORTANT: Avoid writing any logic between createServerClient and
-    // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-    // issues with users being randomly logged out.
+  // IMPORTANT: Avoid writing any logic between createServerClient and
+  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
+  // issues with users being randomly logged out.
 
+  try {
     const {
       data: { user },
       error,
     } = await supabase.auth.getUser()
 
-    // Don't treat missing session as an error - it's normal for unauthenticated users
-    if (error && error.message !== 'Auth session missing!') {
-      console.error('Auth error in middleware:', error)
+    // Only log actual errors, not missing sessions (which is normal for unauthenticated users)
+    if (error && !error.message?.includes('Auth session missing')) {
+      console.error('Auth error in middleware:', error.message)
     }
 
-    const { pathname, searchParams } = request.nextUrl
-
-    // Define public paths that don't require authentication
-    const publicPaths = [
-      '/',
-      '/login',
-      '/signup',
-      '/forgot-password',
-      '/reset-password',
-      '/signup/success',
-      '/terms',
-      '/privacy',
-      '/about',
-      '/auth/callback',
-      '/auth/auth-code-error',
-    ]
-
-    // Define protected paths that require authentication
-    const protectedPaths = [
-      '/dashboard',
-      '/community',
-      '/chronicles',
-      '/vault',
-      '/tickets',
-      '/premium',
-      '/merch',
-      '/coins',
-      '/settings',
-      '/admin',
-      '/mission',
-      '/meet-and-greet',
-      '/profile',
-      '/rooms',
-      '/chat',
-    ]
-
-    // Check if current path is public
-    const isPublicPath = publicPaths.some(path => 
-      pathname === path || pathname.startsWith(`${path}/`)
-    )
-
-    // Check if current path is protected
-    const isProtectedPath = protectedPaths.some(path => 
-      pathname === path || pathname.startsWith(`${path}/`)
-    )
-
-    // Skip auth checks for public paths
-    if (isPublicPath) {
-      // If user is authenticated and trying to access login/signup, redirect to dashboard
-      if (user && (pathname === '/login' || pathname === '/signup')) {
-        const redirectTo = searchParams.get('redirect') || '/dashboard'
-        return NextResponse.redirect(new URL(redirectTo, request.url))
-      }
-      return supabaseResponse
-    }
-
-    // If user is not authenticated and trying to access protected route
-    if (!user && isProtectedPath) {
-      const redirectUrl = new URL('/login', request.url)
-      redirectUrl.searchParams.set('redirect', pathname)
-      return NextResponse.redirect(redirectUrl)
-    }
-
+    // Don't redirect if user is null - this is normal for public pages
     return supabaseResponse
-  } catch (error) {
-    // Don't log "Auth session missing!" as an error since it's expected for unauthenticated users
-    if (error instanceof Error && error.message !== 'Auth session missing!') {
+  } catch (error: any) {
+    // Only log unexpected errors
+    if (!error.message?.includes('Auth session missing')) {
       console.error('Middleware error:', error)
     }
-    // On any error, allow the request to continue
     return supabaseResponse
   }
 }

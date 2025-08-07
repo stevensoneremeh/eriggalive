@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { usePathname } from "next/navigation"
-import { Play, Pause, Volume2, VolumeX, X, Radio } from "lucide-react"
+import { Play, Pause, Volume2, VolumeX, X, Radio } from 'lucide-react'
 import { cn } from "@/lib/utils"
 
 interface RadioLyrics {
@@ -197,7 +197,7 @@ export default function EriggaRadio() {
                 <div
                   className={cn(
                     "flex items-center space-x-1 transition-opacity duration-200",
-                    isHovered || window.innerWidth < 768 ? "opacity-100" : "opacity-0 md:opacity-0",
+                    isHovered || (typeof window !== 'undefined' && window.innerWidth < 768) ? "opacity-100" : "opacity-0 md:opacity-0",
                   )}
                 >
                   <button
