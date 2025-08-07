@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-import { supabase } from "@/lib/supabase"
+import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import type { User, Session } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
@@ -36,44 +36,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+  const supabase = createClient()
 
   const fetchProfile = async (userId: string) => {
     try {
-      // First, clean up any duplicate profiles
-      const { data: allProfiles, error: fetchError } = await supabase
+      const { data, error } = await supabase
         .from("users")
         .select("*")
         .eq("auth_user_id", userId)
+        .single()
 
-      if (fetchError) {
-        console.error("Error fetching profiles:", fetchError)
+      if (error) {
+        console.error("Error fetching profile:", error)
         return null
       }
 
-      if (!allProfiles || allProfiles.length === 0) {
-        console.log("No profile found for user:", userId)
-        return null
-      }
-
-      // If multiple profiles exist, keep the first one and delete the rest
-      if (allProfiles.length > 1) {
-        console.log(`Found ${allProfiles.length} profiles for user ${userId}, cleaning up...`)
-        const keepProfile = allProfiles[0]
-        const duplicateIds = allProfiles.slice(1).map((p) => p.id)
-
-        // Delete duplicate profiles
-        const { error: deleteError } = await supabase.from("users").delete().in("id", duplicateIds)
-
-        if (deleteError) {
-          console.error("Error deleting duplicate profiles:", deleteError)
-        } else {
-          console.log(`Deleted ${duplicateIds.length} duplicate profiles`)
-        }
-
-        return keepProfile
-      }
-
-      return allProfiles[0]
+      return data
     } catch (error) {
       console.error("Error in fetchProfile:", error)
       return null
@@ -143,7 +121,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           // Only redirect on sign in, not on initial load
           if (event === "SIGNED_IN") {
-            router.push("/dashboard")
+            // Check if there's a redirect parameter
+            const urlParams = new URLSearchParams(window.location.search)
+            const redirectTo = urlParams.get('redirect') || '/dashboard'
+            router.push(redirectTo)
           }
         } else {
           if (mounted) {
@@ -163,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [router])
+  }, [router, supabase.auth])
 
   const signIn = async (email: string, password: string) => {
     try {

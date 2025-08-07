@@ -10,8 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Users, MessageCircle, Coins, Trophy, Music, Star, Crown, Zap, TrendingUp, Camera, Edit, Phone, Settings, Calendar, Ticket, ShoppingBag, Eye, Heart, BookOpen } from 'lucide-react'
 import Link from "next/link"
 import { useState, useRef, useEffect } from "react"
-<<<<<<< HEAD
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 import { createClient } from "@/lib/supabase/client"
 
 interface UserStats {
@@ -25,10 +24,6 @@ interface UserStats {
   followingCount: number
   reputationScore: number
 }
-=======
-import { useToast } from "@/components/ui/use-toast"
-import { supabase } from "@/lib/supabase"
->>>>>>> 8382ee5 (Fix: Use correct supabase import and remove supabaseClient references)
 
 export default function DashboardPage() {
   const { user, profile, loading, refreshProfile } = useAuth()
@@ -285,60 +280,6 @@ export default function DashboardPage() {
       default:
         return 0
     }
-  }
-
-<<<<<<< HEAD
-  if (loading || loadingStats) {
-    return (
-      <AuthGuard>
-        <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4 sm:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="animate-pulse space-y-8">
-              <div className="h-8 bg-gray-300 rounded w-1/3"></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-32 bg-gray-300 rounded"></div>
-                ))}
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-6">
-                  <div className="h-64 bg-gray-300 rounded"></div>
-                  <div className="h-48 bg-gray-300 rounded"></div>
-                </div>
-                <div className="space-y-6">
-                  <div className="h-80 bg-gray-300 rounded"></div>
-                  <div className="h-48 bg-gray-300 rounded"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </AuthGuard>
-=======
-  useEffect(() => {
-    if (!loading && !user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to access your dashboard.",
-        variant: "destructive",
-      })
-    }
-  }, [loading, user, toast])
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">Please log in to access your dashboard.</p>
-        </div>
-      </div>
->>>>>>> 8382ee5 (Fix: Use correct supabase import and remove supabaseClient references)
-    )
   }
 
   return (
