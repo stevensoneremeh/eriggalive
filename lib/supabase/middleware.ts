@@ -29,13 +29,17 @@ export async function updateSession(request: NextRequest) {
   )
 
   try {
-    // Get user session
+    // IMPORTANT: Avoid writing any logic between createServerClient and
+    // supabase.auth.getUser(). A simple mistake could make it very hard to debug
+    // issues with users being randomly logged out.
+
     const {
       data: { user },
       error,
     } = await supabase.auth.getUser()
 
-    if (error) {
+    // Don't treat missing session as an error - it's normal for unauthenticated users
+    if (error && error.message !== 'Auth session missing!') {
       console.error('Auth error in middleware:', error)
     }
 
@@ -104,8 +108,11 @@ export async function updateSession(request: NextRequest) {
 
     return supabaseResponse
   } catch (error) {
-    console.error('Middleware error:', error)
-    // On error, allow the request to continue
+    // Don't log "Auth session missing!" as an error since it's expected for unauthenticated users
+    if (error instanceof Error && error.message !== 'Auth session missing!') {
+      console.error('Middleware error:', error)
+    }
+    // On any error, allow the request to continue
     return supabaseResponse
   }
 }
