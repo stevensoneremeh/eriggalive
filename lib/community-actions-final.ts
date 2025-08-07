@@ -1,149 +1,106 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server-final"
+import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
-export async function createPost(formData: FormData) {
+export async function fetchCommunityPosts() {
   try {
-    const supabase = await createClient()
+    const supabase = createClient()
 
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const { data: posts, error } = await supabase
+      .from("community_posts")
+      .select(`
+        *,
+        user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
+        category:community_categories!community_posts_category_id_fkey(id, name, slug)
+      `)
+      .eq("is_published", true)
+      .eq("is_deleted", false)
+      .order("created_at", { ascending: false })
+      .limit(20)
 
-    if (authError || !user) {
-      return { success: false, error: "Authentication required" }
+    if (error) {
+      console.error("Error fetching posts:", error)
+      return []
     }
 
-    // Get user's internal ID
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("id")
-      .eq("auth_user_id", user.id)
-      .single()
+    return posts || []
+  } catch (error) {
+    console.error("Error in fetchCommunityPosts:", error)
+    return []
+  }
+}
 
-    if (userError || !userData) {
-      return { success: false, error: "User profile not found" }
-    }
+export async function createCommunityPost(formData: FormData) {
+  try {
+    const supabase = createClient()
 
+    const title = formData.get("title") as string
     const content = formData.get("content") as string
     const categoryId = formData.get("categoryId") as string
 
-    if (!content || !categoryId) {
-      return { success: false, error: "Content and category are required" }
+    if (!title || !content) {
+      return { error: "Title and content are required" }
     }
 
-    // Extract hashtags from content
-    const hashtags = content.match(/#\w+/g)?.map((tag) => tag.slice(1)) || []
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-    // Create post
-    const { data: post, error: postError } = await supabase
+    if (!user) {
+      return { error: "Authentication required" }
+    }
+
+    const { data: userProfile } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
+
+    if (!userProfile) {
+      return { error: "User profile not found" }
+    }
+
+    const { data: post, error } = await supabase
       .from("community_posts")
       .insert({
-        user_id: userData.id,
-        category_id: Number.parseInt(categoryId),
+        title,
         content,
-        hashtags,
+        user_id: userProfile.id,
+        category_id: categoryId ? Number.parseInt(categoryId) : null,
+        is_published: true,
+        is_deleted: false,
       })
       .select()
       .single()
 
-    if (postError) {
-      console.error("Post creation error:", postError)
-      return { success: false, error: "Failed to create post" }
+    if (error) {
+      console.error("Error creating post:", error)
+      return { error: "Failed to create post" }
     }
 
     revalidatePath("/community")
     return { success: true, post }
   } catch (error) {
-    console.error("Error creating post:", error)
-    return { success: false, error: "An unexpected error occurred" }
+    console.error("Error in createCommunityPost:", error)
+    return { error: "An unexpected error occurred" }
   }
 }
 
-export async function voteOnPost(postId: number) {
+export async function fetchCommunityCategories() {
   try {
-    const supabase = await createClient()
+    const supabase = createClient()
 
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: "Authentication required" }
-    }
-
-    // Call the vote function
-    const { data, error } = await supabase.rpc("handle_post_vote", {
-      p_post_id: postId,
-      p_voter_auth_id: user.id,
-      p_coin_amount: 100,
-    })
+    const { data: categories, error } = await supabase
+      .from("community_categories")
+      .select("*")
+      .eq("is_active", true)
+      .order("display_order", { ascending: true })
 
     if (error) {
-      console.error("Vote error:", error)
-      return { success: false, error: error.message }
+      console.error("Error fetching categories:", error)
+      return []
     }
 
-    revalidatePath("/community")
-    return { success: true, voted: data }
+    return categories || []
   } catch (error) {
-    console.error("Error voting on post:", error)
-    return { success: false, error: "An unexpected error occurred" }
-  }
-}
-
-export async function bookmarkPost(postId: number) {
-  try {
-    const supabase = await createClient()
-
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { success: false, error: "Authentication required" }
-    }
-
-    // Get user's internal ID
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("id")
-      .eq("auth_user_id", user.id)
-      .single()
-
-    if (userError || !userData) {
-      return { success: false, error: "User profile not found" }
-    }
-
-    // Check if already bookmarked
-    const { data: existingBookmark } = await supabase
-      .from("user_bookmarks")
-      .select("id")
-      .eq("user_id", userData.id)
-      .eq("post_id", postId)
-      .single()
-
-    if (existingBookmark) {
-      // Remove bookmark
-      await supabase.from("user_bookmarks").delete().eq("user_id", userData.id).eq("post_id", postId)
-      return { success: true, bookmarked: false }
-    } else {
-      // Add bookmark
-      await supabase.from("user_bookmarks").insert({
-        user_id: userData.id,
-        post_id: postId,
-      })
-      return { success: true, bookmarked: true }
-    }
-  } catch (error) {
-    console.error("Error bookmarking post:", error)
-    return { success: false, error: "An unexpected error occurred" }
+    console.error("Error in fetchCommunityCategories:", error)
+    return []
   }
 }
