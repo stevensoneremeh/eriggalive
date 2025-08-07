@@ -1,472 +1,402 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  Archive,
-  Search,
-  Play,
-  Download,
-  Heart,
-  Share2,
-  Music,
-  Video,
-  ImageIcon,
-  FileText,
-  Calendar,
-  Eye,
-  Lock,
-  Crown,
-  Loader2,
-} from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { formatDistanceToNow } from "date-fns"
-import { cn } from "@/lib/utils"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Music, Video, Image, Lock, Play, Download, Crown, Coins } from 'lucide-react'
+import { BlurredContent } from "@/components/blurred-content"
+import { LoginPromptModal } from "@/components/auth/login-prompt-modal"
+import { useAuthAction } from "@/hooks/use-auth-action"
 import Link from "next/link"
-import Image from "next/image"
 
 interface MediaItem {
   id: string
   title: string
-  description?: string
-  type: "video" | "audio" | "image" | "document"
-  url: string
-  thumbnail?: string
-  duration?: number
-  size?: number
-  tier_required: string
-  is_premium: boolean
-  views: number
-  likes: number
-  created_at: string
-  tags: string[]
+  type: "audio" | "video" | "image"
+  thumbnail: string
+  duration?: string
+  size?: string
+  tier: "free" | "pioneer" | "elder" | "blood_brotherhood"
+  description: string
+  releaseDate: string
+  isExclusive?: boolean
 }
 
 const mockMediaItems: MediaItem[] = [
   {
     id: "1",
-    title: "Behind the Scenes - Studio Session",
-    description: "Exclusive footage from the latest recording session",
-    type: "video",
-    url: "/placeholder.mp4",
-    thumbnail: "/images/hero/erigga1.jpeg",
-    duration: 180,
-    tier_required: "pioneer",
-    is_premium: true,
-    views: 1250,
-    likes: 89,
-    created_at: "2024-01-15T10:00:00Z",
-    tags: ["studio", "behind-scenes", "exclusive"],
+    title: "The Erigma - Full Album",
+    type: "audio",
+    thumbnail: "/erigga/albums/the-erigma-cover.jpeg",
+    duration: "45:32",
+    tier: "free",
+    description: "Erigga's breakthrough album that put him on the map",
+    releaseDate: "2012",
   },
   {
     id: "2",
-    title: "Unreleased Track - 'Street Dreams'",
-    description: "Brand new unreleased track for Blood Brotherhood members",
-    type: "audio",
-    url: "/placeholder.mp3",
-    duration: 240,
-    tier_required: "blood_brotherhood",
-    is_premium: true,
-    views: 890,
-    likes: 156,
-    created_at: "2024-01-10T15:30:00Z",
-    tags: ["unreleased", "exclusive", "new-music"],
+    title: "Behind the Scenes: Studio Sessions",
+    type: "video",
+    thumbnail: "/erigga/studio/erigga-recording-studio.jpeg",
+    duration: "12:45",
+    tier: "pioneer",
+    description: "Exclusive footage from Erigga's recording sessions",
+    releaseDate: "2024",
+    isExclusive: true,
   },
   {
     id: "3",
-    title: "Concert Photos - Lagos Show",
-    description: "High-quality photos from the recent Lagos concert",
-    type: "image",
-    url: "/images/hero/erigga2.jpeg",
-    tier_required: "grassroot",
-    is_premium: false,
-    views: 2100,
-    likes: 234,
-    created_at: "2024-01-05T20:00:00Z",
-    tags: ["concert", "photos", "lagos"],
+    title: "The Erigma II - Deluxe Edition",
+    type: "audio",
+    thumbnail: "/erigga/albums/the-erigma-ii-cover.jpeg",
+    duration: "52:18",
+    tier: "elder",
+    description: "Extended version with bonus tracks and unreleased material",
+    releaseDate: "2019",
+    isExclusive: true,
   },
   {
     id: "4",
-    title: "Lyrics Sheet - 'Paper Boi'",
-    description: "Official handwritten lyrics for Paper Boi",
-    type: "document",
-    url: "/placeholder.pdf",
-    tier_required: "elder",
-    is_premium: true,
-    views: 567,
-    likes: 78,
-    created_at: "2024-01-01T12:00:00Z",
-    tags: ["lyrics", "paper-boi", "handwritten"],
+    title: "Personal Photo Collection",
+    type: "image",
+    thumbnail: "/erigga/photoshoots/erigga-professional-shoot.jpeg",
+    size: "50 photos",
+    tier: "blood_brotherhood",
+    description: "Rare and personal photos from Erigga's journey",
+    releaseDate: "2024",
+    isExclusive: true,
+  },
+  {
+    id: "5",
+    title: "Live Performance - Warri Again",
+    type: "video",
+    thumbnail: "/erigga/performances/erigga-live-performance.jpeg",
+    duration: "25:30",
+    tier: "free",
+    description: "Full live performance from Warri homecoming concert",
+    releaseDate: "2023",
+  },
+  {
+    id: "6",
+    title: "Unreleased Freestyle Collection",
+    type: "audio",
+    thumbnail: "/erigga/studio/erigga-recording-studio.jpg",
+    duration: "18:45",
+    tier: "blood_brotherhood",
+    description: "Exclusive unreleased freestyles and demos",
+    releaseDate: "2024",
+    isExclusive: true,
   },
 ]
 
+const tierColors = {
+  free: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  pioneer: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  elder: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  blood_brotherhood: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+}
+
+const tierNames = {
+  free: "Free",
+  pioneer: "Pioneer",
+  elder: "Elder",
+  blood_brotherhood: "Blood Brotherhood",
+}
+
 export default function VaultPage() {
-  const { profile, isAuthenticated } = useAuth()
-  const [mediaItems, setMediaItems] = useState<MediaItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedType, setSelectedType] = useState<string>("all")
-  const [selectedTier, setSelectedTier] = useState<string>("all")
-  const [sortBy, setSortBy] = useState<string>("newest")
+  const { user, profile, loading } = useAuth()
+  const [selectedTab, setSelectedTab] = useState("all")
+  const [mounted, setMounted] = useState(false)
+  const { executeWithAuth, showLoginPrompt, handleLoginSuccess, handleLoginCancel } = useAuthAction()
 
   useEffect(() => {
-    // Simulate loading media items
-    const timer = setTimeout(() => {
-      setMediaItems(mockMediaItems)
-      setLoading(false)
-    }, 1000)
-
-    return () => clearTimeout(timer)
+    setMounted(true)
   }, [])
 
-  const getTierColor = (tier: string) => {
-    switch (tier?.toLowerCase()) {
-      case "blood_brotherhood":
-      case "blood":
-        return "bg-red-500"
-      case "elder":
-        return "bg-purple-500"
-      case "pioneer":
-        return "bg-blue-500"
-      case "grassroot":
-        return "bg-green-500"
-      default:
-        return "bg-gray-500"
+  const canAccessContent = (item: MediaItem) => {
+    if (!user) return item.tier === "free"
+    if (!profile) return item.tier === "free"
+    
+    const userTier = profile.subscription_tier || "grassroot"
+    const tierHierarchy = ["free", "grassroot", "pioneer", "elder", "blood_brotherhood"]
+    const userTierIndex = tierHierarchy.indexOf(userTier)
+    const itemTierIndex = tierHierarchy.indexOf(item.tier)
+    
+    return userTierIndex >= itemTierIndex
+  }
+
+  const handleContentAccess = (item: MediaItem) => {
+    if (canAccessContent(item)) {
+      // User can access this content
+      console.log("Accessing content:", item.title)
+      // Here you would implement the actual content access logic
+    } else {
+      executeWithAuth(
+        () => {
+          // After login, check again if they can access
+          if (canAccessContent(item)) {
+            console.log("Accessing content after login:", item.title)
+          } else {
+            // Redirect to upgrade page
+            window.location.href = "/premium"
+          }
+        },
+        {
+          title: "Premium Content",
+          description: `This content requires ${tierNames[item.tier]} tier or higher. Sign in to check your access level.`,
+          showToast: true
+        }
+      )
     }
   }
 
-  const getTierDisplayName = (tier: string) => {
-    switch (tier?.toLowerCase()) {
-      case "blood_brotherhood":
-      case "blood":
-        return "Blood"
-      case "elder":
-        return "Elder"
-      case "pioneer":
-        return "Pioneer"
-      case "grassroot":
-        return "Grassroot"
-      default:
-        return "Fan"
-    }
-  }
+  const filteredItems = selectedTab === "all" 
+    ? mockMediaItems 
+    : mockMediaItems.filter(item => item.type === selectedTab)
 
-  const canAccessContent = (requiredTier: string) => {
-    if (!isAuthenticated || !profile) return false
+  const freeItems = mockMediaItems.filter(item => item.tier === "free")
+  const premiumItems = mockMediaItems.filter(item => item.tier !== "free")
 
-    const tierHierarchy = {
-      grassroot: 1,
-      pioneer: 2,
-      elder: 3,
-      blood_brotherhood: 4,
-      blood: 4,
-    }
-
-    const userTierLevel = tierHierarchy[profile.tier?.toLowerCase() as keyof typeof tierHierarchy] || 0
-    const requiredTierLevel = tierHierarchy[requiredTier?.toLowerCase() as keyof typeof tierHierarchy] || 0
-
-    return userTierLevel >= requiredTierLevel
-  }
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "video":
-        return Video
-      case "audio":
-        return Music
-      case "image":
-        return ImageIcon
-      case "document":
-        return FileText
-      default:
-        return Archive
-    }
-  }
-
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60)
-    const remainingSeconds = seconds % 60
-    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`
-  }
-
-  const filteredItems = mediaItems.filter((item) => {
-    const matchesSearch =
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-
-    const matchesType = selectedType === "all" || item.type === selectedType
-    const matchesTier = selectedTier === "all" || item.tier_required === selectedTier
-
-    return matchesSearch && matchesType && matchesTier
-  })
-
-  const sortedItems = [...filteredItems].sort((a, b) => {
-    switch (sortBy) {
-      case "newest":
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      case "oldest":
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      case "popular":
-        return b.views - a.views
-      case "liked":
-        return b.likes - a.likes
-      default:
-        return 0
-    }
-  })
-
-  if (loading) {
+  if (loading || !mounted) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center space-x-3 mb-4">
-          <Archive className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold">Media Vault</h1>
-        </div>
-        <p className="text-muted-foreground">
-          Exclusive content, unreleased tracks, behind-the-scenes footage, and more
-        </p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <div className="flex items-center justify-center mb-6">
+            <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+              <Music className="w-8 h-8 text-white" />
+            </div>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+            Erigga Media Vault
+          </h1>
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-8">
+            Access Erigga's complete collection of music, videos, and exclusive content. 
+            {user ? (
+              <>Your current tier: <Badge className={tierColors[profile?.subscription_tier as keyof typeof tierColors] || tierColors.free}>
+                {tierNames[profile?.subscription_tier as keyof typeof tierNames] || "Grassroot"}
+              </Badge></>
+            ) : (
+              "Sign in to unlock premium content."
+            )}
+          </p>
 
-      {/* Authentication Check */}
-      {!isAuthenticated ? (
-        <Card>
-          <CardContent className="text-center py-12">
-            <Lock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">Access Required</h3>
-            <p className="text-muted-foreground mb-4">Sign in to access exclusive content in the media vault</p>
-            <div className="space-x-2">
-              <Button asChild>
-                <Link href="/login">Sign In</Link>
+          {!user && (
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+              <Button asChild size="lg">
+                <Link href="/signup">
+                  <Crown className="mr-2 h-5 w-5" />
+                  Create Account
+                </Link>
               </Button>
-              <Button variant="outline" asChild>
-                <Link href="/signup">Sign Up</Link>
+              <Button asChild variant="outline" size="lg">
+                <Link href="/login">
+                  Sign In
+                </Link>
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* Filters */}
-          <Card className="mb-6">
+          )}
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <Card className="text-center">
             <CardContent className="p-4">
-              <div className="flex flex-col lg:flex-row gap-4">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <Input
-                    placeholder="Search media..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-
-                <Select value={selectedType} onValueChange={setSelectedType}>
-                  <SelectTrigger className="w-full lg:w-48">
-                    <SelectValue placeholder="Content Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="video">Videos</SelectItem>
-                    <SelectItem value="audio">Audio</SelectItem>
-                    <SelectItem value="image">Images</SelectItem>
-                    <SelectItem value="document">Documents</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={selectedTier} onValueChange={setSelectedTier}>
-                  <SelectTrigger className="w-full lg:w-48">
-                    <SelectValue placeholder="Tier Level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Tiers</SelectItem>
-                    <SelectItem value="grassroot">Grassroot</SelectItem>
-                    <SelectItem value="pioneer">Pioneer</SelectItem>
-                    <SelectItem value="elder">Elder</SelectItem>
-                    <SelectItem value="blood_brotherhood">Blood</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-full lg:w-48">
-                    <SelectValue placeholder="Sort By" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="newest">Newest</SelectItem>
-                    <SelectItem value="oldest">Oldest</SelectItem>
-                    <SelectItem value="popular">Most Viewed</SelectItem>
-                    <SelectItem value="liked">Most Liked</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{freeItems.length}</div>
+              <div className="text-sm text-muted-foreground">Free Content</div>
             </CardContent>
           </Card>
-
-          {/* Content Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {sortedItems.length === 0 ? (
-              <div className="col-span-full">
-                <Card>
-                  <CardContent className="text-center py-12">
-                    <Archive className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium mb-2">No content found</h3>
-                    <p className="text-muted-foreground">
-                      {searchQuery ? "Try adjusting your search terms" : "No media available at the moment"}
-                    </p>
-                  </CardContent>
-                </Card>
+          <Card className="text-center">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{premiumItems.length}</div>
+              <div className="text-sm text-muted-foreground">Premium Content</div>
+            </CardContent>
+          </Card>
+          <Card className="text-center">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                {mockMediaItems.filter(item => item.type === "audio").length}
               </div>
-            ) : (
-              sortedItems.map((item) => {
-                const TypeIcon = getTypeIcon(item.type)
-                const hasAccess = canAccessContent(item.tier_required)
+              <div className="text-sm text-muted-foreground">Audio Tracks</div>
+            </CardContent>
+          </Card>
+          <Card className="text-center">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                {mockMediaItems.filter(item => item.type === "video").length}
+              </div>
+              <div className="text-sm text-muted-foreground">Videos</div>
+            </CardContent>
+          </Card>
+        </div>
 
+        {/* Content Tabs */}
+        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="mb-8">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="all">All Content</TabsTrigger>
+            <TabsTrigger value="audio">Music</TabsTrigger>
+            <TabsTrigger value="video">Videos</TabsTrigger>
+            <TabsTrigger value="image">Photos</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value={selectedTab} className="mt-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredItems.map((item) => {
+                const hasAccess = canAccessContent(item)
+                
                 return (
-                  <Card key={item.id} className="group hover:shadow-lg transition-shadow">
+                  <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                     <div className="relative">
-                      {/* Thumbnail */}
-                      <div className="aspect-video bg-muted rounded-t-lg overflow-hidden">
-                        {item.thumbnail ? (
-                          <Image
-                            src={item.thumbnail || "/placeholder.svg"}
-                            alt={item.title}
-                            fill
-                            className="object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                        ) : (
-                          <div className="flex items-center justify-center h-full">
-                            <TypeIcon className="h-12 w-12 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Overlay */}
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-t-lg">
-                        {hasAccess ? (
-                          <Button size="sm" className="bg-white/20 hover:bg-white/30 text-white">
-                            <Play className="h-4 w-4 mr-2" />
-                            Play
-                          </Button>
-                        ) : (
-                          <div className="text-center text-white">
-                            <Lock className="h-6 w-6 mx-auto mb-2" />
-                            <p className="text-sm">Tier Required</p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Duration */}
-                      {item.duration && (
-                        <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
-                          {formatDuration(item.duration)}
-                        </div>
+                      {hasAccess ? (
+                        <img
+                          src={item.thumbnail || "/placeholder.svg"}
+                          alt={item.title}
+                          className="w-full h-48 object-cover"
+                        />
+                      ) : (
+                        <BlurredContent
+                          src={item.thumbnail}
+                          alt={item.title}
+                          className="w-full h-48 object-cover"
+                          tier={item.tier}
+                        />
                       )}
-
-                      {/* Premium Badge */}
-                      {item.is_premium && (
-                        <div className="absolute top-2 left-2">
-                          <Badge className="bg-yellow-500 text-black">
-                            <Crown className="h-3 w-3 mr-1" />
-                            Premium
-                          </Badge>
-                        </div>
-                      )}
-
-                      {/* Tier Badge */}
-                      <div className="absolute top-2 right-2">
-                        <Badge className={cn("text-white", getTierColor(item.tier_required))}>
-                          {getTierDisplayName(item.tier_required)}
+                      
+                      <div className="absolute top-2 left-2 flex gap-2">
+                        <Badge className={tierColors[item.tier]}>
+                          {tierNames[item.tier]}
                         </Badge>
+                        {item.isExclusive && (
+                          <Badge variant="secondary">
+                            <Crown className="w-3 h-3 mr-1" />
+                            Exclusive
+                          </Badge>
+                        )}
                       </div>
+
+                      <div className="absolute top-2 right-2">
+                        {item.type === "audio" && <Music className="w-5 h-5 text-white bg-black/50 rounded p-1" />}
+                        {item.type === "video" && <Video className="w-5 h-5 text-white bg-black/50 rounded p-1" />}
+                        {item.type === "image" && <Image className="w-5 h-5 text-white bg-black/50 rounded p-1" />}
+                      </div>
+
+                      {!hasAccess && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          <Lock className="w-8 h-8 text-white" />
+                        </div>
+                      )}
                     </div>
 
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-medium line-clamp-2 flex-1">{item.title}</h3>
-                        <TypeIcon className="h-4 w-4 text-muted-foreground ml-2 flex-shrink-0" />
+                    <CardHeader>
+                      <CardTitle className="text-lg">{item.title}</CardTitle>
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span>{item.releaseDate}</span>
+                        <span>{item.duration || item.size}</span>
                       </div>
+                    </CardHeader>
 
-                      {item.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{item.description}</p>
-                      )}
-
-                      {/* Tags */}
-                      {item.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-3">
-                          {item.tags.slice(0, 3).map((tag) => (
-                            <Badge key={tag} variant="secondary" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Stats */}
-                      <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
-                        <div className="flex items-center space-x-3">
-                          <div className="flex items-center">
-                            <Eye className="h-3 w-3 mr-1" />
-                            {item.views}
-                          </div>
-                          <div className="flex items-center">
-                            <Heart className="h-3 w-3 mr-1" />
-                            {item.likes}
-                          </div>
-                        </div>
-                        <div className="flex items-center">
-                          <Calendar className="h-3 w-3 mr-1" />
-                          {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center justify-between">
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground mb-4">{item.description}</p>
+                      
+                      <div className="flex gap-2">
                         {hasAccess ? (
-                          <div className="flex space-x-2">
-                            <Button size="sm" variant="outline">
-                              <Play className="h-3 w-3 mr-1" />
-                              Play
+                          <>
+                            <Button 
+                              size="sm" 
+                              className="flex-1"
+                              onClick={() => handleContentAccess(item)}
+                            >
+                              <Play className="w-4 h-4 mr-2" />
+                              {item.type === "image" ? "View" : "Play"}
                             </Button>
                             <Button size="sm" variant="outline">
-                              <Download className="h-3 w-3" />
+                              <Download className="w-4 h-4" />
                             </Button>
-                          </div>
+                          </>
                         ) : (
-                          <Button size="sm" variant="outline" asChild>
-                            <Link href="/premium">
-                              <Crown className="h-3 w-3 mr-1" />
-                              Upgrade
-                            </Link>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="flex-1"
+                            onClick={() => handleContentAccess(item)}
+                          >
+                            <Lock className="w-4 h-4 mr-2" />
+                            {user ? "Upgrade to Access" : "Sign In to Access"}
                           </Button>
                         )}
-
-                        <Button size="sm" variant="ghost">
-                          <Share2 className="h-3 w-3" />
-                        </Button>
                       </div>
                     </CardContent>
                   </Card>
                 )
-              })
-            )}
-          </div>
-        </>
-      )}
+              })}
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Upgrade CTA for non-premium users */}
+        {user && profile?.subscription_tier === "grassroot" && (
+          <Card className="bg-gradient-to-r from-purple-500 to-blue-500 text-white">
+            <CardContent className="p-8 text-center">
+              <Crown className="w-12 h-12 mx-auto mb-4" />
+              <h3 className="text-2xl font-bold mb-2">Unlock Premium Content</h3>
+              <p className="mb-6 opacity-90">
+                Upgrade your tier to access exclusive music, behind-the-scenes videos, and rare content.
+              </p>
+              <Button asChild size="lg" variant="secondary">
+                <Link href="/premium">
+                  <Coins className="mr-2 h-5 w-5" />
+                  Upgrade Now
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Sign up CTA for non-users */}
+        {!user && (
+          <Card className="bg-gradient-to-r from-purple-500 to-blue-500 text-white">
+            <CardContent className="p-8 text-center">
+              <Crown className="w-12 h-12 mx-auto mb-4" />
+              <h3 className="text-2xl font-bold mb-2">Join the Erigga Community</h3>
+              <p className="mb-6 opacity-90">
+                Create your account to access exclusive content and connect with other fans.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button asChild size="lg" variant="secondary">
+                  <Link href="/signup">
+                    Create Free Account
+                  </Link>
+                </Button>
+                <Button asChild size="lg" variant="outline" className="text-white border-white hover:bg-white/10">
+                  <Link href="/premium">
+                    View Premium Tiers
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Login Prompt Modal */}
+      <LoginPromptModal
+        isOpen={showLoginPrompt}
+        onClose={handleLoginCancel}
+        onSuccess={handleLoginSuccess}
+        title="Access Premium Content"
+        description="Sign in to check your tier access and unlock exclusive content."
+      />
     </div>
   )
 }

@@ -3,20 +3,26 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useTheme } from "@/contexts/theme-context"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Music, Video, Newspaper, Users, ShoppingBag, Calendar } from "lucide-react"
+import { Music, Video, Newspaper, Users, ShoppingBag, Calendar, Crown, Coins } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { SafeHeroVideoCarousel } from "@/components/safe-hero-video-carousel"
 import { getOptimizedVideoSources } from "@/utils/video-utils"
 import EriggaRadio from "@/components/erigga-radio"
+import { LoginPromptModal } from "@/components/auth/login-prompt-modal"
+import { useAuthAction } from "@/hooks/use-auth-action"
 
 export default function HomePage() {
   const { theme } = useTheme()
+  const { user, profile } = useAuth()
   const [currentSlide, setCurrentSlide] = useState(0)
   const [mounted, setMounted] = useState(false)
+  const { executeWithAuth, showLoginPrompt, handleLoginSuccess, handleLoginCancel } = useAuthAction()
+  
   const videoSources = getOptimizedVideoSources()
-  const primaryVideoUrl = videoSources[0]?.src || "/videoshttps://hebbkx1anhila5yf.public.blob.vercel-storage.com/git-blob/prj_87iLY6t51DXvy0yPJ00SYhwlKXWl/K6Q-Lit6vuzvhNfoGXuTFB/public/erigga-hero-video.mp4"
+  const primaryVideoUrl = videoSources[0]?.src || "/videos/erigga-hero-video.mp4"
 
   // Hero images
   const heroImages = [
@@ -26,13 +32,14 @@ export default function HomePage() {
     "/images/hero/erigga4.jpeg",
   ]
 
-  // Features data
+  // Features data with auth requirements
   const features = [
     {
       title: "Media Vault",
       description: "Access Erigga's complete discography, music videos, and exclusive content.",
       icon: Music,
       href: "/vault",
+      requiresAuth: false,
       color: "from-brand-lime to-brand-teal dark:from-white dark:to-harkonnen-gray",
     },
     {
@@ -40,6 +47,7 @@ export default function HomePage() {
       description: "Follow Erigga's journey through animated stories and documentaries.",
       icon: Video,
       href: "/chronicles",
+      requiresAuth: false,
       color: "from-brand-teal to-brand-lime-dark dark:from-harkonnen-gray dark:to-white",
     },
     {
@@ -47,6 +55,7 @@ export default function HomePage() {
       description: "Connect with other fans, share content, and participate in discussions.",
       icon: Users,
       href: "/community",
+      requiresAuth: false,
       color: "from-brand-lime-dark to-brand-teal-light dark:from-white dark:to-harkonnen-light-gray",
     },
     {
@@ -54,6 +63,7 @@ export default function HomePage() {
       description: "Shop exclusive Erigga merchandise and limited edition items.",
       icon: ShoppingBag,
       href: "/merch",
+      requiresAuth: false,
       color: "from-brand-teal-light to-brand-lime dark:from-harkonnen-light-gray dark:to-white",
     },
     {
@@ -61,6 +71,7 @@ export default function HomePage() {
       description: "Get early access to concert tickets and exclusive events.",
       icon: Calendar,
       href: "/tickets",
+      requiresAuth: true,
       color: "from-brand-lime to-brand-teal-dark dark:from-white dark:to-harkonnen-dark-gray",
     },
     {
@@ -68,6 +79,7 @@ export default function HomePage() {
       description: "Upgrade your experience with exclusive perks and content.",
       icon: Newspaper,
       href: "/premium",
+      requiresAuth: true,
       color: "from-brand-teal-dark to-brand-lime-light dark:from-harkonnen-dark-gray dark:to-white",
     },
   ]
@@ -101,6 +113,7 @@ export default function HomePage() {
       color: "border-grassroot-primary dark:border-grassroot-primary",
       bgColor: "bg-grassroot-secondary/20 dark:bg-grassroot-secondary",
       href: "/signup",
+      requiresAuth: false,
     },
     {
       name: "Pioneer",
@@ -117,6 +130,7 @@ export default function HomePage() {
       color: "border-pioneer-primary dark:border-pioneer-primary",
       bgColor: "bg-pioneer-secondary/20 dark:bg-pioneer-secondary",
       href: "/premium",
+      requiresAuth: true,
       popular: true,
     },
     {
@@ -135,6 +149,7 @@ export default function HomePage() {
       color: "border-elder-primary dark:border-elder-primary",
       bgColor: "bg-elder-secondary/20 dark:bg-elder-secondary",
       href: "/premium",
+      requiresAuth: true,
     },
     {
       name: "Blood Brotherhood",
@@ -152,6 +167,7 @@ export default function HomePage() {
       color: "border-blood-primary dark:border-blood-primary",
       bgColor: "bg-blood-secondary/20 dark:bg-blood-secondary",
       href: "/premium",
+      requiresAuth: true,
     },
   ]
 
@@ -163,6 +179,32 @@ export default function HomePage() {
     }, 5000)
     return () => clearInterval(interval)
   }, [heroImages.length])
+
+  const handleFeatureClick = (feature: typeof features[0]) => {
+    if (feature.requiresAuth) {
+      executeWithAuth(
+        () => window.location.href = feature.href,
+        {
+          title: "Sign in to access premium features",
+          description: `${feature.title} requires an account to access exclusive content.`,
+          showToast: true
+        }
+      )
+    }
+  }
+
+  const handleTierClick = (tier: typeof tierPlans[0]) => {
+    if (tier.requiresAuth) {
+      executeWithAuth(
+        () => window.location.href = tier.href,
+        {
+          title: "Sign in to upgrade your tier",
+          description: `${tier.name} tier requires an account to subscribe.`,
+          showToast: true
+        }
+      )
+    }
+  }
 
   if (!mounted) {
     return null
@@ -186,78 +228,160 @@ export default function HomePage() {
               Join the community and get exclusive access to music, videos, and events
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/signup" className="inline-block">
-                <div
-                  className={cn(
-                    "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
-                    "transform hover:scale-105 hover:shadow-xl",
-                    theme === "dark"
-                      ? "bg-white text-harkonnen-black hover:bg-gray-200"
-                      : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
+              {user ? (
+                <>
+                  <Link href="/dashboard" className="inline-block">
+                    <div
+                      className={cn(
+                        "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
+                        "transform hover:scale-105 hover:shadow-xl",
+                        theme === "dark"
+                          ? "bg-white text-harkonnen-black hover:bg-gray-200"
+                          : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
+                      )}
+                    >
+                      Go to Dashboard
+                    </div>
+                  </Link>
+                  {profile && (
+                    <div className="flex items-center gap-2 bg-black/20 backdrop-blur-sm rounded-lg px-4 py-2">
+                      <Crown className="h-5 w-5 text-yellow-400" />
+                      <span className="text-white font-medium">
+                        {profile.subscription_tier?.replace("_", " ").toUpperCase() || "GRASSROOT"} Member
+                      </span>
+                      {profile.coins_balance && (
+                        <>
+                          <Coins className="h-4 w-4 text-yellow-400 ml-2" />
+                          <span className="text-white">{profile.coins_balance}</span>
+                        </>
+                      )}
+                    </div>
                   )}
-                >
-                  Join Now
-                </div>
-              </Link>
-              <Link href="/vault" className="inline-block">
-                <div
-                  className={cn(
-                    "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
-                    "transform hover:scale-105 hover:shadow-xl",
-                    theme === "dark"
-                      ? "bg-transparent border-2 border-white text-white hover:bg-white/10"
-                      : "bg-brand-teal text-white hover:bg-brand-teal-dark",
-                  )}
-                >
-                  Explore Content
-                </div>
-              </Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/signup" className="inline-block">
+                    <div
+                      className={cn(
+                        "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
+                        "transform hover:scale-105 hover:shadow-xl",
+                        theme === "dark"
+                          ? "bg-white text-harkonnen-black hover:bg-gray-200"
+                          : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
+                      )}
+                    >
+                      Join Now
+                    </div>
+                  </Link>
+                  <Link href="/vault" className="inline-block">
+                    <div
+                      className={cn(
+                        "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
+                        "transform hover:scale-105 hover:shadow-xl",
+                        theme === "dark"
+                          ? "bg-transparent border-2 border-white text-white hover:bg-white/10"
+                          : "bg-brand-teal text-white hover:bg-brand-teal-dark",
+                      )}
+                    >
+                      Explore Content
+                    </div>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
       </section>
 
-      {/* Rest of the home page content */}
-      <section className="py-12 px-4 bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12 text-gray-900 dark:text-white">Explore the Platform</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Media Vault</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Access exclusive music, videos, and behind-the-scenes content
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/vault">Explore Vault</Link>
-                </Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Community</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Connect with others, share content, and join discussions
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/community">Join Community</Link>
-                </Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Chronicles</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Follow Erigga's journey through exclusive stories and updates
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/chronicles">Read Chronicles</Link>
-                </Button>
-              </CardContent>
-            </Card>
+      {/* Quick Access Section for Authenticated Users */}
+      {user && (
+        <section className="py-12 px-4 bg-gray-50 dark:bg-gray-900">
+          <div className="max-w-7xl mx-auto">
+            <h2 className="text-3xl font-bold text-center mb-12 text-gray-900 dark:text-white">
+              Welcome back, {profile?.display_name || profile?.username || "Fan"}!
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-xl font-bold mb-2">Your Dashboard</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    View your activity, coins, and community stats
+                  </p>
+                  <Button asChild variant="outline">
+                    <Link href="/dashboard">Go to Dashboard</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-xl font-bold mb-2">Community</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    Join discussions and connect with other fans
+                  </p>
+                  <Button asChild variant="outline">
+                    <Link href="/community">Join Community</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-xl font-bold mb-2">Exclusive Content</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    Access premium content based on your tier
+                  </p>
+                  <Button asChild variant="outline">
+                    <Link href="/vault">Explore Vault</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
+
+      {/* Public Content Section for Non-Authenticated Users */}
+      {!user && (
+        <section className="py-12 px-4 bg-gray-50 dark:bg-gray-900">
+          <div className="max-w-7xl mx-auto">
+            <h2 className="text-3xl font-bold text-center mb-12 text-gray-900 dark:text-white">Explore the Platform</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-xl font-bold mb-2">Media Vault</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    Access exclusive music, videos, and behind-the-scenes content
+                  </p>
+                  <Button asChild variant="outline">
+                    <Link href="/vault">Explore Vault</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-xl font-bold mb-2">Community</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    Connect with others, share content, and join discussions
+                  </p>
+                  <Button asChild variant="outline">
+                    <Link href="/community">Join Community</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-xl font-bold mb-2">Chronicles</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    Follow Erigga's journey through exclusive stories and updates
+                  </p>
+                  <Button asChild variant="outline">
+                    <Link href="/chronicles">Read Chronicles</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Features Section */}
       <section className="py-20 bg-background">
@@ -271,11 +395,12 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <Link key={index} href={feature.href}>
+              <div key={index} onClick={() => handleFeatureClick(feature)}>
                 <Card
                   className={cn(
-                    "h-full transition-all duration-300 hover:scale-105 overflow-hidden",
+                    "h-full transition-all duration-300 hover:scale-105 overflow-hidden cursor-pointer",
                     theme === "dark" ? "harkonnen-card" : "border border-gray-200",
+                    feature.requiresAuth && !user && "opacity-75"
                   )}
                 >
                   <CardContent className="p-6 flex flex-col h-full">
@@ -287,10 +412,15 @@ export default function HomePage() {
                     >
                       <feature.icon className={cn("h-6 w-6", theme === "dark" ? "text-black" : "text-white")} />
                     </div>
-                    <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
+                    <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+                      {feature.title}
+                      {feature.requiresAuth && !user && (
+                        <Crown className="h-4 w-4 text-yellow-500" title="Requires account" />
+                      )}
+                    </h3>
                     <p className="text-muted-foreground flex-grow">{feature.description}</p>
                     <div className="mt-4 flex items-center text-sm font-medium text-brand-teal dark:text-white">
-                      Learn more
+                      {feature.requiresAuth && !user ? "Sign in to access" : "Learn more"}
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-4 w-4 ml-1"
@@ -303,7 +433,7 @@ export default function HomePage() {
                     </div>
                   </CardContent>
                 </Card>
-              </Link>
+              </div>
             ))}
           </div>
         </div>
@@ -372,14 +502,21 @@ export default function HomePage() {
                 )}
                 <Card
                   className={cn(
-                    "h-full border-2 transition-all duration-300",
+                    "h-full border-2 transition-all duration-300 cursor-pointer",
                     plan.color,
                     plan.popular ? "transform scale-105" : "",
                     theme === "dark" ? "harkonnen-card" : "",
+                    plan.requiresAuth && !user && "opacity-75"
                   )}
+                  onClick={() => handleTierClick(plan)}
                 >
                   <CardContent className={cn("p-6", plan.bgColor)}>
-                    <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
+                    <h3 className="text-xl font-bold mb-1 flex items-center gap-2">
+                      {plan.name}
+                      {plan.requiresAuth && !user && (
+                        <Crown className="h-4 w-4 text-yellow-500" title="Requires account" />
+                      )}
+                    </h3>
                     <div className="mb-4">
                       <span className="text-3xl font-bold">{plan.price}</span>
                       {plan.period && <span className="text-muted-foreground">/{plan.period}</span>}
@@ -416,9 +553,13 @@ export default function HomePage() {
                               ? "bg-elder-primary text-white hover:bg-opacity-90"
                               : "bg-blood-primary text-white hover:bg-opacity-90",
                       )}
-                      asChild
                     >
-                      <Link href={plan.href}>{plan.name === "Grassroot" ? "Sign Up Free" : "Subscribe Now"}</Link>
+                      {plan.requiresAuth && !user 
+                        ? "Sign in to Subscribe" 
+                        : plan.name === "Grassroot" 
+                          ? "Sign Up Free" 
+                          : "Subscribe Now"
+                      }
                     </Button>
                   </CardContent>
                 </Card>
@@ -435,21 +576,44 @@ export default function HomePage() {
           <p className="text-lg max-w-2xl mx-auto mb-8 text-white/80">
             Get access to exclusive content, connect with other fans, and be part of Erigga's journey.
           </p>
-          <Link href="/signup" className="inline-block">
-            <div
-              className={cn(
-                "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
-                "transform hover:scale-105 hover:shadow-xl",
-                theme === "dark"
-                  ? "bg-white text-harkonnen-black hover:bg-gray-200"
-                  : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
-              )}
-            >
-              Join Now
-            </div>
-          </Link>
+          {user ? (
+            <Link href="/dashboard" className="inline-block">
+              <div
+                className={cn(
+                  "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
+                  "transform hover:scale-105 hover:shadow-xl",
+                  theme === "dark"
+                    ? "bg-white text-harkonnen-black hover:bg-gray-200"
+                    : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
+                )}
+              >
+                Go to Dashboard
+              </div>
+            </Link>
+          ) : (
+            <Link href="/signup" className="inline-block">
+              <div
+                className={cn(
+                  "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
+                  "transform hover:scale-105 hover:shadow-xl",
+                  theme === "dark"
+                    ? "bg-white text-harkonnen-black hover:bg-gray-200"
+                    : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
+                )}
+              >
+                Join Now
+              </div>
+            </Link>
+          )}
         </div>
       </section>
+
+      {/* Login Prompt Modal */}
+      <LoginPromptModal
+        isOpen={showLoginPrompt}
+        onClose={handleLoginCancel}
+        onSuccess={handleLoginSuccess}
+      />
     </div>
   )
 }
