@@ -24,7 +24,7 @@ import {
   Share2,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabaseClient"
+import { supabase } from "@/lib/supabase"
 
 interface Mission {
   id: string

@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Calendar, MapPin, Users, Clock, QrCode, Download, Share2, Sparkles, Music, Star } from "lucide-react"
 import { AuthGuard } from "@/components/auth-guard"
+import { useAuth } from "@/contexts/auth-context"
 
 // Enhanced events data with September concert
 const events = [
@@ -188,6 +189,7 @@ const cardHoverVariants = {
 }
 
 export default function TicketsPage() {
+  const { user, profile, loading } = useAuth()
   const [selectedEvent, setSelectedEvent] = useState<(typeof events)[0] | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [showReservationModal, setShowReservationModal] = useState(false)
@@ -330,6 +332,21 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
   }
 
   const allTickets = generatedTicket ? [...userTickets, generatedTicket] : userTickets
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">Please log in to view your tickets.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <AuthGuard>

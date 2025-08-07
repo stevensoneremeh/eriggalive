@@ -227,7 +227,18 @@ export function createClient() {
     return createMockClient()
   }
 
-  return supabaseCreateClient<Database>(supabaseUrl, supabaseAnonKey)
+  return supabaseCreateClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+    global: {
+      headers: {
+        "X-Client-Info": "eriggalive-web",
+      },
+    },
+  })
 }
 
 // Export a singleton instance for consistent usage

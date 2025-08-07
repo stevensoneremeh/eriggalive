@@ -9,8 +9,13 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+<<<<<<< HEAD
 import { MessageCircle, Heart, Share2, Plus, TrendingUp, Crown, Send, MoreHorizontal } from 'lucide-react'
 import { supabase } from "@/lib/supabaseClient"
+=======
+import { MessageCircle, Heart, Share2, Plus, TrendingUp, Crown, Send, MoreHorizontal } from "lucide-react"
+import { supabase } from "@/lib/supabase"
+>>>>>>> 8382ee5 (Fix: Use correct supabase import and remove supabaseClient references)
 import { useToast } from "@/hooks/use-toast"
 import { formatDistanceToNow } from "date-fns"
 import { CompleteWorkingCommunityClient } from "./complete-working/complete-working-client"

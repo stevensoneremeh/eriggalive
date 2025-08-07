@@ -15,7 +15,16 @@ const PUBLIC_PATHS = [
 ]
 
 // Define paths that should always be accessible
-const ALWAYS_ACCESSIBLE = ["/api", "/_next", "/favicon.ico", "/images", "/videos", "/fonts", "/placeholder", "/erigga"]
+const ALWAYS_ACCESSIBLE = [
+  "/api",
+  "/_next",
+  "/favicon.ico",
+  "/images",
+  "/videos",
+  "/fonts",
+  "/placeholder",
+  "/erigga",
+]
 
 // Define protected paths
 const PROTECTED_PATHS = [
@@ -63,15 +72,35 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-      auth: {
-        persistSession: false,
-      },
-    })
+    // Get the access token from cookies
+    const access_token = request.cookies.get("sb-access-token")?.value
+
+    // If no access token, treat as unauthenticated
+    if (!access_token) {
+      const redirectUrl = new URL("/login", request.url)
+      redirectUrl.searchParams.set("redirect", pathname)
+      return NextResponse.redirect(redirectUrl)
+    }
+
+    // Create Supabase client with the access token
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        auth: {
+          persistSession: false,
+        },
+        global: {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+          },
+        },
+      }
+    )
 
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await supabase.auth.getUser(access_token)
 
     // If no user and path requires auth, redirect to login
     if (!user && requiresAuth) {

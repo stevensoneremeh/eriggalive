@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 
 export async function GET() {
   try {
-    const supabase = createClientComponentClient()
+    const supabase = createClient()
 
     const { data: categories, error } = await supabase
       .from("community_categories")
@@ -23,8 +23,8 @@ export async function GET() {
       { id: 3, name: "Music Discussion", slug: "music-discussion", is_active: true },
     ]
 
-    return NextResponse.json({ 
-      categories: categories && categories.length > 0 ? categories : defaultCategories 
+    return NextResponse.json({
+      categories: categories && categories.length > 0 ? categories : defaultCategories,
     })
   } catch (error: any) {
     console.error("API Error:", error)

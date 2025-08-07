@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -93,7 +92,7 @@ const TIER_HIERARCHY = {
 }
 
 export default function ChatPage() {
-  const { profile } = useAuth()
+  const { profile, loading } = useAuth()
   const [availableRooms, setAvailableRooms] = useState<ChatRoom[]>([])
 
   useEffect(() => {
@@ -108,6 +107,14 @@ export default function ChatPage() {
       setAvailableRooms(accessible)
     }
   }, [profile])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <span>Loading...</span>
+      </div>
+    )
+  }
 
   if (!profile) {
     return (

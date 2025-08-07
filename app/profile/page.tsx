@@ -31,7 +31,7 @@ import {
   MessageCircle,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabaseClient"
+import { supabase } from "@/lib/supabase"
 
 export default function ProfilePage() {
   const { user, profile, refreshProfile } = useAuth()

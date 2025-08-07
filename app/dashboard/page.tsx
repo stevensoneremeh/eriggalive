@@ -1,6 +1,5 @@
 "use client"
 
-import type React from "react"
 import { AuthGuard } from "@/components/auth-guard"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Users, MessageCircle, Coins, Trophy, Music, Star, Crown, Zap, TrendingUp, Camera, Edit, Phone, Settings, Calendar, Ticket, ShoppingBag, Eye, Heart, BookOpen } from 'lucide-react'
 import Link from "next/link"
 import { useState, useRef, useEffect } from "react"
+<<<<<<< HEAD
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 
@@ -25,6 +25,10 @@ interface UserStats {
   followingCount: number
   reputationScore: number
 }
+=======
+import { useToast } from "@/components/ui/use-toast"
+import { supabase } from "@/lib/supabase"
+>>>>>>> 8382ee5 (Fix: Use correct supabase import and remove supabaseClient references)
 
 export default function DashboardPage() {
   const { user, profile, loading, refreshProfile } = useAuth()
@@ -283,6 +287,7 @@ export default function DashboardPage() {
     }
   }
 
+<<<<<<< HEAD
   if (loading || loadingStats) {
     return (
       <AuthGuard>
@@ -309,6 +314,30 @@ export default function DashboardPage() {
           </div>
         </div>
       </AuthGuard>
+=======
+  useEffect(() => {
+    if (!loading && !user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to access your dashboard.",
+        variant: "destructive",
+      })
+    }
+  }, [loading, user, toast])
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">Please log in to access your dashboard.</p>
+        </div>
+      </div>
+>>>>>>> 8382ee5 (Fix: Use correct supabase import and remove supabaseClient references)
     )
   }
 

@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CoinPurchaseEnhanced } from "@/components/coin-purchase-enhanced"
@@ -14,28 +14,15 @@ export default function CoinsPage() {
   const [activeTab, setActiveTab] = useState("purchase")
 
   if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading...</p>
-          </div>
-        </div>
-      </div>
-    )
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   }
 
   if (!isAuthenticated) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-3xl font-bold mb-4">Erigga Coins</h1>
-          <p className="text-muted-foreground mb-8">Please log in to manage your Erigga Coins</p>
-          <Alert>
-            <Shield className="h-4 w-4" />
-            <AlertDescription>You need to be logged in to purchase or withdraw Erigga Coins.</AlertDescription>
-          </Alert>
+          <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">Please log in to view your coins.</p>
         </div>
       </div>
     )

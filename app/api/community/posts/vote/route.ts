@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClientComponentClient()
+    const supabase = createClient()
 
     // Get authenticated user
     const {
@@ -18,9 +18,9 @@ export async function POST(request: NextRequest) {
 
     // Get user profile
     const { data: userProfile, error: profileError } = await supabase
-      .from("user_profiles")
+      .from("users")
       .select("*")
-      .eq("id", authUser.id)
+      .eq("auth_user_id", authUser.id)
       .single()
 
     if (profileError || !userProfile) {
@@ -50,12 +50,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has already voted
-    const { data: existingVote, error: voteCheckError } = await supabase
+    const { data: existingVote } = await supabase
       .from("community_post_votes")
       .select("*")
       .eq("post_id", postId)
       .eq("user_id", userProfile.id)
-      .single()
+      .maybeSingle()
 
     let voted = false
 
@@ -73,10 +73,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Decrease vote count
-      const { error: updateError } = await supabase
-        .from("community_posts")
-        .update({ vote_count: supabase.raw('vote_count - 1') })
-        .eq("id", postId)
+      const { error: updateError } = await supabase.rpc('decrement_vote_count', { post_id_input: postId })
 
       if (updateError) {
         console.error("Error updating vote count:", updateError)
@@ -98,10 +95,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Increase vote count
-      const { error: updateError } = await supabase
-        .from("community_posts")
-        .update({ vote_count: supabase.raw('vote_count + 1') })
-        .eq("id", postId)
+      const { error: updateError } = await supabase.rpc('increment_vote_count', { post_id_input: postId })
 
       if (updateError) {
         console.error("Error updating vote count:", updateError)
@@ -111,10 +105,10 @@ export async function POST(request: NextRequest) {
     }
 
     revalidatePath("/community")
-    return NextResponse.json({ 
-      success: true, 
-      voted, 
-      message: voted ? "Vote added!" : "Vote removed!" 
+    return NextResponse.json({
+      success: true,
+      voted,
+      message: voted ? "Vote added!" : "Vote removed!"
     })
   } catch (error: any) {
     console.error("API Error:", error)

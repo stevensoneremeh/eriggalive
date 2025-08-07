@@ -306,7 +306,23 @@ function ProductCard({ product, onAddToCart }: ProductCardProps) {
 }
 
 export default function MerchPage() {
-  const { profile } = useAuth()
+  const { user, profile, loading } = useAuth()
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">Please log in to view the merch store.</p>
+        </div>
+      </div>
+    )
+  }
+
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [cart, setCart] = useState<
     Array<{

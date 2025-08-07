@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function GET() {
   try {
-    const supabase = await createClient()
+    const supabase = createClient()
 
     // Get authenticated user
     const {
@@ -14,11 +14,11 @@ export async function GET() {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
-    // Get user profile
+    // Get user profile (change "user_profiles" to "users" if that's your table)
     const { data: profile, error: profileError } = await supabase
-      .from("user_profiles")
+      .from("users")
       .select("*")
-      .eq("id", user.id)
+      .eq("auth_user_id", user.id)
       .single()
 
     if (profileError) {
