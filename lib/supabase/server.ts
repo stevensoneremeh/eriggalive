@@ -1,6 +1,7 @@
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js"
-import type { Database } from "@/types/database"
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from "next/headers"
+import type { Database } from "@/types/database"
 
 /* -------------------------------------------------------------------------- */
 /*                              ENV & UTIL HELPERS                            */
@@ -71,20 +72,28 @@ export function createMockServerClient(): SupabaseClient<Database> {
  * Standard server-side client built with the ANON key.
  * Uses cookies for auth state management.
  */
-export function createServerSupabaseClient() {
+export async function createServerSupabaseClient() {
   if (isPreviewMode()) return createMockServerClient()
 
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-  return createSupabaseClient<Database>(supabaseUrl, supabaseKey, {
-    auth: {
-      persistSession: false,
-    },
-    global: {
-      headers: {
-        Cookie: cookieStore.toString(),
+  return createServerClient<Database>(supabaseUrl, supabaseKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll()
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          )
+        } catch {
+          // The `setAll` method was called from a Server Component.
+          // This can be ignored if you have middleware refreshing
+          // user sessions.
+        }
       },
     },
   })
@@ -93,20 +102,28 @@ export function createServerSupabaseClient() {
 /**
  * Server-side client that can access cookies for auth state
  */
-export function createServerSupabaseClientWithAuth(): SupabaseClient<Database> {
+export async function createServerSupabaseClientWithAuth(): SupabaseClient<Database> {
   if (isPreviewMode()) return createMockServerClient()
 
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabaseUrl = process.env.SUPABASE_URL as string
   const supabaseKey = process.env.SUPABASE_ANON_KEY as string
 
-  return createSupabaseClient<Database>(supabaseUrl, supabaseKey, {
-    auth: {
-      persistSession: false,
-    },
-    global: {
-      headers: {
-        Cookie: cookieStore.toString(),
+  return createServerClient<Database>(supabaseUrl, supabaseKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll()
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          )
+        } catch {
+          // The `setAll` method was called from a Server Component.
+          // This can be ignored if you have middleware refreshing
+          // user sessions.
+        }
       },
     },
   })
@@ -135,9 +152,9 @@ export function createAdminSupabaseClient(): SupabaseClient<Database> {
  * Some modules import `createClient` instead of `createServerSupabaseClient`.
  * Exporting an alias keeps them working without edits.
  */
-export const createClient = createServerSupabaseClient
+export const createClientAlias = createServerSupabaseClient
 
 /**
  * Older code imported `getServerClient`.  Provide the same implementation.
  */
-export const getServerClient = createServerSupabaseClient
+export const getServerClientAlias = createServerSupabaseClient
