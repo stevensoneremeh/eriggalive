@@ -1,66 +1,103 @@
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import { createClient } from "@supabase/supabase-js"
+import { NextResponse, type NextRequest } from "next/server"
+import { updateSession } from '@/lib/supabase/middleware'
+
+// Define admin-only paths that require authentication
+const ADMIN_PATHS = [
+ "/admin",
+]
+
+// Define user-specific paths that require authentication
+const AUTH_REQUIRED_PATHS = [
+ "/dashboard",
+ "/settings",
+]
+
+// Define paths that should always be accessible
+const ALWAYS_ACCESSIBLE = [
+ "/api",
+ "/_next",
+ "/favicon.ico",
+ "/images",
+ "/videos",
+ "/fonts",
+ "/placeholder",
+ "/erigga",
+ "/manifest.json",
+]
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  })
+ const { pathname } = request.nextUrl
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request,
-          })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
+ // Allow all static assets and API routes
+ if (ALWAYS_ACCESSIBLE.some(path => pathname.startsWith(path))) {
+   return NextResponse.next()
+ }
 
-  // Refresh session if expired - required for Server Components
-  await supabase.auth.getUser()
+ // Update session for all requests
+ const response = await updateSession(request)
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+ // Check if this is an admin path
+ if (ADMIN_PATHS.some(path => pathname.startsWith(path))) {
+   // For admin paths, we need to check authentication
+   const supabase = createClient(
+     process.env.NEXT_PUBLIC_SUPABASE_URL!,
+     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+   )
 
-  // Only protect truly sensitive routes
-  const protectedRoutes = ['/admin', '/settings', '/dashboard']
-  const isProtectedRoute = protectedRoutes.some(route => 
-    request.nextUrl.pathname.startsWith(route)
-  )
+   try {
+     const { data: { session } } = await supabase.auth.getSession()
+     
+     if (!session) {
+       const redirectUrl = new URL('/login', request.url)
+       redirectUrl.searchParams.set('redirect', pathname)
+       return NextResponse.redirect(redirectUrl)
+     }
+   } catch (error) {
+     console.error('Auth check error:', error)
+     const redirectUrl = new URL('/login', request.url)
+     redirectUrl.searchParams.set('redirect', pathname)
+     return NextResponse.redirect(redirectUrl)
+   }
+ }
 
-  // Redirect to login only for protected routes when not authenticated
-  if (isProtectedRoute && !user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    url.searchParams.set('redirectTo', request.nextUrl.pathname)
-    return NextResponse.redirect(url)
-  }
+ // Check if this is a user-specific path that requires authentication
+ if (AUTH_REQUIRED_PATHS.some(path => pathname.startsWith(path))) {
+   const supabase = createClient(
+     process.env.NEXT_PUBLIC_SUPABASE_URL!,
+     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+   )
 
-  return supabaseResponse
+   try {
+     const { data: { session } } = await supabase.auth.getSession()
+     
+     if (!session) {
+       const redirectUrl = new URL('/login', request.url)
+       redirectUrl.searchParams.set('redirect', pathname)
+       return NextResponse.redirect(redirectUrl)
+     }
+   } catch (error) {
+     console.error('Auth check error:', error)
+     const redirectUrl = new URL('/login', request.url)
+     redirectUrl.searchParams.set('redirect', pathname)
+     return NextResponse.redirect(redirectUrl)
+   }
+ }
+
+ // For all other paths, allow access but maintain session
+ return response
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - images - .svg, .png, .jpg, .jpeg, .gif, .webp
-     * Feel free to modify this pattern to include more paths.
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+ matcher: [
+   /*
+    * Match all request paths except for the ones starting with:
+    * - _next/static (static files)
+    * - _next/image (image optimization files)
+    * - favicon.ico (favicon file)
+    * - api routes (handled separately)
+    * - static assets
+    */
+   '/((?!_next/static|_next/image|favicon.ico|api|images|videos|fonts|placeholder|erigga|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)',
+ ],
 }
