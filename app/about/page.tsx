@@ -1,11 +1,17 @@
-"use client"
+"use client";
 
-import { useState, useRef, useEffect } from "react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
-import { Progress } from "@/components/ui/progress"
+import { useState, useRef, useEffect } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import {
   Play,
   Pause,
@@ -31,22 +37,28 @@ import {
   Zap,
   Heart,
   Volume2,
-} from "lucide-react"
-import { cn } from "@/lib/utils"
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface TimelineItem {
-  id: string
-  year: string
-  title: string
-  category: "album" | "award" | "event" | "milestone" | "media" | "breakthrough"
-  description: string
-  fullStory: string
-  keyMoments: string[]
-  images: string[]
-  stats?: { label: string; value: string }[]
-  quotes?: string[]
-  achievements?: string[]
-  impact?: string
+  id: string;
+  year: string;
+  title: string;
+  category:
+    | "album"
+    | "award"
+    | "event"
+    | "milestone"
+    | "media"
+    | "breakthrough";
+  description: string;
+  fullStory: string;
+  keyMoments: string[];
+  images: string[];
+  stats?: { label: string; value: string }[];
+  quotes?: string[];
+  achievements?: string[];
+  impact?: string;
 }
 
 const timelineData: TimelineItem[] = [
@@ -65,7 +77,10 @@ const timelineData: TimelineItem[] = [
       "First continental tour spanning West Africa",
       "Legacy album celebrating 15 years in the industry",
     ],
-    images: ["/erigga/awards/erigga-award-ceremony.jpeg", "/erigga/performances/erigga-live-performance.jpeg"],
+    images: [
+      "/erigga/awards/erigga-award-ceremony.jpeg",
+      "/erigga/performances/erigga-live-performance.jpeg",
+    ],
     stats: [
       { label: "Years Active", value: "15+" },
       { label: "Albums Released", value: "6+" },
@@ -93,9 +108,9 @@ const timelineData: TimelineItem[] = [
       "Received Delta State government recognition for cultural impact",
       "Became brand ambassador for major Nigerian companies",
     ],
-    images: ["/erigga/awards/erigga-award-ceremony.jpeg"],
+    images: ["/erigga/awards/headies.jpeg"],
     stats: [
-      { label: "Awards Won", value: "5+" },
+      { label: "Awards Won", value: "E Choke" },
       { label: "Album Sales", value: "Gold" },
       { label: "Industry Respect", value: "Maximum" },
     ],
@@ -113,12 +128,12 @@ const timelineData: TimelineItem[] = [
   },
   {
     id: "media-dominance-2022",
-    year: "2022",
-    title: "Voice of the People",
+    year: "2012",
+    title: "The Erigma (2012)",
     category: "media",
     description: "From street corners to national airwaves",
     fullStory:
-      "By 2022, Erigga had evolved from a street rapper to a cultural commentator whose opinions mattered beyond music. Radio stations across Nigeria began seeking his perspective on social issues, politics, and the state of the music industry.",
+      "By 2012, Erigga had evolved from a street rapper to a cultural commentator whose opinions mattered beyond music. Radio stations across Nigeria began seeking his perspective on social issues, politics, and the state of the music industry.",
     keyMoments: [
       "Became regular guest on major Nigerian radio stations",
       "Started weekly social commentary segment 'Real Talk with Erigga'",
@@ -159,11 +174,11 @@ const timelineData: TimelineItem[] = [
       "Established annual 'Warri to the World' concert",
       "Collaborated live with major Nigerian and international artists",
     ],
-    images: ["/erigga/performances/erigga-live-performance.jpeg"],
+    images: ["/erigga/performances/erigga-live-performance.jpg"],
     stats: [
-      { label: "Live Shows", value: "150+" },
-      { label: "Festival Headlining", value: "20+" },
-      { label: "Audience Capacity", value: "50K+" },
+      { label: "Live Shows", value: "We no see am count" },
+      { label: "Festival Headlining", value: "DO the maths" },
+      { label: "Audience Capacity", value: "The full world" },
     ],
     quotes: [
       "The stage is where I connect with my people directly.",
@@ -178,13 +193,13 @@ const timelineData: TimelineItem[] = [
       "Elevated the standard for live rap performances in Nigeria, proving that authentic artists could command massive audiences.",
   },
   {
-    id: "creative-evolution-2020",
-    year: "2020",
-    title: "The Erigma II Era",
+    id: "The Erigma II",
+    year: "2019",
+    title: "The Erigma II",
     category: "album",
     description: "Artistic maturity meets commercial success",
     fullStory:
-      "The release of 'The Erigma II' in 2020 marked Erigga's artistic and commercial breakthrough. Recorded in his personal studio, the album showcased his evolution from street rapper to sophisticated storyteller while maintaining his raw authenticity.",
+      "In 2019, Erigga released his highly anticipated project The Erigma 2 Album. The body of work has 18 tracks with guest appearances from Victor AD, Zlatan, Magnito, MI Abaga, Ice Prince, Vector, and others.",
     keyMoments: [
       "Released breakthrough album 'The Erigma II'",
       "Established personal recording studio in Warri",
@@ -192,11 +207,11 @@ const timelineData: TimelineItem[] = [
       "Achieved first major streaming milestones",
       "Gained international recognition from African music platforms",
     ],
-    images: ["/erigga/studio/erigga-recording-studio.jpeg"],
+    images: ["/erigga/studio/erigga-recording-studio.jpg"],
     stats: [
       { label: "Album Streams", value: "50M+" },
-      { label: "Chart Position", value: "Top 5" },
-      { label: "Collaborations", value: "15+" },
+      { label: "Chart Position", value: "Top" },
+      { label: "Collaborations", value: "20+" },
     ],
     quotes: [
       "This album represents my growth as an artist and as a person.",
@@ -212,8 +227,8 @@ const timelineData: TimelineItem[] = [
   },
   {
     id: "lifestyle-balance-2019",
-    year: "2019",
-    title: "Success Without Compromise",
+    year: "2021",
+    title: "EP – Before The Chaos",
     category: "milestone",
     description: "Maintaining authenticity while achieving success",
     fullStory:
@@ -225,9 +240,9 @@ const timelineData: TimelineItem[] = [
       "Purchased property while keeping studio in Warri neighborhood",
       "Became mentor to upcoming regional artists",
     ],
-    images: ["/erigga/lifestyle/erigga-luxury-lounge.jpeg"],
+    images: ["/erigga/hero/erigga-main-hero.jpeg"],
     stats: [
-      { label: "Brand Deals", value: "10+" },
+      { label: "Brand Deals", value: "20+" },
       { label: "Community Projects", value: "5" },
       { label: "Mentorship Programs", value: "3" },
     ],
@@ -245,12 +260,12 @@ const timelineData: TimelineItem[] = [
   },
   {
     id: "industry-breakthrough-2015",
-    year: "2015",
+    year: "2010",
     title: "From Underground to Spotlight",
     category: "breakthrough",
     description: "The moment everything changed",
     fullStory:
-      "2015 marked Erigga's transition from underground legend to industry-recognized artist. This professional photoshoot symbolized his readiness to take his career to the next level while maintaining the authenticity that made him a street favorite.",
+      "Erigga began his music career in early 2010. His first musical release was Mo Street Gan. The music video for the song was shot in Nigeria, directed by AKIN Alabi. The song became Radio Continental's theme song.",
     keyMoments: [
       "First major industry photoshoot and media coverage",
       "Signed with prominent talent management company",
@@ -295,7 +310,7 @@ const timelineData: TimelineItem[] = [
     stats: [
       { label: "Age Started", value: "19" },
       { label: "First Recordings", value: "2010" },
-      { label: "Local Following", value: "Growing" },
+      { label: "Local Following", value: "Growing Daily" },
     ],
     quotes: [
       "I started rapping because I had stories that needed to be told.",
@@ -309,201 +324,350 @@ const timelineData: TimelineItem[] = [
     impact:
       "His authentic approach to rap influenced a generation of Nigerian artists to embrace their local identities and real-life experiences.",
   },
-]
+];
 
 const albumsData = [
   {
-    id: "erigma3",
-    title: "The Erigma III",
-    year: "2023",
-    coverImage: "/erigga/albums/the-erigma-iii-cover.jpeg",
-    description:
-      "The culmination of artistic growth and industry mastery, featuring collaborations with top Nigerian artists.",
-    tracks: 18,
-    streamingLinks: [
-      { platform: "Spotify", url: "https://open.spotify.com/artist/erigga" },
-      { platform: "Apple Music", url: "https://music.apple.com/artist/erigga" },
-      { platform: "AudioMack", url: "https://audiomack.com/erigga" },
-      { platform: "YouTube Music", url: "https://music.youtube.com/erigga" },
-    ],
-  },
-  {
-    id: "erigma2",
-    title: "The Erigma II",
-    year: "2020",
-    coverImage: "/erigga/albums/the-erigma-ii-cover.jpeg",
-    description:
-      "The breakthrough album featuring hits like 'Area to the World' that elevated Erigga to national prominence.",
-    tracks: 16,
-    streamingLinks: [
-      { platform: "Spotify", url: "https://open.spotify.com/artist/erigga" },
-      { platform: "Apple Music", url: "https://music.apple.com/artist/erigga" },
-      { platform: "AudioMack", url: "https://audiomack.com/erigga" },
-      { platform: "YouTube Music", url: "https://music.youtube.com/erigga" },
-    ],
-  },
-  {
-    id: "erigga1",
+    id: "The Erigma",
     title: "The Erigma",
-    year: "2017",
-    coverImage: "/erigga/albums/the-erigma-cover.jpeg",
+    year: "2012",
+    coverImage: "/erigga/albums/TheErigma2012.jpg",
     description:
-      "The debut album that introduced Nigeria to Erigga's unique storytelling and authentic street narratives.",
+      "Erigga's debut album that introduced Nigeria to his unique storytelling and authentic street narratives.",
     tracks: 14,
     streamingLinks: [
-      { platform: "Spotify", url: "https://open.spotify.com/artist/erigga" },
-      { platform: "Apple Music", url: "https://music.apple.com/artist/erigga" },
-      { platform: "AudioMack", url: "https://audiomack.com/erigga" },
-      { platform: "YouTube Music", url: "https://music.youtube.com/erigga" },
+      {
+        platform: "Spotify",
+        url: "https://open.spotify.com/album/0ig0jKGNPfqiHMKTjjWyPG",
+      },
+      {
+        platform: "Apple Music",
+        url: "https://music.apple.com/bj/album/the-erigma/1455065257",
+      },
+      {
+        platform: "AudioMack",
+        url: "https://audiomack.com/erigga/album/the-erigma",
+      },
+      {
+        platform: "YouTube Music",
+        url: "https://music.youtube.com/playlist?list=OLAK5uy_lrw6wcIRYLfUahivcD_m5sdetm9hh2G6Y",
+      },
     ],
   },
-]
+  {
+    id: "Okorowanta",
+    title: "Okorowanta",
+    year: "2015",
+    coverImage: "/erigga/albums/Okorowanta2015.jpg",
+    description:
+      "A compelling follow-up that solidified Erigga's place in the Nigerian hip-hop scene with gritty tales from the streets.",
+    tracks: 16,
+    streamingLinks: [
+      {
+        platform: "Spotify",
+        url: "https://open.spotify.com/album/6FeI8RBT23qou7uahjpZSR",
+      },
+      {
+        platform: "Apple Music",
+        url: "https://music.apple.com/ca/album/okorowanta/1382888934",
+      },
+      {
+        platform: "AudioMack",
+        url: "https://audiomack.com/erigga/album/okorowanta",
+      },
+      {
+        platform: "YouTube Music",
+        url: "https://music.youtube.com/playlist?list=OLAK5uy_lrw6wcIRYLfUahivcD_m5sdetm9hh2G6Y",
+      },
+    ],
+  },
+  {
+    id: "A Trip to the South",
+    title: "A Trip to the South",
+    year: "2017",
+    coverImage: "/erigga/albums/ATriptotheSouth2017.jpg",
+    description:
+      "An album that showcases Erigga's versatility, blending southern Nigerian sounds with his signature rap style.",
+    tracks: 14,
+    streamingLinks: [
+      {
+        platform: "Spotify",
+        url: "https://open.spotify.com/album/7jP3LBDKbtPZsDpRrvA1qR",
+      },
+      {
+        platform: "Apple Music",
+        url: "https://music.apple.com/ca/album/a-trip-to-the-south/1259930437",
+      },
+      {
+        platform: "AudioMack",
+        url: "https://audiomack.com/erigga/album/a-trip-to-the-south",
+      },
+      {
+        platform: "YouTube Music",
+        url: "https://music.youtube.com/playlist?list=OLAK5uy_lrw6wcIRYLfUahivcD_m5sdetm9hh2G6Y",
+      },
+    ],
+  },
+  {
+    id: "The Erigma II",
+    title: "The Erigma II",
+    year: "2019",
+    coverImage: "/erigga/albums/heErigmaII2019.jpg",
+    description:
+      "A sequel that delves deeper into Erigga's experiences, featuring collaborations with top Nigerian artists.",
+    tracks: 18,
+    streamingLinks: [
+      {
+        platform: "Spotify",
+        url: "https://open.spotify.com/album/7jP3LBDKbtPZsDpRrvA1qR",
+      },
+      {
+        platform: "Apple Music",
+        url: "https://music.apple.com/bj/album/the-erigma-ii/1455065257",
+      },
+      {
+        platform: "AudioMack",
+        url: "https://audiomack.com/erigga/album/the-erigma-ii",
+      },
+      {
+        platform: "YouTube Music",
+        url: "https://music.youtube.com/playlist?list=OLAK5uy_lrw6wcIRYLfUahivcD_m5sdetm9hh2G6Y",
+      },
+    ],
+  },
+  {
+    id: "Before The Chaos EP",
+    title: "Before The Chaos EP",
+    year: "2021",
+    coverImage: "/erigga/albums/BeforeTheChaosEP2021.jpg",
+    description:
+      "An introspective EP that explores Erigga's thoughts and emotions leading up to turbulent times.",
+    tracks: 6,
+    streamingLinks: [
+      {
+        platform: "Spotify",
+        url: "https://open.spotify.com/album/5Vois3KjcrF8il0gnseuNd",
+      },
+      {
+        platform: "Apple Music",
+        url: "https://music.apple.com/us/album/before-the-chaos-ep/1795159765",
+      },
+      {
+        platform: "AudioMack",
+        url: "https://audiomack.com/erigga/album/before-the-chaos-ep",
+      },
+      {
+        platform: "YouTube Music",
+        url: "https://music.youtube.com/playlist?list=OLAK5uy_lrw6wcIRYLfUahivcD_m5sdetm9hh2G6Y",
+      },
+    ],
+  },
+  {
+    id: "Family Time",
+    title: "Family Time",
+    year: "2023",
+    coverImage: "/erigga/albums/FamilyTime2023.jpg",
+    description:
+      "A heartfelt album that delves into themes of family, love, and personal growth, earning Erigga a Headies award.",
+    tracks: 12,
+    streamingLinks: [
+      {
+        platform: "Spotify",
+        url: "https://open.spotify.com/album/5w41VRNPt3Ef6D1rzr3OMj",
+      },
+      {
+        platform: "Apple Music",
+        url: "https://music.apple.com/ke/album/family-time/1711790944",
+      },
+      {
+        platform: "AudioMack",
+        url: "https://audiomack.com/erigga/album/family-time",
+      },
+      {
+        platform: "YouTube Music",
+        url: "https://music.youtube.com/playlist?list=OLAK5uy_lrw6wcIRYLfUahivcD_m5sdetm9hh2G6Y",
+      },
+    ],
+  },
+  {
+    id: "G.O.A.T",
+    title: "G.O.A.T",
+    year: "2025",
+    coverImage: "/erigga/albums/TheGoat2025.jpg",
+    description:
+      "Erigga's latest album, 'G.O.A.T', showcases his lyrical prowess and features collaborations with top artists, solidifying his legacy in Nigerian hip-hop.",
+    tracks: 13,
+    streamingLinks: [
+      {
+        platform: "Spotify",
+        url: "https://open.spotify.com/album/6FeI8RBT23qou7uahjpZSR",
+      },
+      {
+        platform: "Apple Music",
+        url: "https://music.apple.com/us/album/g-o-a-t/1800828040",
+      },
+      {
+        platform: "AudioMack",
+        url: "https://audiomack.com/erigga/album/g-o-a-t",
+      },
+      {
+        platform: "YouTube Music",
+        url: "https://music.youtube.com/playlist?list=OLAK5uy_lrw6wcIRYLfUahivcD_m5sdetm9hh2G6Y",
+      },
+    ],
+  },
+];
 
 const getCategoryIcon = (category: string) => {
   switch (category) {
     case "album":
-      return <Music className="h-4 w-4" />
+      return <Music className="h-4 w-4" />;
     case "award":
-      return <Trophy className="h-4 w-4" />
+      return <Trophy className="h-4 w-4" />;
     case "event":
-      return <Calendar className="h-4 w-4" />
+      return <Calendar className="h-4 w-4" />;
     case "milestone":
-      return <Mic className="h-4 w-4" />
+      return <Mic className="h-4 w-4" />;
     case "media":
-      return <Radio className="h-4 w-4" />
+      return <Radio className="h-4 w-4" />;
     case "breakthrough":
-      return <Zap className="h-4 w-4" />
+      return <Zap className="h-4 w-4" />;
     default:
-      return <Calendar className="h-4 w-4" />
+      return <Calendar className="h-4 w-4" />;
   }
-}
+};
 
 const getCategoryColor = (category: string) => {
   switch (category) {
     case "album":
-      return "bg-orange-500/10 text-orange-400 border-orange-500/20"
+      return "bg-orange-500/10 text-orange-400 border-orange-500/20";
     case "award":
-      return "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
+      return "bg-yellow-500/10 text-yellow-400 border-yellow-500/20";
     case "event":
-      return "bg-purple-500/10 text-purple-400 border-purple-500/20"
+      return "bg-purple-500/10 text-purple-400 border-purple-500/20";
     case "milestone":
-      return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+      return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
     case "media":
-      return "bg-blue-500/10 text-blue-400 border-blue-500/20"
+      return "bg-blue-500/10 text-blue-400 border-blue-500/20";
     case "breakthrough":
-      return "bg-red-500/10 text-red-400 border-red-500/20"
+      return "bg-red-500/10 text-red-400 border-red-500/20";
     default:
-      return "bg-gray-500/10 text-gray-400 border-gray-500/20"
+      return "bg-gray-500/10 text-gray-400 border-gray-500/20";
   }
-}
+};
 
 function EriggaHomePage() {
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
-  const [activeImageIndex, setActiveImageIndex] = useState<Record<string, number>>({})
-  const [isAutoScrolling, setIsAutoScrolling] = useState(false)
-  const [lightboxOpen, setLightboxOpen] = useState(false)
-  const [lightboxImage, setLightboxImage] = useState("")
-  const [lightboxCaption, setLightboxCaption] = useState("")
-  const [albumsExpanded, setAlbumsExpanded] = useState(false)
-  const [scrollProgress, setScrollProgress] = useState(0)
-  const [currentTimelineIndex, setCurrentTimelineIndex] = useState(0)
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [activeImageIndex, setActiveImageIndex] = useState<
+    Record<string, number>
+  >({});
+  const [isAutoScrolling, setIsAutoScrolling] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState("");
+  const [lightboxCaption, setLightboxCaption] = useState("");
+  const [albumsExpanded, setAlbumsExpanded] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [currentTimelineIndex, setCurrentTimelineIndex] = useState(0);
 
-  const timelineRef = useRef<HTMLDivElement>(null)
-  const autoScrollRef = useRef<NodeJS.Timeout | null>(null)
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
       if (timelineRef.current) {
-        const { scrollTop, scrollHeight, clientHeight } = timelineRef.current
-        const progress = (scrollTop / (scrollHeight - clientHeight)) * 100
-        setScrollProgress(Math.min(progress, 100))
+        const { scrollTop, scrollHeight, clientHeight } = timelineRef.current;
+        const progress = (scrollTop / (scrollHeight - clientHeight)) * 100;
+        setScrollProgress(Math.min(progress, 100));
 
-        const itemHeight = (scrollHeight - clientHeight) / timelineData.length
-        const currentIndex = Math.floor(scrollTop / itemHeight)
-        setCurrentTimelineIndex(Math.min(currentIndex, timelineData.length - 1))
+        const itemHeight = (scrollHeight - clientHeight) / timelineData.length;
+        const currentIndex = Math.floor(scrollTop / itemHeight);
+        setCurrentTimelineIndex(
+          Math.min(currentIndex, timelineData.length - 1)
+        );
       }
-    }
+    };
 
-    const timelineElement = timelineRef.current
+    const timelineElement = timelineRef.current;
     if (timelineElement) {
-      timelineElement.addEventListener("scroll", handleScroll)
-      return () => timelineElement.removeEventListener("scroll", handleScroll)
+      timelineElement.addEventListener("scroll", handleScroll);
+      return () => timelineElement.removeEventListener("scroll", handleScroll);
     }
-  }, [])
+  }, []);
 
   const toggleExpanded = (id: string) => {
-    const newExpanded = new Set(expandedItems)
+    const newExpanded = new Set(expandedItems);
     if (newExpanded.has(id)) {
-      newExpanded.delete(id)
+      newExpanded.delete(id);
     } else {
-      newExpanded.add(id)
+      newExpanded.add(id);
     }
-    setExpandedItems(newExpanded)
-  }
+    setExpandedItems(newExpanded);
+  };
 
   const navigateImage = (id: string, direction: "next" | "prev") => {
-    const currentIndex = activeImageIndex[id] || 0
-    const item = timelineData.find((item) => item.id === id)
-    if (!item) return
+    const currentIndex = activeImageIndex[id] || 0;
+    const item = timelineData.find((item) => item.id === id);
+    if (!item) return;
 
-    const totalImages = item.images.length
-    let newIndex
+    const totalImages = item.images.length;
+    let newIndex;
 
     if (direction === "next") {
-      newIndex = (currentIndex + 1) % totalImages
+      newIndex = (currentIndex + 1) % totalImages;
     } else {
-      newIndex = (currentIndex - 1 + totalImages) % totalImages
+      newIndex = (currentIndex - 1 + totalImages) % totalImages;
     }
 
     setActiveImageIndex({
       ...activeImageIndex,
       [id]: newIndex,
-    })
-  }
+    });
+  };
 
   const openLightbox = (image: string, caption: string) => {
-    setLightboxImage(image)
-    setLightboxCaption(caption)
-    setLightboxOpen(true)
-  }
+    setLightboxImage(image);
+    setLightboxCaption(caption);
+    setLightboxOpen(true);
+  };
 
   const closeLightbox = () => {
-    setLightboxOpen(false)
-    setLightboxImage("")
-    setLightboxCaption("")
-  }
+    setLightboxOpen(false);
+    setLightboxImage("");
+    setLightboxCaption("");
+  };
 
   const toggleAutoScroll = () => {
     if (isAutoScrolling) {
       if (autoScrollRef.current) {
-        clearInterval(autoScrollRef.current)
-        autoScrollRef.current = null
+        clearInterval(autoScrollRef.current);
+        autoScrollRef.current = null;
       }
-      setIsAutoScrolling(false)
+      setIsAutoScrolling(false);
     } else {
-      setIsAutoScrolling(true)
+      setIsAutoScrolling(true);
       autoScrollRef.current = setInterval(() => {
         if (timelineRef.current) {
-          const currentScroll = timelineRef.current.scrollTop
-          const maxScroll = timelineRef.current.scrollHeight - timelineRef.current.clientHeight
+          const currentScroll = timelineRef.current.scrollTop;
+          const maxScroll =
+            timelineRef.current.scrollHeight - timelineRef.current.clientHeight;
 
           if (currentScroll >= maxScroll - 10) {
-            timelineRef.current.scrollTop = 0
+            timelineRef.current.scrollTop = 0;
           } else {
-            timelineRef.current.scrollTop += 6
+            timelineRef.current.scrollTop += 6;
           }
         }
-      }, 15)
+      }, 15);
     }
-  }
+  };
 
   useEffect(() => {
     return () => {
       if (autoScrollRef.current) {
-        clearInterval(autoScrollRef.current)
+        clearInterval(autoScrollRef.current);
       }
-    }
-  }, [])
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-hidden">
@@ -524,7 +688,11 @@ function EriggaHomePage() {
               alt={lightboxCaption}
               className="max-w-full max-h-[80vh] object-contain rounded-lg"
             />
-            {lightboxCaption && <p className="text-center text-white mt-4 text-lg font-medium">{lightboxCaption}</p>}
+            {lightboxCaption && (
+              <p className="text-center text-white mt-4 text-lg font-medium">
+                {lightboxCaption}
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -564,28 +732,41 @@ function EriggaHomePage() {
                 </div>
 
                 <p className="text-xl text-muted-foreground mt-6 max-w-lg leading-relaxed">
-                  Anthony Erhinyoja, professionally known as <strong>Erigga</strong>, is a Nigerian rapper from Warri,
-                  Delta State. Known for his authentic street narratives and raw lyrical content, he has become one of
-                  Nigeria's most respected rap voices.
+                  My name na Erhiga Agarivbie I was born on 30 March 1987, I am
+                  professionally known as <strong>Erigga</strong>, Dem born me
+                  for Warri, Delta State—Area! I be Erigma, so even with this
+                  about me, you fit still no understand me. Scroll down or use
+                  the Auto-scroll button below to skemp the few things this page
+                  fit talk about me.
                 </p>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-card/80 backdrop-blur-sm p-4 rounded-xl border border-orange-500/20">
                   <div className="text-2xl font-bold text-orange-400">15+</div>
-                  <div className="text-sm text-muted-foreground">Years Active</div>
+                  <div className="text-sm text-muted-foreground">
+                    Years Active
+                  </div>
                 </div>
                 <div className="bg-card/80 backdrop-blur-sm p-4 rounded-xl border border-orange-500/20">
-                  <div className="text-2xl font-bold text-orange-400">6+</div>
-                  <div className="text-sm text-muted-foreground">Studio Albums</div>
+                  <div className="text-2xl font-bold text-orange-400">10+</div>
+                  <div className="text-sm text-muted-foreground">
+                    Studio Albums
+                  </div>
                 </div>
                 <div className="bg-card/80 backdrop-blur-sm p-4 rounded-xl border border-orange-500/20">
-                  <div className="text-2xl font-bold text-orange-400">100M+</div>
-                  <div className="text-sm text-muted-foreground">Total Streams</div>
+                  <div className="text-2xl font-bold text-orange-400">
+                    100M+
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Total Streams
+                  </div>
                 </div>
                 <div className="bg-card/80 backdrop-blur-sm p-4 rounded-xl border border-orange-500/20">
                   <div className="text-2xl font-bold text-orange-400">∞</div>
-                  <div className="text-sm text-muted-foreground">Street Credibility</div>
+                  <div className="text-sm text-muted-foreground">
+                    Street Credibility
+                  </div>
                 </div>
               </div>
 
@@ -613,7 +794,9 @@ function EriggaHomePage() {
           <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 animate-bounce">
             <div className="flex flex-col items-center">
               <ArrowDown className="h-8 w-8 text-orange-400" />
-              <span className="text-orange-400 text-sm mt-2 font-medium">Scroll to explore the legacy</span>
+              <span className="text-orange-400 text-sm mt-2 font-medium">
+                Scroll to explore the legacy
+              </span>
             </div>
           </div>
         </div>
@@ -630,9 +813,12 @@ function EriggaHomePage() {
               LEGENDARY BARS
               <div className="w-2 h-2 rounded-full bg-black animate-pulse ml-3"></div>
             </div>
-            <h2 className="text-5xl font-bold text-foreground mb-6">Iconic Rap Lines</h2>
+            <h2 className="text-5xl font-bold text-foreground mb-6">
+              Iconic Rap Lines
+            </h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-              The bars that defined a generation and made Erigga the voice of the streets
+              The bars that defined a generation and made Erigga the voice of
+              the streets
             </p>
           </div>
 
@@ -645,8 +831,12 @@ function EriggaHomePage() {
                     <Volume2 className="h-6 w-6 text-black" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold text-foreground mb-2">Street Anthem</h3>
-                    <Badge className="bg-orange-500/10 text-orange-400 border-orange-500/20">Classic</Badge>
+                    <h3 className="text-xl font-bold text-foreground mb-2">
+                      Street Anthem
+                    </h3>
+                    <Badge className="bg-orange-500/10 text-orange-400 border-orange-500/20">
+                      Classic
+                    </Badge>
                   </div>
                 </div>
 
@@ -674,8 +864,12 @@ function EriggaHomePage() {
                     <Heart className="h-6 w-6 text-black" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold text-foreground mb-2">Real Talk</h3>
-                    <Badge className="bg-yellow-500/10 text-yellow-400 border-yellow-500/20">Motivational</Badge>
+                    <h3 className="text-xl font-bold text-foreground mb-2">
+                      Real Talk
+                    </h3>
+                    <Badge className="bg-yellow-500/10 text-yellow-400 border-yellow-500/20">
+                      Motivational
+                    </Badge>
                   </div>
                 </div>
 
@@ -703,8 +897,12 @@ function EriggaHomePage() {
                     <Zap className="h-6 w-6 text-black" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold text-foreground mb-2">Street Wisdom</h3>
-                    <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Deep</Badge>
+                    <h3 className="text-xl font-bold text-foreground mb-2">
+                      Street Wisdom
+                    </h3>
+                    <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                      Deep
+                    </Badge>
                   </div>
                 </div>
 
@@ -732,8 +930,12 @@ function EriggaHomePage() {
                     <Star className="h-6 w-6 text-black" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold text-foreground mb-2">Legacy</h3>
-                    <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/20">Legendary</Badge>
+                    <h3 className="text-xl font-bold text-foreground mb-2">
+                      Legacy
+                    </h3>
+                    <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/20">
+                      Legendary
+                    </Badge>
                   </div>
                 </div>
 
@@ -770,7 +972,10 @@ function EriggaHomePage() {
                 <h2 className="text-xl font-bold bg-gradient-to-r from-orange-400 to-yellow-500 bg-clip-text text-transparent">
                   ERIGGA'S LEGACY TIMELINE
                 </h2>
-                <Badge variant="outline" className="border-orange-500/30 text-orange-400 text-xs">
+                <Badge
+                  variant="outline"
+                  className="border-orange-500/30 text-orange-400 text-xs"
+                >
                   <Clock className="h-3 w-3 mr-1" />
                   {timelineData[currentTimelineIndex]?.year || "2010"}
                 </Badge>
@@ -782,7 +987,7 @@ function EriggaHomePage() {
                   size="sm"
                   className={cn(
                     "text-muted-foreground hover:text-foreground transition-all font-medium",
-                    isAutoScrolling && "text-orange-400 bg-orange-500/10",
+                    isAutoScrolling && "text-orange-400 bg-orange-500/10"
                   )}
                   onClick={toggleAutoScroll}
                 >
@@ -808,7 +1013,7 @@ function EriggaHomePage() {
                     className="h-8 w-8 rounded-full border-orange-500/30 hover:bg-orange-500/10"
                     onClick={() => {
                       if (timelineRef.current) {
-                        timelineRef.current.scrollTop += 400
+                        timelineRef.current.scrollTop += 400;
                       }
                     }}
                   >
@@ -820,7 +1025,7 @@ function EriggaHomePage() {
                     className="h-8 w-8 rounded-full border-orange-500/30 hover:bg-orange-500/10"
                     onClick={() => {
                       if (timelineRef.current) {
-                        timelineRef.current.scrollTop -= 400
+                        timelineRef.current.scrollTop -= 400;
                       }
                     }}
                   >
@@ -833,11 +1038,15 @@ function EriggaHomePage() {
             {/* Progress Bar */}
             <div className="w-full">
               <div className="flex items-center gap-3 mb-2">
-                <span className="text-xs text-muted-foreground font-medium">Journey Progress</span>
+                <span className="text-xs text-muted-foreground font-medium">
+                  Journey Progress
+                </span>
                 <div className="flex-1">
                   <Progress value={scrollProgress} className="h-2" />
                 </div>
-                <span className="text-xs text-orange-400 font-bold">{Math.round(scrollProgress)}%</span>
+                <span className="text-xs text-orange-400 font-bold">
+                  {Math.round(scrollProgress)}%
+                </span>
               </div>
 
               {/* Timeline Markers */}
@@ -847,7 +1056,9 @@ function EriggaHomePage() {
                     key={item.id}
                     className={cn(
                       "transition-colors",
-                      index <= currentTimelineIndex ? "text-orange-400" : "text-muted-foreground/60",
+                      index <= currentTimelineIndex
+                        ? "text-orange-400"
+                        : "text-muted-foreground/60"
                     )}
                   >
                     {item.year}
@@ -878,7 +1089,10 @@ function EriggaHomePage() {
               {timelineData.map((item, index) => (
                 <div
                   key={item.id}
-                  className={cn("relative flex items-center", index % 2 === 0 ? "justify-start" : "justify-end")}
+                  className={cn(
+                    "relative flex items-center",
+                    index % 2 === 0 ? "justify-start" : "justify-end"
+                  )}
                 >
                   {/* Timeline Dot */}
                   <div
@@ -886,7 +1100,7 @@ function EriggaHomePage() {
                       "absolute left-1/2 transform -translate-x-1/2 w-8 h-8 rounded-full border-4 border-background z-10 shadow-lg transition-all duration-500",
                       index <= currentTimelineIndex
                         ? "bg-gradient-to-br from-orange-400 to-yellow-500 scale-110"
-                        : "bg-muted scale-100",
+                        : "bg-muted scale-100"
                     )}
                   >
                     <div
@@ -894,13 +1108,15 @@ function EriggaHomePage() {
                         "w-full h-full rounded-full transition-all duration-500",
                         index <= currentTimelineIndex
                           ? "bg-gradient-to-br from-orange-300 to-yellow-400 animate-pulse"
-                          : "bg-muted-foreground/50",
+                          : "bg-muted-foreground/50"
                       )}
                     ></div>
 
                     {/* Category Icon */}
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-black text-xs">{getCategoryIcon(item.category)}</div>
+                      <div className="text-black text-xs">
+                        {getCategoryIcon(item.category)}
+                      </div>
                     </div>
                   </div>
 
@@ -909,14 +1125,22 @@ function EriggaHomePage() {
                     className={cn(
                       "w-full max-w-3xl bg-card/95 border-orange-500/20 backdrop-blur-md shadow-2xl hover:shadow-orange-500/10 transition-all duration-500",
                       index % 2 === 0 ? "mr-auto pr-12" : "ml-auto pl-12",
-                      index <= currentTimelineIndex && "border-orange-500/40 shadow-orange-500/20",
+                      index <= currentTimelineIndex &&
+                        "border-orange-500/40 shadow-orange-500/20"
                     )}
                   >
                     <CardHeader className="pb-4">
                       <div className="flex items-center justify-between mb-3">
-                        <Badge className={cn(getCategoryColor(item.category), "font-bold text-xs px-3 py-1")}>
+                        <Badge
+                          className={cn(
+                            getCategoryColor(item.category),
+                            "font-bold text-xs px-3 py-1"
+                          )}
+                        >
                           {getCategoryIcon(item.category)}
-                          <span className="ml-2 uppercase tracking-wide">{item.category}</span>
+                          <span className="ml-2 uppercase tracking-wide">
+                            {item.category}
+                          </span>
                         </Badge>
                         <div className="flex items-center gap-2">
                           <span className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-yellow-500 bg-clip-text text-transparent">
@@ -927,7 +1151,9 @@ function EriggaHomePage() {
                           )}
                         </div>
                       </div>
-                      <CardTitle className="text-foreground text-2xl font-bold mb-2">{item.title}</CardTitle>
+                      <CardTitle className="text-foreground text-2xl font-bold mb-2">
+                        {item.title}
+                      </CardTitle>
                       <CardDescription className="text-muted-foreground text-base leading-relaxed">
                         {item.description}
                       </CardDescription>
@@ -938,12 +1164,14 @@ function EriggaHomePage() {
                       <div className="relative aspect-video rounded-xl overflow-hidden border-2 border-orange-500/30 shadow-lg">
                         <img
                           src={item.images[activeImageIndex[item.id] || 0]}
-                          alt={`${item.title} - Chapter ${(activeImageIndex[item.id] || 0) + 1}`}
+                          alt={`${item.title} - Chapter ${
+                            (activeImageIndex[item.id] || 0) + 1
+                          }`}
                           className="w-full h-full object-cover cursor-pointer transition-transform hover:scale-110"
                           onClick={() =>
                             openLightbox(
                               item.images[activeImageIndex[item.id] || 0],
-                              `${item.title} (${item.year}) - ${item.description}`,
+                              `${item.title} (${item.year}) - ${item.description}`
                             )
                           }
                         />
@@ -975,7 +1203,8 @@ function EriggaHomePage() {
                         {/* Image Counter */}
                         {item.images.length > 1 && (
                           <div className="absolute bottom-3 right-3 bg-black/80 text-white text-sm px-3 py-1 rounded-full font-medium">
-                            {(activeImageIndex[item.id] || 0) + 1} of {item.images.length}
+                            {(activeImageIndex[item.id] || 0) + 1} of{" "}
+                            {item.images.length}
                           </div>
                         )}
                       </div>
@@ -991,7 +1220,9 @@ function EriggaHomePage() {
                               <Star className="h-4 w-4 mr-2" />
                               The Complete Story
                             </h4>
-                            <p className="text-muted-foreground leading-relaxed text-base">{item.fullStory}</p>
+                            <p className="text-muted-foreground leading-relaxed text-base">
+                              {item.fullStory}
+                            </p>
                           </div>
 
                           {/* Key Moments */}
@@ -1004,7 +1235,9 @@ function EriggaHomePage() {
                               {item.keyMoments.map((moment, idx) => (
                                 <li key={idx} className="flex items-start">
                                   <div className="w-2 h-2 bg-orange-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                                  <span className="text-muted-foreground text-sm leading-relaxed">{moment}</span>
+                                  <span className="text-muted-foreground text-sm leading-relaxed">
+                                    {moment}
+                                  </span>
                                 </li>
                               ))}
                             </ul>
@@ -1021,7 +1254,9 @@ function EriggaHomePage() {
                                 {item.achievements.map((achievement, idx) => (
                                   <li key={idx} className="flex items-start">
                                     <Trophy className="h-4 w-4 text-yellow-400 mt-0.5 mr-3 flex-shrink-0" />
-                                    <span className="text-muted-foreground text-sm leading-relaxed">{achievement}</span>
+                                    <span className="text-muted-foreground text-sm leading-relaxed">
+                                      {achievement}
+                                    </span>
                                   </li>
                                 ))}
                               </ul>
@@ -1037,9 +1272,16 @@ function EriggaHomePage() {
                               </h4>
                               <div className="space-y-4">
                                 {item.quotes.map((quote, idx) => (
-                                  <blockquote key={idx} className="border-l-4 border-orange-500/30 pl-4">
-                                    <p className="text-muted-foreground italic text-lg leading-relaxed">"{quote}"</p>
-                                    <cite className="text-orange-400 text-sm font-medium">- Erigga</cite>
+                                  <blockquote
+                                    key={idx}
+                                    className="border-l-4 border-orange-500/30 pl-4"
+                                  >
+                                    <p className="text-muted-foreground italic text-lg leading-relaxed">
+                                      "{quote}"
+                                    </p>
+                                    <cite className="text-orange-400 text-sm font-medium">
+                                      - Erigga
+                                    </cite>
                                   </blockquote>
                                 ))}
                               </div>
@@ -1053,7 +1295,9 @@ function EriggaHomePage() {
                                 <Heart className="h-4 w-4 mr-2" />
                                 Cultural Impact
                               </h4>
-                              <p className="text-muted-foreground leading-relaxed italic">{item.impact}</p>
+                              <p className="text-muted-foreground leading-relaxed italic">
+                                {item.impact}
+                              </p>
                             </div>
                           )}
 
@@ -1068,7 +1312,9 @@ function EriggaHomePage() {
                                   <div className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-yellow-500 bg-clip-text text-transparent">
                                     {stat.value}
                                   </div>
-                                  <div className="text-xs text-muted-foreground mt-1 font-medium">{stat.label}</div>
+                                  <div className="text-xs text-muted-foreground mt-1 font-medium">
+                                    {stat.label}
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -1084,11 +1330,13 @@ function EriggaHomePage() {
                       >
                         {expandedItems.has(item.id) ? (
                           <>
-                            Hide Full Story <ChevronUp className="h-4 w-4 ml-2" />
+                            Hide Full Story{" "}
+                            <ChevronUp className="h-4 w-4 ml-2" />
                           </>
                         ) : (
                           <>
-                            Read Full Story <ChevronDown className="h-4 w-4 ml-2" />
+                            Read Full Story{" "}
+                            <ChevronDown className="h-4 w-4 ml-2" />
                           </>
                         )}
                       </Button>
@@ -1110,10 +1358,12 @@ function EriggaHomePage() {
               COMPLETE DISCOGRAPHY
               <div className="w-2 h-2 rounded-full bg-black animate-pulse ml-3"></div>
             </div>
-            <h2 className="text-5xl font-bold text-foreground mb-6">Albums & Music</h2>
+            <h2 className="text-5xl font-bold text-foreground mb-6">
+              Albums & Music
+            </h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-              From "The Erigma" series to breakthrough hits, explore the complete musical journey of Nigeria's most
-              authentic rap voice.
+              From "The Erigma" series to breakthrough hits, explore the
+              complete musical journey of Nigeria's most authentic rap voice.
             </p>
           </div>
 
@@ -1141,8 +1391,9 @@ function EriggaHomePage() {
                 </Button>
               </div>
               <CardDescription className="text-muted-foreground text-lg">
-                {albumsData.length} major albums • {albumsData.reduce((total, album) => total + album.tracks, 0)} total
-                tracks • The voice of the streets
+                {albumsData.length} major albums •{" "}
+                {albumsData.reduce((total, album) => total + album.tracks, 0)}{" "}
+                total tracks • The voice of the streets
               </CardDescription>
             </CardHeader>
 
@@ -1179,22 +1430,36 @@ function EriggaHomePage() {
                             alt={album.title}
                             className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-105"
                             onClick={() =>
-                              openLightbox(album.coverImage, `${album.title} (${album.year}) - Album Cover`)
+                              openLightbox(
+                                album.coverImage,
+                                `${album.title} (${album.year}) - Album Cover`
+                              )
                             }
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                           <div className="absolute bottom-4 left-4 right-4">
-                            <h3 className="text-xl font-bold text-white mb-1">{album.title}</h3>
-                            <p className="text-orange-400 font-bold">{album.year}</p>
+                            <h3 className="text-xl font-bold text-white mb-1">
+                              {album.title}
+                            </h3>
+                            <p className="text-orange-400 font-bold">
+                              {album.year}
+                            </p>
                           </div>
                         </div>
 
                         <CardContent className="p-6 space-y-4">
-                          <p className="text-muted-foreground text-sm leading-relaxed">{album.description}</p>
+                          <p className="text-muted-foreground text-sm leading-relaxed">
+                            {album.description}
+                          </p>
 
                           <div className="flex items-center justify-between text-sm text-muted-foreground">
-                            <span className="font-medium">{album.tracks} tracks</span>
-                            <Badge variant="outline" className="border-orange-500/30 text-orange-400">
+                            <span className="font-medium">
+                              {album.tracks} tracks
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className="border-orange-500/30 text-orange-400"
+                            >
                               Album
                             </Badge>
                           </div>
@@ -1213,10 +1478,14 @@ function EriggaHomePage() {
                                   variant="outline"
                                   size="sm"
                                   className="border-border text-muted-foreground hover:bg-muted hover:border-orange-500/30 justify-start transition-all"
-                                  onClick={() => window.open(link.url, "_blank")}
+                                  onClick={() =>
+                                    window.open(link.url, "_blank")
+                                  }
                                 >
                                   <Music className="w-3 h-3 mr-2" />
-                                  <span className="text-xs font-medium">{link.platform}</span>
+                                  <span className="text-xs font-medium">
+                                    {link.platform}
+                                  </span>
                                 </Button>
                               ))}
                             </div>
@@ -1240,10 +1509,13 @@ function EriggaHomePage() {
             <div className="w-2 h-2 rounded-full bg-black animate-pulse"></div>
           </div>
 
-          <h2 className="text-5xl font-bold text-foreground mb-8">From Warri to the World</h2>
+          <h2 className="text-5xl font-bold text-foreground mb-8">
+            From Warri to the World
+          </h2>
           <p className="text-xl text-muted-foreground mb-12 max-w-3xl mx-auto leading-relaxed">
-            Erigga's story continues to unfold with each verse, each performance, each moment of authentic connection
-            with his audience. The voice of the streets has become the voice of a generation.
+            Erigga's story continues to unfold with each verse, each
+            performance, each moment of authentic connection with his audience.
+            The voice of the streets has become the voice of a generation.
           </p>
 
           <div className="flex flex-wrap justify-center gap-6 mb-16">
@@ -1269,31 +1541,39 @@ function EriggaHomePage() {
               <div className="text-4xl font-bold bg-gradient-to-r from-orange-400 to-yellow-500 bg-clip-text text-transparent">
                 5M+
               </div>
-              <div className="text-sm text-muted-foreground mt-2 font-medium">Monthly Listeners</div>
+              <div className="text-sm text-muted-foreground mt-2 font-medium">
+                Monthly Listeners
+              </div>
             </div>
             <div className="text-center p-6 bg-card/40 rounded-xl border border-orange-500/10">
               <div className="text-4xl font-bold bg-gradient-to-r from-orange-400 to-yellow-500 bg-clip-text text-transparent">
                 100M+
               </div>
-              <div className="text-sm text-muted-foreground mt-2 font-medium">Total Streams</div>
+              <div className="text-sm text-muted-foreground mt-2 font-medium">
+                Total Streams
+              </div>
             </div>
             <div className="text-center p-6 bg-card/40 rounded-xl border border-orange-500/10">
               <div className="text-4xl font-bold bg-gradient-to-r from-orange-400 to-yellow-500 bg-clip-text text-transparent">
                 2M+
               </div>
-              <div className="text-sm text-muted-foreground mt-2 font-medium">Social Followers</div>
+              <div className="text-sm text-muted-foreground mt-2 font-medium">
+                Social Followers
+              </div>
             </div>
             <div className="text-center p-6 bg-card/40 rounded-xl border border-orange-500/10">
               <div className="text-4xl font-bold bg-gradient-to-r from-orange-400 to-yellow-500 bg-clip-text text-transparent">
                 ∞
               </div>
-              <div className="text-sm text-muted-foreground mt-2 font-medium">Cultural Impact</div>
+              <div className="text-sm text-muted-foreground mt-2 font-medium">
+                Cultural Impact
+              </div>
             </div>
           </div>
         </div>
       </section>
     </div>
-  )
+  );
 }
 
-export default EriggaHomePage
+export default EriggaHomePage;
