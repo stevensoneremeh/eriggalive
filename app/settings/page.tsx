@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { User, SettingsIcon, Bell, Shield, Save, Eye, EyeOff, Crown, Coins, Mail, Calendar, Lock } from 'lucide-react'
+import { User, SettingsIcon, Bell, Shield, Save, Eye, EyeOff, Crown, Coins, Mail, Calendar, Lock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 

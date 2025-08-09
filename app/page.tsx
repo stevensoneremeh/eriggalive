@@ -1,442 +1,453 @@
-import { Suspense } from "react"
+"use client"
+
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/server"
-import { HeroVideoCarousel } from "@/components/hero-video-carousel"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useTheme } from "@/contexts/theme-context"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  Music,
-  Users,
-  Calendar,
-  Trophy,
-  Play,
-  Heart,
-  MessageCircle,
-  TrendingUp,
-  Star,
-  Crown,
-  Coins,
-} from "lucide-react"
-import { formatDistanceToNow } from "date-fns"
+import { Card, CardContent } from "@/components/ui/card"
+import { Music, Video, Newspaper, Users, ShoppingBag, Calendar } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { SafeHeroVideoCarousel } from "@/components/safe-hero-video-carousel"
+import { getOptimizedVideoSources } from "@/utils/video-utils"
+import EriggaRadio from "@/components/erigga-radio"
 
-async function getHomePageData() {
-  const supabase = await createClient()
+export default function HomePage() {
+  const { theme } = useTheme()
+  const [currentSlide, setCurrentSlide] = useState(0)
+  const [mounted, setMounted] = useState(false)
+  const videoSources = getOptimizedVideoSources()
+  const primaryVideoUrl = videoSources[0]?.src || "/videoshttps://hebbkx1anhila5yf.public.blob.vercel-storage.com/git-blob/prj_87iLY6t51DXvy0yPJ00SYhwlKXWl/K6Q-Lit6vuzvhNfoGXuTFB/public/erigga-hero-video.mp4"
 
-  try {
-    // Latest tracks
-    const { data: tracks } = await supabase
-      .from("tracks")
-      .select("*")
-      .eq("is_published", true)
-      .order("created_at", { ascending: false })
-      .limit(6)
-
-    // Latest videos
-    const { data: videos } = await supabase
-      .from("videos")
-      .select("*")
-      .eq("is_published", true)
-      .order("created_at", { ascending: false })
-      .limit(4)
-
-    // Community posts with user info
-    const { data: communityPosts } = await supabase
-      .from("community_posts")
-      .select(
-        `
-        *,
-        users!inner (username, full_name, avatar_url, tier)
-      `,
-      )
-      .eq("is_published", true)
-      .order("created_at", { ascending: false })
-      .limit(3)
-
-    return {
-      tracks: tracks || [],
-      videos: videos || [],
-      communityPosts: communityPosts || [],
-    }
-  } catch (error) {
-    console.error("Error fetching home page data:", error)
-    return {
-      tracks: [],
-      videos: [],
-      communityPosts: [],
-    }
-  }
-}
-
-function LatestTracks({ tracks }: { tracks: any[] }) {
-  return (
-    <section className="py-16 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-4">Latest Tracks</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Fresh sounds from the Paper Boy himself. Stream the latest releases and classics.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tracks.map((track) => (
-            <Card key={track.id} className="group hover:shadow-lg transition-all duration-300">
-              <CardHeader className="p-0">
-                <div className="relative aspect-square overflow-hidden rounded-t-lg">
-                  <img
-                    src={
-                      track.cover_image_url ||
-                      "/placeholder.svg?height=300&width=300&query=album%20cover%20art" ||
-                      "/placeholder.svg"
-                    }
-                    alt={track.title || "Track cover"}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                    <Button size="lg" className="rounded-full">
-                      <Play className="h-6 w-6" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-4">
-                <h3 className="font-semibold text-lg mb-2">{track.title}</h3>
-                <p className="text-muted-foreground text-sm mb-3">{track.description}</p>
-                <div className="flex items-center justify-between">
-                  <Badge variant="secondary">{track.genre || "Hip Hop"}</Badge>
-                  <span className="text-sm text-muted-foreground">
-                    {track?.created_at
-                      ? formatDistanceToNow(new Date(track.created_at), { addSuffix: true })
-                      : "Recently"}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        <div className="text-center mt-8">
-          <Button asChild size="lg">
-            <Link href="/vault">
-              <Music className="mr-2 h-5 w-5" />
-              Explore All Music
-            </Link>
-          </Button>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function CommunityHighlights({ posts }: { posts: any[] }) {
-  const getTierColor = (tier: string) => {
-    const colors = {
-      admin: "bg-red-500 text-white",
-      blood: "bg-red-600 text-white",
-      elder: "bg-purple-500 text-white",
-      pioneer: "bg-blue-500 text-white",
-      grassroot: "bg-green-500 text-white",
-    }
-    return colors[tier as keyof typeof colors] || "bg-gray-500 text-white"
-  }
-
-  return (
-    <section className="py-16">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-4">Community Highlights</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            See what the community is talking about. Join the conversation and connect with fellow fans.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-            {posts.map((post) => (
-              <Card key={post.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4 mb-4">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={post.users?.avatar_url || "/placeholder-user.jpg"} />
-                      <AvatarFallback>{(post.users?.username || "U").charAt(0).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold">{post.users?.full_name || post.users?.username}</span>
-                        <Badge className={getTierColor(post.users?.tier || "grassroot")}>
-                          {(post.users?.tier || "grassroot").replace("_", " ").toUpperCase()}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        @{post.users?.username} •{" "}
-                        {post?.created_at
-                          ? formatDistanceToNow(new Date(post.created_at), { addSuffix: true })
-                          : "Just now"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="text-foreground mb-4 leading-relaxed">{post.content}</p>
-
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Heart className="h-4 w-4" />
-                      <span>{post.vote_count || 0}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <MessageCircle className="h-4 w-4" />
-                      <span>{post.comment_count || 0}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Community Stats
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Active Members</span>
-                    <span className="font-semibold">12,450</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Posts Today</span>
-                    <span className="font-semibold">89</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Total Discussions</span>
-                    <span className="font-semibold">5,678</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Crown className="h-5 w-5" />
-                  Top Contributors
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {[
-                    { name: "WarriKing", tier: "blood", points: 2500 },
-                    { name: "PaperBoi", tier: "elder", points: 1800 },
-                    { name: "StreetPoet", tier: "pioneer", points: 1200 },
-                  ].map((user, index) => (
-                    <div key={user.name} className="flex items-center gap-3">
-                      <span className="text-sm font-medium w-6">#{index + 1}</span>
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{user.name}</p>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            className={
-                              user.tier === "blood"
-                                ? "bg-red-600 text-white"
-                                : user.tier === "elder"
-                                  ? "bg-purple-500 text-white"
-                                  : "bg-blue-500 text-white"
-                            }
-                          >
-                            {user.tier.toUpperCase()}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Coins className="h-3 w-3" />
-                            {user.points}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        <div className="text-center mt-8">
-          <Button asChild size="lg">
-            <Link href="/community">
-              <Users className="mr-2 h-5 w-5" />
-              Join the Community
-            </Link>
-          </Button>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function FeaturesSection() {
-  const features = [
-    {
-      icon: Music,
-      title: "Exclusive Music",
-      description: "Access to unreleased tracks, behind-the-scenes content, and exclusive remixes.",
-      color: "text-purple-600",
-    },
-    {
-      icon: Users,
-      title: "Community",
-      description: "Connect with fellow fans, share thoughts, and participate in discussions.",
-      color: "text-blue-600",
-    },
-    {
-      icon: Calendar,
-      title: "Events",
-      description: "Get early access to concert tickets, meet & greets, and special events.",
-      color: "text-green-600",
-    },
-    {
-      icon: Trophy,
-      title: "Rewards",
-      description: "Earn Erigga coins through participation and unlock exclusive perks.",
-      color: "text-yellow-600",
-    },
-  ]
-
-  return (
-    <section className="py-16 bg-muted/30">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-4">Why Join Erigga Live?</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Experience the ultimate fan platform with exclusive content, community features, and rewards.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map((feature) => (
-            <Card key={feature.title} className="text-center hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div
-                  className={`w-12 h-12 rounded-lg bg-muted flex items-center justify-center mx-auto mb-4 ${feature.color}`}
-                >
-                  <feature.icon className="h-6 w-6" />
-                </div>
-                <CardTitle className="text-lg">{feature.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription>{feature.description}</CardDescription>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-export default async function HomePage() {
-  const { tracks, videos, communityPosts } = await getHomePageData()
-
-  // Restore hero to original behavior: HeroVideoCarousel with images + a videoUrl
-  const heroImages: string[] = [
+  // Hero images
+  const heroImages = [
     "/images/hero/erigga1.jpeg",
     "/images/hero/erigga2.jpeg",
     "/images/hero/erigga3.jpeg",
     "/images/hero/erigga4.jpeg",
   ]
 
-  // Derive from previously published videos (latest first), fallback to a safe placeholder
-  const heroVideoUrl: string =
-    (Array.isArray(videos) && videos.length > 0 && (videos[0] as any)?.video_url) ||
-    "/placeholder.svg?height=800&width=1200"
+  // Features data
+  const features = [
+    {
+      title: "Media Vault",
+      description: "Access Erigga's complete discography, music videos, and exclusive content.",
+      icon: Music,
+      href: "/vault",
+      color: "from-brand-lime to-brand-teal dark:from-white dark:to-harkonnen-gray",
+    },
+    {
+      title: "Erigga Chronicles",
+      description: "Follow Erigga's journey through animated stories and documentaries.",
+      icon: Video,
+      href: "/chronicles",
+      color: "from-brand-teal to-brand-lime-dark dark:from-harkonnen-gray dark:to-white",
+    },
+    {
+      title: "Community",
+      description: "Connect with other fans, share content, and participate in discussions.",
+      icon: Users,
+      href: "/community",
+      color: "from-brand-lime-dark to-brand-teal-light dark:from-white dark:to-harkonnen-light-gray",
+    },
+    {
+      title: "Merch Store",
+      description: "Shop exclusive Erigga merchandise and limited edition items.",
+      icon: ShoppingBag,
+      href: "/merch",
+      color: "from-brand-teal-light to-brand-lime dark:from-harkonnen-light-gray dark:to-white",
+    },
+    {
+      title: "Events & Tickets",
+      description: "Get early access to concert tickets and exclusive events.",
+      icon: Calendar,
+      href: "/tickets",
+      color: "from-brand-lime to-brand-teal-dark dark:from-white dark:to-harkonnen-dark-gray",
+    },
+    {
+      title: "Premium Tiers",
+      description: "Upgrade your experience with exclusive perks and content.",
+      icon: Newspaper,
+      href: "/premium",
+      color: "from-brand-teal-dark to-brand-lime-light dark:from-harkonnen-dark-gray dark:to-white",
+    },
+  ]
+
+  // Testimonials data
+  const testimonials = [
+    {
+      quote: "Erigga's platform connects me directly with real fans. The community here is authentic.",
+      author: "WarriKing23",
+      tier: "Blood Brotherhood",
+    },
+    {
+      quote: "The exclusive content in the vault is worth every coin. Can't get this anywhere else!",
+      author: "PaperBoi99",
+      tier: "Elder",
+    },
+    {
+      quote: "Chronicles series tells Erigga's story in a way I've never seen before. Pure street wisdom.",
+      author: "LagosHustler",
+      tier: "Pioneer",
+    },
+  ]
+
+  // Tier plans data
+  const tierPlans = [
+    {
+      name: "Grassroot",
+      price: "Free",
+      description: "Basic access to the platform",
+      features: ["Community access", "Public content", "Event announcements", "Basic profile"],
+      color: "border-grassroot-primary dark:border-grassroot-primary",
+      bgColor: "bg-grassroot-secondary/20 dark:bg-grassroot-secondary",
+      href: "/signup",
+    },
+    {
+      name: "Pioneer",
+      price: "₦2,000",
+      period: "monthly",
+      description: "Enhanced access with exclusive content",
+      features: [
+        "All Grassroot features",
+        "Early music releases",
+        "Exclusive interviews",
+        "Discounted merch",
+        "Pioneer badge",
+      ],
+      color: "border-pioneer-primary dark:border-pioneer-primary",
+      bgColor: "bg-pioneer-secondary/20 dark:bg-pioneer-secondary",
+      href: "/premium",
+      popular: true,
+    },
+    {
+      name: "Elder",
+      price: "₦5,000",
+      period: "monthly",
+      description: "Premium access with VIP benefits",
+      features: [
+        "All Pioneer features",
+        "Behind-the-scenes content",
+        "Studio session videos",
+        "Priority event access",
+        "Monthly Erigga coins",
+        "Elder badge",
+      ],
+      color: "border-elder-primary dark:border-elder-primary",
+      bgColor: "bg-elder-secondary/20 dark:bg-elder-secondary",
+      href: "/premium",
+    },
+    {
+      name: "Blood Brotherhood",
+      price: "₦10,000",
+      period: "monthly",
+      description: "Ultimate fan experience",
+      features: [
+        "All Elder features",
+        "Direct messaging with Erigga",
+        "Virtual meet & greets",
+        "Exclusive merchandise",
+        "Blood Brotherhood badge",
+        "Voting rights on new content",
+      ],
+      color: "border-blood-primary dark:border-blood-primary",
+      bgColor: "bg-blood-secondary/20 dark:bg-blood-secondary",
+      href: "/premium",
+    },
+  ]
+
+  // Auto-advance carousel
+  useEffect(() => {
+    setMounted(true)
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % heroImages.length)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [heroImages.length])
+
+  if (!mounted) {
+    return null
+  }
 
   return (
-    <div className="min-h-screen">
-      {/* Hero Section: original overlay and CTA preserved */}
-      <section className="relative">
-        <Suspense
-          fallback={
-            <div className="h-[70vh] bg-gradient-to-r from-purple-900 to-blue-900 flex items-center justify-center">
-              <div className="text-center text-white">
-                <h1 className="text-4xl md:text-6xl font-bold mb-4">Erigga Live</h1>
-                <p className="text-xl">The Ultimate Fan Experience</p>
-              </div>
-            </div>
-          }
-        >
-          <div className="relative h-[70vh] overflow-hidden">
-            <HeroVideoCarousel images={heroImages} videoUrl={heroVideoUrl} />
-            <div className="absolute inset-0 flex items-center justify-center z-20">
-              <div className="text-center text-white px-4">
-                <h1 className="text-4xl md:text-6xl font-bold mb-4">Erigga Live</h1>
-                <p className="text-xl opacity-90 mb-6">The Ultimate Fan Experience</p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Button asChild size="lg" variant="secondary">
-                    <Link href="/signup">
-                      <Star className="mr-2 h-5 w-5" />
-                      Get Started Free
-                    </Link>
-                  </Button>
-                  <Button
-                    asChild
-                    size="lg"
-                    variant="outline"
-                    className="text-white border-white hover:bg-white hover:text-purple-600 bg-transparent"
-                  >
-                    <Link href="/premium">
-                      <Crown className="mr-2 h-5 w-5" />
-                      Go Premium
-                    </Link>
-                  </Button>
+    <div className="flex flex-col min-h-screen">
+      {/* Erigga Radio Widget - Only on home page */}
+      <EriggaRadio />
+
+      {/* Hero Section */}
+      <section className="relative h-[80vh] w-full">
+        <SafeHeroVideoCarousel images={heroImages} videoUrl={primaryVideoUrl} className="absolute inset-0" />
+
+        <div className="absolute inset-0 flex items-center justify-center z-10">
+          <div className="text-center max-w-3xl px-4">
+            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 drop-shadow-lg">
+              Welcome to the Official Erigga Live Platform
+            </h1>
+            <p className="text-xl md:text-2xl text-white/90 mb-8 drop-shadow-md">
+              Join the community and get exclusive access to music, videos, and events
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href="/signup" className="inline-block">
+                <div
+                  className={cn(
+                    "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
+                    "transform hover:scale-105 hover:shadow-xl",
+                    theme === "dark"
+                      ? "bg-white text-harkonnen-black hover:bg-gray-200"
+                      : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
+                  )}
+                >
+                  Join Now
                 </div>
-              </div>
+              </Link>
+              <Link href="/vault" className="inline-block">
+                <div
+                  className={cn(
+                    "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
+                    "transform hover:scale-105 hover:shadow-xl",
+                    theme === "dark"
+                      ? "bg-transparent border-2 border-white text-white hover:bg-white/10"
+                      : "bg-brand-teal text-white hover:bg-brand-teal-dark",
+                  )}
+                >
+                  Explore Content
+                </div>
+              </Link>
             </div>
           </div>
-        </Suspense>
+        </div>
       </section>
 
-      {/* Latest Tracks */}
-      <LatestTracks tracks={tracks} />
+      {/* Rest of the home page content */}
+      <section className="py-12 px-4 bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12 text-gray-900 dark:text-white">Explore the Platform</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-xl font-bold mb-2">Media Vault</h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  Access exclusive music, videos, and behind-the-scenes content
+                </p>
+                <Button asChild variant="outline">
+                  <Link href="/vault">Explore Vault</Link>
+                </Button>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-xl font-bold mb-2">Community</h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  Connect with others, share content, and join discussions
+                </p>
+                <Button asChild variant="outline">
+                  <Link href="/community">Join Community</Link>
+                </Button>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-xl font-bold mb-2">Chronicles</h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  Follow Erigga's journey through exclusive stories and updates
+                </p>
+                <Button asChild variant="outline">
+                  <Link href="/chronicles">Read Chronicles</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
 
-      {/* Community Highlights */}
-      <CommunityHighlights posts={communityPosts} />
+      {/* Features Section */}
+      <section className="py-20 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Platform Features</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Everything you need to connect with Erigga and fellow fans in one place.
+            </p>
+          </div>
 
-      {/* Features */}
-      <FeaturesSection />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {features.map((feature, index) => (
+              <Link key={index} href={feature.href}>
+                <Card
+                  className={cn(
+                    "h-full transition-all duration-300 hover:scale-105 overflow-hidden",
+                    theme === "dark" ? "harkonnen-card" : "border border-gray-200",
+                  )}
+                >
+                  <CardContent className="p-6 flex flex-col h-full">
+                    <div
+                      className={cn(
+                        "w-12 h-12 rounded-full mb-4 flex items-center justify-center bg-gradient-to-br",
+                        feature.color,
+                      )}
+                    >
+                      <feature.icon className={cn("h-6 w-6", theme === "dark" ? "text-black" : "text-white")} />
+                    </div>
+                    <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
+                    <p className="text-muted-foreground flex-grow">{feature.description}</p>
+                    <div className="mt-4 flex items-center text-sm font-medium text-brand-teal dark:text-white">
+                      Learn more
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4 ml-1"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="py-20 bg-accent">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Fan Testimonials</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Hear what the community has to say about the Erigga fan platform.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {testimonials.map((testimonial, index) => (
+              <Card
+                key={index}
+                className={cn("h-full", theme === "dark" ? "harkonnen-card" : "border border-gray-200")}
+              >
+                <CardContent className="p-6 flex flex-col h-full">
+                  <div className="mb-4">
+                    {[...Array(5)].map((_, i) => (
+                      <svg
+                        key={i}
+                        className="inline-block w-5 h-5 text-yellow-500"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
+                  </div>
+                  <p className="text-lg italic mb-6 flex-grow">"{testimonial.quote}"</p>
+                  <div>
+                    <p className="font-bold">{testimonial.author}</p>
+                    <p className="text-sm text-muted-foreground">{testimonial.tier} Member</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section className="py-20 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Membership Tiers</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Choose the tier that fits your level of fandom and unlock exclusive perks.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {tierPlans.map((plan, index) => (
+              <div key={index} className="relative">
+                {plan.popular && (
+                  <div className="absolute -top-4 left-0 right-0 flex justify-center">
+                    <span className="bg-brand-lime text-brand-teal dark:bg-white dark:text-black px-3 py-1 rounded-full text-sm font-medium">
+                      Most Popular
+                    </span>
+                  </div>
+                )}
+                <Card
+                  className={cn(
+                    "h-full border-2 transition-all duration-300",
+                    plan.color,
+                    plan.popular ? "transform scale-105" : "",
+                    theme === "dark" ? "harkonnen-card" : "",
+                  )}
+                >
+                  <CardContent className={cn("p-6", plan.bgColor)}>
+                    <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
+                    <div className="mb-4">
+                      <span className="text-3xl font-bold">{plan.price}</span>
+                      {plan.period && <span className="text-muted-foreground">/{plan.period}</span>}
+                    </div>
+                    <p className="text-muted-foreground mb-6">{plan.description}</p>
+                    <ul className="space-y-2 mb-6">
+                      {plan.features.map((feature, i) => (
+                        <li key={i} className="flex items-start">
+                          <svg
+                            className="h-5 w-5 text-green-500 mr-2 mt-0.5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M5 13l4 4L19 7"
+                            ></path>
+                          </svg>
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <Button
+                      className={cn(
+                        "w-full",
+                        plan.name === "Grassroot"
+                          ? "bg-grassroot-primary text-white hover:bg-opacity-90"
+                          : plan.name === "Pioneer"
+                            ? "bg-pioneer-primary text-white hover:bg-opacity-90"
+                            : plan.name === "Elder"
+                              ? "bg-elder-primary text-white hover:bg-opacity-90"
+                              : "bg-blood-primary text-white hover:bg-opacity-90",
+                      )}
+                      asChild
+                    >
+                      <Link href={plan.href}>{plan.name === "Grassroot" ? "Sign Up Free" : "Subscribe Now"}</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+      <section className="py-20 bg-brand-teal dark:bg-harkonnen-black text-white">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold mb-4">Ready to Join the Movement?</h2>
-          <p className="text-xl mb-8 opacity-90">
-            Get exclusive access to Erigga&apos;s world and connect with the community.
+          <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Join the Movement?</h2>
+          <p className="text-lg max-w-2xl mx-auto mb-8 text-white/80">
+            Get access to exclusive content, connect with other fans, and be part of Erigga's journey.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button asChild size="lg" variant="secondary">
-              <Link href="/signup">
-                <Star className="mr-2 h-5 w-5" />
-                Get Started Free
-              </Link>
-            </Button>
-            <Button
-              asChild
-              size="lg"
-              variant="outline"
-              className="text-white border-white hover:bg-white hover:text-purple-600 bg-transparent"
+          <Link href="/signup" className="inline-block">
+            <div
+              className={cn(
+                "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
+                "transform hover:scale-105 hover:shadow-xl",
+                theme === "dark"
+                  ? "bg-white text-harkonnen-black hover:bg-gray-200"
+                  : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
+              )}
             >
-              <Link href="/premium">
-                <Crown className="mr-2 h-5 w-5" />
-                Go Premium
-              </Link>
-            </Button>
-          </div>
+              Join Now
+            </div>
+          </Link>
         </div>
       </section>
     </div>
