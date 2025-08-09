@@ -1,19 +1,31 @@
 import { Suspense } from "react"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
 import { HeroVideoCarousel } from "@/components/hero-video-carousel"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Music, Users, Calendar, Trophy, Play, Heart, MessageCircle, TrendingUp, Star, Crown, Coins } from 'lucide-react'
-import Link from "next/link"
+import {
+  Music,
+  Users,
+  Calendar,
+  Trophy,
+  Play,
+  Heart,
+  MessageCircle,
+  TrendingUp,
+  Star,
+  Crown,
+  Coins,
+} from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 
-// Keep your original server-side data fetching shape
 async function getHomePageData() {
   const supabase = await createClient()
 
   try {
+    // Latest tracks
     const { data: tracks } = await supabase
       .from("tracks")
       .select("*")
@@ -21,6 +33,7 @@ async function getHomePageData() {
       .order("created_at", { ascending: false })
       .limit(6)
 
+    // Latest videos
     const { data: videos } = await supabase
       .from("videos")
       .select("*")
@@ -28,6 +41,7 @@ async function getHomePageData() {
       .order("created_at", { ascending: false })
       .limit(4)
 
+    // Community posts with user info
     const { data: communityPosts } = await supabase
       .from("community_posts")
       .select(
@@ -72,7 +86,11 @@ function LatestTracks({ tracks }: { tracks: any[] }) {
               <CardHeader className="p-0">
                 <div className="relative aspect-square overflow-hidden rounded-t-lg">
                   <img
-                    src={track.cover_image_url || "/placeholder.svg?height=300&width=300&query=cover%20image"}
+                    src={
+                      track.cover_image_url ||
+                      "/placeholder.svg?height=300&width=300&query=album%20cover%20art" ||
+                      "/placeholder.svg"
+                    }
                     alt={track.title || "Track cover"}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
@@ -142,9 +160,7 @@ function CommunityHighlights({ posts }: { posts: any[] }) {
                   <div className="flex items-start gap-4 mb-4">
                     <Avatar className="h-10 w-10">
                       <AvatarImage src={post.users?.avatar_url || "/placeholder-user.jpg"} />
-                      <AvatarFallback>
-                        {(post.users?.username || "U").charAt(0).toUpperCase()}
-                      </AvatarFallback>
+                      <AvatarFallback>{(post.users?.username || "U").charAt(0).toUpperCase()}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
@@ -328,7 +344,7 @@ function FeaturesSection() {
 export default async function HomePage() {
   const { tracks, videos, communityPosts } = await getHomePageData()
 
-  // Restore hero to the original pattern: full-bleed carousel with background video + images
+  // Restore hero to original behavior: HeroVideoCarousel with images + a videoUrl
   const heroImages: string[] = [
     "/images/hero/erigga1.jpeg",
     "/images/hero/erigga2.jpeg",
@@ -336,14 +352,14 @@ export default async function HomePage() {
     "/images/hero/erigga4.jpeg",
   ]
 
-  // Try to use the latest published video URL if available; fall back to a safe placeholder
+  // Derive from previously published videos (latest first), fallback to a safe placeholder
   const heroVideoUrl: string =
-    (Array.isArray(videos) && videos[0]?.video_url) ||
+    (Array.isArray(videos) && videos.length > 0 && (videos[0] as any)?.video_url) ||
     "/placeholder.svg?height=800&width=1200"
 
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
+      {/* Hero Section: original overlay and CTA preserved */}
       <section className="relative">
         <Suspense
           fallback={
@@ -355,10 +371,8 @@ export default async function HomePage() {
             </div>
           }
         >
-          {/* Fixed: pass correct props (images, videoUrl) instead of videos */}
           <div className="relative h-[70vh] overflow-hidden">
             <HeroVideoCarousel images={heroImages} videoUrl={heroVideoUrl} />
-            {/* Overlay content retained */}
             <div className="absolute inset-0 flex items-center justify-center z-20">
               <div className="text-center text-white px-4">
                 <h1 className="text-4xl md:text-6xl font-bold mb-4">Erigga Live</h1>
@@ -374,7 +388,7 @@ export default async function HomePage() {
                     asChild
                     size="lg"
                     variant="outline"
-                    className="text-white border-white hover:bg-white hover:text-purple-600"
+                    className="text-white border-white hover:bg-white hover:text-purple-600 bg-transparent"
                   >
                     <Link href="/premium">
                       <Crown className="mr-2 h-5 w-5" />
@@ -401,7 +415,9 @@ export default async function HomePage() {
       <section className="py-16 bg-gradient-to-r from-purple-600 to-blue-600 text-white">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Join the Movement?</h2>
-          <p className="text-xl mb-8 opacity-90">Get exclusive access to Erigga&apos;s world and connect with the community.</p>
+          <p className="text-xl mb-8 opacity-90">
+            Get exclusive access to Erigga&apos;s world and connect with the community.
+          </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button asChild size="lg" variant="secondary">
               <Link href="/signup">
@@ -413,7 +429,7 @@ export default async function HomePage() {
               asChild
               size="lg"
               variant="outline"
-              className="text-white border-white hover:bg-white hover:text-purple-600"
+              className="text-white border-white hover:bg-white hover:text-purple-600 bg-transparent"
             >
               <Link href="/premium">
                 <Crown className="mr-2 h-5 w-5" />
