@@ -8,7 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { UserTierBadge } from "@/components/user-tier-badge"
 import { formatDistanceToNow } from "date-fns"
-import { MessageSquare, MoreHorizontal, Flag, Edit, Trash2, LinkIcon, Play, Pause } from 'lucide-react'
+import { MessageSquare, MoreHorizontal, Flag, Edit, Trash2, LinkIcon, Play, Pause } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { CommunityPost } from "@/types/database"
 import { VoteButton } from "./vote-button-fixed"
@@ -17,7 +17,7 @@ import { useToast } from "@/components/ui/use-toast"
 import DOMPurify from "isomorphic-dompurify"
 import { CommentSection } from "./comment-section-fixed"
 import { RichTextEditor } from "./rich-text-editor"
-import { deletePostAction, editPostAction } from "@/lib/community-actions"
+import { deletePostAction, editPostAction } from "@/lib/community-actions-fixed"
 
 interface PostCardProps {
   post: CommunityPost

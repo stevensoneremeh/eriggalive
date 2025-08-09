@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
-import { Heart } from 'lucide-react'
-import { voteOnPostAction } from "@/lib/community-actions"
-import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/components/ui/use-toast"
+import { voteOnPostAction } from "@/lib/community-actions-fixed"
+import { ArrowBigUp, Loader2, Coins } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface VoteButtonProps {
   postId: number
@@ -13,6 +14,9 @@ interface VoteButtonProps {
   initialVoteCount: number
   initialHasVoted: boolean
   currentUserId?: string
+  onVoteSuccess?: (newVoteCount: number, newHasVoted: boolean) => void
+  size?: "sm" | "md"
+  className?: string
 }
 
 export function VoteButton({
@@ -21,76 +25,112 @@ export function VoteButton({
   initialVoteCount,
   initialHasVoted,
   currentUserId,
+  onVoteSuccess,
+  size = "md",
+  className,
 }: VoteButtonProps) {
-  const [voteCount, setVoteCount] = useState(initialVoteCount)
-  const [hasVoted, setHasVoted] = useState(initialHasVoted)
-  const [isVoting, setIsVoting] = useState(false)
+  const { user, profile, isAuthenticated } = useAuth()
   const { toast } = useToast()
-  const { user } = useAuth()
+  const [isVoting, startVoteTransition] = useTransition()
+  const [optimisticVoteCount, setOptimisticVoteCount] = useState(initialVoteCount)
+  const [optimisticHasVoted, setOptimisticHasVoted] = useState(initialHasVoted)
 
-  const handleVote = async () => {
-    if (!user) {
+  const handleVote = () => {
+    if (!isAuthenticated || !user || !profile) {
       toast({
-        title: "Authentication Required",
-        description: "Please log in to vote on posts.",
+        title: "Login Required",
+        description: "Please login to vote on posts.",
         variant: "destructive",
       })
       return
     }
 
-    if (isVoting) return
+    if (profile.coins < 100) {
+      toast({
+        title: "Insufficient Coins",
+        description: "You need at least 100 Erigga Coins to vote.",
+        variant: "destructive",
+      })
+      return
+    }
 
-    setIsVoting(true)
+    startVoteTransition(async () => {
+      // Optimistic update
+      const originalVoteCount = optimisticVoteCount
+      const originalHasVoted = optimisticHasVoted
 
-    try {
-      const result = await voteOnPostAction(postId, user.id)
+      setOptimisticVoteCount(originalHasVoted ? originalVoteCount - 1 : originalVoteCount + 1)
+      setOptimisticHasVoted(!originalHasVoted)
 
-      if (result.success) {
-        if (result.voted) {
-          setVoteCount((prev) => prev + 1)
-          setHasVoted(true)
-        } else {
-          setVoteCount((prev) => Math.max(0, prev - 1))
-          setHasVoted(false)
+      try {
+        // Get post creator's auth_user_id
+        const { data: postCreatorData } = await fetch(`/api/users/${postCreatorId}`).then((r) => r.json())
+        const postCreatorAuthId = postCreatorData?.auth_user_id
+
+        if (!postCreatorAuthId) {
+          throw new Error("Post creator not found")
         }
 
-        toast({
-          title: "Success",
-          description: result.message,
-        })
-      } else {
+        const result = await voteOnPostAction(postId, postCreatorAuthId)
+
+        if (result.success) {
+          toast({
+            title: result.voted ? "Vote Added!" : "Vote Removed!",
+            description: result.message,
+          })
+
+          // Update parent component
+          if (onVoteSuccess) {
+            onVoteSuccess(optimisticVoteCount, optimisticHasVoted)
+          }
+        } else {
+          // Revert optimistic update on error
+          setOptimisticVoteCount(originalVoteCount)
+          setOptimisticHasVoted(originalHasVoted)
+
+          toast({
+            title: "Vote Failed",
+            description: result.error,
+            variant: "destructive",
+          })
+        }
+      } catch (error: any) {
+        // Revert optimistic update on error
+        setOptimisticVoteCount(originalVoteCount)
+        setOptimisticHasVoted(originalHasVoted)
+
+        console.error("Vote error:", error)
         toast({
           title: "Vote Failed",
-          description: result.error,
+          description: error.message || "Something went wrong",
           variant: "destructive",
         })
       }
-    } catch (error: any) {
-      console.error("Vote error:", error)
-      toast({
-        title: "Error",
-        description: "Something went wrong while voting.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsVoting(false)
-    }
+    })
   }
+
+  const isOwnPost = profile?.id === postCreatorId
 
   return (
     <Button
       variant="ghost"
-      size="sm"
+      size={size === "sm" ? "sm" : "default"}
+      className={cn(
+        "flex items-center gap-2 text-muted-foreground hover:text-primary",
+        optimisticHasVoted && "text-primary",
+        isOwnPost && "opacity-50 cursor-not-allowed",
+        className,
+      )}
       onClick={handleVote}
-      disabled={isVoting}
-      className={`flex items-center gap-2 transition-colors ${
-        hasVoted
-          ? "text-red-500 hover:text-red-600"
-          : "text-muted-foreground hover:text-red-500"
-      }`}
+      disabled={isVoting || isOwnPost || !isAuthenticated}
     >
-      <Heart className={`h-4 w-4 ${hasVoted ? "fill-current" : ""}`} />
-      <span className="font-medium">{voteCount}</span>
+      {isVoting ? (
+        <Loader2 className={cn("animate-spin", size === "sm" ? "h-4 w-4" : "h-5 w-5")} />
+      ) : (
+        <ArrowBigUp className={cn(size === "sm" ? "h-4 w-4" : "h-5 w-5", optimisticHasVoted && "fill-current")} />
+      )}
+      <span className="font-medium">{optimisticVoteCount}</span>
+      <Coins className={cn("text-yellow-500", size === "sm" ? "h-3 w-3" : "h-4 w-4")} />
     </Button>
   )
 }

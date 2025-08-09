@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react"
 import { CommentCard } from "./comment-card"
 import { CreateCommentForm } from "./create-comment-form"
 import type { CommunityComment } from "@/types/database"
-import { fetchCommentsForPost } from "@/lib/community-actions"
+import { fetchCommentsForPost } from "@/lib/community-actions-fixed"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/contexts/auth-context"
 
