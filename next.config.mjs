@@ -19,6 +19,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: '**.supabase.co',
       },
+      {
+        protocol: 'https',
+        hostname: '**.supabase.in',
+      },
     ],
     unoptimized: true,
   },
@@ -63,11 +67,25 @@ const nextConfig = {
     // Disable the missing suspense with CSR bailout check
     missingSuspenseWithCSRBailout: false,
     // Additional experimental flags to help with SSR issues
-    serverComponentsExternalPackages: [],
-    optimizePackageImports: ['lucide-react'],
+    serverComponentsExternalPackages: ['@supabase/supabase-js'],
+    optimizePackageImports: ['lucide-react', '@supabase/supabase-js'],
   },
-  // Force static generation for specific pages
+  // Ensure proper build output
   output: 'standalone',
+  // Add webpack configuration for better builds
+  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
+    // Ignore node-specific modules when bundling for the browser
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+      };
+    }
+    
+    return config;
+  },
 };
 
 export default nextConfig;

@@ -6,6 +6,9 @@ const requiredEnvVars = [
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
   "SUPABASE_JWT_SECRET",
+]
+
+const optionalEnvVars = [
   "ADMIN_PASSWORD",
   "MOD_PASSWORD",
   "GRASSROOT_PASSWORD",
@@ -14,15 +17,22 @@ const requiredEnvVars = [
   "BLOOD_PASSWORD",
 ]
 
-const missingVars = requiredEnvVars.filter((varName) => !process.env[varName])
+const missingRequired = requiredEnvVars.filter((varName) => !process.env[varName])
+const missingOptional = optionalEnvVars.filter((varName) => !process.env[varName])
 
-if (missingVars.length > 0) {
+if (missingRequired.length > 0) {
   console.error("❌ Missing required environment variables:")
-  missingVars.forEach((varName) => console.error(`   - ${varName}`))
+  missingRequired.forEach((varName) => console.error(`   - ${varName}`))
   console.error("\nPlease add these to your Vercel project settings.")
   process.exit(1)
 } else {
   console.log("✅ All required environment variables are set!")
+}
+
+if (missingOptional.length > 0) {
+  console.warn("⚠️  Missing optional environment variables:")
+  missingOptional.forEach((varName) => console.warn(`   - ${varName}`))
+  console.warn("\nThese are optional but may be needed for full functionality.")
 }
 
 // Check URL format
@@ -32,4 +42,11 @@ if (supabaseUrl && !supabaseUrl.startsWith("https://")) {
   process.exit(1)
 }
 
+// Check if Supabase URL looks valid
+if (supabaseUrl && !supabaseUrl.includes(".supabase.")) {
+  console.error("❌ NEXT_PUBLIC_SUPABASE_URL doesn't appear to be a valid Supabase URL")
+  process.exit(1)
+}
+
 console.log("✅ Environment variables look good!")
+console.log(`✅ Supabase URL: ${supabaseUrl}`)

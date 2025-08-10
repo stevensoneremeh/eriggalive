@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createClient as createServerClient } from "@/lib/supabase/server"
 
 // Post types
 export type PostWithUser = {
@@ -81,18 +81,19 @@ export const clientDb = {
     }
 
     // Transform the data to match our PostWithUser type
-    const posts: PostWithUser[] = data.map((post) => ({
-      id: post.id,
-      content: post.content,
-      type: post.type,
-      media_urls: post.media_urls,
-      media_types: post.media_types,
-      thumbnail_urls: post.thumbnail_urls,
-      like_count: post.like_count,
-      comment_count: post.comment_count,
-      created_at: post.created_at,
-      user: post.users,
-    }))
+    const posts: PostWithUser[] =
+      data?.map((post) => ({
+        id: post.id,
+        content: post.content,
+        type: post.type,
+        media_urls: post.media_urls || [],
+        media_types: post.media_types || [],
+        thumbnail_urls: post.thumbnail_urls || [],
+        like_count: post.like_count || 0,
+        comment_count: post.comment_count || 0,
+        created_at: post.created_at,
+        user: post.users,
+      })) || []
 
     return { posts, error: null }
   },
@@ -130,15 +131,16 @@ export const clientDb = {
     }
 
     // Transform the data to match our BarSubmission type
-    const bars: BarSubmission[] = data.map((bar) => ({
-      id: bar.id,
-      content: bar.content,
-      audio_url: bar.media_urls[0],
-      vote_count: bar.vote_count,
-      user_id: bar.user_id,
-      created_at: bar.created_at,
-      user: bar.users,
-    }))
+    const bars: BarSubmission[] =
+      data?.map((bar) => ({
+        id: bar.id,
+        content: bar.content,
+        audio_url: bar.media_urls?.[0],
+        vote_count: bar.vote_count || 0,
+        user_id: bar.user_id,
+        created_at: bar.created_at,
+        user: bar.users,
+      })) || []
 
     return { bars, error: null }
   },
@@ -178,15 +180,16 @@ export const clientDb = {
     }
 
     // Transform the data to match our BarSubmission type
-    const topBars: BarSubmission[] = data.map((bar) => ({
-      id: bar.id,
-      content: bar.content,
-      audio_url: bar.media_urls[0],
-      vote_count: bar.vote_count,
-      user_id: bar.user_id,
-      created_at: bar.created_at,
-      user: bar.users,
-    }))
+    const topBars: BarSubmission[] =
+      data?.map((bar) => ({
+        id: bar.id,
+        content: bar.content,
+        audio_url: bar.media_urls?.[0],
+        vote_count: bar.vote_count || 0,
+        user_id: bar.user_id,
+        created_at: bar.created_at,
+        user: bar.users,
+      })) || []
 
     return { topBars, error: null }
   },
@@ -214,71 +217,76 @@ export const clientDb = {
       return { contributors: [], error: error.message }
     }
 
-    return { contributors: data, error: null }
+    return { contributors: data || [], error: null }
   },
 
   // Vote on a bar
   async voteOnBar(postId: number, userId: number, coinAmount = 1) {
     const supabase = createClient()
 
-    // Start a transaction
-    // 1. Update the post's like_count
-    // 2. Create a coin transaction
-    // 3. Update the user's coin balance
+    try {
+      // Start a transaction-like operation
+      // 1. Check if user has enough coins
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("coins")
+        .eq("id", userId)
+        .single()
 
-    // First, check if user has enough coins
-    const { data: userData, error: userError } = await supabase.from("users").select("coins").eq("id", userId).single()
+      if (userError || !userData) {
+        console.error("Error fetching user data:", userError)
+        return { success: false, error: userError?.message || "User not found" }
+      }
 
-    if (userError || !userData) {
-      console.error("Error fetching user data:", userError)
-      return { success: false, error: userError?.message || "User not found" }
+      if (userData.coins < coinAmount) {
+        return { success: false, error: "Not enough coins" }
+      }
+
+      // 2. Update post like_count
+      const { error: postError } = await supabase.rpc("increment_post_likes", {
+        post_id: postId,
+        increment_by: coinAmount,
+      })
+
+      if (postError) {
+        console.error("Error updating post:", postError)
+        return { success: false, error: postError.message }
+      }
+
+      // 3. Create coin transaction
+      const { error: transactionError } = await supabase.from("coin_transactions").insert({
+        user_id: userId,
+        amount: -coinAmount,
+        transaction_type: "content_access",
+        status: "completed",
+        description: `Voted on bar post #${postId}`,
+        fee_amount: 0,
+        currency: "NGN",
+        exchange_rate: 1,
+        metadata: { post_id: postId },
+      })
+
+      if (transactionError) {
+        console.error("Error creating transaction:", transactionError)
+        return { success: false, error: transactionError.message }
+      }
+
+      // 4. Update user's coin balance
+      const { error: updateUserError } = await supabase
+        .from("users")
+        .update({ coins: userData.coins - coinAmount })
+        .eq("id", userId)
+
+      if (updateUserError) {
+        console.error("Error updating user coins:", updateUserError)
+        return { success: false, error: updateUserError.message }
+      }
+
+      return { success: true, error: null }
+    } catch (error) {
+      console.error("Unexpected error in voteOnBar:", error)
+      return { success: false, error: "An unexpected error occurred" }
     }
-
-    if (userData.coins < coinAmount) {
-      return { success: false, error: "Not enough coins" }
-    }
-
-    // Update post like_count
-    const { error: postError } = await supabase
-      .from("posts")
-      .update({ like_count: supabase.rpc("increment", { inc: coinAmount }) })
-      .eq("id", postId)
-
-    if (postError) {
-      console.error("Error updating post:", postError)
-      return { success: false, error: postError.message }
-    }
-
-    // Create coin transaction
-    const { error: transactionError } = await supabase.from("coin_transactions").insert({
-      user_id: userId,
-      amount: -coinAmount,
-      transaction_type: "content_access",
-      status: "completed",
-      description: `Voted on bar post #${postId}`,
-      fee_amount: 0,
-      currency: "NGN",
-      exchange_rate: 1,
-      metadata: { post_id: postId },
-    })
-
-    if (transactionError) {
-      console.error("Error creating transaction:", transactionError)
-      return { success: false, error: transactionError.message }
-    }
-
-    // Update user's coin balance
-    const { error: updateUserError } = await supabase
-      .from("users")
-      .update({ coins: userData.coins - coinAmount })
-      .eq("id", userId)
-
-    if (updateUserError) {
-      console.error("Error updating user coins:", updateUserError)
-      return { success: false, error: updateUserError.message }
-    }
-
-    return { success: true, error: null }
   },
 
   // Create a new post
@@ -307,21 +315,22 @@ export const clientDb = {
         hashtags: [],
       })
       .select()
+      .single()
 
     if (error) {
       console.error("Error creating post:", error)
       return { post: null, error: error.message }
     }
 
-    return { post: data[0], error: null }
+    return { post: data, error: null }
   },
 }
 
 // Server-side database operations
 export const serverDb = {
-  // Similar functions but using createServerSupabaseClient
+  // Similar functions but using createServerClient
   async getPosts(category?: string, limit = 10, page = 1) {
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerClient()
     const startIndex = (page - 1) * limit
 
     let query = supabase
@@ -362,18 +371,19 @@ export const serverDb = {
     }
 
     // Transform the data to match our PostWithUser type
-    const posts: PostWithUser[] = data.map((post) => ({
-      id: post.id,
-      content: post.content,
-      type: post.type,
-      media_urls: post.media_urls,
-      media_types: post.media_types,
-      thumbnail_urls: post.thumbnail_urls,
-      like_count: post.like_count,
-      comment_count: post.comment_count,
-      created_at: post.created_at,
-      user: post.users,
-    }))
+    const posts: PostWithUser[] =
+      data?.map((post) => ({
+        id: post.id,
+        content: post.content,
+        type: post.type,
+        media_urls: post.media_urls || [],
+        media_types: post.media_types || [],
+        thumbnail_urls: post.thumbnail_urls || [],
+        like_count: post.like_count || 0,
+        comment_count: post.comment_count || 0,
+        created_at: post.created_at,
+        user: post.users,
+      })) || []
 
     return { posts, error: null }
   },
