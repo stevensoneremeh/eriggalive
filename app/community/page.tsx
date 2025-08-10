@@ -26,11 +26,11 @@ import {
   FlameIcon as Fire,
   Eye,
   MoreHorizontal,
+  User,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
-import { User } from "lucide-react" // Import User icon
 
 interface Post {
   id: string
@@ -121,32 +121,13 @@ const mockPosts: Post[] = [
     created_at: new Date(Date.now() - 86400000).toISOString(),
     updated_at: new Date(Date.now() - 86400000).toISOString(),
   },
-  {
-    id: "3",
-    title: "Share Your Best Bars Challenge! 🎤",
-    content:
-      "Time to show what you got! Drop your best 16 bars in the comments. The most creative and fire bars will get featured and the winner gets exclusive merch! Let's see who's got the skills. #BarsChallenge",
-    author_id: "mod1",
-    author: {
-      username: "CommunityMod",
-      full_name: "Community Moderator",
-      avatar_url: "/placeholder-user.jpg",
-      tier: "elder",
-    },
-    category: "bars",
-    likes_count: 89,
-    comments_count: 156,
-    views_count: 890,
-    created_at: new Date(Date.now() - 172800000).toISOString(),
-    updated_at: new Date(Date.now() - 172800000).toISOString(),
-  },
 ]
 
 export default function CommunityPage() {
   const { isAuthenticated, profile, isLoading } = useAuth()
   const [posts, setPosts] = useState<Post[]>([])
   const [userPosts, setUserPosts] = useState<Post[]>([])
-  const [categories, setCategories] = useState<Category[]>(mockCategories)
+  const [categories] = useState<Category[]>(mockCategories)
   const [loading, setLoading] = useState(true)
   const [newPostTitle, setNewPostTitle] = useState("")
   const [newPostContent, setNewPostContent] = useState("")
@@ -161,110 +142,13 @@ export default function CommunityPage() {
   const loadPosts = async () => {
     try {
       setLoading(true)
-
-      // Try to load from database first
-      const { data: postsData, error: postsError } = await supabase
-        .from("community_posts")
-        .select(`
-          *,
-          user:users!community_posts_user_id_fkey(
-            username,
-            full_name,
-            avatar_url,
-            tier
-          )
-        `)
-        .eq("is_published", true)
-        .eq("is_deleted", false)
-        .order("created_at", { ascending: false })
-        .limit(50)
-
-      if (postsError) {
-        console.error("Error loading posts:", postsError)
-        setPosts(mockPosts)
-        return
-      }
-
-      const transformedPosts =
-        postsData?.map((post) => ({
-          id: post.id.toString(),
-          title: post.title || "Untitled Post",
-          content: post.content,
-          author_id: post.user_id.toString(),
-          author: post.user
-            ? {
-                username: post.user.username,
-                full_name: post.user.full_name,
-                avatar_url: post.user.avatar_url,
-                tier: post.user.tier,
-              }
-            : undefined,
-          category: post.category_id?.toString() || "general",
-          likes_count: post.vote_count || 0,
-          comments_count: post.comment_count || 0,
-          views_count: Math.floor(Math.random() * 1000) + 100,
-          created_at: post.created_at,
-          updated_at: post.updated_at,
-        })) || []
-
-      setPosts(transformedPosts.length > 0 ? transformedPosts : mockPosts)
+      // For now, use mock data - you can implement real data loading later
+      setPosts(mockPosts)
     } catch (error) {
       console.error("Error loading posts:", error)
       setPosts(mockPosts)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const loadUserPosts = async () => {
-    if (!profile) return
-
-    try {
-      const { data: postsData, error: postsError } = await supabase
-        .from("community_posts")
-        .select(`
-          *,
-          user:users!community_posts_user_id_fkey(
-            username,
-            full_name,
-            avatar_url,
-            tier
-          )
-        `)
-        .eq("user_id", profile.id)
-        .eq("is_deleted", false)
-        .order("created_at", { ascending: false })
-
-      if (postsError) {
-        console.error("Error loading user posts:", postsError)
-        return
-      }
-
-      const transformedPosts =
-        postsData?.map((post) => ({
-          id: post.id.toString(),
-          title: post.title || "Untitled Post",
-          content: post.content,
-          author_id: post.user_id.toString(),
-          author: post.user
-            ? {
-                username: post.user.username,
-                full_name: post.user.full_name,
-                avatar_url: post.user.avatar_url,
-                tier: post.user.tier,
-              }
-            : undefined,
-          category: post.category_id?.toString() || "general",
-          likes_count: post.vote_count || 0,
-          comments_count: post.comment_count || 0,
-          views_count: Math.floor(Math.random() * 1000) + 100,
-          created_at: post.created_at,
-          updated_at: post.updated_at,
-        })) || []
-
-      setUserPosts(transformedPosts)
-    } catch (error) {
-      console.error("Error loading user posts:", error)
     }
   }
 
@@ -280,27 +164,6 @@ export default function CommunityPage() {
     }
 
     try {
-      const categoryId = categories.find((cat) => cat.id === selectedCategory)?.id || "1"
-
-      const { data, error } = await supabase.from("community_posts").insert([
-        {
-          title: newPostTitle.trim(),
-          content: newPostContent.trim(),
-          user_id: profile.id,
-          category_id: Number.parseInt(categoryId),
-          is_published: true,
-          is_deleted: false,
-          vote_count: 0,
-          comment_count: 0,
-        },
-      ])
-
-      if (error) {
-        console.error("Error creating post:", error)
-        toast.error("Failed to create post")
-        return
-      }
-
       // Add the new post to the local state
       const newPost: Post = {
         id: Date.now().toString(),
@@ -403,12 +266,6 @@ export default function CommunityPage() {
   useEffect(() => {
     loadPosts()
   }, [])
-
-  useEffect(() => {
-    if (profile) {
-      loadUserPosts()
-    }
-  }, [profile])
 
   if (isLoading) {
     return (

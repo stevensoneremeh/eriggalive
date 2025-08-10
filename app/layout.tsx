@@ -2,8 +2,8 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
+import { ClerkProvider } from "@clerk/nextjs"
 import { ThemeProvider } from "@/components/theme-provider"
-import { AuthProvider } from "@/contexts/auth-context"
 import { SafeThemeProvider } from "@/contexts/theme-context"
 import { UnifiedNavigation } from "@/components/navigation/unified-navigation"
 import { Toaster } from "@/components/ui/toaster"
@@ -25,12 +25,12 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-        <ErrorBoundary>
-          <SafeThemeProvider>
-            <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-              <AuthProvider>
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <body className={inter.className}>
+          <ErrorBoundary>
+            <SafeThemeProvider>
+              <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
                 <div className="min-h-screen bg-background">
                   {/* Main Navigation - Always Visible */}
                   <Suspense fallback={<SimpleLoading />}>
@@ -43,11 +43,11 @@ export default function RootLayout({
                   </main>
                 </div>
                 <Toaster />
-              </AuthProvider>
-            </ThemeProvider>
-          </SafeThemeProvider>
-        </ErrorBoundary>
-      </body>
-    </html>
+              </ThemeProvider>
+            </SafeThemeProvider>
+          </ErrorBoundary>
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }

@@ -128,13 +128,13 @@ export function UnifiedNavigation() {
                     <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                       <Avatar className="h-10 w-10">
                         <AvatarImage
-                          src={profile?.avatar_url || "/placeholder-user.jpg"}
+                          src={user?.imageUrl || "/placeholder-user.jpg"}
                           alt={profile?.username || "User"}
                         />
                         <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold">
                           {profile?.full_name?.charAt(0) ||
                             profile?.username?.charAt(0) ||
-                            user?.email?.charAt(0) ||
+                            user?.emailAddresses?.[0]?.emailAddress?.charAt(0) ||
                             "U"}
                         </AvatarFallback>
                       </Avatar>
@@ -144,7 +144,9 @@ export function UnifiedNavigation() {
                     <div className="flex items-center justify-start gap-2 p-2">
                       <div className="flex flex-col space-y-1 leading-none">
                         <p className="font-medium">{profile?.full_name || profile?.username || "User"}</p>
-                        <p className="w-[200px] truncate text-sm text-muted-foreground">{user.email}</p>
+                        <p className="w-[200px] truncate text-sm text-muted-foreground">
+                          {user?.emailAddresses?.[0]?.emailAddress}
+                        </p>
                         {profile?.tier && (
                           <Badge className={`w-fit text-xs ${getTierColor(profile.tier)}`}>
                             <Crown className="w-3 h-3 mr-1" />
@@ -200,19 +202,21 @@ export function UnifiedNavigation() {
                     <div className="flex items-center space-x-3 p-4 bg-muted rounded-lg">
                       <Avatar className="h-12 w-12">
                         <AvatarImage
-                          src={profile?.avatar_url || "/placeholder-user.jpg"}
+                          src={user?.imageUrl || "/placeholder-user.jpg"}
                           alt={profile?.username || "User"}
                         />
                         <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold">
                           {profile?.full_name?.charAt(0) ||
                             profile?.username?.charAt(0) ||
-                            user?.email?.charAt(0) ||
+                            user?.emailAddresses?.[0]?.emailAddress?.charAt(0) ||
                             "U"}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col">
                         <p className="font-medium">{profile?.full_name || profile?.username || "User"}</p>
-                        <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {user?.emailAddresses?.[0]?.emailAddress}
+                        </p>
                         {profile?.tier && (
                           <Badge className={`w-fit text-xs mt-1 ${getTierColor(profile.tier)}`}>
                             <Crown className="w-3 h-3 mr-1" />
