@@ -4,6 +4,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ClerkProvider } from "@clerk/nextjs"
 import { ThemeProvider } from "@/components/theme-provider"
+import { AuthProvider } from "@/contexts/auth-context"
 import { SafeThemeProvider } from "@/contexts/theme-context"
 import { UnifiedNavigation } from "@/components/navigation/unified-navigation"
 import { Toaster } from "@/components/ui/toaster"
@@ -31,18 +32,20 @@ export default function RootLayout({
           <ErrorBoundary>
             <SafeThemeProvider>
               <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-                <div className="min-h-screen bg-background">
-                  {/* Main Navigation - Always Visible */}
-                  <Suspense fallback={<SimpleLoading />}>
-                    <UnifiedNavigation />
-                  </Suspense>
+                <AuthProvider>
+                  <div className="min-h-screen bg-background">
+                    {/* Main Navigation - Always Visible */}
+                    <Suspense fallback={<SimpleLoading />}>
+                      <UnifiedNavigation />
+                    </Suspense>
 
-                  {/* Main Content with proper spacing for fixed nav */}
-                  <main className="pt-16 pb-20 md:pb-4">
-                    <Suspense fallback={<SimpleLoading />}>{children}</Suspense>
-                  </main>
-                </div>
-                <Toaster />
+                    {/* Main Content with proper spacing for fixed nav */}
+                    <main className="pt-16 pb-20 md:pb-4">
+                      <Suspense fallback={<SimpleLoading />}>{children}</Suspense>
+                    </main>
+                  </div>
+                  <Toaster />
+                </AuthProvider>
               </ThemeProvider>
             </SafeThemeProvider>
           </ErrorBoundary>

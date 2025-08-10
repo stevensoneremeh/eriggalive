@@ -34,6 +34,7 @@ import {
 import { useAuth } from "@/contexts/auth-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
 import { Badge } from "@/components/ui/badge"
+import { SignInButton, SignUpButton, SignedIn, SignedOut } from "@clerk/nextjs"
 
 const navigationItems = [
   { name: "Home", href: "/", icon: Home },
@@ -110,7 +111,7 @@ export function UnifiedNavigation() {
 
           {/* User Menu / Auth Buttons */}
           <div className="flex items-center space-x-4">
-            {user ? (
+            <SignedIn>
               <div className="flex items-center space-x-3">
                 {/* Coins Display */}
                 {profile?.coins !== undefined && (
@@ -176,16 +177,22 @@ export function UnifiedNavigation() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-            ) : (
+            </SignedIn>
+
+            <SignedOut>
               <div className="hidden md:flex items-center space-x-2">
-                <Button asChild variant="ghost" size="sm">
-                  <Link href="/login">Sign In</Link>
-                </Button>
-                <Button asChild size="sm" className="bg-lime-500 text-teal-900 hover:bg-lime-600">
-                  <Link href="/signup">Join Now</Link>
-                </Button>
+                <SignInButton mode="modal">
+                  <Button variant="ghost" size="sm">
+                    Sign In
+                  </Button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <Button size="sm" className="bg-lime-500 text-teal-900 hover:bg-lime-600">
+                    Join Now
+                  </Button>
+                </SignUpButton>
               </div>
-            )}
+            </SignedOut>
 
             {/* Mobile Menu */}
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -198,7 +205,7 @@ export function UnifiedNavigation() {
               <SheetContent side="right" className="w-[300px] sm:w-[400px]">
                 <div className="flex flex-col space-y-4 mt-4">
                   {/* User Info in Mobile */}
-                  {user && (
+                  <SignedIn>
                     <div className="flex items-center space-x-3 p-4 bg-muted rounded-lg">
                       <Avatar className="h-12 w-12">
                         <AvatarImage
@@ -225,7 +232,7 @@ export function UnifiedNavigation() {
                         )}
                       </div>
                     </div>
-                  )}
+                  </SignedIn>
 
                   {/* Navigation Items */}
                   <div className="space-y-2">
@@ -251,7 +258,7 @@ export function UnifiedNavigation() {
                   </div>
 
                   {/* Auth Buttons for Mobile */}
-                  {user ? (
+                  <SignedIn>
                     <div className="space-y-2 pt-4 border-t">
                       <Button asChild variant="outline" className="w-full justify-start bg-transparent">
                         <Link href="/dashboard" onClick={() => setIsOpen(false)}>
@@ -277,25 +284,25 @@ export function UnifiedNavigation() {
                         Log out
                       </Button>
                     </div>
-                  ) : (
+                  </SignedIn>
+
+                  <SignedOut>
                     <div className="space-y-2 pt-4 border-t">
-                      <Button
-                        asChild
-                        variant="outline"
-                        className="w-full bg-transparent"
-                        onClick={() => setIsOpen(false)}
-                      >
-                        <Link href="/login">Sign In</Link>
-                      </Button>
-                      <Button
-                        asChild
-                        className="w-full bg-lime-500 text-teal-900 hover:bg-lime-600"
-                        onClick={() => setIsOpen(false)}
-                      >
-                        <Link href="/signup">Join Now</Link>
-                      </Button>
+                      <SignInButton mode="modal">
+                        <Button variant="outline" className="w-full bg-transparent" onClick={() => setIsOpen(false)}>
+                          Sign In
+                        </Button>
+                      </SignInButton>
+                      <SignUpButton mode="modal">
+                        <Button
+                          className="w-full bg-lime-500 text-teal-900 hover:bg-lime-600"
+                          onClick={() => setIsOpen(false)}
+                        >
+                          Join Now
+                        </Button>
+                      </SignUpButton>
                     </div>
-                  )}
+                  </SignedOut>
                 </div>
               </SheetContent>
             </Sheet>

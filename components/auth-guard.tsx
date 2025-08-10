@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useAuth } from "@/contexts/auth-context"
+import { useAuth } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 
@@ -13,12 +12,12 @@ interface AuthGuardProps {
 }
 
 export function AuthGuard({ children, fallback, redirectTo = "/login" }: AuthGuardProps) {
-  const { user, loading } = useAuth()
+  const { isLoaded, userId } = useAuth()
   const router = useRouter()
   const [shouldRedirect, setShouldRedirect] = useState(false)
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (isLoaded && !userId) {
       setShouldRedirect(true)
       // Small delay to prevent flash
       const timer = setTimeout(() => {
@@ -29,9 +28,9 @@ export function AuthGuard({ children, fallback, redirectTo = "/login" }: AuthGua
     } else {
       setShouldRedirect(false)
     }
-  }, [user, loading, router, redirectTo])
+  }, [userId, isLoaded, router, redirectTo])
 
-  if (loading) {
+  if (!isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <div className="text-center">
@@ -42,7 +41,7 @@ export function AuthGuard({ children, fallback, redirectTo = "/login" }: AuthGua
     )
   }
 
-  if (!user || shouldRedirect) {
+  if (!userId || shouldRedirect) {
     return (
       fallback || (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
