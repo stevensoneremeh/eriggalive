@@ -57,6 +57,7 @@ const createMockServerClient = () => {
                   .fill(0)
                   .map((_, i) => ({
                     id: i + 1,
+                    title: `Mock post title ${i + 1}`,
                     content: `Mock post content ${i + 1}`,
                     vote_count: Math.floor(Math.random() * 50),
                     comment_count: Math.floor(Math.random() * 10),
@@ -108,18 +109,6 @@ const createMockServerClient = () => {
         eq: (column: string, value: any) => Promise.resolve({ error: null }),
       }),
     }),
-    auth: {
-      getUser: () =>
-        Promise.resolve({
-          data: { user: { id: "mock-user-id", email: "mock@example.com" } },
-          error: null,
-        }),
-      getSession: () =>
-        Promise.resolve({
-          data: { session: { user: { id: "mock-user-id", email: "mock@example.com" } } },
-          error: null,
-        }),
-    },
     rpc: (functionName: string, params: any) => Promise.resolve({ data: true, error: null }),
     channel: (name: string) => ({
       on: (event: string, callback: any) => ({ subscribe: () => {} }),
@@ -160,40 +149,10 @@ export async function createClient() {
         }
       },
     },
-  })
-}
-
-// Alternative function for cases where cookies() might not be available
-export function createClientComponentClient() {
-  // This should only be used in client components
-  if (typeof window === "undefined") {
-    throw new Error("createClientComponentClient should only be used in client components")
-  }
-
-  return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return document.cookie.split(";").map((cookie) => {
-            const [name, value] = cookie.trim().split("=")
-            return { name, value: decodeURIComponent(value || "") }
-          })
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            let cookieString = `${name}=${encodeURIComponent(value)}`
-            if (options?.maxAge) cookieString += `; max-age=${options.maxAge}`
-            if (options?.path) cookieString += `; path=${options.path}`
-            if (options?.domain) cookieString += `; domain=${options.domain}`
-            if (options?.secure) cookieString += "; secure"
-            if (options?.httpOnly) cookieString += "; httponly"
-            if (options?.sameSite) cookieString += `; samesite=${options.sameSite}`
-            document.cookie = cookieString
-          })
-        },
-      },
+    auth: {
+      persistSession: false, // Disable Supabase auth since we're using Clerk
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
     },
-  )
+  })
 }

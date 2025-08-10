@@ -44,68 +44,6 @@ const createMockClient = () => {
           },
           error: null,
         }),
-      signInWithPassword: () =>
-        Promise.resolve({
-          data: {
-            user: {
-              id: "mock-user-id",
-              email: "mock@example.com",
-              user_metadata: { username: "mockuser", full_name: "Mock User" },
-              aud: "authenticated",
-              role: "authenticated",
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            session: {
-              access_token: "mock-token",
-              refresh_token: "mock-refresh-token",
-              expires_at: Date.now() + 3600000,
-              token_type: "bearer",
-              user: {
-                id: "mock-user-id",
-                email: "mock@example.com",
-              },
-            },
-          },
-          error: null,
-        }),
-      signUp: () =>
-        Promise.resolve({
-          data: {
-            user: {
-              id: "mock-user-id",
-              email: "mock@example.com",
-              user_metadata: { username: "mockuser", full_name: "Mock User" },
-              aud: "authenticated",
-              role: "authenticated",
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            session: {
-              access_token: "mock-token",
-              refresh_token: "mock-refresh-token",
-              expires_at: Date.now() + 3600000,
-              token_type: "bearer",
-              user: {
-                id: "mock-user-id",
-                email: "mock@example.com",
-              },
-            },
-          },
-          error: null,
-        }),
-      signOut: () => Promise.resolve({ error: null }),
-      resetPasswordForEmail: () => Promise.resolve({ error: null }),
-      updateUser: () =>
-        Promise.resolve({
-          data: { user: null },
-          error: null,
-        }),
-      exchangeCodeForSession: () =>
-        Promise.resolve({
-          data: { session: null, user: null },
-          error: null,
-        }),
       onAuthStateChange: (callback: any) => {
         // Simulate initial auth state
         setTimeout(() => {
@@ -163,6 +101,7 @@ const createMockClient = () => {
                   .fill(0)
                   .map((_, i) => ({
                     id: i + 1,
+                    title: `Mock post title ${i + 1}`,
                     content: `Mock post content ${i + 1}`,
                     vote_count: Math.floor(Math.random() * 50),
                     comment_count: Math.floor(Math.random() * 10),
@@ -275,9 +214,9 @@ export function createClient() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       {
         auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true,
+          persistSession: false, // Disable Supabase auth since we're using Clerk
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
         },
         global: {
           headers: {

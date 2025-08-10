@@ -5,17 +5,11 @@ const requiredEnvVars = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
-  "SUPABASE_JWT_SECRET",
+  "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+  "CLERK_SECRET_KEY",
 ]
 
-const optionalEnvVars = [
-  "ADMIN_PASSWORD",
-  "MOD_PASSWORD",
-  "GRASSROOT_PASSWORD",
-  "PIONEER_PASSWORD",
-  "ELDER_PASSWORD",
-  "BLOOD_PASSWORD",
-]
+const optionalEnvVars = ["CLERK_WEBHOOK_SECRET", "SUPABASE_JWT_SECRET"]
 
 const missingRequired = requiredEnvVars.filter((varName) => !process.env[varName])
 const missingOptional = optionalEnvVars.filter((varName) => !process.env[varName])
@@ -35,18 +29,30 @@ if (missingOptional.length > 0) {
   console.warn("\nThese are optional but may be needed for full functionality.")
 }
 
-// Check URL format
+// Check URL formats
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 if (supabaseUrl && !supabaseUrl.startsWith("https://")) {
   console.error("❌ NEXT_PUBLIC_SUPABASE_URL should start with https://")
   process.exit(1)
 }
 
-// Check if Supabase URL looks valid
 if (supabaseUrl && !supabaseUrl.includes(".supabase.")) {
   console.error("❌ NEXT_PUBLIC_SUPABASE_URL doesn't appear to be a valid Supabase URL")
   process.exit(1)
 }
 
+const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+if (clerkPublishableKey && !clerkPublishableKey.startsWith("pk_")) {
+  console.error("❌ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY should start with pk_")
+  process.exit(1)
+}
+
+const clerkSecretKey = process.env.CLERK_SECRET_KEY
+if (clerkSecretKey && !clerkSecretKey.startsWith("sk_")) {
+  console.error("❌ CLERK_SECRET_KEY should start with sk_")
+  process.exit(1)
+}
+
 console.log("✅ Environment variables look good!")
 console.log(`✅ Supabase URL: ${supabaseUrl}`)
+console.log(`✅ Clerk integration configured`)
