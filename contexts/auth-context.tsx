@@ -53,42 +53,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchProfile = useCallback(
     async (userId: string): Promise<UserProfile | null> => {
       try {
-        // Use a simple query to avoid RLS issues
-        const { data, error } = await supabase
-          .from("users")
-          .select(
-            `
-            id,
-            auth_user_id,
-            username,
-            full_name,
-            email,
-            avatar_url,
-            tier,
-            role,
-            level,
-            points,
-            coins,
-            bio,
-            is_verified,
-            is_active,
-            is_banned,
-            reputation_score,
-            created_at,
-            updated_at
-          `,
-          )
-          .eq("auth_user_id", userId)
-          .maybeSingle()
+        const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).single()
 
         if (error) {
-          console.error("Error fetching profile:", error.message)
+          console.error("Error fetching profile:", error)
           return null
         }
 
         return data
-      } catch (error: any) {
-        console.error("Error in fetchProfile:", error.message)
+      } catch (error) {
+        console.error("Error in fetchProfile:", error)
         return null
       }
     },
@@ -108,19 +82,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         data: { session },
         error,
       } = await supabase.auth.getSession()
-
       if (error) {
-        console.error("Error refreshing session:", error.message)
+        console.error("Error refreshing session:", error)
         return
       }
-
       setSession(session)
       if (session?.user) {
         const profileData = await fetchProfile(session.user.id)
         setProfile(profileData)
       }
-    } catch (error: any) {
-      console.error("Error in refreshSession:", error.message)
+    } catch (error) {
+      console.error("Error in refreshSession:", error)
     }
   }, [supabase, fetchProfile])
 
@@ -132,11 +104,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
 
       if (session?.user) {
-        // Only fetch profile if we don't have one or if it's a different user
-        if (!profile || profile.auth_user_id !== session.user.id) {
-          const profileData = await fetchProfile(session.user.id)
-          setProfile(profileData)
-        }
+        const profileData = await fetchProfile(session.user.id)
+        setProfile(profileData)
 
         // Only redirect on sign in, not on initial load or token refresh
         if (event === "SIGNED_IN" && initialized) {
@@ -167,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setLoading(false)
     },
-    [fetchProfile, router, initialized, profile],
+    [fetchProfile, router, initialized],
   )
 
   useEffect(() => {
@@ -182,14 +151,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } = await supabase.auth.getSession()
 
         if (error) {
-          console.error("Error getting session:", error.message)
+          console.error("Error getting session:", error)
         }
 
         if (mounted) {
           await handleAuthStateChange("INITIAL_SESSION", initialSession)
         }
-      } catch (error: any) {
-        console.error("Error initializing auth:", error.message)
+      } catch (error) {
+        console.error("Error initializing auth:", error)
         if (mounted) {
           setLoading(false)
           setInitialized(true)
@@ -226,9 +195,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Don't set loading to false here - let the auth state change handle it
         return { error: null }
-      } catch (error: any) {
+      } catch (error) {
         setLoading(false)
-        return { error: { message: error.message || "An unexpected error occurred" } }
+        return { error }
       }
     },
     [supabase.auth],
@@ -271,9 +240,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setLoading(false)
         return { error: null }
-      } catch (error: any) {
+      } catch (error) {
         setLoading(false)
-        return { error: { message: error.message || "An unexpected error occurred" } }
+        return { error }
       }
     },
     [supabase.auth, router],
@@ -283,8 +252,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true)
       await supabase.auth.signOut()
-    } catch (error: any) {
-      console.error("Error signing out:", error.message)
+    } catch (error) {
+      console.error("Error signing out:", error)
     } finally {
       setLoading(false)
     }
@@ -297,8 +266,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           redirectTo: `${window.location.origin}/reset-password`,
         })
         return { error }
-      } catch (error: any) {
-        return { error: { message: error.message || "An unexpected error occurred" } }
+      } catch (error) {
+        return { error }
       }
     },
     [supabase.auth],
@@ -311,8 +280,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password: password,
         })
         return { error }
-      } catch (error: any) {
-        return { error: { message: error.message || "An unexpected error occurred" } }
+      } catch (error) {
+        return { error }
       }
     },
     [supabase.auth],

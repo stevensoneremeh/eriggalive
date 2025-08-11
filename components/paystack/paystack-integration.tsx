@@ -1,141 +1,150 @@
 "use client"
 
 import type React from "react"
-
-import { useEffect, useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
 
-declare global {
-  interface Window {
-    PaystackPop: any
-  }
-}
-
 interface PaystackIntegrationProps {
-  amount: number
+  amount: number // in naira
   email: string
   metadata?: Record<string, any>
   onSuccess: (reference: string) => void
   onError: (error: string) => void
-  children?: React.ReactNode
-  className?: string
-  disabled?: boolean
+  onClose?: () => void
+  children: React.ReactNode
+}
+
+declare global {
+  interface Window {
+    PaystackPop?: {
+      setup: (options: {
+        key: string
+        email: string
+        amount: number
+        currency: string
+        ref: string
+        metadata?: any
+        callback: (response: any) => void
+        onClose: () => void
+      }) => {
+        openIframe: () => void
+      }
+    }
+  }
 }
 
 export function PaystackIntegration({
   amount,
   email,
-  metadata = {},
+  metadata,
   onSuccess,
   onError,
+  onClose,
   children,
-  className,
-  disabled = false,
 }: PaystackIntegrationProps) {
   const [isLoading, setIsLoading] = useState(false)
-  const [scriptLoaded, setScriptLoaded] = useState(false)
+  const [isPaystackLoaded, setIsPaystackLoaded] = useState(false)
+  const { toast } = useToast()
 
   useEffect(() => {
-    // Check if Paystack script is already loaded
-    if (window.PaystackPop) {
-      setScriptLoaded(true)
-      return
-    }
+    const loadPaystack = () => {
+      if (typeof window !== "undefined") {
+        // Check if Paystack is already loaded
+        if (window.PaystackPop) {
+          setIsPaystackLoaded(true)
+          return
+        }
 
-    // Load Paystack script
-    const script = document.createElement("script")
-    script.src = "https://js.paystack.co/v1/inline.js"
-    script.async = true
-    script.onload = () => setScriptLoaded(true)
-    script.onerror = () => {
-      console.error("Failed to load Paystack script")
-      onError("Failed to load payment system")
-    }
+        // Check if script is already in DOM
+        const existingScript = document.querySelector('script[src="https://js.paystack.co/v1/inline.js"]')
+        if (existingScript) {
+          existingScript.addEventListener("load", () => setIsPaystackLoaded(true))
+          return
+        }
 
-    document.body.appendChild(script)
+        // Create and load script
+        const script = document.createElement("script")
+        script.src = "https://js.paystack.co/v1/inline.js"
+        script.async = true
 
-    return () => {
-      // Cleanup script if component unmounts
-      if (document.body.contains(script)) {
-        document.body.removeChild(script)
+        script.onload = () => {
+          setIsPaystackLoaded(true)
+        }
+
+        script.onerror = () => {
+          onError("Failed to load payment gateway")
+        }
+
+        document.head.appendChild(script)
       }
     }
+
+    loadPaystack()
   }, [onError])
 
-  const handlePayment = () => {
-    if (!scriptLoaded || !window.PaystackPop) {
-      onError("Payment system not ready. Please try again.")
+  const handlePayment = async () => {
+    if (!isPaystackLoaded) {
+      onError("Payment gateway not ready")
       return
     }
 
-    if (!email || !amount) {
-      onError("Invalid payment details")
+    if (!email) {
+      onError("Email is required for payment")
       return
     }
 
     setIsLoading(true)
 
     try {
-      const handler = window.PaystackPop.setup({
-        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_your_key_here",
-        email: email,
-        amount: amount * 100, // Convert to kobo
+      const reference = `erigga_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      const handler = window.PaystackPop!.setup({
+        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_0123456789abcdef0123456789abcdef01234567",
+        email,
+        amount: Math.round(amount * 100), // Convert to kobo
         currency: "NGN",
-        ref: `erigga_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        ref: reference,
         metadata: {
-          custom_fields: [
-            {
-              display_name: "Email",
-              variable_name: "email",
-              value: email,
-            },
-            ...Object.entries(metadata).map(([key, value]) => ({
-              display_name: key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
-              variable_name: key,
-              value: String(value),
-            })),
-          ],
+          ...metadata,
+          timestamp: new Date().toISOString(),
         },
         callback: (response: any) => {
           setIsLoading(false)
           if (response.status === "success") {
             onSuccess(response.reference)
+            toast({
+              title: "Payment Successful",
+              description: "Your payment has been processed successfully",
+            })
           } else {
-            onError("Payment was not completed")
+            onError("Payment was not successful")
           }
         },
         onClose: () => {
           setIsLoading(false)
-          onError("Payment cancelled")
+          onClose?.()
         },
       })
 
       handler.openIframe()
-    } catch (error: any) {
+    } catch (error) {
       setIsLoading(false)
-      onError(error.message || "Payment failed")
+      onError(error instanceof Error ? error.message : "Payment failed")
     }
   }
 
-  if (children) {
-    return (
-      <div onClick={handlePayment} className={className}>
-        {children}
-      </div>
-    )
-  }
-
   return (
-    <Button onClick={handlePayment} disabled={disabled || isLoading || !scriptLoaded} className={className}>
+    <div onClick={handlePayment} className="inline-block">
       {isLoading ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        <Button disabled>
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
           Processing...
-        </>
+        </Button>
       ) : (
-        `Pay ₦${amount.toLocaleString()}`
+        children
       )}
-    </Button>
+    </div>
   )
 }
