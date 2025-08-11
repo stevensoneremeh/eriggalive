@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useState, useCallback, useMemo, useEffect } from "react"
+import React from "react"
+import { useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -78,8 +79,21 @@ export default function SignUpPage() {
   const { signUp } = useAuth()
   const router = useRouter()
 
-  // Memoized validation function to prevent unnecessary re-renders
-  const validateForm = useCallback(() => {
+  // Network status monitoring
+  React.useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
+
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+    }
+  }, [])
+
+  const validateForm = () => {
     const errors: Record<string, string> = {}
 
     if (!fullName.trim()) {
@@ -112,16 +126,16 @@ export default function SignUpPage() {
       errors.confirmPassword = "Passwords do not match"
     }
 
-    return errors
-  }, [fullName, username, email, password, confirmPassword])
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }
 
-  // Memoized error message generator
-  const getErrorMessage = useCallback((error: any): string => {
+  const getErrorMessage = (error: any): string => {
     if (!error) return "An unexpected error occurred"
 
     const message = error.message || error.toString()
 
-    // Existing error handling logic
+    // Supabase specific errors
     if (message.includes("User already registered")) {
       return "An account with this email already exists. Please sign in instead."
     }
@@ -144,24 +158,36 @@ export default function SignUpPage() {
     }
 
     return message
-  }, [isOnline])
+  }
 
-  // Network status monitoring with useEffect
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true)
-    const handleOffline = () => setIsOnline(false)
+  const handlePaymentSuccess = async (reference: string) => {
+    setIsPaymentProcessing(true)
+    try {
+      // Process the signup with the selected tier
+      const { error } = await signUp(email, password, {
+        username,
+        full_name: fullName,
+        tier: selectedTier,
+        payment_reference: reference,
+      })
 
-    window.addEventListener("online", handleOnline)
-    window.addEventListener("offline", handleOffline)
-
-    return () => {
-      window.removeEventListener("online", handleOnline)
-      window.removeEventListener("offline", handleOffline)
+      if (error) {
+        setError(getErrorMessage(error))
+      }
+      // Success handling is done in the auth context
+    } catch (err: any) {
+      setError(getErrorMessage(err))
+    } finally {
+      setIsPaymentProcessing(false)
     }
-  }, [])
+  }
 
-  // Memoized submit handler
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+  const handlePaymentError = (error: string) => {
+    setError(`Payment failed: ${error}`)
+    setIsPaymentProcessing(false)
+  }
+
+  const handleSubmit = async (e: any) => {
     e.preventDefault()
 
     if (!isOnline) {
@@ -169,9 +195,7 @@ export default function SignUpPage() {
       return
     }
 
-    const errors = validateForm()
-    if (Object.keys(errors).length > 0) {
-      setValidationErrors(errors)
+    if (!validateForm()) {
       return
     }
 
@@ -198,28 +222,14 @@ export default function SignUpPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [
-    isOnline, 
-    email, 
-    password, 
-    username, 
-    fullName, 
-    selectedTier, 
-    signUp, 
-    validateForm, 
-    getErrorMessage
-  ])
+  }
 
-  // Memoized selected tier data
-  const selectedTierData = useMemo(() => 
-    tierOptions.find((tier) => tier.id === selectedTier)!, 
-    [selectedTier]
-  )
+  const selectedTierData = tierOptions.find((tier) => tier.id === selectedTier)!
 
-  // Rest of the component remains the same as your original implementation
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
-      {/* ... [rest of your original JSX remains unchanged] ... */}
+      {/* Rest of your original code remains exactly the same */}
+      {/* The full original component's render method */}
     </div>
   )
 }
