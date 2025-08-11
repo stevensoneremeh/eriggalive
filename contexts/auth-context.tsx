@@ -53,10 +53,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchProfile = useCallback(
     async (userId: string): Promise<UserProfile | null> => {
       try {
-        // Use a simpler query to avoid RLS issues
+        // Use a simple query to avoid RLS issues
         const { data, error } = await supabase
           .from("users")
-          .select(`
+          .select(
+            `
             id,
             auth_user_id,
             username,
@@ -75,7 +76,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             reputation_score,
             created_at,
             updated_at
-          `)
+          `,
+          )
           .eq("auth_user_id", userId)
           .maybeSingle()
 
