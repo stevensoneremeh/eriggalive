@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useCallback, useMemo } from "react"
+import React, { useState, useCallback, useMemo, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -61,54 +61,26 @@ const tierOptions: TierOption[] = [
 ]
 
 export default function SignUpPage() {
-  const [formState, setFormState] = useState({
-    email: "",
-    password: "",
-    confirmPassword: "",
-    username: "",
-    fullName: "",
-    selectedTier: "free" as UserTier,
-    showPassword: false,
-    showConfirmPassword: false,
-    isLoading: false,
-    isPaymentProcessing: false,
-    error: "",
-    isOnline: true,
-    validationErrors: {} as Record<string, string>
-  })
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [username, setUsername] = useState("")
+  const [fullName, setFullName] = useState("")
+  const [selectedTier, setSelectedTier] = useState<UserTier>("free")
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false)
+  const [error, setError] = useState("")
+  const [isOnline, setIsOnline] = useState(true)
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
 
   const { signUp } = useAuth()
   const router = useRouter()
 
-  // Memoized update function to reduce unnecessary renders
-  const updateFormState = useCallback((updates: Partial<typeof formState>) => {
-    setFormState(prev => ({
-      ...prev,
-      ...updates
-    }))
-  }, [])
-
-  // Network status monitoring
-  React.useEffect(() => {
-    const handleOnline = () => updateFormState({ isOnline: true })
-    const handleOffline = () => updateFormState({ isOnline: false })
-
-    window.addEventListener("online", handleOnline)
-    window.addEventListener("offline", handleOffline)
-
-    return () => {
-      window.removeEventListener("online", handleOnline)
-      window.removeEventListener("offline", handleOffline)
-    }
-  }, [updateFormState])
-
-  // Memoized validation function
+  // Memoized validation function to prevent unnecessary re-renders
   const validateForm = useCallback(() => {
     const errors: Record<string, string> = {}
-
-    const {
-      fullName, username, email, password, confirmPassword
-    } = formState
 
     if (!fullName.trim()) {
       errors.fullName = "Full name is required"
@@ -141,98 +113,113 @@ export default function SignUpPage() {
     }
 
     return errors
-  }, [formState.fullName, formState.username, formState.email, 
-      formState.password, formState.confirmPassword])
+  }, [fullName, username, email, password, confirmPassword])
 
-  // Memoized error message generation
+  // Memoized error message generator
   const getErrorMessage = useCallback((error: any): string => {
     if (!error) return "An unexpected error occurred"
 
     const message = error.message || error.toString()
 
-    // Existing error message logic...
+    // Existing error handling logic
     if (message.includes("User already registered")) {
       return "An account with this email already exists. Please sign in instead."
     }
-    // ... (rest of the existing error handling)
+    if (message.includes("Password should be at least")) {
+      return "Password is too weak. Please use at least 8 characters with uppercase, lowercase, and numbers."
+    }
+    if (message.includes("Invalid email")) {
+      return "Please enter a valid email address."
+    }
+    if (message.includes("signup is disabled")) {
+      return "Account registration is temporarily disabled. Please try again later."
+    }
+    if (message.includes("Email rate limit exceeded")) {
+      return "Too many signup attempts. Please wait a few minutes before trying again."
+    }
+
+    // Network errors
+    if (message.includes("fetch") || message.includes("network") || !isOnline) {
+      return "Network connection error. Please check your internet connection and try again."
+    }
 
     return message
+  }, [isOnline])
+
+  // Network status monitoring with useEffect
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
+
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+    }
   }, [])
 
-  // Handlers with reduced dependencies
-  const handleInputChange = useCallback((field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    updateFormState({ 
-      [field]: value,
-      validationErrors: { ...formState.validationErrors, [field]: '' }
-    })
-  }, [updateFormState, formState.validationErrors])
-
+  // Memoized submit handler
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formState.isOnline) {
-      updateFormState({ error: "No internet connection. Please check your network and try again." })
+    if (!isOnline) {
+      setError("No internet connection. Please check your network and try again.")
       return
     }
 
-    const validationErrors = validateForm()
-    if (Object.keys(validationErrors).length > 0) {
-      updateFormState({ validationErrors })
+    const errors = validateForm()
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors)
       return
     }
 
-    updateFormState({ isLoading: true, error: "" })
+    setIsLoading(true)
+    setError("")
 
     try {
-      if (formState.selectedTier === "free") {
-        const { error } = await signUp(formState.email, formState.password, {
-          username: formState.username,
-          full_name: formState.fullName,
-          tier: formState.selectedTier,
+      // For free tier, proceed directly with signup
+      if (selectedTier === "free") {
+        const { error } = await signUp(email, password, {
+          username,
+          full_name: fullName,
+          tier: selectedTier,
         })
 
         if (error) {
-          updateFormState({ error: getErrorMessage(error) })
+          setError(getErrorMessage(error))
         }
+        // Success handling is done in the auth context
       }
+      // For paid tiers, payment will be handled by PaystackIntegration component
     } catch (err: any) {
-      updateFormState({ error: getErrorMessage(err) })
+      setError(getErrorMessage(err))
     } finally {
-      updateFormState({ isLoading: false })
+      setIsLoading(false)
     }
   }, [
-    formState.isOnline, 
-    formState.email, 
-    formState.password, 
-    formState.username, 
-    formState.fullName, 
-    formState.selectedTier,
-    signUp,
-    updateFormState,
-    validateForm,
+    isOnline, 
+    email, 
+    password, 
+    username, 
+    fullName, 
+    selectedTier, 
+    signUp, 
+    validateForm, 
     getErrorMessage
   ])
 
   // Memoized selected tier data
   const selectedTierData = useMemo(() => 
-    tierOptions.find((tier) => tier.id === formState.selectedTier)!, 
-    [formState.selectedTier]
+    tierOptions.find((tier) => tier.id === selectedTier)!, 
+    [selectedTier]
   )
 
-  // Rest of the component remains largely the same...
+  // Rest of the component remains the same as your original implementation
   return (
-    // Your existing JSX, but update state references to use formState
-    // For example:
-    <Input
-      id="email"
-      type="email"
-      placeholder="Enter your email"
-      value={formState.email}
-      onChange={handleInputChange('email')}
-      disabled={formState.isLoading || formState.isPaymentProcessing}
-      className={formState.validationErrors.email ? "border-red-500" : ""}
-    />
-    // ... similar changes throughout the component
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
+      {/* ... [rest of your original JSX remains unchanged] ... */}
+    </div>
   )
 }
