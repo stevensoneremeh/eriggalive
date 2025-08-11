@@ -1,6 +1,5 @@
-import { createClient } from "@supabase/supabase-js"
 import { NextResponse, type NextRequest } from "next/server"
-import { updateSession } from '@/lib/supabase/middleware'
+import { updateSession } from "@/lib/supabase/middleware"
 
 // Define public paths that don't require authentication
 const PUBLIC_PATHS = [
@@ -16,16 +15,7 @@ const PUBLIC_PATHS = [
 ]
 
 // Define paths that should always be accessible
-const ALWAYS_ACCESSIBLE = [
-  "/api",
-  "/_next",
-  "/favicon.ico",
-  "/images",
-  "/videos",
-  "/fonts",
-  "/placeholder",
-  "/erigga",
-]
+const ALWAYS_ACCESSIBLE = ["/api", "/_next", "/favicon.ico", "/images", "/videos", "/fonts", "/placeholder", "/erigga"]
 
 // Define protected paths
 const PROTECTED_PATHS = [
@@ -44,7 +34,13 @@ const PROTECTED_PATHS = [
 ]
 
 export async function middleware(request: NextRequest) {
-  return await updateSession(request)
+  try {
+    return await updateSession(request)
+  } catch (error: any) {
+    console.error("Middleware error:", error.message)
+    // Continue with the request even if there's an error
+    return NextResponse.next()
+  }
 }
 
 export const config = {
@@ -57,6 +53,6 @@ export const config = {
      * - api routes
      * - static assets
      */
-    '/((?!_next/static|_next/image|favicon.ico|api|images|videos|fonts|placeholder|erigga|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)',
+    "/((?!_next/static|_next/image|favicon.ico|api|images|videos|fonts|placeholder|erigga|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)",
   ],
 }
