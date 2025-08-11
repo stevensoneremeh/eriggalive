@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+
 import { AuthGuard } from "@/components/auth-guard"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -277,12 +278,14 @@ export default function DashboardPage() {
 
   const getTierColor = (tier: string) => {
     switch (tier) {
-      case "free":
+      case "grassroot":
         return "bg-gradient-to-r from-green-400 to-emerald-500 text-white"
-      case "pro":
+      case "pioneer":
         return "bg-gradient-to-r from-purple-400 to-indigo-500 text-white"
-      case "enterprise":
+      case "elder":
         return "bg-gradient-to-r from-orange-400 to-red-500 text-white"
+      case "blood_brotherhood":
+        return "bg-gradient-to-r from-yellow-400 to-orange-500 text-white"
       default:
         return "bg-gradient-to-r from-gray-400 to-gray-500 text-white"
     }
@@ -290,11 +293,13 @@ export default function DashboardPage() {
 
   const getTierProgress = (tier: string) => {
     switch (tier) {
-      case "free":
-        return 33
-      case "pro":
-        return 66
-      case "enterprise":
+      case "grassroot":
+        return 25
+      case "pioneer":
+        return 50
+      case "elder":
+        return 75
+      case "blood_brotherhood":
         return 100
       default:
         return 0
@@ -421,9 +426,9 @@ export default function DashboardPage() {
                 </div>
                 <div className="mt-4 sm:mt-0">
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Badge className={`px-4 py-2 text-sm font-semibold ${getTierColor(profile?.tier || "free")}`}>
+                    <Badge className={`px-4 py-2 text-sm font-semibold ${getTierColor(profile?.tier || "grassroot")}`}>
                       <Crown className="w-4 h-4 mr-2" />
-                      {profile?.tier?.toUpperCase() || "FREE"}
+                      {profile?.tier?.replace("_", " ").toUpperCase() || "GRASSROOT"}
                     </Badge>
                   </motion.div>
                 </div>
@@ -560,27 +565,27 @@ export default function DashboardPage() {
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-white">
-                            {profile?.tier?.toUpperCase() || "FREE"} Member
+                            {profile?.tier?.replace("_", " ").toUpperCase() || "GRASSROOT"} Member
                           </span>
                           <span className="text-sm text-gray-300">
-                            {getTierProgress(profile?.tier || "free")}% Complete
+                            {getTierProgress(profile?.tier || "grassroot")}% Complete
                           </span>
                         </div>
                         <div className="relative">
-                          <Progress value={getTierProgress(profile?.tier || "free")} className="h-3 bg-white/10" />
+                          <Progress value={getTierProgress(profile?.tier || "grassroot")} className="h-3 bg-white/10" />
                           <motion.div
                             className="absolute top-0 left-0 h-3 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"
                             initial={{ width: 0 }}
-                            animate={{ width: `${getTierProgress(profile?.tier || "free")}%` }}
+                            animate={{ width: `${getTierProgress(profile?.tier || "grassroot")}%` }}
                             transition={{ duration: 1, delay: 0.5 }}
                           />
                         </div>
-                        <div className="grid grid-cols-3 gap-2 text-xs">
-                          {["Free", "Pro", "Enterprise"].map((tier, index) => (
+                        <div className="grid grid-cols-4 gap-2 text-xs">
+                          {["Grassroot", "Pioneer", "Elder", "Blood Brotherhood"].map((tier, index) => (
                             <div key={tier} className="text-center">
                               <motion.div
                                 className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                                  getTierProgress(profile?.tier || "free") >= (index + 1) * 33
+                                  getTierProgress(profile?.tier || "grassroot") >= (index + 1) * 25
                                     ? "bg-gradient-to-r from-purple-500 to-blue-500"
                                     : "bg-white/20"
                                 }`}

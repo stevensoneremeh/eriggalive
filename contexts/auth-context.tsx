@@ -34,7 +34,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 // Create a single supabase client instance
 let supabaseClient: ReturnType<typeof createClient> | null = null
 
-function getSupabaseClient() {
+const getSupabaseClient = () => {
   if (!supabaseClient) {
     supabaseClient = createClient()
   }
@@ -86,15 +86,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error("Error refreshing session:", error)
         return
       }
-
       setSession(session)
-      setUser(session?.user ?? null)
-
       if (session?.user) {
         const profileData = await fetchProfile(session.user.id)
         setProfile(profileData)
-      } else {
-        setProfile(null)
       }
     } catch (error) {
       console.error("Error in refreshSession:", error)
@@ -188,15 +183,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string, password: string) => {
       try {
         setLoading(true)
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
-        return { error }
+
+        if (error) {
+          setLoading(false)
+          return { error }
+        }
+
+        // Don't set loading to false here - let the auth state change handle it
+        return { error: null }
       } catch (error) {
-        return { error }
-      } finally {
         setLoading(false)
+        return { error }
       }
     },
     [supabase.auth],
@@ -223,17 +224,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         })
 
-        if (error) return { error }
+        if (error) {
+          setLoading(false)
+          return { error }
+        }
 
-        // The trigger will handle profile creation
+        // If signup is successful, redirect to success page or dashboard
+        if (data.user && !data.user.email_confirmed_at) {
+          // Email confirmation required
+          router.push("/signup/success")
+        } else if (data.user) {
+          // Auto-confirmed, go to dashboard
+          router.push("/dashboard")
+        }
+
+        setLoading(false)
         return { error: null }
       } catch (error) {
-        return { error }
-      } finally {
         setLoading(false)
+        return { error }
       }
     },
-    [supabase.auth],
+    [supabase.auth, router],
   )
 
   const signOut = useCallback(async () => {

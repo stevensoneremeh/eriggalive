@@ -251,47 +251,24 @@ const createMockClient = () => {
   } as any
 }
 
-// Create a Supabase client for browser usage
-let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null
+let client: ReturnType<typeof createBrowserClient<Database>> | undefined
 
 export function createClient() {
-  if (isPreviewMode) {
-    return createMockClient()
+  if (!client) {
+    client = createBrowserClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    )
   }
-
-  if (!supabaseClient) {
-    // Validate environment variables
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      console.error("Missing Supabase environment variables")
-      return createMockClient()
-    }
-
-    try {
-      supabaseClient = createBrowserClient<Database>(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-          auth: {
-            persistSession: true,
-            autoRefreshToken: true,
-            detectSessionInUrl: true,
-          },
-          global: {
-            headers: {
-              "X-Client-Info": "eriggalive-web",
-            },
-          },
-        },
-      )
-    } catch (error) {
-      console.error("Failed to create Supabase client:", error)
-      return createMockClient()
-    }
-  }
-  return supabaseClient
+  return client
 }
 
 // Export a singleton instance for consistent usage
+let supabaseClient: ReturnType<typeof createClient> | null = null
+
 export function getSupabaseClient() {
-  return createClient()
+  if (!supabaseClient) {
+    supabaseClient = createClient()
+  }
+  return supabaseClient
 }

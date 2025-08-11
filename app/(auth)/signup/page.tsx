@@ -173,9 +173,8 @@ export default function SignUpPage() {
 
       if (error) {
         setError(getErrorMessage(error))
-      } else {
-        router.push("/dashboard")
       }
+      // Success handling is done in the auth context
     } catch (err: any) {
       setError(getErrorMessage(err))
     } finally {
@@ -185,6 +184,7 @@ export default function SignUpPage() {
 
   const handlePaymentError = (error: string) => {
     setError(`Payment failed: ${error}`)
+    setIsPaymentProcessing(false)
   }
 
   const handleSubmit = async (e: any) => {
@@ -213,9 +213,8 @@ export default function SignUpPage() {
 
         if (error) {
           setError(getErrorMessage(error))
-        } else {
-          router.push("/dashboard")
         }
+        // Success handling is done in the auth context
       }
       // For paid tiers, payment will be handled by PaystackIntegration component
     } catch (err: any) {
