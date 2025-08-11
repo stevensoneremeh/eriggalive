@@ -1,14 +1,19 @@
 import { createBrowserClient } from "@supabase/ssr"
 import type { Database } from "@/types/database"
 
-// Check if we're in a browser environment
-const isBrowser = typeof window !== "undefined"
+// Check if Supabase environment variables are available
+export const isSupabaseConfigured =
+  typeof process.env.NEXT_PUBLIC_SUPABASE_URL === "string" &&
+  process.env.NEXT_PUBLIC_SUPABASE_URL.length > 0 &&
+  typeof process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === "string" &&
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.length > 0
 
-// Check if we're in preview mode
+// Check if we're in preview mode (v0.dev or similar)
 const isPreviewMode =
-  isBrowser && (window.location.hostname.includes("vusercontent.net") || window.location.hostname.includes("v0.dev"))
+  typeof window !== "undefined" &&
+  (window.location.hostname.includes("vusercontent.net") || window.location.hostname.includes("v0.dev"))
 
-// Define the mock client function for preview mode
+// Mock client for preview mode
 const createMockClient = () => {
   return {
     auth: {
@@ -44,12 +49,12 @@ const createMockClient = () => {
           },
           error: null,
         }),
-      signInWithPassword: () =>
+      signInWithPassword: ({ email, password }: { email: string; password: string }) =>
         Promise.resolve({
           data: {
             user: {
               id: "mock-user-id",
-              email: "mock@example.com",
+              email: email,
               user_metadata: { username: "mockuser", full_name: "Mock User" },
               aud: "authenticated",
               role: "authenticated",
@@ -63,18 +68,18 @@ const createMockClient = () => {
               token_type: "bearer",
               user: {
                 id: "mock-user-id",
-                email: "mock@example.com",
+                email: email,
               },
             },
           },
           error: null,
         }),
-      signUp: () =>
+      signUp: ({ email, password, options }: { email: string; password: string; options?: any }) =>
         Promise.resolve({
           data: {
             user: {
               id: "mock-user-id",
-              email: "mock@example.com",
+              email: email,
               user_metadata: { username: "mockuser", full_name: "Mock User" },
               aud: "authenticated",
               role: "authenticated",
@@ -88,7 +93,7 @@ const createMockClient = () => {
               token_type: "bearer",
               user: {
                 id: "mock-user-id",
-                email: "mock@example.com",
+                email: email,
               },
             },
           },
@@ -101,13 +106,7 @@ const createMockClient = () => {
           data: { user: null },
           error: null,
         }),
-      exchangeCodeForSession: () =>
-        Promise.resolve({
-          data: { session: null, user: null },
-          error: null,
-        }),
       onAuthStateChange: (callback: any) => {
-        // Simulate initial auth state
         setTimeout(() => {
           callback("SIGNED_IN", {
             access_token: "mock-token",
@@ -131,7 +130,7 @@ const createMockClient = () => {
             if (table === "users" && column === "auth_user_id") {
               return Promise.resolve({
                 data: {
-                  id: 1,
+                  id: "mock-user-id",
                   auth_user_id: value,
                   username: "mockuser",
                   full_name: "Mock User",
@@ -140,7 +139,6 @@ const createMockClient = () => {
                   coins: 500,
                   level: 1,
                   points: 0,
-                  reputation_score: 100,
                   avatar_url: null,
                   is_verified: false,
                   is_active: true,
@@ -156,58 +154,8 @@ const createMockClient = () => {
           maybeSingle: () => Promise.resolve({ data: null, error: null }),
         }),
         order: (column: string, options?: { ascending: boolean }) => ({
-          limit: (limit: number) => {
-            if (table === "community_posts") {
-              return Promise.resolve({
-                data: Array(Math.min(limit, 3))
-                  .fill(0)
-                  .map((_, i) => ({
-                    id: i + 1,
-                    content: `Mock post content ${i + 1}`,
-                    vote_count: Math.floor(Math.random() * 50),
-                    comment_count: Math.floor(Math.random() * 10),
-                    created_at: new Date().toISOString(),
-                    user: {
-                      id: 1,
-                      username: "mockuser",
-                      full_name: "Mock User",
-                      tier: "grassroot",
-                      avatar_url: null,
-                    },
-                    category: {
-                      id: 1,
-                      name: "General",
-                      slug: "general",
-                    },
-                    user_has_voted: false,
-                  })),
-                error: null,
-              })
-            }
-            if (table === "community_categories") {
-              return Promise.resolve({
-                data: [
-                  { id: 1, name: "General", slug: "general", is_active: true },
-                  { id: 2, name: "Music", slug: "music", is_active: true },
-                  { id: 3, name: "Events", slug: "events", is_active: true },
-                ],
-                error: null,
-              })
-            }
-            return Promise.resolve({ data: [], error: null })
-          },
+          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
           range: (start: number, end: number) => Promise.resolve({ data: [], error: null }),
-        }),
-        is: (column: string, value: any) => ({
-          order: (column: string, options?: { ascending: boolean }) => ({
-            limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-          }),
-        }),
-        ilike: (column: string, value: string) => ({
-          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-        }),
-        or: (conditions: string) => ({
-          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
         }),
       }),
       insert: (data: any) => ({
@@ -235,40 +183,41 @@ const createMockClient = () => {
         eq: (column: string, value: any) => Promise.resolve({ error: null }),
       }),
     }),
-    storage: {
-      from: (bucket: string) => ({
-        upload: (path: string, file: File) =>
-          Promise.resolve({
-            data: { path: `mock/${path}` },
-            error: null,
-          }),
-        getPublicUrl: (path: string) => ({
-          data: { publicUrl: `/placeholder.svg` },
-        }),
-      }),
-    },
-    rpc: (functionName: string, params: any) => Promise.resolve({ data: true, error: null }),
   } as any
 }
 
+// Singleton client instance
 let client: ReturnType<typeof createBrowserClient<Database>> | undefined
 
 export function createClient() {
-  if (!client) {
+  // Return mock client in preview mode
+  if (isPreviewMode) {
+    return createMockClient()
+  }
+
+  // Return existing client if it exists (singleton pattern)
+  if (client) {
+    return client
+  }
+
+  // Check if Supabase is configured
+  if (!isSupabaseConfigured) {
+    console.warn("Supabase environment variables are not set. Using mock client.")
+    return createMockClient()
+  }
+
+  try {
     client = createBrowserClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     )
+
+    return client
+  } catch (error) {
+    console.error("Failed to create Supabase client:", error)
+    return createMockClient()
   }
-  return client
 }
 
-// Export a singleton instance for consistent usage
-let supabaseClient: ReturnType<typeof createClient> | null = null
-
-export function getSupabaseClient() {
-  if (!supabaseClient) {
-    supabaseClient = createClient()
-  }
-  return supabaseClient
-}
+// Export the singleton client
+export const supabase = createClient()
