@@ -186,38 +186,41 @@ const createMockClient = () => {
   } as any
 }
 
-// Singleton client instance
-let client: ReturnType<typeof createBrowserClient<Database>> | undefined
+let clientInstance: ReturnType<typeof createBrowserClient<Database>> | any | undefined
 
 export function createClient() {
   // Return mock client in preview mode
   if (isPreviewMode) {
-    return createMockClient()
+    if (!clientInstance) {
+      clientInstance = createMockClient()
+    }
+    return clientInstance
   }
 
   // Return existing client if it exists (singleton pattern)
-  if (client) {
-    return client
+  if (clientInstance) {
+    return clientInstance
   }
 
   // Check if Supabase is configured
   if (!isSupabaseConfigured) {
     console.warn("Supabase environment variables are not set. Using mock client.")
-    return createMockClient()
+    clientInstance = createMockClient()
+    return clientInstance
   }
 
   try {
-    client = createBrowserClient<Database>(
+    clientInstance = createBrowserClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     )
 
-    return client
+    return clientInstance
   } catch (error) {
     console.error("Failed to create Supabase client:", error)
-    return createMockClient()
+    clientInstance = createMockClient()
+    return clientInstance
   }
 }
 
-// Export the singleton client
 export const supabase = createClient()

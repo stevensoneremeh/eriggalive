@@ -1,7 +1,6 @@
 "use client"
 
-import { useActionState } from "react"
-import { useFormStatus } from "react-dom"
+import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,7 +9,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Loader2, Eye, EyeOff, Check, Crown, Building } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
 import { signUp } from "@/lib/actions"
 
 const TIER_PRICES = {
@@ -47,33 +45,39 @@ const TIER_FEATURES = {
   ],
 }
 
-function SubmitButton({ tier }: { tier: string }) {
-  const { pending } = useFormStatus()
-  const price = TIER_PRICES[tier as keyof typeof TIER_PRICES]
-
-  return (
-    <Button
-      type="submit"
-      disabled={pending}
-      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200"
-    >
-      {pending ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Creating Account...
-        </>
-      ) : (
-        <>{price === 0 ? "Create Free Account" : `Create Account - ₦${price.toLocaleString()}`}</>
-      )}
-    </Button>
-  )
-}
-
 export default function SignUpForm() {
-  const [state, formAction] = useActionState(signUp, null)
+  const [isPending, startTransition] = useTransition()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [selectedTier, setSelectedTier] = useState("grassroot")
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+
+  const handleSubmit = async (formData: FormData) => {
+    setError(null)
+    setSuccess(null)
+
+    const password = formData.get("password") as string
+    const confirmPassword = formData.get("confirmPassword") as string
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match")
+      return
+    }
+
+    startTransition(async () => {
+      try {
+        const result = await signUp(null, formData)
+        if (result?.error) {
+          setError(result.error)
+        } else if (result?.success) {
+          setSuccess(result.success)
+        }
+      } catch (err) {
+        setError("An unexpected error occurred. Please try again.")
+      }
+    })
+  }
 
   const getTierIcon = (tier: string) => {
     switch (tier) {
@@ -116,17 +120,17 @@ export default function SignUpForm() {
         </CardDescription>
       </CardHeader>
 
-      <form action={formAction}>
+      <form action={handleSubmit}>
         <CardContent className="space-y-6">
-          {state?.error && (
+          {error && (
             <Alert className="border-red-500/20 bg-red-500/10">
-              <AlertDescription className="text-red-400">{state.error}</AlertDescription>
+              <AlertDescription className="text-red-400">{error}</AlertDescription>
             </Alert>
           )}
 
-          {state?.success && (
+          {success && (
             <Alert className="border-green-500/20 bg-green-500/10">
-              <AlertDescription className="text-green-400">{state.success}</AlertDescription>
+              <AlertDescription className="text-green-400">{success}</AlertDescription>
             </Alert>
           )}
 
@@ -268,7 +272,24 @@ export default function SignUpForm() {
         </CardContent>
 
         <CardFooter className="flex flex-col space-y-4">
-          <SubmitButton tier={selectedTier} />
+          <Button
+            type="submit"
+            disabled={isPending}
+            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200"
+          >
+            {isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating Account...
+              </>
+            ) : (
+              <>
+                {TIER_PRICES[selectedTier as keyof typeof TIER_PRICES] === 0
+                  ? "Create Free Account"
+                  : `Create Account - ₦${TIER_PRICES[selectedTier as keyof typeof TIER_PRICES].toLocaleString()}`}
+              </>
+            )}
+          </Button>
 
           <p className="text-center text-sm text-gray-300">
             Already have an account?{" "}

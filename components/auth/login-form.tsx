@@ -1,7 +1,6 @@
 "use client"
 
-import { useActionState } from "react"
-import { useFormStatus } from "react-dom"
+import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,41 +9,29 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
 import { signIn } from "@/lib/actions"
-
-function SubmitButton() {
-  const { pending } = useFormStatus()
-
-  return (
-    <Button
-      type="submit"
-      disabled={pending}
-      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200"
-    >
-      {pending ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Signing in...
-        </>
-      ) : (
-        "Sign In"
-      )}
-    </Button>
-  )
-}
 
 export default function LoginForm() {
   const router = useRouter()
-  const [state, formAction] = useActionState(signIn, null)
+  const [isPending, startTransition] = useTransition()
   const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // Handle successful login by redirecting
-  useEffect(() => {
-    if (state?.success) {
-      router.push("/")
-    }
-  }, [state, router])
+  const handleSubmit = async (formData: FormData) => {
+    setError(null)
+    startTransition(async () => {
+      try {
+        const result = await signIn(null, formData)
+        if (result?.error) {
+          setError(result.error)
+        } else if (result?.success) {
+          router.push("/")
+        }
+      } catch (err) {
+        setError("An unexpected error occurred. Please try again.")
+      }
+    })
+  }
 
   return (
     <Card className="w-full max-w-md relative z-10 bg-black/40 backdrop-blur-xl border-purple-500/20">
@@ -55,11 +42,11 @@ export default function LoginForm() {
         <CardDescription className="text-center text-gray-300">Sign in to your EriggaLive account</CardDescription>
       </CardHeader>
 
-      <form action={formAction}>
+      <form action={handleSubmit}>
         <CardContent className="space-y-4">
-          {state?.error && (
+          {error && (
             <Alert className="border-red-500/20 bg-red-500/10">
-              <AlertDescription className="text-red-400">{state.error}</AlertDescription>
+              <AlertDescription className="text-red-400">{error}</AlertDescription>
             </Alert>
           )}
 
@@ -108,7 +95,20 @@ export default function LoginForm() {
         </CardContent>
 
         <CardFooter className="flex flex-col space-y-4">
-          <SubmitButton />
+          <Button
+            type="submit"
+            disabled={isPending}
+            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200"
+          >
+            {isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              "Sign In"
+            )}
+          </Button>
 
           <p className="text-center text-sm text-gray-300">
             Don't have an account?{" "}
