@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -156,13 +156,10 @@ export default function CommunityPage() {
   const [sortBy, setSortBy] = useState("newest")
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all")
 
-  const supabase = createClient()
-
   const loadPosts = async () => {
     try {
       setLoading(true)
 
-      // Try to load from database first
       const { data: postsData, error: postsError } = await supabase
         .from("community_posts")
         .select(`
@@ -174,8 +171,7 @@ export default function CommunityPage() {
             tier
           )
         `)
-        .eq("is_published", true)
-        .eq("is_deleted", false)
+        .match({ is_published: true, is_deleted: false })
         .order("created_at", { ascending: false })
         .limit(50)
 
@@ -301,7 +297,6 @@ export default function CommunityPage() {
         return
       }
 
-      // Add the new post to the local state
       const newPost: Post = {
         id: Date.now().toString(),
         title: newPostTitle.trim(),

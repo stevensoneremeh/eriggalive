@@ -126,6 +126,39 @@ const createMockClient = () => {
     from: (table: string) => ({
       select: (columns?: string) => ({
         eq: (column: string, value: any) => ({
+          eq: (column2: string, value2: any) => ({
+            order: (orderColumn: string, options?: { ascending: boolean }) => ({
+              limit: (limit: number) => {
+                if (table === "community_posts") {
+                  return Promise.resolve({
+                    data: [
+                      {
+                        id: 1,
+                        title: "Welcome to the Community!",
+                        content: "This is a mock post for preview mode.",
+                        user_id: "mock-user-id",
+                        category_id: 1,
+                        is_published: true,
+                        is_deleted: false,
+                        vote_count: 5,
+                        comment_count: 2,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                        user: {
+                          username: "mockuser",
+                          full_name: "Mock User",
+                          avatar_url: null,
+                          tier: "grassroot",
+                        },
+                      },
+                    ],
+                    error: null,
+                  })
+                }
+                return Promise.resolve({ data: [], error: null })
+              },
+            }),
+          }),
           single: () => {
             if (table === "users" && column === "auth_user_id") {
               return Promise.resolve({
@@ -152,6 +185,60 @@ const createMockClient = () => {
             return Promise.resolve({ data: null, error: null })
           },
           maybeSingle: () => Promise.resolve({ data: null, error: null }),
+        }),
+        match: (conditions: Record<string, any>) => ({
+          order: (orderColumn: string, options?: { ascending: boolean }) => ({
+            limit: (limit: number) => {
+              if (table === "community_posts") {
+                return Promise.resolve({
+                  data: [
+                    {
+                      id: 1,
+                      title: "Welcome to the Community!",
+                      content:
+                        "This is a mock post for preview mode. You can create posts, interact with other users, and explore all the community features.",
+                      user_id: "mock-user-id",
+                      category_id: 1,
+                      is_published: true,
+                      is_deleted: false,
+                      vote_count: 5,
+                      comment_count: 2,
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                      user: {
+                        username: "mockuser",
+                        full_name: "Mock User",
+                        avatar_url: null,
+                        tier: "grassroot",
+                      },
+                    },
+                    {
+                      id: 2,
+                      title: "Preview Mode Active",
+                      content:
+                        "This is another mock post to show how the community feed works. In the real app, these would be actual user posts from the database.",
+                      user_id: "mock-user-id-2",
+                      category_id: 2,
+                      is_published: true,
+                      is_deleted: false,
+                      vote_count: 12,
+                      comment_count: 8,
+                      created_at: new Date(Date.now() - 86400000).toISOString(),
+                      updated_at: new Date(Date.now() - 86400000).toISOString(),
+                      user: {
+                        username: "previewuser",
+                        full_name: "Preview User",
+                        avatar_url: null,
+                        tier: "pioneer",
+                      },
+                    },
+                  ],
+                  error: null,
+                })
+              }
+              return Promise.resolve({ data: [], error: null })
+            },
+          }),
         }),
         order: (column: string, options?: { ascending: boolean }) => ({
           limit: (limit: number) => Promise.resolve({ data: [], error: null }),
