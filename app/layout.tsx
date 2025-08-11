@@ -2,7 +2,6 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { ClerkProvider } from "@clerk/nextjs"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/contexts/auth-context"
 import { SafeThemeProvider } from "@/contexts/theme-context"
@@ -26,31 +25,29 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <ClerkProvider>
-      <html lang="en" suppressHydrationWarning>
-        <body className={inter.className}>
-          <ErrorBoundary>
-            <SafeThemeProvider>
-              <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-                <AuthProvider>
-                  <div className="min-h-screen bg-background">
-                    {/* Main Navigation - Always Visible */}
-                    <Suspense fallback={<SimpleLoading />}>
-                      <UnifiedNavigation />
-                    </Suspense>
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
+        <ErrorBoundary>
+          <SafeThemeProvider>
+            <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+              <AuthProvider>
+                <div className="min-h-screen bg-background">
+                  {/* Main Navigation - Always Visible */}
+                  <Suspense fallback={<SimpleLoading />}>
+                    <UnifiedNavigation />
+                  </Suspense>
 
-                    {/* Main Content with proper spacing for fixed nav */}
-                    <main className="pt-16 pb-20 md:pb-4">
-                      <Suspense fallback={<SimpleLoading />}>{children}</Suspense>
-                    </main>
-                  </div>
-                  <Toaster />
-                </AuthProvider>
-              </ThemeProvider>
-            </SafeThemeProvider>
-          </ErrorBoundary>
-        </body>
-      </html>
-    </ClerkProvider>
+                  {/* Main Content with proper spacing for fixed nav */}
+                  <main className="pt-16 pb-20 md:pb-4">
+                    <Suspense fallback={<SimpleLoading />}>{children}</Suspense>
+                  </main>
+                </div>
+                <Toaster />
+              </AuthProvider>
+            </ThemeProvider>
+          </SafeThemeProvider>
+        </ErrorBoundary>
+      </body>
+    </html>
   )
 }

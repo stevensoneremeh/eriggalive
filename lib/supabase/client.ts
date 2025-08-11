@@ -1,5 +1,5 @@
-import { createBrowserClient } from "@supabase/ssr"
-import type { Database } from "@/types/database"
+import { createBrowserClient } from '@supabase/ssr'
+import type { Database } from '@/types/database'
 
 // Check if we're in a browser environment
 const isBrowser = typeof window !== "undefined"
@@ -44,6 +44,66 @@ const createMockClient = () => {
           },
           error: null,
         }),
+      signInWithPassword: () =>
+        Promise.resolve({
+          data: {
+            user: {
+              id: "mock-user-id",
+              email: "mock@example.com",
+              user_metadata: { username: "mockuser", full_name: "Mock User" },
+              aud: "authenticated",
+              role: "authenticated",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+            session: {
+              access_token: "mock-token",
+              refresh_token: "mock-refresh-token",
+              expires_at: Date.now() + 3600000,
+              token_type: "bearer",
+              user: {
+                id: "mock-user-id",
+                email: "mock@example.com",
+              },
+            },
+          },
+          error: null,
+        }),
+      signUp: () =>
+        Promise.resolve({
+          data: {
+            user: {
+              id: "mock-user-id",
+              email: "mock@example.com",
+              user_metadata: { username: "mockuser", full_name: "Mock User" },
+              aud: "authenticated",
+              role: "authenticated",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+            session: {
+              access_token: "mock-token",
+              refresh_token: "mock-refresh-token",
+              expires_at: Date.now() + 3600000,
+              token_type: "bearer",
+              user: {
+                id: "mock-user-id",
+                email: "mock@example.com",
+              },
+            },
+          },
+          error: null,
+        }),
+      signOut: () => Promise.resolve({ error: null }),
+      resetPasswordForEmail: () => Promise.resolve({ error: null }),
+      updateUser: () => Promise.resolve({ 
+        data: { user: null },
+        error: null 
+      }),
+      exchangeCodeForSession: () => Promise.resolve({ 
+        data: { session: null, user: null },
+        error: null 
+      }),
       onAuthStateChange: (callback: any) => {
         // Simulate initial auth state
         setTimeout(() => {
@@ -101,7 +161,6 @@ const createMockClient = () => {
                   .fill(0)
                   .map((_, i) => ({
                     id: i + 1,
-                    title: `Mock post title ${i + 1}`,
                     content: `Mock post content ${i + 1}`,
                     vote_count: Math.floor(Math.random() * 50),
                     comment_count: Math.floor(Math.random() * 10),
@@ -187,12 +246,6 @@ const createMockClient = () => {
       }),
     },
     rpc: (functionName: string, params: any) => Promise.resolve({ data: true, error: null }),
-    channel: (name: string) => ({
-      on: (event: string, callback: any) => ({ subscribe: () => {} }),
-      subscribe: () => Promise.resolve({ status: "SUBSCRIBED" }),
-      unsubscribe: () => Promise.resolve({ status: "CLOSED" }),
-    }),
-    removeChannel: () => {},
   } as any
 }
 
@@ -204,7 +257,7 @@ export function createClient() {
 
   // Validate environment variables
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    console.error("Missing Supabase environment variables")
+    console.error('Missing Supabase environment variables')
     return createMockClient()
   }
 
@@ -214,19 +267,19 @@ export function createClient() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       {
         auth: {
-          persistSession: false, // Disable Supabase auth since we're using Clerk
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
         },
         global: {
           headers: {
-            "X-Client-Info": "eriggalive-web",
+            'X-Client-Info': 'eriggalive-web',
           },
         },
-      },
+      }
     )
   } catch (error) {
-    console.error("Failed to create Supabase client:", error)
+    console.error('Failed to create Supabase client:', error)
     return createMockClient()
   }
 }

@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { useAuth } from "@/contexts/auth-context"
+import { useAuth } from "@/contexts/auth-context" // Keep your existing auth
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Heart, Download, Star, TrendingUp, Users } from "lucide-react"
-import { toast } from "sonner"
+import { useToast } from "@/hooks/use-toast"
 
 interface FreebieItem {
   id: number
@@ -25,7 +25,8 @@ interface FreebieItem {
 export default function FreebiesRoom() {
   const [freebies, setFreebies] = useState<FreebieItem[]>([])
   const [loading, setLoading] = useState(true)
-  const { user, profile } = useAuth()
+  const { user, profile } = useAuth() // Use your existing auth
+  const { toast } = useToast()
   const supabase = createClient()
 
   useEffect(() => {
@@ -34,36 +35,38 @@ export default function FreebiesRoom() {
 
   const loadFreebies = async () => {
     try {
-      // For now, use mock data since we're focusing on auth migration
-      const mockFreebies: FreebieItem[] = [
-        {
-          id: 1,
-          title: "Exclusive Track Preview",
-          description: "Get early access to Erigga's latest track before official release",
-          file_url: "/placeholder.mp3",
-          vote_count: 45,
-          download_count: 23,
-          created_at: new Date().toISOString(),
-          user_has_voted: false,
-          type: "track",
-        },
-        {
-          id: 2,
-          title: "Behind the Scenes Video",
-          description: "Exclusive footage from the studio sessions",
-          file_url: "/placeholder.mp4",
-          vote_count: 67,
-          download_count: 34,
-          created_at: new Date().toISOString(),
-          user_has_voted: false,
-          type: "video",
-        },
-      ]
+      const { data: freebiesData } = await supabase
+        .from("freebies")
+        .select("*")
+        .eq("is_active", true)
+        .order("vote_count", { ascending: false })
 
-      setFreebies(mockFreebies)
+      if (freebiesData) {
+        // Check which items current user has voted on
+        let userVotes: number[] = []
+        if (profile) {
+          const { data: votesData } = await supabase
+            .from("freebie_votes")
+            .select("freebie_id")
+            .eq("user_id", profile.id)
+
+          userVotes = votesData?.map((v) => v.freebie_id) || []
+        }
+
+        const formattedFreebies = freebiesData.map((item) => ({
+          ...item,
+          user_has_voted: userVotes.includes(item.id),
+        }))
+
+        setFreebies(formattedFreebies)
+      }
     } catch (error) {
       console.error("Error loading freebies:", error)
-      toast.error("Failed to load freebies")
+      toast({
+        title: "Error",
+        description: "Failed to load freebies",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
@@ -71,44 +74,87 @@ export default function FreebiesRoom() {
 
   const voteOnFreebie = async (freebieId: number) => {
     if (!profile) {
-      toast.error("Please sign in to vote on freebies")
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to vote on freebies",
+        variant: "destructive",
+      })
       return
     }
 
     try {
-      // Update local state for now
-      setFreebies((prev) =>
-        prev.map((freebie) =>
-          freebie.id === freebieId
-            ? {
-                ...freebie,
-                user_has_voted: !freebie.user_has_voted,
-                vote_count: freebie.user_has_voted ? freebie.vote_count - 1 : freebie.vote_count + 1,
-              }
-            : freebie,
-        ),
-      )
+      // Check if already voted
+      const { data: existingVote } = await supabase
+        .from("freebie_votes")
+        .select("id")
+        .eq("freebie_id", freebieId)
+        .eq("user_id", profile.id)
+        .single()
 
-      toast.success(freebies.find((f) => f.id === freebieId)?.user_has_voted ? "Vote removed" : "Voted!")
+      if (existingVote) {
+        // Remove vote
+        await supabase.from("freebie_votes").delete().eq("freebie_id", freebieId).eq("user_id", profile.id)
+
+        // Update freebie vote count
+        await supabase.rpc("decrement_freebie_votes", { freebie_id: freebieId })
+
+        toast({
+          title: "Vote removed",
+          description: "Your vote has been removed",
+        })
+      } else {
+        // Add vote
+        await supabase.from("freebie_votes").insert({
+          freebie_id: freebieId,
+          user_id: profile.id,
+        })
+
+        // Update freebie vote count
+        await supabase.rpc("increment_freebie_votes", { freebie_id: freebieId })
+
+        toast({
+          title: "Voted!",
+          description: "Your vote has been counted",
+        })
+      }
+
+      loadFreebies() // Reload to update counts
     } catch (error) {
       console.error("Error voting:", error)
-      toast.error("Failed to vote")
+      toast({
+        title: "Error",
+        description: "Failed to vote",
+        variant: "destructive",
+      })
     }
   }
 
   const downloadFreebie = async (freebieId: number, fileUrl: string, title: string) => {
     try {
-      // Update download count
-      setFreebies((prev) =>
-        prev.map((freebie) =>
-          freebie.id === freebieId ? { ...freebie, download_count: freebie.download_count + 1 } : freebie,
-        ),
-      )
+      // Increment download count
+      await supabase.rpc("increment_freebie_downloads", { freebie_id: freebieId })
 
-      toast.success("Download started")
+      // Create download link
+      const link = document.createElement("a")
+      link.href = fileUrl
+      link.download = title
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      toast({
+        title: "Download started",
+        description: "Your download has begun",
+      })
+
+      loadFreebies() // Reload to update download counts
     } catch (error) {
       console.error("Error downloading:", error)
-      toast.error("Failed to download file")
+      toast({
+        title: "Error",
+        description: "Failed to download file",
+        variant: "destructive",
+      })
     }
   }
 

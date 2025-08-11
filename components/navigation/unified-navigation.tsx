@@ -34,7 +34,6 @@ import {
 import { useAuth } from "@/contexts/auth-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
 import { Badge } from "@/components/ui/badge"
-import { SignInButton, SignUpButton, SignedIn, SignedOut } from "@clerk/nextjs"
 
 const navigationItems = [
   { name: "Home", href: "/", icon: Home },
@@ -111,7 +110,7 @@ export function UnifiedNavigation() {
 
           {/* User Menu / Auth Buttons */}
           <div className="flex items-center space-x-4">
-            <SignedIn>
+            {user ? (
               <div className="flex items-center space-x-3">
                 {/* Coins Display */}
                 {profile?.coins !== undefined && (
@@ -129,13 +128,13 @@ export function UnifiedNavigation() {
                     <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                       <Avatar className="h-10 w-10">
                         <AvatarImage
-                          src={user?.imageUrl || "/placeholder-user.jpg"}
+                          src={profile?.avatar_url || "/placeholder-user.jpg"}
                           alt={profile?.username || "User"}
                         />
                         <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold">
                           {profile?.full_name?.charAt(0) ||
                             profile?.username?.charAt(0) ||
-                            user?.emailAddresses?.[0]?.emailAddress?.charAt(0) ||
+                            user?.email?.charAt(0) ||
                             "U"}
                         </AvatarFallback>
                       </Avatar>
@@ -145,9 +144,7 @@ export function UnifiedNavigation() {
                     <div className="flex items-center justify-start gap-2 p-2">
                       <div className="flex flex-col space-y-1 leading-none">
                         <p className="font-medium">{profile?.full_name || profile?.username || "User"}</p>
-                        <p className="w-[200px] truncate text-sm text-muted-foreground">
-                          {user?.emailAddresses?.[0]?.emailAddress}
-                        </p>
+                        <p className="w-[200px] truncate text-sm text-muted-foreground">{user.email}</p>
                         {profile?.tier && (
                           <Badge className={`w-fit text-xs ${getTierColor(profile.tier)}`}>
                             <Crown className="w-3 h-3 mr-1" />
@@ -177,22 +174,16 @@ export function UnifiedNavigation() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-            </SignedIn>
-
-            <SignedOut>
+            ) : (
               <div className="hidden md:flex items-center space-x-2">
-                <SignInButton mode="modal">
-                  <Button variant="ghost" size="sm">
-                    Sign In
-                  </Button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <Button size="sm" className="bg-lime-500 text-teal-900 hover:bg-lime-600">
-                    Join Now
-                  </Button>
-                </SignUpButton>
+                <Button asChild variant="ghost" size="sm">
+                  <Link href="/login">Sign In</Link>
+                </Button>
+                <Button asChild size="sm" className="bg-lime-500 text-teal-900 hover:bg-lime-600">
+                  <Link href="/signup">Join Now</Link>
+                </Button>
               </div>
-            </SignedOut>
+            )}
 
             {/* Mobile Menu */}
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -205,25 +196,23 @@ export function UnifiedNavigation() {
               <SheetContent side="right" className="w-[300px] sm:w-[400px]">
                 <div className="flex flex-col space-y-4 mt-4">
                   {/* User Info in Mobile */}
-                  <SignedIn>
+                  {user && (
                     <div className="flex items-center space-x-3 p-4 bg-muted rounded-lg">
                       <Avatar className="h-12 w-12">
                         <AvatarImage
-                          src={user?.imageUrl || "/placeholder-user.jpg"}
+                          src={profile?.avatar_url || "/placeholder-user.jpg"}
                           alt={profile?.username || "User"}
                         />
                         <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold">
                           {profile?.full_name?.charAt(0) ||
                             profile?.username?.charAt(0) ||
-                            user?.emailAddresses?.[0]?.emailAddress?.charAt(0) ||
+                            user?.email?.charAt(0) ||
                             "U"}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col">
                         <p className="font-medium">{profile?.full_name || profile?.username || "User"}</p>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {user?.emailAddresses?.[0]?.emailAddress}
-                        </p>
+                        <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                         {profile?.tier && (
                           <Badge className={`w-fit text-xs mt-1 ${getTierColor(profile.tier)}`}>
                             <Crown className="w-3 h-3 mr-1" />
@@ -232,7 +221,7 @@ export function UnifiedNavigation() {
                         )}
                       </div>
                     </div>
-                  </SignedIn>
+                  )}
 
                   {/* Navigation Items */}
                   <div className="space-y-2">
@@ -258,7 +247,7 @@ export function UnifiedNavigation() {
                   </div>
 
                   {/* Auth Buttons for Mobile */}
-                  <SignedIn>
+                  {user ? (
                     <div className="space-y-2 pt-4 border-t">
                       <Button asChild variant="outline" className="w-full justify-start bg-transparent">
                         <Link href="/dashboard" onClick={() => setIsOpen(false)}>
@@ -284,25 +273,25 @@ export function UnifiedNavigation() {
                         Log out
                       </Button>
                     </div>
-                  </SignedIn>
-
-                  <SignedOut>
+                  ) : (
                     <div className="space-y-2 pt-4 border-t">
-                      <SignInButton mode="modal">
-                        <Button variant="outline" className="w-full bg-transparent" onClick={() => setIsOpen(false)}>
-                          Sign In
-                        </Button>
-                      </SignInButton>
-                      <SignUpButton mode="modal">
-                        <Button
-                          className="w-full bg-lime-500 text-teal-900 hover:bg-lime-600"
-                          onClick={() => setIsOpen(false)}
-                        >
-                          Join Now
-                        </Button>
-                      </SignUpButton>
+                      <Button
+                        asChild
+                        variant="outline"
+                        className="w-full bg-transparent"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        <Link href="/login">Sign In</Link>
+                      </Button>
+                      <Button
+                        asChild
+                        className="w-full bg-lime-500 text-teal-900 hover:bg-lime-600"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        <Link href="/signup">Join Now</Link>
+                      </Button>
                     </div>
-                  </SignedOut>
+                  )}
                 </div>
               </SheetContent>
             </Sheet>

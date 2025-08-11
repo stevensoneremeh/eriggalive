@@ -19,18 +19,6 @@ const nextConfig = {
         protocol: 'https',
         hostname: '**.supabase.co',
       },
-      {
-        protocol: 'https',
-        hostname: '**.supabase.in',
-      },
-      {
-        protocol: 'https',
-        hostname: '**.clerk.accounts.dev',
-      },
-      {
-        protocol: 'https',
-        hostname: '**.clerk.com',
-      },
     ],
     unoptimized: true,
   },
@@ -72,25 +60,13 @@ const nextConfig = {
     ];
   },
   experimental: {
+    // Disable the missing suspense with CSR bailout check
     missingSuspenseWithCSRBailout: false,
-    // Remove conflicting serverComponentsExternalPackages
+    // Additional experimental flags to help with SSR issues
+    serverComponentsExternalPackages: [],
     optimizePackageImports: ['lucide-react'],
   },
-  // Remove transpilePackages to avoid conflicts
-  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
-    // Handle Supabase properly in webpack
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        net: false,
-        tls: false,
-        crypto: false,
-      };
-    }
-    
-    return config;
-  },
+  // Force static generation for specific pages
   output: 'standalone',
 };
 
