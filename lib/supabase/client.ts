@@ -1,5 +1,5 @@
-import { createBrowserClient } from '@supabase/ssr'
-import type { Database } from '@/types/database'
+import { createBrowserClient } from "@supabase/ssr"
+import type { Database } from "@/types/database"
 
 // Check if we're in a browser environment
 const isBrowser = typeof window !== "undefined"
@@ -96,14 +96,16 @@ const createMockClient = () => {
         }),
       signOut: () => Promise.resolve({ error: null }),
       resetPasswordForEmail: () => Promise.resolve({ error: null }),
-      updateUser: () => Promise.resolve({ 
-        data: { user: null },
-        error: null 
-      }),
-      exchangeCodeForSession: () => Promise.resolve({ 
-        data: { session: null, user: null },
-        error: null 
-      }),
+      updateUser: () =>
+        Promise.resolve({
+          data: { user: null },
+          error: null,
+        }),
+      exchangeCodeForSession: () =>
+        Promise.resolve({
+          data: { session: null, user: null },
+          error: null,
+        }),
       onAuthStateChange: (callback: any) => {
         // Simulate initial auth state
         setTimeout(() => {
@@ -250,46 +252,46 @@ const createMockClient = () => {
 }
 
 // Create a Supabase client for browser usage
+let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null
+
 export function createClient() {
   if (isPreviewMode) {
     return createMockClient()
   }
 
-  // Validate environment variables
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    console.error('Missing Supabase environment variables')
-    return createMockClient()
-  }
+  if (!supabaseClient) {
+    // Validate environment variables
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      console.error("Missing Supabase environment variables")
+      return createMockClient()
+    }
 
-  try {
-    return createBrowserClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true,
-        },
-        global: {
-          headers: {
-            'X-Client-Info': 'eriggalive-web',
+    try {
+      supabaseClient = createBrowserClient<Database>(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+          },
+          global: {
+            headers: {
+              "X-Client-Info": "eriggalive-web",
+            },
           },
         },
-      }
-    )
-  } catch (error) {
-    console.error('Failed to create Supabase client:', error)
-    return createMockClient()
+      )
+    } catch (error) {
+      console.error("Failed to create Supabase client:", error)
+      return createMockClient()
+    }
   }
+  return supabaseClient
 }
 
 // Export a singleton instance for consistent usage
-let supabaseClient: ReturnType<typeof createClient> | null = null
-
 export function getSupabaseClient() {
-  if (!supabaseClient) {
-    supabaseClient = createClient()
-  }
-  return supabaseClient
+  return createClient()
 }

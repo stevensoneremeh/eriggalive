@@ -1,7 +1,6 @@
 "use client"
 
 import React from "react"
-
 import { useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
@@ -18,7 +17,7 @@ import { DynamicLogo } from "@/components/dynamic-logo"
 import { PaystackIntegration } from "@/components/paystack/paystack-integration"
 import { motion, AnimatePresence } from "framer-motion"
 
-type UserTier = "grassroot" | "pioneer" | "elder"
+type UserTier = "free" | "pro" | "enterprise"
 
 interface TierOption {
   id: UserTier
@@ -33,7 +32,7 @@ interface TierOption {
 
 const tierOptions: TierOption[] = [
   {
-    id: "grassroot",
+    id: "free",
     name: "Free",
     price: 0,
     description: "Perfect for getting started",
@@ -42,7 +41,7 @@ const tierOptions: TierOption[] = [
     color: "from-green-500 to-emerald-600",
   },
   {
-    id: "pioneer",
+    id: "pro",
     name: "Pro",
     price: 2500,
     description: "Enhanced experience for true fans",
@@ -52,11 +51,11 @@ const tierOptions: TierOption[] = [
     popular: true,
   },
   {
-    id: "elder",
+    id: "enterprise",
     name: "Enterprise",
     price: 5000,
     description: "Ultimate fan experience",
-    features: ["All Pioneer features", "VIP event access", "Direct artist interaction", "Exclusive merchandise"],
+    features: ["All Pro features", "VIP event access", "Direct artist interaction", "Exclusive merchandise"],
     icon: Zap,
     color: "from-orange-500 to-red-600",
   },
@@ -68,7 +67,7 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [username, setUsername] = useState("")
   const [fullName, setFullName] = useState("")
-  const [selectedTier, setSelectedTier] = useState<UserTier>("grassroot")
+  const [selectedTier, setSelectedTier] = useState<UserTier>("free")
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -175,7 +174,7 @@ export default function SignUpPage() {
       if (error) {
         setError(getErrorMessage(error))
       } else {
-        router.push("/signup/success")
+        router.push("/dashboard")
       }
     } catch (err: any) {
       setError(getErrorMessage(err))
@@ -205,7 +204,7 @@ export default function SignUpPage() {
 
     try {
       // For free tier, proceed directly with signup
-      if (selectedTier === "grassroot") {
+      if (selectedTier === "free") {
         const { error } = await signUp(email, password, {
           username,
           full_name: fullName,
@@ -215,7 +214,7 @@ export default function SignUpPage() {
         if (error) {
           setError(getErrorMessage(error))
         } else {
-          router.push("/signup/success")
+          router.push("/dashboard")
         }
       }
       // For paid tiers, payment will be handled by PaystackIntegration component
@@ -498,7 +497,7 @@ export default function SignUpPage() {
               </AnimatePresence>
 
               {/* Submit Button */}
-              {selectedTier === "grassroot" ? (
+              {selectedTier === "free" ? (
                 <Button
                   type="submit"
                   className="w-full h-12 text-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
@@ -526,7 +525,7 @@ export default function SignUpPage() {
                   onError={handlePaymentError}
                 >
                   <Button
-                    type="submit"
+                    type="button"
                     className={`w-full h-12 text-lg bg-gradient-to-r ${selectedTierData.color} hover:opacity-90`}
                     disabled={isLoading || isPaymentProcessing || !isOnline || !validateForm()}
                   >
