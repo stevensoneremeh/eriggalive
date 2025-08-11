@@ -30,6 +30,7 @@ import {
   Radio,
   Ticket,
   Info,
+  Play,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
@@ -40,6 +41,7 @@ const navigationItems = [
   { name: "Mission", href: "/mission", icon: Target },
   { name: "Community", href: "/community", icon: Users },
   { name: "Vault", href: "/vault", icon: Music },
+  { name: "Media", href: "/media", icon: Play },
   { name: "Coins", href: "/coins", icon: Coins },
   { name: "Chat", href: "/chat", icon: MessageCircle },
   { name: "Meet & Greet", href: "/meet-and-greet", icon: Phone },

@@ -12,7 +12,21 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Calendar, MapPin, Users, Clock, QrCode, Download, Share2, Sparkles, Music, Star } from "lucide-react"
+import {
+  Calendar,
+  MapPin,
+  Users,
+  Clock,
+  QrCode,
+  Download,
+  Share2,
+  Sparkles,
+  Music,
+  Star,
+  CheckCircle,
+  Gift,
+  Zap,
+} from "lucide-react"
 import { AuthGuard } from "@/components/auth-guard"
 import { useAuth } from "@/contexts/auth-context"
 
@@ -30,7 +44,7 @@ const events = [
     price: 0, // Free event
     maxTickets: 200,
     ticketsSold: 45,
-    image: "/erigga-poster.jpg",
+    image: "/erigga/hero/erigga-main-hero.jpeg",
     category: "Intimate Session",
     isVip: true,
     isSpecial: true,
@@ -46,7 +60,7 @@ const events = [
     price: 500000, // 5000 NGN in kobo
     maxTickets: 5000,
     ticketsSold: 3200,
-    image: "/placeholder.svg?height=300&width=400",
+    image: "/images/hero/erigga1.jpeg",
     category: "Concert",
     isVip: false,
   },
@@ -60,7 +74,7 @@ const events = [
     price: 1000000, // 10000 NGN in kobo
     maxTickets: 3000,
     ticketsSold: 1800,
-    image: "/placeholder.svg?height=300&width=400",
+    image: "/images/hero/erigga2.jpeg",
     category: "Concert",
     isVip: true,
   },
@@ -334,7 +348,11 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
   const allTickets = generatedTicket ? [...userTickets, generatedTicket] : userTickets
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-500"></div>
+      </div>
+    )
   }
 
   if (!user) {
@@ -350,7 +368,12 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
 
   return (
     <AuthGuard>
-      <div className="min-h-screen py-8 px-4 relative overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="min-h-screen py-8 px-4 relative overflow-hidden bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900"
+      >
         {/* Animated background elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div
@@ -447,22 +470,35 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
           <AnimatePresence>
             {allTickets.length > 0 && (
               <motion.section className="mb-12" variants={containerVariants} initial="hidden" animate="visible">
-                <motion.h2 className="text-2xl font-bold mb-6 flex items-center gap-2" variants={itemVariants}>
-                  <QrCode className="h-6 w-6 text-orange-500" />
-                  Your Tickets
-                  {generatedTicket && (
-                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="ml-2">
-                      <Badge className="bg-green-500 text-white">NEW!</Badge>
-                    </motion.div>
-                  )}
-                </motion.h2>
+                <motion.div variants={itemVariants} className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg">
+                      <QrCode className="h-6 w-6 text-orange-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Your Tickets</h2>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Manage your event tickets</p>
+                    </div>
+                    {generatedTicket && (
+                      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="ml-2">
+                        <Badge className="bg-green-500 text-white">
+                          <Gift className="h-3 w-3 mr-1" />
+                          NEW!
+                        </Badge>
+                      </motion.div>
+                    )}
+                  </div>
+                  <Badge variant="outline" className="text-sm">
+                    {allTickets.length} ticket{allTickets.length !== 1 ? "s" : ""}
+                  </Badge>
+                </motion.div>
                 <motion.div
                   className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
                   variants={containerVariants}
                 >
                   {allTickets.map((ticket, index) => (
                     <motion.div key={ticket.id} variants={itemVariants} whileHover={cardHoverVariants.hover} layout>
-                      <Card className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border-orange-500/40 overflow-hidden relative">
+                      <Card className="bg-gradient-to-br from-white to-gray-50 border-2 border-orange-200 overflow-hidden relative hover:shadow-xl transition-all duration-300">
                         {ticket.specialAccess && (
                           <motion.div
                             className="absolute top-2 right-2 z-10"
@@ -478,46 +514,49 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
                             <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
                           </motion.div>
                         )}
-                        <CardHeader>
+                        <CardHeader className="bg-gradient-to-r from-orange-500 to-red-500 text-white">
                           <div className="flex items-center justify-between">
-                            <Badge className="bg-green-500 text-white">{ticket.status}</Badge>
-                            <QrCode className="h-5 w-5 text-orange-500" />
+                            <Badge className="bg-white/20 text-white border-white/30">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              {ticket.status.toUpperCase()}
+                            </Badge>
+                            <QrCode className="h-5 w-5" />
                           </div>
                           <CardTitle className="text-lg">{ticket.eventTitle}</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="space-y-2 text-sm">
+                        <CardContent className="space-y-4 p-6">
+                          <div className="space-y-3 text-sm">
                             <div className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4 text-muted-foreground" />
-                              <span>
+                              <MapPin className="h-4 w-4 text-orange-500" />
+                              <span className="font-medium">
                                 {ticket.venue}, {ticket.location}
                               </span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              <Calendar className="h-4 w-4 text-orange-500" />
                               <span>{formatDate(ticket.date)}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Users className="h-4 w-4 text-muted-foreground" />
+                              <Users className="h-4 w-4 text-orange-500" />
                               <span>Holder: {ticket.holderName}</span>
                             </div>
                           </div>
 
                           <motion.div
-                            className="bg-background/50 p-3 rounded-lg text-center"
-                            whileHover={{ scale: 1.05 }}
+                            className="bg-gray-50 p-4 rounded-lg text-center border-2 border-dashed border-gray-200"
+                            whileHover={{ scale: 1.02 }}
                             transition={{ duration: 0.2 }}
                           >
-                            <div className="w-20 h-20 mx-auto mb-2 bg-white p-2 rounded flex items-center justify-center">
-                              <QrCode className="w-full h-full text-black" />
+                            <div className="w-20 h-20 mx-auto mb-3 bg-white p-3 rounded-lg shadow-sm flex items-center justify-center">
+                              <QrCode className="w-full h-full text-gray-800" />
                             </div>
-                            <p className="text-xs font-mono">{ticket.ticketNumber}</p>
+                            <p className="text-xs font-mono text-gray-600 break-all">{ticket.ticketNumber}</p>
                           </motion.div>
 
                           <div className="flex gap-2">
                             <Button
                               size="sm"
-                              className="flex-1 bg-orange-500 hover:bg-orange-600 text-black"
+                              className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
                               onClick={() => downloadTicket(ticket)}
                             >
                               <Download className="h-4 w-4 mr-1" />
@@ -526,7 +565,7 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
                             <Button
                               size="sm"
                               variant="outline"
-                              className="border-orange-400 text-orange-400 bg-transparent"
+                              className="border-orange-400 text-orange-600 hover:bg-orange-50 bg-transparent"
                             >
                               <Share2 className="h-4 w-4" />
                             </Button>
@@ -542,10 +581,20 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
 
           {/* Upcoming Events */}
           <motion.section className="mb-12" variants={containerVariants} initial="hidden" animate="visible">
-            <motion.h2 className="text-2xl font-bold mb-6 flex items-center gap-2" variants={itemVariants}>
-              <Calendar className="h-6 w-6 text-orange-500" />
-              Upcoming Shows
-            </motion.h2>
+            <motion.div variants={itemVariants} className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg">
+                  <Calendar className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Upcoming Shows</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Don't miss these amazing events</p>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-sm">
+                {events.length} event{events.length !== 1 ? "s" : ""}
+              </Badge>
+            </motion.div>
             <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" variants={containerVariants}>
               {events.map((event, index) => {
                 const availableTickets = event.maxTickets - event.ticketsSold
@@ -553,7 +602,7 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
 
                 return (
                   <motion.div key={event.id} variants={itemVariants} whileHover={cardHoverVariants.hover}>
-                    <Card className="bg-card/50 border-orange-500/20 hover:border-orange-500/40 transition-all group overflow-hidden relative">
+                    <Card className="bg-white/90 backdrop-blur-sm border-2 border-gray-200 hover:border-orange-300 transition-all group overflow-hidden relative hover:shadow-xl">
                       {event.isSpecial && (
                         <motion.div
                           className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-red-500"
@@ -567,7 +616,7 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
                           <motion.img
                             src={event.image || "/placeholder.svg"}
                             alt={event.title}
-                            className="w-full h-48 object-cover rounded-t-lg"
+                            className="w-full h-48 object-cover"
                             whileHover={{ scale: 1.05 }}
                             transition={{ duration: 0.3 }}
                           />
@@ -583,7 +632,7 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
                               </Badge>
                             </motion.div>
                           )}
-                          <Badge className="absolute top-2 left-2 bg-orange-500 text-black">{event.category}</Badge>
+                          <Badge className="absolute top-2 left-2 bg-orange-500 text-white">{event.category}</Badge>
                           {event.tags && (
                             <div className="absolute bottom-2 left-2 flex gap-1">
                               {event.tags.map((tag, tagIndex) => (
@@ -593,7 +642,7 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
                                   animate={{ opacity: 1, y: 0 }}
                                   transition={{ delay: tagIndex * 0.1 }}
                                 >
-                                  <Badge variant="secondary" className="text-xs">
+                                  <Badge variant="secondary" className="text-xs bg-white/90 text-gray-800">
                                     {tag}
                                   </Badge>
                                 </motion.div>
@@ -607,7 +656,7 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
                           <div>
                             <h3 className="font-bold text-lg mb-2">{event.title}</h3>
                             {event.subtitle && (
-                              <p className="text-sm text-orange-400 font-medium mb-2">{event.subtitle}</p>
+                              <p className="text-sm text-orange-600 font-medium mb-2">{event.subtitle}</p>
                             )}
                             <p className="text-sm text-muted-foreground mb-3">{event.description}</p>
                           </div>
@@ -635,7 +684,7 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
                               <span>Reserved</span>
                               <span>{soldOutPercentage.toFixed(0)}%</span>
                             </div>
-                            <div className="w-full bg-gray-700 rounded-full h-2">
+                            <div className="w-full bg-gray-200 rounded-full h-2">
                               <motion.div
                                 className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full"
                                 initial={{ width: 0 }}
@@ -679,7 +728,7 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
                               <Dialog>
                                 <DialogTrigger asChild>
                                   <Button
-                                    className="bg-orange-500 hover:bg-orange-600 text-black"
+                                    className="bg-orange-500 hover:bg-orange-600 text-white"
                                     disabled={availableTickets === 0}
                                     onClick={() => setSelectedEvent(event)}
                                   >
@@ -710,7 +759,7 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
                                       </div>
 
                                       <Button
-                                        className="w-full bg-orange-500 hover:bg-orange-600 text-black"
+                                        className="w-full bg-orange-500 hover:bg-orange-600 text-white"
                                         onClick={() => handleTicketPurchase(selectedEvent)}
                                         disabled={isProcessing}
                                       >
@@ -738,36 +787,55 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
 
           {/* Past Shows */}
           <motion.section variants={containerVariants} initial="hidden" animate="visible">
-            <motion.h2 className="text-2xl font-bold mb-6" variants={itemVariants}>
-              Past Shows Recap
-            </motion.h2>
+            <motion.div variants={itemVariants} className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-purple-100 to-purple-200 rounded-lg">
+                  <Music className="h-6 w-6 text-purple-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Past Shows Recap</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Relive the amazing moments</p>
+                </div>
+              </div>
+            </motion.div>
             <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-6" variants={containerVariants}>
               {pastEvents.map((event, index) => (
                 <motion.div key={event.id} variants={itemVariants} whileHover={cardHoverVariants.hover}>
-                  <Card className="bg-card/50 border-orange-500/20">
+                  <Card className="bg-white/90 backdrop-blur-sm border-2 border-gray-200 hover:shadow-lg transition-all duration-300">
                     <CardContent className="p-6">
                       <div className="space-y-4">
-                        <div>
-                          <h3 className="font-bold text-lg">{event.title}</h3>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-4 w-4" />
-                              {event.venue}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4" />
-                              {formatDate(event.date)}
-                            </span>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="font-bold text-lg">{event.title}</h3>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-4 w-4" />
+                                {event.venue}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-4 w-4" />
+                                {formatDate(event.date)}
+                              </span>
+                            </div>
                           </div>
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Completed
+                          </Badge>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-orange-500" />
-                          <span className="font-semibold">{event.attendees.toLocaleString()} fans attended</span>
+                        <div className="flex items-center gap-2 bg-blue-50 p-3 rounded-lg">
+                          <Users className="h-5 w-5 text-blue-600" />
+                          <span className="font-semibold text-blue-700">
+                            {event.attendees.toLocaleString()} fans attended
+                          </span>
                         </div>
 
                         <div>
-                          <h4 className="font-semibold mb-2">Highlights:</h4>
+                          <h4 className="font-semibold mb-2 flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-orange-500" />
+                            Highlights:
+                          </h4>
                           <ul className="space-y-1">
                             {event.highlights.map((highlight, highlightIndex) => (
                               <motion.li
@@ -891,7 +959,14 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
                 className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
                 disabled={isProcessing}
               >
-                {isProcessing ? "Reserving..." : "Reserve My Spot"}
+                {isProcessing ? (
+                  <>
+                    <Zap className="w-4 h-4 mr-2 animate-spin" />
+                    Reserving...
+                  </>
+                ) : (
+                  "Reserve My Spot"
+                )}
               </Button>
 
               <p className="text-xs text-muted-foreground text-center">
@@ -903,7 +978,7 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
 
         {/* Paystack Script */}
         <script src="https://js.paystack.co/v1/inline.js"></script>
-      </div>
+      </motion.div>
     </AuthGuard>
   )
 }
