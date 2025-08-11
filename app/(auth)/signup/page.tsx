@@ -34,7 +34,7 @@ interface TierOption {
 const tierOptions: TierOption[] = [
   {
     id: "grassroot",
-    name: "Grassroot",
+    name: "Free",
     price: 0,
     description: "Perfect for getting started",
     features: ["Basic community access", "Limited content", "Standard support"],
@@ -43,7 +43,7 @@ const tierOptions: TierOption[] = [
   },
   {
     id: "pioneer",
-    name: "Pioneer",
+    name: "Pro",
     price: 2500,
     description: "Enhanced experience for true fans",
     features: ["Full community access", "Exclusive content", "Priority support", "Early access to events"],
@@ -53,7 +53,7 @@ const tierOptions: TierOption[] = [
   },
   {
     id: "elder",
-    name: "Elder",
+    name: "Enterprise",
     price: 5000,
     description: "Ultimate fan experience",
     features: ["All Pioneer features", "VIP event access", "Direct artist interaction", "Exclusive merchandise"],
