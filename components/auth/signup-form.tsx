@@ -7,15 +7,18 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Loader2, Eye, EyeOff, Check, Crown, Building } from "lucide-react"
+import { Loader2, Eye, EyeOff, Check, Crown, Building, Zap, DollarSign } from "lucide-react"
 import Link from "next/link"
 import { signUp } from "@/lib/actions"
+import { PaystackIntegration } from "@/components/paystack/paystack-integration"
+import { useRouter } from "next/navigation"
 
 const TIER_PRICES = {
   grassroot: 0,
-  pioneer: 2000,
+  pioneer: 2500, // Updated to match tier system pricing
   elder: 5000,
   blood_brotherhood: 10000,
+  enterprise: 0, // Added enterprise tier with custom pricing
 }
 
 const TIER_FEATURES = {
@@ -24,7 +27,7 @@ const TIER_FEATURES = {
     "All Grassroot features",
     "Early music releases",
     "Exclusive interviews",
-    "Discounted merch",
+    "10% merch discount",
     "Pioneer badge",
   ],
   elder: [
@@ -43,15 +46,43 @@ const TIER_FEATURES = {
     "Blood Brotherhood badge",
     "Voting rights on new content",
   ],
+  enterprise: [
+    "All Blood Brotherhood features",
+    "Custom pricing from $200+",
+    "Dedicated account manager",
+    "Custom integrations",
+    "Priority support",
+    "Enterprise badge",
+    "Bulk user management",
+  ],
 }
 
 export default function SignUpForm() {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [selectedTier, setSelectedTier] = useState("grassroot")
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+  const [paymentReference, setPaymentReference] = useState<string | null>(null)
+  const [formData, setFormData] = useState<FormData | null>(null)
+  const [enterpriseAmount, setEnterpriseAmount] = useState("")
+
+  const getEnterpriseAmountInNaira = () => {
+    const usdAmount = Number.parseFloat(enterpriseAmount)
+    if (isNaN(usdAmount) || usdAmount < 200) return 0
+    // Convert USD to Naira (approximate rate: 1 USD = 1000 NGN)
+    return Math.round(usdAmount * 1000)
+  }
+
+  const getTierPrice = () => {
+    if (selectedTier === "enterprise") {
+      return getEnterpriseAmountInNaira()
+    }
+    return TIER_PRICES[selectedTier as keyof typeof TIER_PRICES]
+  }
 
   const handleSubmit = async (formData: FormData) => {
     setError(null)
@@ -65,18 +96,77 @@ export default function SignUpForm() {
       return
     }
 
+    if (selectedTier === "enterprise") {
+      const usdAmount = Number.parseFloat(enterpriseAmount)
+      if (isNaN(usdAmount) || usdAmount < 200) {
+        setError("Enterprise tier requires a minimum of $200")
+        return
+      }
+    }
+
+    const tierPrice = getTierPrice()
+
+    if (tierPrice === 0) {
+      startTransition(async () => {
+        try {
+          const result = await signUp(null, formData)
+          if (result?.error) {
+            setError(result.error)
+          } else if (result?.success) {
+            setSuccess("Account created successfully! Redirecting to dashboard...")
+            setTimeout(() => {
+              router.push(result.redirect || "/dashboard")
+            }, 2000)
+          }
+        } catch (err) {
+          setError("An unexpected error occurred. Please try again.")
+        }
+      })
+    } else {
+      setFormData(formData)
+      // Payment will be handled by PaystackIntegration component
+    }
+  }
+
+  const handlePaymentSuccess = async (reference: string) => {
+    setPaymentReference(reference)
+    setIsProcessingPayment(true)
+
+    if (!formData) {
+      setError("Form data not found. Please try again.")
+      setIsProcessingPayment(false)
+      return
+    }
+
+    formData.append("paymentReference", reference)
+    formData.append("tierPrice", getTierPrice().toString())
+    if (selectedTier === "enterprise") {
+      formData.append("enterpriseAmountUSD", enterpriseAmount)
+    }
+
     startTransition(async () => {
       try {
         const result = await signUp(null, formData)
         if (result?.error) {
           setError(result.error)
         } else if (result?.success) {
-          setSuccess(result.success)
+          setSuccess("Payment successful! Account created. Redirecting to dashboard...")
+          // Use the redirect from server action if available
+          setTimeout(() => {
+            router.push(result.redirect || "/dashboard")
+          }, 2000)
         }
       } catch (err) {
-        setError("An unexpected error occurred. Please try again.")
+        setError("Account creation failed after payment. Please contact support.")
+      } finally {
+        setIsProcessingPayment(false)
       }
     })
+  }
+
+  const handlePaymentError = (error: string) => {
+    setError(`Payment failed: ${error}`)
+    setFormData(null)
   }
 
   const getTierIcon = (tier: string) => {
@@ -89,6 +179,8 @@ export default function SignUpForm() {
         return <Building className="h-5 w-5" />
       case "blood_brotherhood":
         return <Crown className="h-5 w-5 text-red-500" />
+      case "enterprise":
+        return <Zap className="h-5 w-5 text-purple-500" />
       default:
         return <Check className="h-5 w-5" />
     }
@@ -104,10 +196,15 @@ export default function SignUpForm() {
         return "border-purple-500/30 bg-purple-500/10"
       case "blood_brotherhood":
         return "border-red-500/30 bg-red-500/10"
+      case "enterprise":
+        return "border-purple-600/30 bg-purple-600/10"
       default:
         return "border-gray-500/30 bg-gray-500/10"
     }
   }
+
+  const tierPrice = getTierPrice()
+  const needsPayment = tierPrice > 0
 
   return (
     <Card className="w-full max-w-2xl relative z-10 bg-black/40 backdrop-blur-xl border-purple-500/20">
@@ -250,17 +347,25 @@ export default function SignUpForm() {
                         {getTierIcon(tier)}
                         <div>
                           <div className="font-semibold text-white capitalize">
-                            {tier.replace("_", " ")} {price > 0 && `- ₦${price.toLocaleString()}`}
+                            {tier.replace("_", " ")}
+                            {tier !== "enterprise" && price > 0 && ` - ₦${price.toLocaleString()}`}
+                            {tier === "enterprise" && " - Custom Pricing"}
                           </div>
                           <div className="text-sm text-gray-400">
                             {TIER_FEATURES[tier as keyof typeof TIER_FEATURES].slice(0, 2).join(", ")}
                           </div>
                         </div>
                       </div>
-                      {price > 0 && (
+                      {tier !== "enterprise" && price > 0 && (
                         <div className="text-right">
                           <div className="text-lg font-bold text-purple-400">₦{price.toLocaleString()}</div>
                           <div className="text-xs text-gray-400">monthly</div>
+                        </div>
+                      )}
+                      {tier === "enterprise" && (
+                        <div className="text-right">
+                          <div className="text-lg font-bold text-purple-400">Custom</div>
+                          <div className="text-xs text-gray-400">from $200+</div>
                         </div>
                       )}
                     </div>
@@ -268,28 +373,91 @@ export default function SignUpForm() {
                 </div>
               ))}
             </RadioGroup>
+
+            {selectedTier === "enterprise" && (
+              <div className="space-y-2">
+                <Label htmlFor="enterpriseAmount" className="text-gray-200">
+                  Enterprise Amount (USD)
+                </Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="enterpriseAmount"
+                    type="number"
+                    min="200"
+                    step="1"
+                    placeholder="Enter amount (minimum $200)"
+                    value={enterpriseAmount}
+                    onChange={(e) => setEnterpriseAmount(e.target.value)}
+                    className="bg-black/20 border-purple-500/30 text-white placeholder:text-gray-400 focus:border-purple-400 pl-10"
+                  />
+                </div>
+                {enterpriseAmount && Number.parseFloat(enterpriseAmount) >= 200 && (
+                  <div className="text-sm text-gray-300">
+                    Equivalent: ₦{getEnterpriseAmountInNaira().toLocaleString()}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
 
         <CardFooter className="flex flex-col space-y-4">
-          <Button
-            type="submit"
-            disabled={isPending}
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200"
-          >
-            {isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating Account...
-              </>
-            ) : (
-              <>
-                {TIER_PRICES[selectedTier as keyof typeof TIER_PRICES] === 0
-                  ? "Create Free Account"
-                  : `Create Account - ₦${TIER_PRICES[selectedTier as keyof typeof TIER_PRICES].toLocaleString()}`}
-              </>
-            )}
-          </Button>
+          {!needsPayment ? (
+            <Button
+              type="submit"
+              disabled={isPending}
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200"
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                "Create Free Account"
+              )}
+            </Button>
+          ) : (
+            <div className="w-full space-y-4">
+              <Button
+                type="submit"
+                disabled={
+                  isPending ||
+                  isProcessingPayment ||
+                  (selectedTier === "enterprise" && (!enterpriseAmount || Number.parseFloat(enterpriseAmount) < 200))
+                }
+                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200"
+              >
+                {isPending || isProcessingPayment ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {isProcessingPayment ? "Processing Payment..." : "Preparing Payment..."}
+                  </>
+                ) : (
+                  `Pay ₦${tierPrice.toLocaleString()} & Create Account`
+                )}
+              </Button>
+
+              {formData && (
+                <PaystackIntegration
+                  amount={tierPrice}
+                  email={formData.get("email") as string}
+                  metadata={{
+                    tier: selectedTier,
+                    fullName: formData.get("fullName") as string,
+                    username: formData.get("username") as string,
+                    signup_type: "tier_subscription",
+                    ...(selectedTier === "enterprise" && { enterpriseAmountUSD: enterpriseAmount }),
+                  }}
+                  onSuccess={handlePaymentSuccess}
+                  onError={handlePaymentError}
+                >
+                  <div />
+                </PaystackIntegration>
+              )}
+            </div>
+          )}
 
           <p className="text-center text-sm text-gray-300">
             Already have an account?{" "}

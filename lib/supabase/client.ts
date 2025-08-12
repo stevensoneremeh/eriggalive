@@ -80,11 +80,12 @@ const createMockClient = () => {
             user: {
               id: "mock-user-id",
               email: email,
-              user_metadata: { username: "mockuser", full_name: "Mock User" },
+              user_metadata: { username: "mockuser", full_name: "Mock User", ...options?.data },
               aud: "authenticated",
               role: "authenticated",
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
+              email_confirmed_at: new Date().toISOString(), // Auto-confirm email in mock mode
             },
             session: {
               access_token: "mock-token",
@@ -270,6 +271,18 @@ const createMockClient = () => {
         eq: (column: string, value: any) => Promise.resolve({ error: null }),
       }),
     }),
+    storage: {
+      from: (bucket: string) => ({
+        upload: (path: string, file: File) =>
+          Promise.resolve({
+            data: { path: `mock/${path}` },
+            error: null,
+          }),
+        getPublicUrl: (path: string) => ({
+          data: { publicUrl: `https://mock-storage.com/${path}` },
+        }),
+      }),
+    },
   } as any
 }
 
