@@ -7,53 +7,42 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Loader2, Eye, EyeOff, Check, Crown, Building, Zap, DollarSign } from "lucide-react"
+import { Loader2, Eye, EyeOff, Check, Crown, Zap, DollarSign } from "lucide-react"
 import Link from "next/link"
 import { signUp } from "@/lib/actions"
 import { PaystackIntegration } from "@/components/paystack/paystack-integration"
 import { useRouter } from "next/navigation"
 
 const TIER_PRICES = {
-  grassroot: 0,
-  pioneer: 2500, // Updated to match tier system pricing
-  elder: 5000,
-  blood_brotherhood: 10000,
-  enterprise: 0, // Added enterprise tier with custom pricing
+  free: 0,
+  premium: 5000, // ₦5,000 monthly
+  enterprise: 0, // Custom pricing from $200+
 }
 
 const TIER_FEATURES = {
-  grassroot: ["Community access", "Public content", "Event announcements", "Basic profile"],
-  pioneer: [
-    "All Grassroot features",
+  free: ["Community access", "Public content", "Event announcements", "Basic profile"],
+  premium: [
+    "All Free features",
     "Early music releases",
     "Exclusive interviews",
-    "10% merch discount",
-    "Pioneer badge",
-  ],
-  elder: [
-    "All Pioneer features",
     "Behind-the-scenes content",
     "Studio session videos",
     "Priority event access",
     "Monthly Erigga coins",
-    "Elder badge",
+    "Premium badge",
   ],
-  blood_brotherhood: [
-    "All Elder features",
+  enterprise: [
+    "All Premium features",
+    "Custom pricing from $200+",
     "Direct messaging with Erigga",
     "Virtual meet & greets",
     "Exclusive merchandise",
-    "Blood Brotherhood badge",
-    "Voting rights on new content",
-  ],
-  enterprise: [
-    "All Blood Brotherhood features",
-    "Custom pricing from $200+",
     "Dedicated account manager",
     "Custom integrations",
     "Priority support",
     "Enterprise badge",
     "Bulk user management",
+    "Voting rights on new content",
   ],
 }
 
@@ -62,7 +51,7 @@ export default function SignUpForm() {
   const [isPending, startTransition] = useTransition()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [selectedTier, setSelectedTier] = useState("grassroot")
+  const [selectedTier, setSelectedTier] = useState("free") // Default to free tier
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
@@ -171,14 +160,10 @@ export default function SignUpForm() {
 
   const getTierIcon = (tier: string) => {
     switch (tier) {
-      case "grassroot":
+      case "free":
         return <Check className="h-5 w-5" />
-      case "pioneer":
+      case "premium":
         return <Crown className="h-5 w-5" />
-      case "elder":
-        return <Building className="h-5 w-5" />
-      case "blood_brotherhood":
-        return <Crown className="h-5 w-5 text-red-500" />
       case "enterprise":
         return <Zap className="h-5 w-5 text-purple-500" />
       default:
@@ -188,14 +173,10 @@ export default function SignUpForm() {
 
   const getTierColor = (tier: string) => {
     switch (tier) {
-      case "grassroot":
+      case "free":
         return "border-green-500/30 bg-green-500/10"
-      case "pioneer":
+      case "premium":
         return "border-blue-500/30 bg-blue-500/10"
-      case "elder":
-        return "border-purple-500/30 bg-purple-500/10"
-      case "blood_brotherhood":
-        return "border-red-500/30 bg-red-500/10"
       case "enterprise":
         return "border-purple-600/30 bg-purple-600/10"
       default:
@@ -347,7 +328,7 @@ export default function SignUpForm() {
                         {getTierIcon(tier)}
                         <div>
                           <div className="font-semibold text-white capitalize">
-                            {tier.replace("_", " ")}
+                            {tier}
                             {tier !== "enterprise" && price > 0 && ` - ₦${price.toLocaleString()}`}
                             {tier === "enterprise" && " - Custom Pricing"}
                           </div>
