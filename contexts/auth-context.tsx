@@ -150,7 +150,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(profileData)
 
         if (event === "SIGNED_IN" && initialized) {
-          router.push("/dashboard") // Redirect to dashboard instead of home
+          // Check if this is coming from a signup by looking at the URL or session metadata
+          const isFromSignup =
+            session.user.email_confirmed_at && new Date(session.user.email_confirmed_at).getTime() > Date.now() - 10000 // Within last 10 seconds
+
+          if (!isFromSignup) {
+            router.push("/dashboard")
+          }
         }
       } else {
         setProfile(null)
@@ -256,11 +262,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email,
           password,
           options: {
-            emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`,
+            emailRedirectTo:
+              process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback`,
             data: {
               username: userData.username,
               full_name: userData.full_name,
-              tier: userData.tier || "free", // Updated default tier to "free"
+              tier: userData.tier || "free",
               payment_reference: userData.payment_reference,
             },
           },
@@ -271,14 +278,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { error }
         }
 
-        setLoading(false)
+        if (data.user && data.session) {
+          setLoading(false)
+          // Small delay to ensure state is updated
+          setTimeout(() => {
+            router.push("/dashboard")
+          }, 100)
+        } else {
+          setLoading(false)
+        }
+
         return { error: null }
       } catch (error: any) {
         setLoading(false)
         return { error: { message: error.message || "An unexpected error occurred" } }
       }
     },
-    [supabaseClient, clientError],
+    [supabaseClient, clientError, router],
   )
 
   const signOut = useCallback(async () => {
