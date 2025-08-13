@@ -39,40 +39,84 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [initialized, setInitialized] = useState(false)
   const router = useRouter()
 
-  const supabase = createClient()
+  const [supabaseClient, setSupabaseClient] = useState<ReturnType<typeof createClient> | null>(null)
+  const [clientError, setClientError] = useState<string | null>(null)
+
+  useEffect(() => {
+    try {
+      const client = createClient()
+      setSupabaseClient(client)
+      setClientError(null)
+    } catch (error: any) {
+      console.error("Failed to initialize Supabase client:", error)
+      setClientError(error.message)
+      setLoading(false)
+      setInitialized(true)
+    }
+  }, [])
 
   const fetchProfile = useCallback(
     async (userId: string): Promise<UserProfile | null> => {
-      try {
-        const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).maybeSingle()
+      if (!supabaseClient || clientError) {
+        console.warn("Supabase client not available, skipping profile fetch")
+        return null
+      }
 
-        if (error) {
-          console.error("Error fetching profile:", error.message)
-          return null
+      try {
+        let retries = 3
+        let lastError: any = null
+
+        while (retries > 0) {
+          try {
+            const { data, error } = await supabaseClient
+              .from("users")
+              .select("*")
+              .eq("auth_user_id", userId)
+              .maybeSingle()
+
+            if (error) {
+              console.error("Error fetching profile:", error.message)
+              return null
+            }
+
+            return data
+          } catch (error: any) {
+            lastError = error
+            retries--
+            if (retries > 0) {
+              console.warn(`Profile fetch failed, retrying... (${retries} attempts left)`)
+              await new Promise((resolve) => setTimeout(resolve, 1000)) // Wait 1 second before retry
+            }
+          }
         }
 
-        return data
+        throw lastError
       } catch (error: any) {
-        console.error("Error in fetchProfile:", error.message)
+        console.error("Error in fetchProfile after retries:", error.message)
         return null
       }
     },
-    [supabase],
+    [supabaseClient, clientError],
   )
 
   const refreshProfile = useCallback(async () => {
-    if (user) {
+    if (user && supabaseClient && !clientError) {
       const profileData = await fetchProfile(user.id)
       setProfile(profileData)
     }
-  }, [user, fetchProfile])
+  }, [user, fetchProfile, supabaseClient, clientError])
 
   const refreshSession = useCallback(async () => {
+    if (!supabaseClient || clientError) {
+      console.warn("Supabase client not available, skipping session refresh")
+      return
+    }
+
     try {
       const {
         data: { session },
         error,
-      } = await supabase.auth.getSession()
+      } = await supabaseClient.auth.getSession()
 
       if (error) {
         console.error("Error refreshing session:", error.message)
@@ -91,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error: any) {
       console.error("Error in refreshSession:", error.message)
     }
-  }, [supabase, fetchProfile])
+  }, [supabaseClient, clientError, fetchProfile])
 
   const handleAuthStateChange = useCallback(
     async (event: string, session: Session | null) => {
@@ -100,13 +144,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session)
       setUser(session?.user ?? null)
 
-      if (session?.user) {
+      if (session?.user && supabaseClient && !clientError) {
         // Fetch profile for authenticated user
         const profileData = await fetchProfile(session.user.id)
         setProfile(profileData)
 
         if (event === "SIGNED_IN" && initialized) {
-          router.push("/")
+          router.push("/dashboard") // Redirect to dashboard instead of home
         }
       } else {
         setProfile(null)
@@ -121,10 +165,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setLoading(false)
     },
-    [fetchProfile, router, initialized],
+    [fetchProfile, router, initialized, supabaseClient, clientError],
   )
 
   useEffect(() => {
+    if (!supabaseClient || clientError) {
+      return
+    }
+
     let mounted = true
 
     const initializeAuth = async () => {
@@ -132,7 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const {
           data: { session: initialSession },
           error,
-        } = await supabase.auth.getSession()
+        } = await supabaseClient.auth.getSession()
 
         if (error) {
           console.error("Error getting session:", error.message)
@@ -154,20 +202,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(handleAuthStateChange)
+    } = supabaseClient.auth.onAuthStateChange(handleAuthStateChange)
 
     return () => {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [supabase.auth, handleAuthStateChange])
+  }, [supabaseClient, clientError, handleAuthStateChange])
 
   const signIn = useCallback(
     async (email: string, password: string) => {
+      if (!supabaseClient || clientError) {
+        return { error: { message: "Authentication service is not available" } }
+      }
+
       try {
         setLoading(true)
 
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
           email,
           password,
         })
@@ -184,7 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: { message: error.message || "An unexpected error occurred" } }
       }
     },
-    [supabase.auth],
+    [supabaseClient, clientError],
   )
 
   const signUp = useCallback(
@@ -193,18 +245,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password: string,
       userData: { username: string; full_name: string; tier?: string; payment_reference?: string },
     ) => {
+      if (!supabaseClient || clientError) {
+        return { error: { message: "Authentication service is not available" } }
+      }
+
       try {
         setLoading(true)
 
-        const { data, error } = await supabase.auth.signUp({
+        const { data, error } = await supabaseClient.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || window.location.origin,
+            emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`,
             data: {
               username: userData.username,
               full_name: userData.full_name,
-              tier: userData.tier || "grassroot",
+              tier: userData.tier || "free", // Updated default tier to "free"
               payment_reference: userData.payment_reference,
             },
           },
@@ -222,13 +278,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: { message: error.message || "An unexpected error occurred" } }
       }
     },
-    [supabase.auth],
+    [supabaseClient, clientError],
   )
 
   const signOut = useCallback(async () => {
+    if (!supabaseClient || clientError) {
+      console.warn("Supabase client not available, clearing local state only")
+      setUser(null)
+      setSession(null)
+      setProfile(null)
+      router.push("/login")
+      return
+    }
+
     try {
       setLoading(true)
-      const { error } = await supabase.auth.signOut()
+      const { error } = await supabaseClient.auth.signOut()
 
       if (error) {
         console.error("Error signing out:", error.message)
@@ -238,12 +303,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }, [supabase.auth])
+  }, [supabaseClient, clientError, router])
 
   const resetPassword = useCallback(
     async (email: string) => {
+      if (!supabaseClient || clientError) {
+        return { error: { message: "Authentication service is not available" } }
+      }
+
       try {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/reset-password`,
         })
         return { error }
@@ -251,13 +320,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: { message: error.message || "An unexpected error occurred" } }
       }
     },
-    [supabase.auth],
+    [supabaseClient, clientError],
   )
 
   const updatePassword = useCallback(
     async (password: string) => {
+      if (!supabaseClient || clientError) {
+        return { error: { message: "Authentication service is not available" } }
+      }
+
       try {
-        const { error } = await supabase.auth.updateUser({
+        const { error } = await supabaseClient.auth.updateUser({
           password: password,
         })
         return { error }
@@ -265,8 +338,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: { message: error.message || "An unexpected error occurred" } }
       }
     },
-    [supabase.auth],
+    [supabaseClient, clientError],
   )
+
+  if (clientError) {
+    console.error("Supabase configuration error:", clientError)
+    // Still provide the context but with limited functionality
+  }
 
   const value = {
     user,
