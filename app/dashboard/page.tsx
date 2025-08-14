@@ -69,11 +69,10 @@ export default function DashboardPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
-  // Load user statistics
   useEffect(() => {
     if (user && profile) {
-      loadUserStats()
-      loadRecentActivity()
+      // Load stats and activity in parallel for better performance
+      Promise.all([loadUserStats(), loadRecentActivity()])
     }
   }, [user, profile])
 
@@ -83,69 +82,58 @@ export default function DashboardPage() {
     try {
       setLoadingStats(true)
 
-      // Get community posts count
-      const { count: postsCount } = await supabase
-        .from("community_posts")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", profile.id)
-        .eq("is_deleted", false)
-
-      // Get community comments count
-      const { count: commentsCount } = await supabase
-        .from("community_comments")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", profile.id)
-        .eq("is_deleted", false)
-
-      // Get votes given count
-      const { count: votesCount } = await supabase
-        .from("community_post_votes")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", profile.id)
-
-      // Get tickets count
-      const { count: ticketsCount } = await supabase
-        .from("tickets")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-
-      // Get purchases count
-      const { count: purchasesCount } = await supabase
-        .from("store_purchases")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-
-      // Get vault views count
-      const { count: vaultViewsCount } = await supabase
-        .from("vault_views")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-
-      // Get followers count
-      const { count: followersCount } = await supabase
-        .from("user_follows")
-        .select("*", { count: "exact", head: true })
-        .eq("following_id", profile.id)
-
-      // Get following count
-      const { count: followingCount } = await supabase
-        .from("user_follows")
-        .select("*", { count: "exact", head: true })
-        .eq("follower_id", profile.id)
+      const [
+        postsResult,
+        commentsResult,
+        votesResult,
+        ticketsResult,
+        purchasesResult,
+        vaultViewsResult,
+        followersResult,
+        followingResult,
+      ] = await Promise.all([
+        supabase
+          .from("community_posts")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", profile.id)
+          .eq("is_deleted", false),
+        supabase
+          .from("community_comments")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", profile.id)
+          .eq("is_deleted", false),
+        supabase.from("community_post_votes").select("*", { count: "exact", head: true }).eq("user_id", profile.id),
+        supabase.from("tickets").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+        supabase.from("store_purchases").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+        supabase.from("vault_views").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+        supabase.from("user_follows").select("*", { count: "exact", head: true }).eq("following_id", profile.id),
+        supabase.from("user_follows").select("*", { count: "exact", head: true }).eq("follower_id", profile.id),
+      ])
 
       setUserStats({
-        totalPosts: postsCount || 0,
-        totalComments: commentsCount || 0,
-        totalVotes: votesCount || 0,
-        totalTickets: ticketsCount || 0,
-        totalPurchases: purchasesCount || 0,
-        vaultViews: vaultViewsCount || 0,
-        followersCount: followersCount || 0,
-        followingCount: followingCount || 0,
+        totalPosts: postsResult.count || 0,
+        totalComments: commentsResult.count || 0,
+        totalVotes: votesResult.count || 0,
+        totalTickets: ticketsResult.count || 0,
+        totalPurchases: purchasesResult.count || 0,
+        vaultViews: vaultViewsResult.count || 0,
+        followersCount: followersResult.count || 0,
+        followingCount: followingResult.count || 0,
         reputationScore: profile.reputation_score || 0,
       })
     } catch (error) {
       console.error("Error loading user stats:", error)
+      setUserStats({
+        totalPosts: 0,
+        totalComments: 0,
+        totalVotes: 0,
+        totalTickets: 0,
+        totalPurchases: 0,
+        vaultViews: 0,
+        followersCount: 0,
+        followingCount: 0,
+        reputationScore: 0,
+      })
     } finally {
       setLoadingStats(false)
     }
@@ -155,37 +143,34 @@ export default function DashboardPage() {
     if (!profile) return
 
     try {
-      // Get recent posts
-      const { data: recentPosts } = await supabase
-        .from("community_posts")
-        .select("id, content, created_at")
-        .eq("user_id", profile.id)
-        .eq("is_deleted", false)
-        .order("created_at", { ascending: false })
-        .limit(3)
-
-      // Get recent comments
-      const { data: recentComments } = await supabase
-        .from("community_comments")
-        .select("id, content, created_at")
-        .eq("user_id", profile.id)
-        .eq("is_deleted", false)
-        .order("created_at", { ascending: false })
-        .limit(3)
-
-      // Get recent tickets
-      const { data: recentTickets } = await supabase
-        .from("tickets")
-        .select("id, ticket_number, created_at, events(title)")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(2)
+      const [recentPostsResult, recentCommentsResult, recentTicketsResult] = await Promise.all([
+        supabase
+          .from("community_posts")
+          .select("id, content, created_at")
+          .eq("user_id", profile.id)
+          .eq("is_deleted", false)
+          .order("created_at", { ascending: false })
+          .limit(3),
+        supabase
+          .from("community_comments")
+          .select("id, content, created_at")
+          .eq("user_id", profile.id)
+          .eq("is_deleted", false)
+          .order("created_at", { ascending: false })
+          .limit(3),
+        supabase
+          .from("tickets")
+          .select("id, ticket_number, created_at, events(title)")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(2),
+      ])
 
       const activities = []
 
       // Add posts to activity
-      if (recentPosts) {
-        recentPosts.forEach((post) => {
+      if (recentPostsResult.data) {
+        recentPostsResult.data.forEach((post) => {
           activities.push({
             type: "post",
             content: `Created post: ${post.content.substring(0, 50)}...`,
@@ -197,8 +182,8 @@ export default function DashboardPage() {
       }
 
       // Add comments to activity
-      if (recentComments) {
-        recentComments.forEach((comment) => {
+      if (recentCommentsResult.data) {
+        recentCommentsResult.data.forEach((comment) => {
           activities.push({
             type: "comment",
             content: `Commented: ${comment.content.substring(0, 50)}...`,
@@ -210,8 +195,8 @@ export default function DashboardPage() {
       }
 
       // Add tickets to activity
-      if (recentTickets) {
-        recentTickets.forEach((ticket) => {
+      if (recentTicketsResult.data) {
+        recentTicketsResult.data.forEach((ticket) => {
           activities.push({
             type: "ticket",
             content: `Got ticket for ${ticket.events?.title || "Event"}`,
@@ -227,6 +212,7 @@ export default function DashboardPage() {
       setRecentActivity(activities.slice(0, 5))
     } catch (error) {
       console.error("Error loading recent activity:", error)
+      setRecentActivity([])
     }
   }
 

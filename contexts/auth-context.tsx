@@ -37,6 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [initialized, setInitialized] = useState(false)
+  const [profileCache, setProfileCache] = useState<{ [key: string]: UserProfile }>({})
   const router = useRouter()
 
   const supabase = createClient()
@@ -49,11 +50,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return null
         }
 
+        if (profileCache[userId]) {
+          return profileCache[userId]
+        }
+
         const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).maybeSingle()
 
         if (error) {
           console.error("Error fetching profile:", error.message)
           return null
+        }
+
+        if (data) {
+          setProfileCache((prev) => ({ ...prev, [userId]: data }))
         }
 
         return data
@@ -62,11 +71,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return null
       }
     },
-    [supabase],
+    [supabase, profileCache],
   )
 
   const refreshProfile = useCallback(async () => {
     if (user) {
+      setProfileCache((prev) => {
+        const newCache = { ...prev }
+        delete newCache[user.id]
+        return newCache
+      })
       const profileData = await fetchProfile(user.id)
       setProfile(profileData)
     }
@@ -106,9 +120,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
 
       if (session?.user) {
-        // Fetch profile for authenticated users
-        const profileData = await fetchProfile(session.user.id)
-        setProfile(profileData)
+        fetchProfile(session.user.id).then((profileData) => {
+          setProfile(profileData)
+        })
 
         if (event === "SIGNED_IN" && initialized) {
           const urlParams = new URLSearchParams(window.location.search)
@@ -125,6 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         setProfile(null)
+        setProfileCache({})
 
         if (event === "SIGNED_OUT" && initialized) {
           router.push("/")
@@ -230,7 +245,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data.user && !data.user.email_confirmed_at) {
           router.push("/signup/success")
         } else if (data.user) {
-          // Auto-confirmed users will be handled by auth state change
         }
 
         setLoading(false)
