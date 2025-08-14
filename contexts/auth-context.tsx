@@ -53,33 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchProfile = useCallback(
     async (userId: string): Promise<UserProfile | null> => {
       try {
-        // Use a simple query to avoid RLS issues
-        const { data, error } = await supabase
-          .from("users")
-          .select(
-            `
-            id,
-            auth_user_id,
-            username,
-            full_name,
-            email,
-            avatar_url,
-            tier,
-            role,
-            level,
-            points,
-            coins,
-            bio,
-            is_verified,
-            is_active,
-            is_banned,
-            reputation_score,
-            created_at,
-            updated_at
-          `,
-          )
-          .eq("auth_user_id", userId)
-          .maybeSingle()
+        const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).maybeSingle()
 
         if (error) {
           console.error("Error fetching profile:", error.message)
@@ -115,9 +89,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setSession(session)
+      setUser(session?.user ?? null)
+
       if (session?.user) {
         const profileData = await fetchProfile(session.user.id)
         setProfile(profileData)
+      } else {
+        setProfile(null)
       }
     } catch (error: any) {
       console.error("Error in refreshSession:", error.message)
@@ -132,20 +110,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
 
       if (session?.user) {
-        // Only fetch profile if we don't have one or if it's a different user
-        if (!profile || profile.auth_user_id !== session.user.id) {
-          const profileData = await fetchProfile(session.user.id)
-          setProfile(profileData)
-        }
+        // Fetch profile for authenticated users
+        const profileData = await fetchProfile(session.user.id)
+        setProfile(profileData)
 
-        // Only redirect on sign in, not on initial load or token refresh
         if (event === "SIGNED_IN" && initialized) {
-          // Check if there's a redirect parameter in the URL
           const urlParams = new URLSearchParams(window.location.search)
           const redirectTo = urlParams.get("redirect")
 
           if (redirectTo && redirectTo.startsWith("/")) {
-            // Clear the redirect parameter from URL
             const newUrl = new URL(window.location.href)
             newUrl.searchParams.delete("redirect")
             window.history.replaceState({}, "", newUrl.toString())
@@ -158,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null)
 
         if (event === "SIGNED_OUT" && initialized) {
-          router.push("/login")
+          router.push("/")
         }
       }
 
@@ -167,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setLoading(false)
     },
-    [fetchProfile, router, initialized, profile],
+    [fetchProfile, router, initialized],
   )
 
   useEffect(() => {
@@ -175,7 +148,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initializeAuth = async () => {
       try {
-        // Get initial session
         const {
           data: { session: initialSession },
           error,
@@ -199,7 +171,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initializeAuth()
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(handleAuthStateChange)
@@ -224,7 +195,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { error }
         }
 
-        // Don't set loading to false here - let the auth state change handle it
         return { error: null }
       } catch (error: any) {
         setLoading(false)
@@ -252,6 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               tier: userData.tier || "free",
               payment_reference: userData.payment_reference,
             },
+            emailRedirectTo: `${window.location.origin}/auth/callback?redirect=/dashboard`,
           },
         })
 
@@ -260,13 +231,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { error }
         }
 
-        // If signup is successful, redirect to success page or dashboard
         if (data.user && !data.user.email_confirmed_at) {
-          // Email confirmation required
           router.push("/signup/success")
         } else if (data.user) {
-          // Auto-confirmed, go to dashboard
-          router.push("/dashboard")
+          // Auto-confirmed users will be handled by auth state change
         }
 
         setLoading(false)
@@ -282,13 +250,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     try {
       setLoading(true)
-      await supabase.auth.signOut()
+      setUser(null)
+      setSession(null)
+      setProfile(null)
+
+      const { error } = await supabase.auth.signOut()
+
+      if (error) {
+        console.error("Error signing out:", error.message)
+      }
+
+      router.push("/")
     } catch (error: any) {
       console.error("Error signing out:", error.message)
     } finally {
       setLoading(false)
     }
-  }, [supabase.auth])
+  }, [supabase.auth, router])
 
   const resetPassword = useCallback(
     async (email: string) => {
