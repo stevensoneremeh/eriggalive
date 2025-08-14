@@ -10,7 +10,7 @@ export async function updateSession(request: NextRequest) {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Missing Supabase environment variables in middleware")
+    console.error("[SERVER] Missing Supabase environment variables in middleware")
     return supabaseResponse
   }
 
@@ -30,20 +30,31 @@ export async function updateSession(request: NextRequest) {
       },
     })
 
-    // This will refresh session if expired - required for Server Components
     const {
       data: { user },
       error,
     } = await supabase.auth.getUser()
 
     if (error) {
-      console.warn("Auth error in middleware:", error.message)
-      // Don't block the request, just log the error
+      // Only log actual errors, not missing sessions
+      if (error.message !== "Auth session missing!" && !error.message.includes("session_not_found")) {
+        console.warn("[SERVER] Auth error in middleware:", error.message)
+      }
+      // Don't block the request for auth errors
+      return supabaseResponse
+    }
+
+    if (user) {
+      try {
+        await supabase.auth.getSession()
+      } catch (sessionError: any) {
+        console.warn("[SERVER] Session refresh error:", sessionError.message)
+      }
     }
 
     return supabaseResponse
   } catch (error: any) {
-    console.error("Middleware error:", error.message)
+    console.error("[SERVER] Middleware execution error:", error.message)
     // Return the original response if there's an error
     return supabaseResponse
   }

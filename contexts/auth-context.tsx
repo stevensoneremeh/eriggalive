@@ -31,16 +31,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Create a single supabase client instance
-let supabaseClient: ReturnType<typeof createClient> | null = null
-
-const getSupabaseClient = () => {
-  if (!supabaseClient) {
-    supabaseClient = createClient()
-  }
-  return supabaseClient
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -48,11 +38,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [initialized, setInitialized] = useState(false)
   const router = useRouter()
-  const supabase = getSupabaseClient()
+
+  const supabase = createClient()
 
   const fetchProfile = useCallback(
     async (userId: string): Promise<UserProfile | null> => {
       try {
+        if (!supabase) {
+          console.warn("Supabase client not available")
+          return null
+        }
+
         const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).maybeSingle()
 
         if (error) {
@@ -250,14 +246,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     try {
       setLoading(true)
+
       setUser(null)
       setSession(null)
       setProfile(null)
 
-      const { error } = await supabase.auth.signOut()
-
-      if (error) {
-        console.error("Error signing out:", error.message)
+      if (supabase) {
+        const { error } = await supabase.auth.signOut()
+        if (error) {
+          console.error("Error signing out:", error.message)
+        }
       }
 
       router.push("/")
@@ -266,7 +264,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }, [supabase.auth, router])
+  }, [supabase, router])
 
   const resetPassword = useCallback(
     async (email: string) => {
