@@ -1,24 +1,11 @@
-import { createServerClient } from "@supabase/ssr"
-import { NextResponse, type NextRequest } from "next/server"
-
-// Check if Supabase environment variables are available
-export const isSupabaseConfigured =
-  typeof process.env.NEXT_PUBLIC_SUPABASE_URL === "string" &&
-  process.env.NEXT_PUBLIC_SUPABASE_URL.length > 0 &&
-  typeof process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === "string" &&
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.length > 0
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
-  // If Supabase is not configured, just continue without auth
-  if (!isSupabaseConfigured) {
-    return NextResponse.next({
-      request,
-    })
-  }
+  let supabaseResponse = NextResponse.next({
+    request,
+  })
 
-  const res = NextResponse.next()
-
-  // Create a Supabase client configured to use cookies
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -29,29 +16,41 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-          const response = NextResponse.next({
+          supabaseResponse = NextResponse.next({
             request,
           })
-          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
-          return response
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
         },
       },
-    },
+    }
   )
 
-  // Check if this is an auth callback
-  const requestUrl = new URL(request.url)
-  const code = requestUrl.searchParams.get("code")
+  // IMPORTANT: Avoid writing any logic between createServerClient and
+  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
+  // issues with users being randomly logged out.
 
-  if (code) {
-    // Exchange the code for a session
-    await supabase.auth.exchangeCodeForSession(code)
-    // Redirect to home page after successful auth
-    return NextResponse.redirect(new URL("/", request.url))
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
+
+    // Only log actual errors, not missing sessions
+    if (error && !error.message.includes('Auth session missing')) {
+      console.error('Auth error in middleware:', error.message)
+    }
+
+    // Allow all requests to continue - we'll handle auth at the component level
+    return supabaseResponse
+  } catch (error: any) {
+    // Only log unexpected errors
+    if (!error.message?.includes('Auth session missing')) {
+      console.error('Unexpected auth error in middleware:', error)
+    }
+    
+    // Always allow the request to continue
+    return supabaseResponse
   }
-
-  // Refresh session if expired - required for Server Components
-  await supabase.auth.getSession()
-
-  return res
 }

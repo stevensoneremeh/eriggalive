@@ -1,175 +1,68 @@
 "use client"
 
-import { useState } from "react"
 import type React from "react"
 
+import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import {
-  Calendar,
-  MapPin,
-  Users,
-  Clock,
-  QrCode,
-  Download,
-  Sparkles,
-  Music,
-  Gift,
-  Zap,
-  Shield,
-  Search,
-  Filter,
-  Ticket,
-  Star,
-} from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { Calendar, MapPin, Users, Clock, QrCode, Download, Share2, Sparkles, Music, Star } from "lucide-react"
 import { AuthGuard } from "@/components/auth-guard"
 import { useAuth } from "@/contexts/auth-context"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { createClient } from "@/lib/supabase/client"
-import { PaystackIntegration } from "@/components/paystack/paystack-integration"
-
-interface TicketData {
-  id: string
-  eventTitle: string
-  eventDate: string
-  eventTime: string
-  venue: string
-  ticketType: string
-  price: number
-  status: "confirmed" | "pending" | "used" | "expired"
-  qrCode: string
-  seatNumber?: string
-  description?: string
-}
-
-interface Event {
-  id: string
-  title: string
-  description: string
-  date: string
-  time: string
-  venue: string
-  price: number
-  capacity: number
-  sold: number
-  image: string
-  category: string
-}
-
-const mockTickets: TicketData[] = [
-  {
-    id: "TKT001",
-    eventTitle: "Erigga Live Concert 2024",
-    eventDate: "2024-03-15",
-    eventTime: "8:00 PM",
-    venue: "Eko Convention Centre, Lagos",
-    ticketType: "VIP",
-    price: 15000,
-    status: "confirmed",
-    qrCode: "QR123456789",
-    seatNumber: "A12",
-    description: "VIP access with meet and greet",
-  },
-  {
-    id: "TKT002",
-    eventTitle: "Paper Boi Album Launch",
-    eventDate: "2024-04-20",
-    eventTime: "7:00 PM",
-    venue: "Terra Kulture, Victoria Island",
-    ticketType: "Regular",
-    price: 5000,
-    status: "pending",
-    qrCode: "QR987654321",
-    description: "Exclusive album launch event",
-  },
-]
 
 // Enhanced events data with September concert
-const eventsData = [
+const events = [
   {
     id: "erigga-september-2025",
     title: "Erigga Live – September 2025",
+    subtitle: "Intimate Session with THE GOAT",
     description:
       "Be part of history. Experience Erigga live in an intimate setting with special guests and surprise performances",
-    date: "2025-09-03",
-    time: "20:00",
     venue: "The Playground",
+    location: "Warri, Nigeria",
+    date: "2025-09-03T20:00:00Z",
     price: 0, // Free event
-    capacity: 200,
-    sold: 45,
-    image: "/erigga/hero/erigga-main-hero.jpeg",
+    maxTickets: 200,
+    ticketsSold: 45,
+    image: "/erigga-poster.jpg",
     category: "Intimate Session",
+    isVip: true,
+    isSpecial: true,
+    tags: ["Exclusive", "Limited", "VIP Access"],
   },
   {
     id: "1",
     title: "Warri Live Show 2024",
     description: "Experience Erigga live in his hometown with special guests and surprise performances",
-    date: "2024-12-25",
-    time: "20:00",
     venue: "Warri City Stadium",
+    location: "Warri, Delta State",
+    date: "2024-12-25T20:00:00Z",
     price: 500000, // 5000 NGN in kobo
-    capacity: 5000,
-    sold: 3200,
-    image: "/images/hero/erigga1.jpeg",
+    maxTickets: 5000,
+    ticketsSold: 3200,
+    image: "/placeholder.svg?height=300&width=400",
     category: "Concert",
+    isVip: false,
   },
   {
     id: "2",
     title: "Lagos Concert - Paper Boi Live",
     description: "The biggest Erigga concert in Lagos with full band and special effects",
-    date: "2025-01-15",
-    time: "19:00",
     venue: "Eko Hotel Convention Centre",
+    location: "Victoria Island, Lagos",
+    date: "2025-01-15T19:00:00Z",
     price: 1000000, // 10000 NGN in kobo
-    capacity: 3000,
-    sold: 1800,
-    image: "/images/hero/erigga2.jpeg",
+    maxTickets: 3000,
+    ticketsSold: 1800,
+    image: "/placeholder.svg?height=300&width=400",
     category: "Concert",
-  },
-]
-
-const mockEvents: Event[] = [
-  {
-    id: "EVT001",
-    title: "Erigga Live Experience 2024",
-    description: "The biggest concert of the year featuring Erigga and special guests",
-    date: "2024-05-15",
-    time: "8:00 PM",
-    venue: "National Theatre, Iganmu Lagos",
-    price: 10000,
-    capacity: 5000,
-    sold: 3200,
-    image: "/images/hero/erigga1.jpeg",
-    category: "Concert",
-  },
-  {
-    id: "EVT002",
-    title: "Street Dreams Tour",
-    description: "Intimate acoustic session with Erigga",
-    date: "2024-06-22",
-    time: "6:00 PM",
-    venue: "Freedom Park, Lagos Island",
-    price: 7500,
-    capacity: 1000,
-    sold: 450,
-    image: "/images/hero/erigga2.jpeg",
-    category: "Acoustic",
-  },
-  {
-    id: "EVT003",
-    title: "Meet & Greet Session",
-    description: "Exclusive fan meetup with photo opportunities",
-    date: "2024-07-10",
-    time: "4:00 PM",
-    venue: "Silverbird Galleria, Victoria Island",
-    price: 25000,
-    capacity: 50,
-    sold: 35,
-    image: "/images/hero/erigga3.jpeg",
-    category: "Meet & Greet",
+    isVip: true,
   },
 ]
 
@@ -289,38 +182,15 @@ const cardHoverVariants = {
   hover: {
     scale: 1.02,
     y: -5,
-    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
     transition: {
       duration: 0.2,
     },
   },
 }
 
-const glowVariants = {
-  animate: {
-    boxShadow: [
-      "0 0 20px rgba(168, 85, 247, 0.4)",
-      "0 0 40px rgba(168, 85, 247, 0.6)",
-      "0 0 20px rgba(168, 85, 247, 0.4)",
-    ],
-    transition: {
-      duration: 2,
-      repeat: Number.POSITIVE_INFINITY,
-      ease: "easeInOut",
-    },
-  },
-}
-
 export default function TicketsPage() {
-  const { user, profile } = useAuth()
-  const [activeTab, setActiveTab] = useState("my-tickets")
-  const [tickets, setTickets] = useState<TicketData[]>(mockTickets)
-  const [events, setEvents] = useState<Event[]>(mockEvents)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [purchaseLoading, setPurchaseLoading] = useState<string | null>(null)
-  const supabase = createClient()
-  const [selectedEvent, setSelectedEvent] = useState<(typeof eventsData)[0] | null>(null)
+  const { user, profile, loading } = useAuth()
+  const [selectedEvent, setSelectedEvent] = useState<(typeof events)[0] | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [showReservationModal, setShowReservationModal] = useState(false)
   const [reservationData, setReservationData] = useState({
@@ -406,7 +276,7 @@ export default function TicketsPage() {
     }
   }
 
-  const handleTicketPurchaseOld = async (event: (typeof eventsData)[0]) => {
+  const handleTicketPurchase = async (event: (typeof events)[0]) => {
     setIsProcessing(true)
 
     try {
@@ -463,468 +333,577 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
 
   const allTickets = generatedTicket ? [...userTickets, generatedTicket] : userTickets
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "confirmed":
-        return "bg-green-500 text-white"
-      case "pending":
-        return "bg-yellow-500 text-white"
-      case "used":
-        return "bg-gray-500 text-white"
-      case "expired":
-        return "bg-red-500 text-white"
-      default:
-        return "bg-gray-500 text-white"
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "confirmed":
-        return <Sparkles className="w-4 h-4" />
-      case "pending":
-        return <Clock className="w-4 h-4" />
-      case "used":
-        return <Star className="w-4 h-4" />
-      case "expired":
-        return <Zap className="w-4 h-4" />
-      default:
-        return <Ticket className="w-4 h-4" />
-    }
-  }
-
-  const handleTicketPurchase = async (eventId: string, paymentReference: string) => {
-    try {
-      setPurchaseLoading(eventId)
-      // Here you would implement the ticket purchase logic
-      // For now, we'll just simulate a successful purchase
-      console.log("Purchasing ticket for event:", eventId, "with reference:", paymentReference)
-
-      // Add success notification here
-      alert("Ticket purchased successfully!")
-    } catch (error) {
-      console.error("Error purchasing ticket:", error)
-      alert("Failed to purchase ticket. Please try again.")
-    } finally {
-      setPurchaseLoading(null)
-    }
-  }
-
-  const handlePaymentError = (error: string) => {
-    console.error("Payment error:", error)
-    alert(`Payment failed: ${error}`)
-  }
-
-  const filteredEvents = events.filter(
-    (event) =>
-      event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.venue.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
-
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-        <motion.div
-          animate={{
-            rotate: 360,
-          }}
-          transition={{
-            duration: 1,
-            repeat: Number.POSITIVE_INFINITY,
-            ease: "linear",
-          }}
-          className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full"
-        />
-      </div>
-    )
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center">
-          <Shield className="h-16 w-16 text-purple-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-semibold mb-2 text-white">Authentication Required</h2>
-          <p className="text-gray-400 mb-6">Please log in to view your tickets and events.</p>
-          <Button
-            asChild
-            className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
-          >
-            <a href="/login">Sign In</a>
-          </Button>
-        </motion.div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">Please log in to view your tickets.</p>
+        </div>
       </div>
     )
   }
 
   return (
     <AuthGuard>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
-        className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden"
-      >
-        {/* Animated Background Elements */}
+      <div className="min-h-screen py-8 px-4 relative overflow-hidden">
+        {/* Animated background elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div
-            className="absolute top-20 left-10 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl"
+            className="absolute top-20 left-10 w-32 h-32 bg-orange-500/10 rounded-full blur-xl"
             animate={{
               scale: [1, 1.2, 1],
               opacity: [0.3, 0.6, 0.3],
             }}
             transition={{
-              duration: 8,
+              duration: 4,
               repeat: Number.POSITIVE_INFINITY,
               ease: "easeInOut",
             }}
           />
           <motion.div
-            className="absolute bottom-20 right-10 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"
+            className="absolute bottom-20 right-10 w-48 h-48 bg-red-500/10 rounded-full blur-xl"
             animate={{
               scale: [1.2, 1, 1.2],
               opacity: [0.2, 0.5, 0.2],
             }}
             transition={{
-              duration: 10,
+              duration: 5,
               repeat: Number.POSITIVE_INFINITY,
               ease: "easeInOut",
             }}
           />
+        </div>
+
+        {/* Confetti Effect */}
+        <AnimatePresence>
+          {showConfetti && (
+            <motion.div
+              className="fixed inset-0 pointer-events-none z-50"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              {[...Array(50)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute w-2 h-2 bg-orange-500 rounded-full"
+                  initial={{
+                    x: Math.random() * window.innerWidth,
+                    y: -10,
+                    rotate: 0,
+                  }}
+                  animate={{
+                    y: window.innerHeight + 10,
+                    rotate: 360,
+                    x: Math.random() * window.innerWidth,
+                  }}
+                  transition={{
+                    duration: Math.random() * 3 + 2,
+                    ease: "easeOut",
+                  }}
+                />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="container mx-auto max-w-6xl relative z-10">
+          {/* Header */}
           <motion.div
-            className="absolute top-1/2 left-1/2 w-64 h-64 bg-orange-500/5 rounded-full blur-2xl"
-            animate={{
-              x: [-50, 50, -50],
-              y: [-30, 30, -30],
-            }}
-            transition={{
-              duration: 12,
-              repeat: Number.POSITIVE_INFINITY,
-              ease: "easeInOut",
-            }}
-          />
-        </div>
+            className="text-center mb-12"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <motion.h1
+              className="font-street text-4xl md:text-6xl bg-gradient-to-r from-orange-500 via-red-500 to-orange-600 bg-clip-text text-transparent mb-4"
+              animate={{
+                backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Number.POSITIVE_INFINITY,
+                ease: "linear",
+              }}
+            >
+              LIVE SHOWS
+            </motion.h1>
+            <motion.p
+              className="text-xl text-muted-foreground"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3, duration: 0.6 }}
+            >
+              Experience Erigga live. Feel the energy. Be part of the movement.
+            </motion.p>
+          </motion.div>
 
-        <div className="relative z-10 p-4 sm:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto">
-            {/* Header */}
-            <motion.div variants={itemVariants} initial="hidden" animate="visible" className="mb-8 text-center">
-              <motion.h1
-                className="text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-4"
-                animate={{
-                  backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
-                }}
-                transition={{
-                  duration: 5,
-                  repeat: Number.POSITIVE_INFINITY,
-                  ease: "linear",
-                }}
-              >
-                Event Tickets
-              </motion.h1>
-              <p className="text-gray-300 text-lg max-w-2xl mx-auto">
-                Manage your tickets, discover upcoming events, and secure your spot at exclusive Erigga Live experiences
-              </p>
-            </motion.div>
-
-            {/* Tabs */}
-            <motion.div variants={itemVariants} initial="hidden" animate="visible" transition={{ delay: 0.1 }}>
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 bg-white/5 backdrop-blur-xl border-white/10 mb-8">
-                  <TabsTrigger
-                    value="my-tickets"
-                    className="flex items-center gap-2 data-[state=active]:bg-purple-500 data-[state=active]:text-white"
-                  >
-                    <Ticket className="w-4 h-4" />
-                    My Tickets
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="buy-tickets"
-                    className="flex items-center gap-2 data-[state=active]:bg-purple-500 data-[state=active]:text-white"
-                  >
-                    <Gift className="w-4 h-4" />
-                    Buy Tickets
-                  </TabsTrigger>
-                </TabsList>
-
-                <AnimatePresence mode="wait">
-                  {/* My Tickets Tab */}
-                  <TabsContent value="my-tickets" className="mt-0">
-                    <motion.div
-                      key="my-tickets"
-                      variants={containerVariants}
-                      initial="hidden"
-                      animate="visible"
-                      exit="hidden"
-                      className="space-y-6"
-                    >
-                      {tickets.length === 0 ? (
-                        <motion.div variants={itemVariants} className="text-center py-12">
-                          <Card className="bg-white/5 backdrop-blur-xl border-white/10">
-                            <CardContent className="p-8">
-                              <Ticket className="w-16 h-16 text-purple-400 mx-auto mb-4" />
-                              <h3 className="text-xl font-semibold text-white mb-2">No Tickets Yet</h3>
-                              <p className="text-gray-300 mb-6">
-                                You haven't purchased any tickets yet. Check out upcoming events!
-                              </p>
-                              <Button
-                                onClick={() => setActiveTab("buy-tickets")}
-                                className="bg-gradient-to-r from-purple-500 to-blue-500 hover:opacity-90"
-                              >
-                                Browse Events
-                              </Button>
-                            </CardContent>
-                          </Card>
-                        </motion.div>
-                      ) : (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          {tickets.map((ticket, index) => (
-                            <motion.div key={ticket.id} variants={itemVariants} whileHover={cardHoverVariants.hover}>
-                              <Card className="bg-white/5 backdrop-blur-xl border-white/10 hover:bg-white/10 transition-all duration-300 overflow-hidden">
-                                <div className="bg-gradient-to-r from-purple-500 to-blue-500 h-2"></div>
-                                <CardHeader className="pb-4">
-                                  <div className="flex justify-between items-start">
-                                    <div className="flex-1">
-                                      <CardTitle className="text-white text-lg mb-2">{ticket.eventTitle}</CardTitle>
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <Badge className={getStatusColor(ticket.status)}>
-                                          {getStatusIcon(ticket.status)}
-                                          {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
-                                        </Badge>
-                                        <Badge variant="outline" className="text-gray-300 border-gray-500">
-                                          {ticket.ticketType}
-                                        </Badge>
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="text-2xl font-bold text-white">₦{ticket.price.toLocaleString()}</p>
-                                      <p className="text-xs text-gray-400">#{ticket.id}</p>
-                                    </div>
-                                  </div>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                                    <div className="flex items-center gap-2 text-gray-300">
-                                      <Calendar className="w-4 h-4 text-purple-400" />
-                                      <span>{new Date(ticket.eventDate).toLocaleDateString()}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-gray-300">
-                                      <Clock className="w-4 h-4 text-blue-400" />
-                                      <span>{ticket.eventTime}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-gray-300 sm:col-span-2">
-                                      <MapPin className="w-4 h-4 text-orange-400" />
-                                      <span className="truncate">{ticket.venue}</span>
-                                    </div>
-                                  </div>
-
-                                  {ticket.seatNumber && (
-                                    <div className="bg-white/5 rounded-lg p-3">
-                                      <p className="text-sm text-gray-300">Seat Number</p>
-                                      <p className="text-lg font-bold text-white">{ticket.seatNumber}</p>
-                                    </div>
-                                  )}
-
-                                  {ticket.description && <p className="text-sm text-gray-300">{ticket.description}</p>}
-
-                                  <div className="flex gap-2 pt-4">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="flex-1 border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white bg-transparent"
-                                    >
-                                      <QrCode className="w-4 h-4 mr-2" />
-                                      View QR
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="flex-1 border-blue-500 text-blue-400 hover:bg-blue-500 hover:text-white bg-transparent"
-                                    >
-                                      <Download className="w-4 h-4 mr-2" />
-                                      Download
-                                    </Button>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            </motion.div>
-                          ))}
-                        </div>
-                      )}
+          {/* Your Tickets Section */}
+          <AnimatePresence>
+            {allTickets.length > 0 && (
+              <motion.section className="mb-12" variants={containerVariants} initial="hidden" animate="visible">
+                <motion.h2 className="text-2xl font-bold mb-6 flex items-center gap-2" variants={itemVariants}>
+                  <QrCode className="h-6 w-6 text-orange-500" />
+                  Your Tickets
+                  {generatedTicket && (
+                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="ml-2">
+                      <Badge className="bg-green-500 text-white">NEW!</Badge>
                     </motion.div>
-                  </TabsContent>
-
-                  {/* Buy Tickets Tab */}
-                  <TabsContent value="buy-tickets" className="mt-0">
-                    <motion.div
-                      key="buy-tickets"
-                      variants={containerVariants}
-                      initial="hidden"
-                      animate="visible"
-                      exit="hidden"
-                      className="space-y-6"
-                    >
-                      {/* Search Bar */}
-                      <motion.div variants={itemVariants}>
-                        <Card className="bg-white/5 backdrop-blur-xl border-white/10">
-                          <CardContent className="p-4">
-                            <div className="flex gap-4">
-                              <div className="flex-1 relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                                <Input
-                                  placeholder="Search events..."
-                                  value={searchQuery}
-                                  onChange={(e) => setSearchQuery(e.target.value)}
-                                  className="pl-10 bg-white/5 border-white/10 text-white placeholder-gray-400"
-                                />
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="border-white/10 text-gray-300 bg-transparent"
-                              >
-                                <Filter className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-
-                      {/* Events Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredEvents.map((event, index) => (
-                          <motion.div key={event.id} variants={itemVariants} whileHover={cardHoverVariants.hover}>
-                            <Card className="bg-white/5 backdrop-blur-xl border-white/10 hover:bg-white/10 transition-all duration-300 overflow-hidden">
-                              <div className="relative h-48 bg-gradient-to-br from-purple-500/20 to-blue-500/20">
-                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                  <Music className="w-12 h-12 text-white/60" />
-                                </div>
-                                <Badge className="absolute top-3 right-3 bg-orange-500 text-white">
-                                  {event.category}
-                                </Badge>
-                                <div className="absolute bottom-3 left-3 right-3">
-                                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2">
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-white text-sm font-medium">
-                                        {event.sold}/{event.capacity} sold
-                                      </span>
-                                      <span className="text-white text-sm">
-                                        {Math.round((event.sold / event.capacity) * 100)}%
-                                      </span>
-                                    </div>
-                                    <div className="w-full bg-white/20 rounded-full h-2 mt-1">
-                                      <motion.div
-                                        className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full"
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${(event.sold / event.capacity) * 100}%` }}
-                                        transition={{ duration: 1, delay: index * 0.1 }}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <CardHeader className="pb-3">
-                                <CardTitle className="text-white text-lg">{event.title}</CardTitle>
-                                <CardDescription className="text-gray-300">{event.description}</CardDescription>
-                              </CardHeader>
-
-                              <CardContent className="space-y-4">
-                                <div className="space-y-2 text-sm">
-                                  <div className="flex items-center gap-2 text-gray-300">
-                                    <Calendar className="w-4 h-4 text-purple-400" />
-                                    <span>{new Date(event.date).toLocaleDateString()}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-gray-300">
-                                    <Clock className="w-4 h-4 text-blue-400" />
-                                    <span>{event.time}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-gray-300">
-                                    <MapPin className="w-4 h-4 text-orange-400" />
-                                    <span className="truncate">{event.venue}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-gray-300">
-                                    <Users className="w-4 h-4 text-green-400" />
-                                    <span>{event.capacity - event.sold} spots left</span>
-                                  </div>
-                                </div>
-
-                                <div className="flex justify-between items-center pt-4">
-                                  <div>
-                                    <p className="text-2xl font-bold text-white">₦{event.price.toLocaleString()}</p>
-                                    <p className="text-xs text-gray-400">per ticket</p>
-                                  </div>
-
-                                  {event.sold >= event.capacity ? (
-                                    <Button disabled className="bg-gray-600">
-                                      Sold Out
-                                    </Button>
-                                  ) : profile?.email ? (
-                                    <PaystackIntegration
-                                      amount={event.price}
-                                      email={profile.email}
-                                      metadata={{
-                                        event_id: event.id,
-                                        event_title: event.title,
-                                        user_id: profile.id,
-                                      }}
-                                      onSuccess={(reference) => handleTicketPurchase(event.id, reference)}
-                                      onError={handlePaymentError}
-                                    >
-                                      <Button
-                                        className="bg-gradient-to-r from-purple-500 to-blue-500 hover:opacity-90"
-                                        disabled={purchaseLoading === event.id}
-                                      >
-                                        {purchaseLoading === event.id ? (
-                                          <motion.div
-                                            animate={{ rotate: 360 }}
-                                            transition={{
-                                              duration: 1,
-                                              repeat: Number.POSITIVE_INFINITY,
-                                              ease: "linear",
-                                            }}
-                                            className="w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"
-                                          />
-                                        ) : (
-                                          <Ticket className="w-4 h-4 mr-2" />
-                                        )}
-                                        {purchaseLoading === event.id ? "Processing..." : "Buy Ticket"}
-                                      </Button>
-                                    </PaystackIntegration>
-                                  ) : (
-                                    <Button disabled className="bg-gray-600">
-                                      Login Required
-                                    </Button>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Card>
+                  )}
+                </motion.h2>
+                <motion.div
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                  variants={containerVariants}
+                >
+                  {allTickets.map((ticket, index) => (
+                    <motion.div key={ticket.id} variants={itemVariants} whileHover={cardHoverVariants.hover} layout>
+                      <Card className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border-orange-500/40 overflow-hidden relative">
+                        {ticket.specialAccess && (
+                          <motion.div
+                            className="absolute top-2 right-2 z-10"
+                            animate={{
+                              rotate: [0, 5, -5, 0],
+                            }}
+                            transition={{
+                              duration: 2,
+                              repeat: Number.POSITIVE_INFINITY,
+                              ease: "easeInOut",
+                            }}
+                          >
+                            <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
                           </motion.div>
-                        ))}
-                      </div>
+                        )}
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <Badge className="bg-green-500 text-white">{ticket.status}</Badge>
+                            <QrCode className="h-5 w-5 text-orange-500" />
+                          </div>
+                          <CardTitle className="text-lg">{ticket.eventTitle}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="space-y-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-muted-foreground" />
+                              <span>
+                                {ticket.venue}, {ticket.location}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              <span>{formatDate(ticket.date)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-muted-foreground" />
+                              <span>Holder: {ticket.holderName}</span>
+                            </div>
+                          </div>
 
-                      {filteredEvents.length === 0 && (
-                        <motion.div variants={itemVariants} className="text-center py-12">
-                          <Card className="bg-white/5 backdrop-blur-xl border-white/10">
-                            <CardContent className="p-8">
-                              <Search className="w-16 h-16 text-purple-400 mx-auto mb-4" />
-                              <h3 className="text-xl font-semibold text-white mb-2">No Events Found</h3>
-                              <p className="text-gray-300">
-                                No events match your search criteria. Try adjusting your search terms.
-                              </p>
-                            </CardContent>
-                          </Card>
-                        </motion.div>
-                      )}
+                          <motion.div
+                            className="bg-background/50 p-3 rounded-lg text-center"
+                            whileHover={{ scale: 1.05 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            <div className="w-20 h-20 mx-auto mb-2 bg-white p-2 rounded flex items-center justify-center">
+                              <QrCode className="w-full h-full text-black" />
+                            </div>
+                            <p className="text-xs font-mono">{ticket.ticketNumber}</p>
+                          </motion.div>
+
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              className="flex-1 bg-orange-500 hover:bg-orange-600 text-black"
+                              onClick={() => downloadTicket(ticket)}
+                            >
+                              <Download className="h-4 w-4 mr-1" />
+                              Download
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-orange-400 text-orange-400 bg-transparent"
+                            >
+                              <Share2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
                     </motion.div>
-                  </TabsContent>
-                </AnimatePresence>
-              </Tabs>
+                  ))}
+                </motion.div>
+              </motion.section>
+            )}
+          </AnimatePresence>
+
+          {/* Upcoming Events */}
+          <motion.section className="mb-12" variants={containerVariants} initial="hidden" animate="visible">
+            <motion.h2 className="text-2xl font-bold mb-6 flex items-center gap-2" variants={itemVariants}>
+              <Calendar className="h-6 w-6 text-orange-500" />
+              Upcoming Shows
+            </motion.h2>
+            <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" variants={containerVariants}>
+              {events.map((event, index) => {
+                const availableTickets = event.maxTickets - event.ticketsSold
+                const soldOutPercentage = (event.ticketsSold / event.maxTickets) * 100
+
+                return (
+                  <motion.div key={event.id} variants={itemVariants} whileHover={cardHoverVariants.hover}>
+                    <Card className="bg-card/50 border-orange-500/20 hover:border-orange-500/40 transition-all group overflow-hidden relative">
+                      {event.isSpecial && (
+                        <motion.div
+                          className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-red-500"
+                          initial={{ scaleX: 0 }}
+                          animate={{ scaleX: 1 }}
+                          transition={{ delay: index * 0.1, duration: 0.5 }}
+                        />
+                      )}
+                      <CardHeader className="p-0">
+                        <div className="relative">
+                          <motion.img
+                            src={event.image || "/placeholder.svg"}
+                            alt={event.title}
+                            className="w-full h-48 object-cover rounded-t-lg"
+                            whileHover={{ scale: 1.05 }}
+                            transition={{ duration: 0.3 }}
+                          />
+                          {event.isVip && (
+                            <motion.div
+                              initial={{ scale: 0, rotate: -45 }}
+                              animate={{ scale: 1, rotate: 0 }}
+                              transition={{ delay: 0.2 }}
+                            >
+                              <Badge className="absolute top-2 right-2 bg-yellow-500 text-black">
+                                <Sparkles className="h-3 w-3 mr-1" />
+                                VIP
+                              </Badge>
+                            </motion.div>
+                          )}
+                          <Badge className="absolute top-2 left-2 bg-orange-500 text-black">{event.category}</Badge>
+                          {event.tags && (
+                            <div className="absolute bottom-2 left-2 flex gap-1">
+                              {event.tags.map((tag, tagIndex) => (
+                                <motion.div
+                                  key={tag}
+                                  initial={{ opacity: 0, y: 10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: tagIndex * 0.1 }}
+                                >
+                                  <Badge variant="secondary" className="text-xs">
+                                    {tag}
+                                  </Badge>
+                                </motion.div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-6">
+                        <div className="space-y-4">
+                          <div>
+                            <h3 className="font-bold text-lg mb-2">{event.title}</h3>
+                            {event.subtitle && (
+                              <p className="text-sm text-orange-400 font-medium mb-2">{event.subtitle}</p>
+                            )}
+                            <p className="text-sm text-muted-foreground mb-3">{event.description}</p>
+                          </div>
+
+                          <div className="space-y-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-orange-500" />
+                              <span>
+                                {event.venue}, {event.location}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-orange-500" />
+                              <span>{formatDate(event.date)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-orange-500" />
+                              <span>{availableTickets} spots left</span>
+                            </div>
+                          </div>
+
+                          {/* Availability bar */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span>Reserved</span>
+                              <span>{soldOutPercentage.toFixed(0)}%</span>
+                            </div>
+                            <div className="w-full bg-gray-700 rounded-full h-2">
+                              <motion.div
+                                className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${soldOutPercentage}%` }}
+                                transition={{ delay: 0.5, duration: 1 }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-4">
+                            <div>
+                              <motion.span
+                                className="text-2xl font-bold text-orange-500"
+                                animate={
+                                  event.price === 0
+                                    ? {
+                                        scale: [1, 1.1, 1],
+                                        color: ["#f97316", "#ef4444", "#f97316"],
+                                      }
+                                    : {}
+                                }
+                                transition={{
+                                  duration: 2,
+                                  repeat: Number.POSITIVE_INFINITY,
+                                  ease: "easeInOut",
+                                }}
+                              >
+                                {formatPrice(event.price)}
+                              </motion.span>
+                            </div>
+
+                            {event.id === "erigga-september-2025" ? (
+                              <Button
+                                className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+                                disabled={availableTickets === 0}
+                                onClick={() => setShowReservationModal(true)}
+                              >
+                                {availableTickets === 0 ? "Fully Reserved" : "Reserve Spot"}
+                              </Button>
+                            ) : (
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button
+                                    className="bg-orange-500 hover:bg-orange-600 text-black"
+                                    disabled={availableTickets === 0}
+                                    onClick={() => setSelectedEvent(event)}
+                                  >
+                                    {availableTickets === 0 ? "Sold Out" : "Buy Ticket"}
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-md">
+                                  <DialogHeader>
+                                    <DialogTitle>Purchase Ticket</DialogTitle>
+                                  </DialogHeader>
+                                  {selectedEvent && (
+                                    <div className="space-y-4">
+                                      <div>
+                                        <h4 className="font-semibold">{selectedEvent.title}</h4>
+                                        <p className="text-sm text-muted-foreground">{selectedEvent.venue}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                          {formatDate(selectedEvent.date)}
+                                        </p>
+                                      </div>
+
+                                      <div className="bg-orange-500/10 p-4 rounded-lg">
+                                        <div className="flex justify-between items-center">
+                                          <span>Ticket Price:</span>
+                                          <span className="text-xl font-bold text-orange-500">
+                                            {formatPrice(selectedEvent.price)}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      <Button
+                                        className="w-full bg-orange-500 hover:bg-orange-600 text-black"
+                                        onClick={() => handleTicketPurchase(selectedEvent)}
+                                        disabled={isProcessing}
+                                      >
+                                        {isProcessing ? "Processing..." : "Pay with Paystack"}
+                                      </Button>
+
+                                      <p className="text-xs text-muted-foreground text-center">
+                                        Secure payment powered by Paystack. You'll receive your ticket via email after
+                                        payment.
+                                      </p>
+                                    </div>
+                                  )}
+                                </DialogContent>
+                              </Dialog>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )
+              })}
             </motion.div>
-          </div>
+          </motion.section>
+
+          {/* Past Shows */}
+          <motion.section variants={containerVariants} initial="hidden" animate="visible">
+            <motion.h2 className="text-2xl font-bold mb-6" variants={itemVariants}>
+              Past Shows Recap
+            </motion.h2>
+            <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-6" variants={containerVariants}>
+              {pastEvents.map((event, index) => (
+                <motion.div key={event.id} variants={itemVariants} whileHover={cardHoverVariants.hover}>
+                  <Card className="bg-card/50 border-orange-500/20">
+                    <CardContent className="p-6">
+                      <div className="space-y-4">
+                        <div>
+                          <h3 className="font-bold text-lg">{event.title}</h3>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-4 w-4" />
+                              {event.venue}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4" />
+                              {formatDate(event.date)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-orange-500" />
+                          <span className="font-semibold">{event.attendees.toLocaleString()} fans attended</span>
+                        </div>
+
+                        <div>
+                          <h4 className="font-semibold mb-2">Highlights:</h4>
+                          <ul className="space-y-1">
+                            {event.highlights.map((highlight, highlightIndex) => (
+                              <motion.li
+                                key={highlightIndex}
+                                className="text-sm text-muted-foreground flex items-center gap-2"
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: highlightIndex * 0.1 }}
+                              >
+                                <div className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
+                                {highlight}
+                              </motion.li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </motion.div>
+          </motion.section>
         </div>
-      </motion.div>
+
+        {/* Reservation Modal */}
+        <Dialog open={showReservationModal} onOpenChange={setShowReservationModal}>
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Music className="h-5 w-5 text-orange-500" />
+                Reserve Your Spot
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleReservation} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Full Name *</Label>
+                <Input
+                  id="fullName"
+                  value={reservationData.fullName}
+                  onChange={(e) => setReservationData((prev) => ({ ...prev, fullName: e.target.value }))}
+                  required
+                  placeholder="Enter your full name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={reservationData.email}
+                  onChange={(e) => setReservationData((prev) => ({ ...prev, email: e.target.value }))}
+                  required
+                  placeholder="Enter your email"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="location">Location</Label>
+                <Select
+                  value={reservationData.location}
+                  onValueChange={(value) => setReservationData((prev) => ({ ...prev, location: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select your location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {NIGERIAN_LOCATIONS.map((location) => (
+                      <SelectItem key={location} value={location}>
+                        {location}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password *</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={reservationData.password}
+                  onChange={(e) => setReservationData((prev) => ({ ...prev, password: e.target.value }))}
+                  required
+                  placeholder="Create a password"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="favoriteTrack">Favorite Erigga Track</Label>
+                <Select
+                  value={reservationData.favoriteTrack}
+                  onValueChange={(value) => setReservationData((prev) => ({ ...prev, favoriteTrack: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a track you want Erigga to perform" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ERIGGA_SONGS.map((song) => (
+                      <SelectItem key={song} value={song}>
+                        {song}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="message">Message to Erigga</Label>
+                <Textarea
+                  id="message"
+                  value={reservationData.message}
+                  onChange={(e) => setReservationData((prev) => ({ ...prev, message: e.target.value }))}
+                  placeholder="Share your message with Erigga..."
+                  rows={3}
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+                disabled={isProcessing}
+              >
+                {isProcessing ? "Reserving..." : "Reserve My Spot"}
+              </Button>
+
+              <p className="text-xs text-muted-foreground text-center">
+                By reserving, you agree to receive updates about the event. Your spot is confirmed upon submission.
+              </p>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Paystack Script */}
+        <script src="https://js.paystack.co/v1/inline.js"></script>
+      </div>
     </AuthGuard>
   )
 }

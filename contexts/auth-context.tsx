@@ -20,13 +20,12 @@ interface AuthContextType {
   signUp: (
     email: string,
     password: string,
-    userData: { username: string; full_name: string; tier?: string; payment_reference?: string },
+    userData: { username: string; full_name: string },
   ) => Promise<{ error: any }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error: any }>
   updatePassword: (password: string) => Promise<{ error: any }>
   refreshProfile: () => Promise<void>
-  refreshSession: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -38,165 +37,95 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [initialized, setInitialized] = useState(false)
   const router = useRouter()
+  const supabase = createClient()
 
-  const [supabaseClient, setSupabaseClient] = useState<ReturnType<typeof createClient> | null>(null)
-  const [clientError, setClientError] = useState<string | null>(null)
-
-  useEffect(() => {
+  const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
     try {
-      const client = createClient()
-      setSupabaseClient(client)
-      setClientError(null)
-    } catch (error: any) {
-      console.error("Failed to initialize Supabase client:", error)
-      setClientError(error.message)
-      setLoading(false)
-      setInitialized(true)
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("auth_user_id", userId)
+        .single()
+
+      if (error) {
+        console.error("Error fetching profile:", error)
+        return null
+      }
+
+      return data
+    } catch (error) {
+      console.error("Error in fetchProfile:", error)
+      return null
     }
-  }, [])
-
-  const fetchProfile = useCallback(
-    async (userId: string): Promise<UserProfile | null> => {
-      if (!supabaseClient || clientError) {
-        console.warn("Supabase client not available, skipping profile fetch")
-        return null
-      }
-
-      try {
-        let retries = 3
-        let lastError: any = null
-
-        while (retries > 0) {
-          try {
-            const { data, error } = await supabaseClient
-              .from("users")
-              .select("*")
-              .eq("auth_user_id", userId)
-              .maybeSingle()
-
-            if (error) {
-              console.error("Error fetching profile:", error.message)
-              return null
-            }
-
-            return data
-          } catch (error: any) {
-            lastError = error
-            retries--
-            if (retries > 0) {
-              console.warn(`Profile fetch failed, retrying... (${retries} attempts left)`)
-              await new Promise((resolve) => setTimeout(resolve, 1000)) // Wait 1 second before retry
-            }
-          }
-        }
-
-        throw lastError
-      } catch (error: any) {
-        console.error("Error in fetchProfile after retries:", error.message)
-        return null
-      }
-    },
-    [supabaseClient, clientError],
-  )
+  }, [supabase])
 
   const refreshProfile = useCallback(async () => {
-    if (user && supabaseClient && !clientError) {
+    if (user) {
       const profileData = await fetchProfile(user.id)
       setProfile(profileData)
     }
-  }, [user, fetchProfile, supabaseClient, clientError])
+  }, [user, fetchProfile])
 
-  const refreshSession = useCallback(async () => {
-    if (!supabaseClient || clientError) {
-      console.warn("Supabase client not available, skipping session refresh")
-      return
-    }
+  const handleAuthStateChange = useCallback(async (event: string, session: Session | null) => {
+    console.log("Auth state change:", event, session?.user?.email)
 
-    try {
-      const {
-        data: { session },
-        error,
-      } = await supabaseClient.auth.getSession()
+    setSession(session)
+    setUser(session?.user ?? null)
 
-      if (error) {
-        console.error("Error refreshing session:", error.message)
-        return
-      }
+    if (session?.user) {
+      const profileData = await fetchProfile(session.user.id)
+      setProfile(profileData)
 
-      setSession(session)
-      setUser(session?.user ?? null)
-
-      if (session?.user) {
-        const profileData = await fetchProfile(session.user.id)
-        setProfile(profileData)
-      } else {
-        setProfile(null)
-      }
-    } catch (error: any) {
-      console.error("Error in refreshSession:", error.message)
-    }
-  }, [supabaseClient, clientError, fetchProfile])
-
-  const handleAuthStateChange = useCallback(
-    async (event: string, session: Session | null) => {
-      console.log("Auth state change:", event, session?.user?.email)
-
-      setSession(session)
-      setUser(session?.user ?? null)
-
-      if (session?.user && supabaseClient && !clientError) {
-        // Fetch profile for authenticated user
-        const profileData = await fetchProfile(session.user.id)
-        setProfile(profileData)
-
-        if (event === "SIGNED_IN" && initialized) {
-          // Check if this is coming from a signup by looking at the URL or session metadata
-          const isFromSignup =
-            session.user.email_confirmed_at && new Date(session.user.email_confirmed_at).getTime() > Date.now() - 10000 // Within last 10 seconds
-
-          if (!isFromSignup) {
-            router.push("/dashboard")
-          }
-        }
-      } else {
-        setProfile(null)
-
-        if (event === "SIGNED_OUT" && initialized) {
-          router.push("/login")
+      // Only redirect on sign in, not on initial load or token refresh
+      if (event === "SIGNED_IN" && initialized) {
+        // Check if there's a redirect parameter in the URL
+        const urlParams = new URLSearchParams(window.location.search)
+        const redirectTo = urlParams.get('redirect')
+        
+        if (redirectTo && redirectTo.startsWith('/')) {
+          // Clear the redirect parameter from URL
+          const newUrl = new URL(window.location.href)
+          newUrl.searchParams.delete('redirect')
+          window.history.replaceState({}, '', newUrl.toString())
+          router.push(redirectTo)
+        } else {
+          router.push('/dashboard')
         }
       }
+    } else {
+      setProfile(null)
 
-      if (!initialized) {
-        setInitialized(true)
+      if (event === "SIGNED_OUT" && initialized) {
+        router.push("/login")
       }
-      setLoading(false)
-    },
-    [fetchProfile, router, initialized, supabaseClient, clientError],
-  )
+    }
+
+    if (!initialized) {
+      setInitialized(true)
+    }
+    setLoading(false)
+  }, [fetchProfile, router, initialized])
 
   useEffect(() => {
-    if (!supabaseClient || clientError) {
-      return
-    }
-
     let mounted = true
 
     const initializeAuth = async () => {
       try {
+        // Get initial session
         const {
           data: { session: initialSession },
           error,
-        } = await supabaseClient.auth.getSession()
+        } = await supabase.auth.getSession()
 
         if (error) {
-          console.error("Error getting session:", error.message)
+          console.error("Error getting session:", error)
         }
 
         if (mounted) {
           await handleAuthStateChange("INITIAL_SESSION", initialSession)
         }
-      } catch (error: any) {
-        console.error("Error initializing auth:", error.message)
+      } catch (error) {
+        console.error("Error initializing auth:", error)
         if (mounted) {
           setLoading(false)
           setInitialized(true)
@@ -206,161 +135,86 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initializeAuth()
 
+    // Listen for auth changes
     const {
       data: { subscription },
-    } = supabaseClient.auth.onAuthStateChange(handleAuthStateChange)
+    } = supabase.auth.onAuthStateChange(handleAuthStateChange)
 
     return () => {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [supabaseClient, clientError, handleAuthStateChange])
+  }, [supabase.auth, handleAuthStateChange])
 
-  const signIn = useCallback(
-    async (email: string, password: string) => {
-      if (!supabaseClient || clientError) {
-        return { error: { message: "Authentication service is not available" } }
-      }
-
-      try {
-        setLoading(true)
-
-        const { data, error } = await supabaseClient.auth.signInWithPassword({
-          email,
-          password,
-        })
-
-        if (error) {
-          setLoading(false)
-          return { error }
-        }
-
-        // Let auth state change handle the rest
-        return { error: null }
-      } catch (error: any) {
-        setLoading(false)
-        return { error: { message: error.message || "An unexpected error occurred" } }
-      }
-    },
-    [supabaseClient, clientError],
-  )
-
-  const signUp = useCallback(
-    async (
-      email: string,
-      password: string,
-      userData: { username: string; full_name: string; tier?: string; payment_reference?: string },
-    ) => {
-      if (!supabaseClient || clientError) {
-        return { error: { message: "Authentication service is not available" } }
-      }
-
-      try {
-        setLoading(true)
-
-        const { data, error } = await supabaseClient.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo:
-              process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback`,
-            data: {
-              username: userData.username,
-              full_name: userData.full_name,
-              tier: userData.tier || "free",
-              payment_reference: userData.payment_reference,
-            },
-          },
-        })
-
-        if (error) {
-          setLoading(false)
-          return { error }
-        }
-
-        if (data.user && data.session) {
-          setLoading(false)
-          // Small delay to ensure state is updated
-          setTimeout(() => {
-            router.push("/dashboard")
-          }, 100)
-        } else {
-          setLoading(false)
-        }
-
-        return { error: null }
-      } catch (error: any) {
-        setLoading(false)
-        return { error: { message: error.message || "An unexpected error occurred" } }
-      }
-    },
-    [supabaseClient, clientError, router],
-  )
-
-  const signOut = useCallback(async () => {
-    if (!supabaseClient || clientError) {
-      console.warn("Supabase client not available, clearing local state only")
-      setUser(null)
-      setSession(null)
-      setProfile(null)
-      router.push("/login")
-      return
-    }
-
+  const signIn = useCallback(async (email: string, password: string) => {
     try {
       setLoading(true)
-      const { error } = await supabaseClient.auth.signOut()
-
-      if (error) {
-        console.error("Error signing out:", error.message)
-      }
-    } catch (error: any) {
-      console.error("Error signing out:", error.message)
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      return { error }
+    } catch (error) {
+      return { error }
     } finally {
       setLoading(false)
     }
-  }, [supabaseClient, clientError, router])
+  }, [supabase.auth])
 
-  const resetPassword = useCallback(
-    async (email: string) => {
-      if (!supabaseClient || clientError) {
-        return { error: { message: "Authentication service is not available" } }
-      }
+  const signUp = useCallback(async (email: string, password: string, userData: { username: string; full_name: string }) => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: userData,
+        },
+      })
 
-      try {
-        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/reset-password`,
-        })
-        return { error }
-      } catch (error: any) {
-        return { error: { message: error.message || "An unexpected error occurred" } }
-      }
-    },
-    [supabaseClient, clientError],
-  )
+      if (error) return { error }
 
-  const updatePassword = useCallback(
-    async (password: string) => {
-      if (!supabaseClient || clientError) {
-        return { error: { message: "Authentication service is not available" } }
-      }
+      // The trigger will handle profile creation
+      return { error: null }
+    } catch (error) {
+      return { error }
+    } finally {
+      setLoading(false)
+    }
+  }, [supabase.auth])
 
-      try {
-        const { error } = await supabaseClient.auth.updateUser({
-          password: password,
-        })
-        return { error }
-      } catch (error: any) {
-        return { error: { message: error.message || "An unexpected error occurred" } }
-      }
-    },
-    [supabaseClient, clientError],
-  )
+  const signOut = useCallback(async () => {
+    try {
+      setLoading(true)
+      await supabase.auth.signOut()
+    } catch (error) {
+      console.error("Error signing out:", error)
+    } finally {
+      setLoading(false)
+    }
+  }, [supabase.auth])
 
-  if (clientError) {
-    console.error("Supabase configuration error:", clientError)
-    // Still provide the context but with limited functionality
-  }
+  const resetPassword = useCallback(async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      return { error }
+    } catch (error) {
+      return { error }
+    }
+  }, [supabase.auth])
+
+  const updatePassword = useCallback(async (password: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: password,
+      })
+      return { error }
+    } catch (error) {
+      return { error }
+    }
+  }, [supabase.auth])
 
   const value = {
     user,
@@ -375,7 +229,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     resetPassword,
     updatePassword,
     refreshProfile,
-    refreshSession,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

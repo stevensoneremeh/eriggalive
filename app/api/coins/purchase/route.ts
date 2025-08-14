@@ -2,7 +2,12 @@ import { type NextRequest, NextResponse } from "next/server"
 
 // Check if we're in preview/development mode
 const isPreviewMode = () => {
-  return process.env.NODE_ENV === "development"
+  return (
+    process.env.NODE_ENV === "development" ||
+    process.env.VERCEL_ENV === "preview" ||
+    !process.env.PAYSTACK_SECRET_KEY ||
+    process.env.PAYSTACK_SECRET_KEY.startsWith("pk_test_")
+  )
 }
 
 // Enhanced user verification with better error handling
@@ -13,8 +18,16 @@ function verifyUser(request: NextRequest) {
       return { error: "Missing or invalid authorization header", user: null }
     }
 
-    // Production JWT verification would go here
-    return { error: "Authentication required", user: null }
+    // In production, verify JWT token here
+    // For now, return mock user data
+    const mockUser = {
+      id: "user-123",
+      email: "user@example.com",
+      username: "testuser",
+      coins: 15000, // Mock current balance
+    }
+
+    return { user: mockUser, error: null }
   } catch (error) {
     return { error: "Authentication failed", user: null }
   }

@@ -1,6 +1,6 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
-export type UserTier = "free" | "pro" | "enterprise"
+export type UserTier = "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
 export type UserRole = "user" | "moderator" | "admin" | "super_admin"
 export type SubscriptionStatus = "active" | "canceled" | "past_due" | "incomplete" | "trialing"
 export type PaymentStatus = "pending" | "processing" | "completed" | "failed" | "refunded" | "canceled"
@@ -49,7 +49,6 @@ export interface User {
   two_factor_secret?: string
   preferences: Record<string, any>
   metadata: Record<string, any>
-  reputation_score?: number
   created_at: string
   updated_at: string
 }
@@ -159,7 +158,6 @@ export interface Database {
           is_verified?: boolean
           is_active?: boolean
           is_banned?: boolean
-          reputation_score?: number
           created_at?: string
           updated_at?: string
         }
@@ -178,7 +176,6 @@ export interface Database {
           is_verified?: boolean
           is_active?: boolean
           is_banned?: boolean
-          reputation_score?: number
           created_at?: string
           updated_at?: string
         }
