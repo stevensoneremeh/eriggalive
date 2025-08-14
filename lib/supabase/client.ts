@@ -4,11 +4,11 @@ import type { Database } from "@/types/database"
 // Check if we're in a browser environment
 const isBrowser = typeof window !== "undefined"
 
-// Check if we're in preview mode
+// Check if we're in preview mode (v0.dev or similar)
 const isPreviewMode =
   isBrowser && (window.location.hostname.includes("vusercontent.net") || window.location.hostname.includes("v0.dev"))
 
-// Define the mock client function for preview mode
+// Mock client for preview mode
 const createMockClient = () => {
   return {
     auth: {
@@ -107,7 +107,6 @@ const createMockClient = () => {
           error: null,
         }),
       onAuthStateChange: (callback: any) => {
-        // Simulate initial auth state
         setTimeout(() => {
           callback("SIGNED_IN", {
             access_token: "mock-token",
@@ -136,7 +135,7 @@ const createMockClient = () => {
                   username: "mockuser",
                   full_name: "Mock User",
                   email: "mock@example.com",
-                  tier: "grassroot",
+                  tier: "free",
                   coins: 500,
                   level: 1,
                   points: 0,
@@ -156,58 +155,8 @@ const createMockClient = () => {
           maybeSingle: () => Promise.resolve({ data: null, error: null }),
         }),
         order: (column: string, options?: { ascending: boolean }) => ({
-          limit: (limit: number) => {
-            if (table === "community_posts") {
-              return Promise.resolve({
-                data: Array(Math.min(limit, 3))
-                  .fill(0)
-                  .map((_, i) => ({
-                    id: i + 1,
-                    content: `Mock post content ${i + 1}`,
-                    vote_count: Math.floor(Math.random() * 50),
-                    comment_count: Math.floor(Math.random() * 10),
-                    created_at: new Date().toISOString(),
-                    user: {
-                      id: 1,
-                      username: "mockuser",
-                      full_name: "Mock User",
-                      tier: "grassroot",
-                      avatar_url: null,
-                    },
-                    category: {
-                      id: 1,
-                      name: "General",
-                      slug: "general",
-                    },
-                    user_has_voted: false,
-                  })),
-                error: null,
-              })
-            }
-            if (table === "community_categories") {
-              return Promise.resolve({
-                data: [
-                  { id: 1, name: "General", slug: "general", is_active: true },
-                  { id: 2, name: "Music", slug: "music", is_active: true },
-                  { id: 3, name: "Events", slug: "events", is_active: true },
-                ],
-                error: null,
-              })
-            }
-            return Promise.resolve({ data: [], error: null })
-          },
+          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
           range: (start: number, end: number) => Promise.resolve({ data: [], error: null }),
-        }),
-        is: (column: string, value: any) => ({
-          order: (column: string, options?: { ascending: boolean }) => ({
-            limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-          }),
-        }),
-        ilike: (column: string, value: string) => ({
-          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
-        }),
-        or: (conditions: string) => ({
-          limit: (limit: number) => Promise.resolve({ data: [], error: null }),
         }),
       }),
       insert: (data: any) => ({
@@ -251,24 +200,51 @@ const createMockClient = () => {
   } as any
 }
 
+// Singleton client instance
 let client: ReturnType<typeof createBrowserClient<Database>> | undefined
 
 export function createClient() {
-  if (!client) {
-    client = createBrowserClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    )
+  // Return mock client in preview mode
+  if (isPreviewMode) {
+    return createMockClient()
   }
-  return client
+
+  // Return existing client if it exists
+  if (client) {
+    return client
+  }
+
+  // Validate environment variables
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("Missing Supabase environment variables")
+    return createMockClient()
+  }
+
+  try {
+    client = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+      global: {
+        headers: {
+          "X-Client-Info": "eriggalive-web",
+        },
+      },
+    })
+
+    return client
+  } catch (error) {
+    console.error("Failed to create Supabase client:", error)
+    return createMockClient()
+  }
 }
 
-// Export a singleton instance for consistent usage
-let supabaseClient: ReturnType<typeof createClient> | null = null
-
+// Export singleton getter
 export function getSupabaseClient() {
-  if (!supabaseClient) {
-    supabaseClient = createClient()
-  }
-  return supabaseClient
+  return createClient()
 }
