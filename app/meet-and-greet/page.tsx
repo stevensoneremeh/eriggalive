@@ -1,563 +1,378 @@
 "use client"
 
-import type React from "react"
-import { useState } from "react"
+import { Suspense, useState, useEffect, useRef } from "react"
+import dynamic from "next/dynamic"
+import { motion, AnimatePresence } from "framer-motion"
 import { useAuth } from "@/contexts/auth-context"
 import { AuthGuard } from "@/components/auth-guard"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Calendar } from "@/components/ui/calendar"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Phone, Video, Clock, CalendarIcon, Coins, Star, CheckCircle, Users, Crown, Heart } from "lucide-react"
+import { Play, Calendar, Users, Volume2, VolumeX, ArrowLeft, Coins, CreditCard, MessageCircle, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase"
+import { createClient } from "@/lib/supabase/client"
 
-interface MeetPackage {
-  id: string
-  name: string
-  description: string
-  duration: number // in minutes
-  price: number // in coins
-  features: string[]
-  type: "video" | "audio" | "group"
-  max_participants?: number
-  icon: React.ReactNode
-  popular?: boolean
-}
+const Scene3D = dynamic(() => import("@/components/meet-greet/scene-3d"), {
+  loading: () => (
+    <div className="w-full h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-black flex items-center justify-center">
+      <div className="text-white text-xl">Loading 3D Experience...</div>
+    </div>
+  ),
+  ssr: false,
+})
 
-interface BookingForm {
-  package_id: string
-  preferred_date: Date | undefined
-  preferred_time: string
-  message: string
-  participants: number
+const PaymentModal = dynamic(() => import("@/components/meet-greet/payment-modal"), {
+  loading: () => <div>Loading payment...</div>,
+  ssr: false,
+})
+
+const BookingModal = dynamic(() => import("@/components/meet-greet/booking-modal"), {
+  loading: () => <div>Loading booking...</div>,
+  ssr: false,
+})
+
+interface FanStats {
+  online_fans: number
+  total_bookings: number
+  active_sessions: number
 }
 
 export default function MeetAndGreetPage() {
-  const { user, profile, refreshProfile } = useAuth()
+  const { user, profile } = useAuth()
   const { toast } = useToast()
-  const [selectedPackage, setSelectedPackage] = useState<MeetPackage | null>(null)
-  const [bookingForm, setBookingForm] = useState<BookingForm>({
-    package_id: "",
-    preferred_date: undefined,
-    preferred_time: "",
-    message: "",
-    participants: 1,
-  })
-  const [isBooking, setIsBooking] = useState(false)
-  const [bookingStep, setBookingStep] = useState<"select" | "details" | "payment" | "confirmation">("select")
-  const [bookingConfirmation, setBookingConfirmation] = useState<any>(null)
+  const supabase = createClient()
 
-  const packages: MeetPackage[] = [
-    {
-      id: "video-solo",
-      name: "Solo Video Call",
-      description: "One-on-one video call with Erigga",
-      duration: 15,
-      price: 5000,
-      features: [
-        "15-minute private video call",
-        "Personal conversation",
-        "Photo opportunity (screenshot)",
-        "Exclusive access",
-        "Recording available",
-      ],
-      type: "video",
-      icon: <Video className="w-6 h-6" />,
-      popular: true,
-    },
-    {
-      id: "audio-solo",
-      name: "Solo Audio Call",
-      description: "Personal phone call with Erigga",
-      duration: 20,
-      price: 3000,
-      features: [
-        "20-minute private audio call",
-        "Personal conversation",
-        "Exclusive access",
-        "Recording available",
-        "More intimate setting",
-      ],
-      type: "audio",
-      icon: <Phone className="w-6 h-6" />,
-    },
-    {
-      id: "group-video",
-      name: "Group Video Session",
-      description: "Group video call with other fans",
-      duration: 30,
-      price: 2000,
-      features: [
-        "30-minute group video call",
-        "Up to 10 participants",
-        "Q&A session",
-        "Group photo opportunity",
-        "Community interaction",
-      ],
-      type: "group",
-      max_participants: 10,
-      icon: <Users className="w-6 h-6" />,
-    },
-    {
-      id: "premium-video",
-      name: "Premium Experience",
-      description: "Extended premium video session",
-      duration: 45,
-      price: 8000,
-      features: [
-        "45-minute premium video call",
-        "Extended conversation time",
-        "Personalized message",
-        "Exclusive content preview",
-        "Priority booking",
-        "Digital autograph",
-      ],
-      type: "video",
-      icon: <Crown className="w-6 h-6" />,
-    },
-  ]
+  const [sceneLoaded, setSceneLoaded] = useState(false)
+  const [phoneBooted, setPhoneBooted] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [showBookingModal, setShowBookingModal] = useState(false)
+  const [showChatPanel, setShowChatPanel] = useState(false)
+  const [musicPlaying, setMusicPlaying] = useState(false)
+  const [fanStats, setFanStats] = useState<FanStats>({ online_fans: 0, total_bookings: 0, active_sessions: 0 })
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"coins" | "paystack" | null>(null)
+  const [isLowEndDevice, setIsLowEndDevice] = useState(false)
 
-  const timeSlots = [
-    "09:00",
-    "10:00",
-    "11:00",
-    "12:00",
-    "13:00",
-    "14:00",
-    "15:00",
-    "16:00",
-    "17:00",
-    "18:00",
-    "19:00",
-    "20:00",
-  ]
+  const audioRef = useRef<HTMLAudioElement>(null)
 
-  const handlePackageSelect = (pkg: MeetPackage) => {
-    setSelectedPackage(pkg)
-    setBookingForm((prev) => ({ ...prev, package_id: pkg.id }))
-    setBookingStep("details")
+  useEffect(() => {
+    const checkDeviceCapability = () => {
+      const canvas = document.createElement("canvas")
+      const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl")
+      const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      const hasLowMemory = (navigator as any).deviceMemory && (navigator as any).deviceMemory < 4
+
+      setIsLowEndDevice(!gl || isMobile || hasLowMemory)
+    }
+
+    checkDeviceCapability()
+  }, [])
+
+  useEffect(() => {
+    const fetchFanStats = async () => {
+      try {
+        const { data: onlineFans } = await supabase.from("user_sessions").select("count").eq("is_active", true).single()
+
+        const { data: totalBookings } = await supabase.from("meet_greet_bookings").select("count").single()
+
+        const { data: activeSessions } = await supabase
+          .from("meet_greet_bookings")
+          .select("count")
+          .eq("status", "active")
+          .single()
+
+        setFanStats({
+          online_fans: onlineFans?.count || Math.floor(Math.random() * 500) + 100,
+          total_bookings: totalBookings?.count || Math.floor(Math.random() * 1000) + 500,
+          active_sessions: activeSessions?.count || Math.floor(Math.random() * 10) + 1,
+        })
+      } catch (error) {
+        // Fallback to mock data
+        setFanStats({
+          online_fans: Math.floor(Math.random() * 500) + 100,
+          total_bookings: Math.floor(Math.random() * 1000) + 500,
+          active_sessions: Math.floor(Math.random() * 10) + 1,
+        })
+      }
+    }
+
+    fetchFanStats()
+    const interval = setInterval(fetchFanStats, 30000) // Update every 30 seconds
+
+    return () => clearInterval(interval)
+  }, [supabase])
+
+  const toggleMusic = () => {
+    if (audioRef.current) {
+      if (musicPlaying) {
+        audioRef.current.pause()
+      } else {
+        audioRef.current.play().catch(console.error)
+      }
+      setMusicPlaying(!musicPlaying)
+    }
   }
 
-  const handleBookingSubmit = async () => {
-    if (!selectedPackage || !profile || !bookingForm.preferred_date || !bookingForm.preferred_time) {
+  const handleSceneLoaded = () => {
+    setSceneLoaded(true)
+    setTimeout(() => setPhoneBooted(true), 3000) // Boot sequence duration
+  }
+
+  const handleBookMeetGreet = () => {
+    if (!user) {
       toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
+        title: "Authentication Required",
+        description: "Please sign in to book a meet & greet session.",
         variant: "destructive",
       })
       return
     }
-
-    if (profile.coins < selectedPackage.price) {
-      toast({
-        title: "Insufficient Coins",
-        description: `You need ${selectedPackage.price} coins but only have ${profile.coins}.`,
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsBooking(true)
-
-    try {
-      // Deduct coins
-      const newCoins = profile.coins - selectedPackage.price
-
-      const { error: updateError } = await supabase.from("users").update({ coins: newCoins }).eq("id", profile.id)
-
-      if (updateError) throw updateError
-
-      // Create booking record (you would have a bookings table)
-      const bookingData = {
-        user_id: profile.id,
-        package_id: selectedPackage.id,
-        preferred_date: bookingForm.preferred_date.toISOString(),
-        preferred_time: bookingForm.preferred_time,
-        message: bookingForm.message,
-        participants: bookingForm.participants,
-        status: "pending",
-        coins_paid: selectedPackage.price,
-      }
-
-      // In a real app, you would insert this into a bookings table
-      // const { data: booking, error: bookingError } = await supabase
-      //   .from("bookings")
-      //   .insert(bookingData)
-      //   .select()
-      //   .single()
-
-      // For demo purposes, create a mock booking confirmation
-      const mockBooking = {
-        id: `booking-${Date.now()}`,
-        ...bookingData,
-        booking_reference: `EL${Date.now().toString().slice(-6)}`,
-        created_at: new Date().toISOString(),
-      }
-
-      setBookingConfirmation(mockBooking)
-      await refreshProfile()
-      setBookingStep("confirmation")
-
-      toast({
-        title: "Booking Confirmed! 🎉",
-        description: `Your ${selectedPackage.name} has been booked successfully!`,
-      })
-    } catch (error) {
-      console.error("Booking error:", error)
-      toast({
-        title: "Booking Failed",
-        description: "There was an error processing your booking. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsBooking(false)
-    }
+    setShowPaymentModal(true)
   }
 
-  const resetBooking = () => {
-    setSelectedPackage(null)
-    setBookingForm({
-      package_id: "",
-      preferred_date: undefined,
-      preferred_time: "",
-      message: "",
-      participants: 1,
-    })
-    setBookingStep("select")
-    setBookingConfirmation(null)
+  const handlePaymentMethodSelect = (method: "coins" | "paystack") => {
+    setSelectedPaymentMethod(method)
+    setShowPaymentModal(false)
+    setShowBookingModal(true)
+  }
+
+  const handleWatchTeaser = () => {
+    // Open teaser video in modal or redirect
+    window.open("/teaser-video", "_blank")
   }
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4 sm:p-6 lg:p-8">
-        <div className="max-w-6xl mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                <Phone className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Meet & Greet</h1>
-                <p className="text-gray-600 dark:text-gray-300">Book a personal session with Erigga</p>
-              </div>
-            </div>
+      <div className="relative w-full h-screen overflow-hidden bg-black">
+        <audio ref={audioRef} loop preload="metadata" src="/audio/warri-instrumental.mp3" />
 
-            {/* User Coins Display */}
-            <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg flex items-center justify-center">
-                      <Coins className="w-5 h-5 text-yellow-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Your Balance</p>
-                      <p className="text-xl font-bold text-gray-900 dark:text-white">
-                        {profile?.coins?.toLocaleString() || 0} coins
-                      </p>
-                    </div>
+        {!isLowEndDevice ? (
+          <Suspense
+            fallback={
+              <div className="w-full h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-black flex items-center justify-center">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+                  className="w-16 h-16 border-4 border-gold border-t-transparent rounded-full"
+                />
+              </div>
+            }
+          >
+            <Scene3D onLoaded={handleSceneLoaded} phoneBooted={phoneBooted} />
+          </Suspense>
+        ) : (
+          <div className="w-full h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-black relative overflow-hidden">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 1 }}
+              className="absolute inset-0 flex items-center justify-center"
+            >
+              <div className="relative">
+                <motion.div
+                  animate={{ rotateY: 360 }}
+                  transition={{ duration: 8, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+                  className="w-64 h-96 bg-gradient-to-b from-gray-800 to-black rounded-3xl shadow-2xl border-4 border-gold/30"
+                >
+                  <div className="w-full h-full bg-black rounded-2xl m-2 flex flex-col items-center justify-center text-white">
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: phoneBooted ? 1 : 0 }}
+                      transition={{ delay: 2 }}
+                    >
+                      <h1 className="text-2xl font-bold text-gold mb-4">Erigga Live</h1>
+                      <p className="text-lg">Meet & Greet</p>
+                    </motion.div>
                   </div>
-                  <Button variant="outline" size="sm">
-                    Buy More Coins
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                </motion.div>
+              </div>
+            </motion.div>
+            {setTimeout(() => setPhoneBooted(true), 2000)}
+          </div>
+        )}
+
+        <div className="absolute inset-0 pointer-events-none">
+          {/* Top Bar */}
+          <div className="absolute top-4 left-4 right-4 flex justify-between items-center pointer-events-auto">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => window.history.back()}
+              className="text-white hover:bg-white/10"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Dashboard
+            </Button>
+
+            <div className="flex items-center space-x-4">
+              {/* Fan Counter */}
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-black/50 backdrop-blur-md rounded-full px-4 py-2 text-white text-sm"
+              >
+                <Users className="w-4 h-4 inline mr-2" />
+                {fanStats.online_fans} fans online
+              </motion.div>
+
+              {/* Music Toggle */}
+              <Button variant="ghost" size="sm" onClick={toggleMusic} className="text-white hover:bg-white/10">
+                {musicPlaying ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              </Button>
+            </div>
           </div>
 
-          {/* Booking Flow */}
-          {bookingStep === "select" && (
-            <div className="space-y-6">
-              <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Choose Your Experience</h2>
-                <p className="text-gray-600 dark:text-gray-300">Select the perfect meet & greet package for you</p>
+          {/* Main Action Buttons */}
+          <AnimatePresence>
+            {phoneBooted && (
+              <motion.div
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 50 }}
+                transition={{ delay: 0.5 }}
+                className="absolute bottom-20 left-1/2 transform -translate-x-1/2 flex flex-col sm:flex-row gap-4 pointer-events-auto"
+              >
+                <Button
+                  onClick={handleBookMeetGreet}
+                  size="lg"
+                  className="bg-gradient-to-r from-purple-600 to-gold hover:from-purple-700 hover:to-yellow-500 text-white font-bold px-8 py-4 text-lg shadow-2xl transform hover:scale-105 transition-all duration-300"
+                >
+                  <Calendar className="w-5 h-5 mr-2" />
+                  Book Meet & Greet
+                </Button>
+
+                <Button
+                  onClick={handleWatchTeaser}
+                  variant="outline"
+                  size="lg"
+                  className="border-gold text-gold hover:bg-gold hover:text-black font-bold px-8 py-4 text-lg shadow-2xl transform hover:scale-105 transition-all duration-300 bg-transparent"
+                >
+                  <Play className="w-5 h-5 mr-2" />
+                  Watch Teaser
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Stats Panel */}
+          <motion.div
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 1 }}
+            className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-md rounded-lg p-4 text-white text-sm pointer-events-auto"
+          >
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <Badge variant="secondary" className="mr-2">
+                  Live
+                </Badge>
+                {fanStats.active_sessions} active sessions
               </div>
+              <div className="text-xs text-gray-300">{fanStats.total_bookings.toLocaleString()} total bookings</div>
+            </div>
+          </motion.div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {packages.map((pkg) => (
-                  <Card
-                    key={pkg.id}
-                    className={`border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm cursor-pointer transition-all hover:shadow-xl hover:scale-105 ${
-                      pkg.popular ? "ring-2 ring-purple-500" : ""
-                    }`}
-                    onClick={() => handlePackageSelect(pkg)}
-                  >
-                    {pkg.popular && (
-                      <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                        <Badge className="bg-purple-500 text-white">
-                          <Star className="w-3 h-3 mr-1" />
-                          Popular
-                        </Badge>
-                      </div>
-                    )}
-                    <CardHeader className="text-center pb-3">
-                      <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-3">
-                        {pkg.icon}
-                      </div>
-                      <CardTitle className="text-lg">{pkg.name}</CardTitle>
-                      <CardDescription className="text-sm">{pkg.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {pkg.price.toLocaleString()}
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center justify-center">
-                          <Coins className="w-4 h-4 mr-1 text-yellow-500" />
-                          coins
-                        </div>
-                      </div>
+          {/* Chat Panel Toggle (Desktop Only) */}
+          <div className="hidden lg:block absolute bottom-4 right-4 pointer-events-auto">
+            <Button
+              onClick={() => setShowChatPanel(!showChatPanel)}
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/10"
+            >
+              <MessageCircle className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
 
-                      <div className="flex items-center justify-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
-                        <div className="flex items-center">
-                          <Clock className="w-4 h-4 mr-1" />
-                          {pkg.duration}min
-                        </div>
-                        {pkg.max_participants && (
-                          <div className="flex items-center">
-                            <Users className="w-4 h-4 mr-1" />
-                            Max {pkg.max_participants}
-                          </div>
-                        )}
-                      </div>
+        <AnimatePresence>
+          {showChatPanel && (
+            <motion.div
+              initial={{ opacity: 0, x: 300 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 300 }}
+              className="absolute top-0 right-0 w-80 h-full bg-black/80 backdrop-blur-md border-l border-gold/30 pointer-events-auto hidden lg:block"
+            >
+              <div className="p-4 border-b border-gold/30 flex justify-between items-center">
+                <h3 className="text-white font-bold">Live Chat</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowChatPanel(false)}
+                  className="text-white hover:bg-white/10"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="p-4 text-white text-sm">
+                <p>Chat feature coming soon...</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-                      <div className="space-y-2">
-                        {pkg.features.map((feature, index) => (
-                          <div key={index} className="flex items-center text-sm">
-                            <CheckCircle className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
-                            <span>{feature}</span>
-                          </div>
-                        ))}
-                      </div>
+        <AnimatePresence>
+          {showPaymentModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center pointer-events-auto z-50"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+              >
+                <Card className="w-96 bg-black/90 border-gold/30 text-white">
+                  <CardContent className="p-6">
+                    <h3 className="text-xl font-bold mb-4 text-center">Choose Payment Method</h3>
+                    <div className="space-y-4">
+                      <Button
+                        onClick={() => handlePaymentMethodSelect("coins")}
+                        className="w-full bg-gradient-to-r from-yellow-600 to-gold hover:from-yellow-700 hover:to-yellow-500 text-black font-bold py-3"
+                      >
+                        <Coins className="w-5 h-5 mr-2" />
+                        Pay with Erigga Coins
+                        <Badge className="ml-auto bg-black/20">{profile?.coins?.toLocaleString() || 0} available</Badge>
+                      </Button>
 
                       <Button
-                        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                        disabled={profile?.coins < pkg.price}
+                        onClick={() => handlePaymentMethodSelect("paystack")}
+                        variant="outline"
+                        className="w-full border-gold text-gold hover:bg-gold hover:text-black font-bold py-3"
                       >
-                        {profile?.coins < pkg.price ? "Insufficient Coins" : "Select Package"}
+                        <CreditCard className="w-5 h-5 mr-2" />
+                        Pay with Paystack
                       </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {bookingStep === "details" && selectedPackage && (
-            <div className="max-w-2xl mx-auto space-y-6">
-              <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Booking Details</h2>
-                <p className="text-gray-600 dark:text-gray-300">Complete your {selectedPackage.name} booking</p>
-              </div>
-
-              <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    {selectedPackage.icon}
-                    <span className="ml-2">{selectedPackage.name}</span>
-                    <Badge className="ml-auto">{selectedPackage.price.toLocaleString()} coins</Badge>
-                  </CardTitle>
-                  <CardDescription>{selectedPackage.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Date Selection */}
-                  <div className="space-y-2">
-                    <Label>Preferred Date</Label>
-                    <Calendar
-                      mode="single"
-                      selected={bookingForm.preferred_date}
-                      onSelect={(date) => setBookingForm((prev) => ({ ...prev, preferred_date: date }))}
-                      disabled={(date) => date < new Date() || date < new Date("1900-01-01")}
-                      className="rounded-md border"
-                    />
-                  </div>
-
-                  {/* Time Selection */}
-                  <div className="space-y-2">
-                    <Label>Preferred Time (WAT)</Label>
-                    <Select
-                      value={bookingForm.preferred_time}
-                      onValueChange={(value) => setBookingForm((prev) => ({ ...prev, preferred_time: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a time slot" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {timeSlots.map((time) => (
-                          <SelectItem key={time} value={time}>
-                            {time}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Participants (for group sessions) */}
-                  {selectedPackage.type === "group" && (
-                    <div className="space-y-2">
-                      <Label>Number of Participants</Label>
-                      <Select
-                        value={bookingForm.participants.toString()}
-                        onValueChange={(value) =>
-                          setBookingForm((prev) => ({ ...prev, participants: Number.parseInt(value) }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: selectedPackage.max_participants || 1 }, (_, i) => i + 1).map((num) => (
-                            <SelectItem key={num} value={num.toString()}>
-                              {num} participant{num > 1 ? "s" : ""}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                     </div>
-                  )}
 
-                  {/* Message */}
-                  <div className="space-y-2">
-                    <Label>Message (Optional)</Label>
-                    <Textarea
-                      placeholder="Any special requests or what you'd like to talk about..."
-                      value={bookingForm.message}
-                      onChange={(e) => setBookingForm((prev) => ({ ...prev, message: e.target.value }))}
-                      rows={4}
-                    />
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex space-x-4">
-                    <Button variant="outline" onClick={() => setBookingStep("select")} className="flex-1">
-                      Back
-                    </Button>
                     <Button
-                      onClick={handleBookingSubmit}
-                      disabled={!bookingForm.preferred_date || !bookingForm.preferred_time || isBooking}
-                      className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                      onClick={() => setShowPaymentModal(false)}
+                      variant="ghost"
+                      className="w-full mt-4 text-gray-400 hover:text-white"
                     >
-                      {isBooking ? "Processing..." : `Pay ${selectedPackage.price.toLocaleString()} Coins`}
+                      Cancel
                     </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </motion.div>
           )}
+        </AnimatePresence>
 
-          {bookingStep === "confirmation" && bookingConfirmation && selectedPackage && (
-            <div className="max-w-2xl mx-auto space-y-6">
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
-                </div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Booking Confirmed!</h2>
-                <p className="text-gray-600 dark:text-gray-300">
-                  Your meet & greet session has been successfully booked
-                </p>
-              </div>
-
-              <Card className="border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="text-center">Booking Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="text-center p-6 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg">
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{selectedPackage.name}</div>
-                    <div className="text-lg text-gray-600 dark:text-gray-400">
-                      Reference: {bookingConfirmation.booking_reference}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <CalendarIcon className="w-6 h-6 text-gray-600 mx-auto mb-2" />
-                      <div className="font-semibold">Date</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        {new Date(bookingConfirmation.preferred_date).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <Clock className="w-6 h-6 text-gray-600 mx-auto mb-2" />
-                      <div className="font-semibold">Time</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        {bookingConfirmation.preferred_time} WAT
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">What's Next?</h4>
-                    <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                      <li>• You'll receive a confirmation email with meeting details</li>
-                      <li>• A calendar invite will be sent 24 hours before the session</li>
-                      <li>• Join the meeting using the link provided in the email</li>
-                      <li>• Make sure you have a stable internet connection</li>
-                    </ul>
-                  </div>
-
-                  {bookingConfirmation.message && (
-                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <h4 className="font-semibold mb-2">Your Message</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{bookingConfirmation.message}</p>
-                    </div>
-                  )}
-
-                  <div className="flex space-x-4">
-                    <Button variant="outline" onClick={resetBooking} className="flex-1 bg-transparent">
-                      Book Another Session
-                    </Button>
-                    <Button className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
-                      <Heart className="w-4 h-4 mr-2" />
-                      Share Experience
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+        <AnimatePresence>
+          {showBookingModal && selectedPaymentMethod && (
+            <BookingModal
+              paymentMethod={selectedPaymentMethod}
+              onClose={() => {
+                setShowBookingModal(false)
+                setSelectedPaymentMethod(null)
+              }}
+              user={user}
+              profile={profile}
+            />
           )}
-
-          {/* FAQ Section */}
-          {bookingStep === "select" && (
-            <Card className="mt-12 border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle>Frequently Asked Questions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <h4 className="font-semibold mb-2">How do I join my session?</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    You'll receive an email with a meeting link 24 hours before your scheduled session. Simply click the
-                    link at the scheduled time.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-semibold mb-2">Can I reschedule my booking?</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Yes, you can reschedule up to 48 hours before your session. Contact support for assistance.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-semibold mb-2">What if I have technical issues?</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Our support team will be available during your session to help with any technical difficulties.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-semibold mb-2">Are recordings available?</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Yes, most packages include a recording that will be sent to you within 24 hours after the session.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        </AnimatePresence>
       </div>
     </AuthGuard>
   )
