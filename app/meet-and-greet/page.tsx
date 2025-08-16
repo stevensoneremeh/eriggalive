@@ -21,11 +21,6 @@ const Scene3D = dynamic(() => import("@/components/meet-greet/scene-3d"), {
   ssr: false,
 })
 
-const PaymentModal = dynamic(() => import("@/components/meet-greet/payment-modal"), {
-  loading: () => <div>Loading payment...</div>,
-  ssr: false,
-})
-
 const BookingModal = dynamic(() => import("@/components/meet-greet/booking-modal"), {
   loading: () => <div>Loading booking...</div>,
   ssr: false,
