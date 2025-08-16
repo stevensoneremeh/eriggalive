@@ -11,7 +11,6 @@ import {
   Archive,
   Search,
   Play,
-  Download,
   Heart,
   Share2,
   Music,
@@ -26,6 +25,8 @@ import {
   Coins,
   CreditCard,
   Unlock,
+  ExternalLink,
+  Minimize,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { formatDistanceToNow } from "date-fns"
@@ -39,6 +40,7 @@ interface MediaItem {
   description?: string
   type: "video" | "audio" | "image" | "document"
   url: string
+  youtube_url?: string
   thumbnail?: string
   duration?: number
   size?: number
@@ -50,71 +52,152 @@ interface MediaItem {
   likes: number
   created_at: string
   tags: string[]
+  category?: "video" | "music"
 }
 
-const mockMediaItems: MediaItem[] = [
+const videoGalleryData: MediaItem[] = [
   {
-    id: "1",
-    title: "Behind the Scenes - Studio Session",
-    description: "Exclusive footage from the latest recording session",
+    id: "v1",
+    title: "Erigga NewMoney - Mo Street Gan",
+    description: "Official music video",
     type: "video",
-    url: "/placeholder.mp4",
-    thumbnail: "/images/hero/erigga1.jpeg",
-    duration: 180,
-    tier_required: "pro",
-    unlock_price_coins: 500,
-    unlock_price_naira: 250,
-    is_premium: true,
-    views: 1250,
-    likes: 89,
-    created_at: "2024-01-15T10:00:00Z",
-    tags: ["studio", "behind-scenes", "exclusive"],
-  },
-  {
-    id: "2",
-    title: "Unreleased Track - 'Street Dreams'",
-    description: "Brand new unreleased track for Enterprise members",
-    type: "audio",
-    url: "/placeholder.mp3",
-    duration: 240,
-    tier_required: "enterprise",
-    unlock_price_coins: 1000,
-    unlock_price_naira: 500,
-    is_premium: true,
-    views: 890,
-    likes: 156,
-    created_at: "2024-01-10T15:30:00Z",
-    tags: ["unreleased", "exclusive", "new-music"],
-  },
-  {
-    id: "3",
-    title: "Concert Photos - Lagos Show",
-    description: "High-quality photos from the recent Lagos concert",
-    type: "image",
-    url: "/images/hero/erigga2.jpeg",
+    url: "https://www.youtube.com/watch?v=C00ks18kAho",
+    youtube_url: "https://www.youtube.com/watch?v=C00ks18kAho",
+    thumbnail: `https://img.youtube.com/vi/C00ks18kAho/maxresdefault.jpg`,
     tier_required: "free",
     is_premium: false,
-    views: 2100,
-    likes: 234,
-    created_at: "2024-01-05T20:00:00Z",
-    tags: ["concert", "photos", "lagos"],
+    views: 15420,
+    likes: 892,
+    created_at: "2024-01-20T10:00:00Z",
+    tags: ["music-video", "mo-street-gan", "official"],
   },
   {
-    id: "4",
-    title: "Lyrics Sheet - 'Paper Boi'",
-    description: "Official handwritten lyrics for Paper Boi",
-    type: "document",
-    url: "/placeholder.pdf",
+    id: "v2",
+    title: "Erigga - PTSD feat. Odumodublvck",
+    description: "Official music video featuring Odumodublvck",
+    type: "video",
+    url: "https://www.youtube.com/watch?v=PQSHohH5Pgo",
+    youtube_url: "https://www.youtube.com/watch?v=PQSHohH5Pgo",
+    thumbnail: `https://img.youtube.com/vi/PQSHohH5Pgo/maxresdefault.jpg`,
+    tier_required: "free",
+    is_premium: false,
+    views: 23150,
+    likes: 1340,
+    created_at: "2024-01-18T15:30:00Z",
+    tags: ["music-video", "ptsd", "collaboration"],
+  },
+  {
+    id: "v3",
+    title: "24 Hours With ERIGGA",
+    description: "Behind the scenes documentary",
+    type: "video",
+    url: "https://www.youtube.com/watch?v=jOvBpbnvLZk",
+    youtube_url: "https://www.youtube.com/watch?v=jOvBpbnvLZk",
+    thumbnail: `https://img.youtube.com/vi/jOvBpbnvLZk/maxresdefault.jpg`,
     tier_required: "pro",
-    unlock_price_coins: 300,
-    unlock_price_naira: 150,
     is_premium: true,
-    views: 567,
-    likes: 78,
-    created_at: "2024-01-01T12:00:00Z",
-    tags: ["lyrics", "paper-boi", "handwritten"],
+    unlock_price_coins: 500,
+    unlock_price_naira: 250,
+    views: 8750,
+    likes: 567,
+    created_at: "2024-01-15T12:00:00Z",
+    tags: ["documentary", "behind-scenes", "exclusive"],
   },
 ]
+
+const musicData: MediaItem[] = [
+  {
+    id: "m1",
+    title: "PTSD feat. Odumodublvck",
+    description: "Audio track",
+    type: "audio",
+    url: "https://www.youtube.com/watch?v=PQSHohH5Pgo",
+    youtube_url: "https://www.youtube.com/watch?v=PQSHohH5Pgo",
+    thumbnail: `https://img.youtube.com/vi/PQSHohH5Pgo/maxresdefault.jpg`,
+    tier_required: "free",
+    is_premium: false,
+    views: 45230,
+    likes: 2890,
+    created_at: "2024-01-18T15:30:00Z",
+    tags: ["audio", "ptsd", "collaboration"],
+  },
+  {
+    id: "m2",
+    title: "Good Loving",
+    description: "Audio track",
+    type: "audio",
+    url: "https://www.youtube.com/watch?v=iakjkSyo-J4",
+    youtube_url: "https://www.youtube.com/watch?v=iakjkSyo-J4",
+    thumbnail: `https://img.youtube.com/vi/iakjkSyo-J4/maxresdefault.jpg`,
+    tier_required: "free",
+    is_premium: false,
+    views: 32100,
+    likes: 1950,
+    created_at: "2024-01-16T10:00:00Z",
+    tags: ["audio", "good-loving", "love-song"],
+  },
+]
+
+const allMediaItems = [
+  ...videoGalleryData.map((item) => ({ ...item, category: "video" as const })),
+  ...musicData.map((item) => ({ ...item, category: "music" as const })),
+]
+
+interface YouTubePlayerProps {
+  videoId: string
+  title: string
+  isFullscreen: boolean
+  onToggleFullscreen: () => void
+  onClose: () => void
+}
+
+function YouTubePlayer({ videoId, title, isFullscreen, onToggleFullscreen, onClose }: YouTubePlayerProps) {
+  return (
+    <AnimatePresence>
+      {isFullscreen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black z-50 flex items-center justify-center"
+        >
+          <div className="relative w-full h-full max-w-6xl max-h-[90vh] mx-4">
+            <div className="absolute top-4 right-4 z-10 flex gap-2">
+              <Button
+                onClick={onToggleFullscreen}
+                size="sm"
+                variant="secondary"
+                className="bg-black/50 hover:bg-black/70 text-white"
+              >
+                <Minimize className="h-4 w-4" />
+              </Button>
+              <Button
+                onClick={onClose}
+                size="sm"
+                variant="secondary"
+                className="bg-black/50 hover:bg-black/70 text-white"
+              >
+                ✕
+              </Button>
+            </div>
+            <iframe
+              src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`}
+              title={title}
+              className="w-full h-full rounded-lg"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+function getYouTubeVideoId(url: string): string {
+  const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
+  return match ? match[1] : ""
+}
 
 interface UnlockModalProps {
   item: MediaItem
@@ -186,7 +269,11 @@ export function EnhancedVaultPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedType, setSelectedType] = useState<string>("all")
   const [selectedTier, setSelectedTier] = useState<string>("all")
+  const [selectedCategory, setSelectedCategory] = useState<string>("all") // Added category filter
   const [sortBy, setSortBy] = useState<string>("newest")
+  const [currentPlayer, setCurrentPlayer] = useState<{ videoId: string; title: string; isFullscreen: boolean } | null>(
+    null,
+  ) // Added player state
   const [unlockModal, setUnlockModal] = useState<{ item: MediaItem; isOpen: boolean }>({
     item: {} as MediaItem,
     isOpen: false,
@@ -194,12 +281,23 @@ export function EnhancedVaultPage() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setMediaItems(mockMediaItems)
+      setMediaItems(allMediaItems) // Using combined media items
       setLoading(false)
     }, 1000)
 
     return () => clearTimeout(timer)
   }, [])
+
+  const playVideo = (item: MediaItem) => {
+    if (item.youtube_url) {
+      const videoId = getYouTubeVideoId(item.youtube_url)
+      setCurrentPlayer({ videoId, title: item.title, isFullscreen: false })
+    }
+  }
+
+  const redirectToYouTube = (url: string) => {
+    window.open(url, "_blank", "noopener,noreferrer")
+  }
 
   const getTierColor = (tier: string) => {
     switch (tier?.toLowerCase()) {
@@ -289,8 +387,9 @@ export function EnhancedVaultPage() {
 
     const matchesType = selectedType === "all" || item.type === selectedType
     const matchesTier = selectedTier === "all" || item.tier_required === selectedTier
+    const matchesCategory = selectedCategory === "all" || (item as any).category === selectedCategory // Added category filtering
 
-    return matchesSearch && matchesType && matchesTier
+    return matchesSearch && matchesType && matchesTier && matchesCategory
   })
 
   const sortedItems = [...filteredItems].sort((a, b) => {
@@ -327,7 +426,7 @@ export function EnhancedVaultPage() {
           <h1 className="text-3xl font-bold">Media Vault</h1>
         </div>
         <p className="text-muted-foreground">
-          Exclusive content, unreleased tracks, behind-the-scenes footage, and more
+          Exclusive content, music videos, audio tracks, and behind-the-scenes footage
         </p>
       </motion.div>
 
@@ -366,6 +465,17 @@ export function EnhancedVaultPage() {
                       className="pl-10"
                     />
                   </div>
+
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger className="w-full lg:w-48">
+                      <SelectValue placeholder="Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      <SelectItem value="video">Video Gallery</SelectItem>
+                      <SelectItem value="music">Music</SelectItem>
+                    </SelectContent>
+                  </Select>
 
                   <Select value={selectedType} onValueChange={setSelectedType}>
                     <SelectTrigger className="w-full lg:w-48">
@@ -431,6 +541,7 @@ export function EnhancedVaultPage() {
               sortedItems.map((item, index) => {
                 const TypeIcon = getTypeIcon(item.type)
                 const hasAccess = canAccessContent(item.tier_required)
+                const videoId = item.youtube_url ? getYouTubeVideoId(item.youtube_url) : ""
 
                 return (
                   <motion.div
@@ -476,10 +587,27 @@ export function EnhancedVaultPage() {
                           {/* Overlay */}
                           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-t-lg">
                             {hasAccess ? (
-                              <Button size="sm" className="bg-white/20 hover:bg-white/30 text-white">
-                                <Play className="h-4 w-4 mr-2" />
-                                Play
-                              </Button>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  className="bg-white/20 hover:bg-white/30 text-white"
+                                  onClick={() => playVideo(item)}
+                                >
+                                  <Play className="h-4 w-4 mr-2" />
+                                  Play
+                                </Button>
+                                {item.youtube_url && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="bg-red-600 hover:bg-red-700 text-white border-red-600"
+                                    onClick={() => redirectToYouTube(item.youtube_url!)}
+                                  >
+                                    <ExternalLink className="h-4 w-4 mr-2" />
+                                    YouTube
+                                  </Button>
+                                )}
+                              </div>
                             ) : (
                               <Button
                                 size="sm"
@@ -579,13 +707,21 @@ export function EnhancedVaultPage() {
                           <div className="flex items-center justify-between">
                             {hasAccess ? (
                               <div className="flex space-x-2">
-                                <Button size="sm" variant="outline">
+                                <Button size="sm" variant="outline" onClick={() => playVideo(item)}>
                                   <Play className="h-3 w-3 mr-1" />
                                   Play
                                 </Button>
-                                <Button size="sm" variant="outline">
-                                  <Download className="h-3 w-3" />
-                                </Button>
+                                {item.youtube_url && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-red-600 border-red-200 hover:bg-red-50 bg-transparent"
+                                    onClick={() => redirectToYouTube(item.youtube_url!)}
+                                  >
+                                    <ExternalLink className="h-3 w-3 mr-1" />
+                                    YouTube
+                                  </Button>
+                                )}
                               </div>
                             ) : (
                               <Button
@@ -611,6 +747,18 @@ export function EnhancedVaultPage() {
             )}
           </motion.div>
         </>
+      )}
+
+      {currentPlayer && (
+        <YouTubePlayer
+          videoId={currentPlayer.videoId}
+          title={currentPlayer.title}
+          isFullscreen={currentPlayer.isFullscreen}
+          onToggleFullscreen={() =>
+            setCurrentPlayer((prev) => (prev ? { ...prev, isFullscreen: !prev.isFullscreen } : null))
+          }
+          onClose={() => setCurrentPlayer(null)}
+        />
       )}
 
       {/* Unlock Modal */}
