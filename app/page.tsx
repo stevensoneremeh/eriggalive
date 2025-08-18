@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { motion, useScroll, useTransform } from "framer-motion"
 import { useTheme } from "@/contexts/theme-context"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Music, Video, Newspaper, Users, ShoppingBag, Calendar } from "lucide-react"
+import { Music, Video, Newspaper, Users, ShoppingBag, Calendar, Play, Radio } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SafeHeroVideoCarousel } from "@/components/safe-hero-video-carousel"
 import { getOptimizedVideoSources } from "@/utils/video-utils"
@@ -13,10 +15,18 @@ import EriggaRadio from "@/components/erigga-radio"
 
 export default function HomePage() {
   const { theme } = useTheme()
+  const { isAuthenticated } = useAuth()
   const [currentSlide, setCurrentSlide] = useState(0)
   const [mounted, setMounted] = useState(false)
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
+  const { scrollY } = useScroll()
   const videoSources = getOptimizedVideoSources()
-  const primaryVideoUrl = videoSources[0]?.src || "/videoshttps://hebbkx1anhila5yf.public.blob.vercel-storage.com/git-blob/prj_87iLY6t51DXvy0yPJ00SYhwlKXWl/K6Q-Lit6vuzvhNfoGXuTFB/public/erigga-hero-video.mp4"
+  const primaryVideoUrl =
+    videoSources[0]?.src ||
+    "/videoshttps://hebbkx1anhila5yf.public.blob.vercel-storage.com/git-blob/prj_87iLY6t51DXvy0yPJ00SYhwlKXWl/K6Q-Lit6vuzvhNfoGXuTFB/public/erigga-hero-video.mp4"
+
+  const heroY = useTransform(scrollY, [0, 500], [0, 150])
+  const heroOpacity = useTransform(scrollY, [0, 300], [1, 0])
 
   // Hero images
   const heroImages = [
@@ -26,49 +36,49 @@ export default function HomePage() {
     "/images/hero/erigga4.jpeg",
   ]
 
-  // Features data
+  // Features data with enhanced descriptions
   const features = [
     {
       title: "Media Vault",
       description: "Access Erigga's complete discography, music videos, and exclusive content.",
       icon: Music,
       href: "/vault",
-      color: "from-brand-lime to-brand-teal dark:from-white dark:to-harkonnen-gray",
+      gradient: "from-primary to-accent",
     },
     {
       title: "Erigga Chronicles",
       description: "Follow Erigga's journey through animated stories and documentaries.",
       icon: Video,
       href: "/chronicles",
-      color: "from-brand-teal to-brand-lime-dark dark:from-harkonnen-gray dark:to-white",
+      gradient: "from-accent to-secondary",
     },
     {
       title: "Community",
       description: "Connect with other fans, share content, and participate in discussions.",
       icon: Users,
       href: "/community",
-      color: "from-brand-lime-dark to-brand-teal-light dark:from-white dark:to-harkonnen-light-gray",
+      gradient: "from-secondary to-primary",
     },
     {
       title: "Merch Store",
       description: "Shop exclusive Erigga merchandise and limited edition items.",
       icon: ShoppingBag,
       href: "/merch",
-      color: "from-brand-teal-light to-brand-lime dark:from-harkonnen-light-gray dark:to-white",
+      gradient: "from-primary/80 to-accent/80",
     },
     {
       title: "Events & Tickets",
       description: "Get early access to concert tickets and exclusive events.",
       icon: Calendar,
       href: "/tickets",
-      color: "from-brand-lime to-brand-teal-dark dark:from-white dark:to-harkonnen-dark-gray",
+      gradient: "from-accent/80 to-secondary/80",
     },
     {
       title: "Premium Tiers",
       description: "Upgrade your experience with exclusive perks and content.",
       icon: Newspaper,
       href: "/premium",
-      color: "from-brand-teal-dark to-brand-lime-light dark:from-harkonnen-dark-gray dark:to-white",
+      gradient: "from-secondary/80 to-primary/80",
     },
   ]
 
@@ -155,6 +165,16 @@ export default function HomePage() {
     },
   ]
 
+  // Check for reduced motion preference
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)")
+    setPrefersReducedMotion(mediaQuery.matches)
+
+    const handleChange = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches)
+    mediaQuery.addEventListener("change", handleChange)
+    return () => mediaQuery.removeEventListener("change", handleChange)
+  }, [])
+
   // Auto-advance carousel
   useEffect(() => {
     setMounted(true)
@@ -173,49 +193,153 @@ export default function HomePage() {
       {/* Erigga Radio Widget - Only on home page */}
       <EriggaRadio />
 
-      {/* Hero Section */}
-      <section className="relative h-[80vh] w-full">
-        <SafeHeroVideoCarousel images={heroImages} videoUrl={primaryVideoUrl} className="absolute inset-0" />
+      <section className="relative h-[100vh] w-full overflow-hidden">
+        {/* Background with parallax effect */}
+        <motion.div className="absolute inset-0" style={{ y: heroY }}>
+          <SafeHeroVideoCarousel images={heroImages} videoUrl={primaryVideoUrl} className="absolute inset-0" />
+          {/* Gradient overlay for better text readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40" />
+          {/* Noise texture overlay */}
+          <div className="absolute inset-0 noise-texture opacity-30" />
+        </motion.div>
 
-        <div className="absolute inset-0 flex items-center justify-center z-10">
-          <div className="text-center max-w-3xl px-4">
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 drop-shadow-lg">
-              Welcome to the Official Erigga Live Platform
-            </h1>
-            <p className="text-xl md:text-2xl text-white/90 mb-8 drop-shadow-md">
-              Join the community and get exclusive access to music, videos, and events
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/signup" className="inline-block">
-                <div
-                  className={cn(
-                    "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
-                    "transform hover:scale-105 hover:shadow-xl",
-                    theme === "dark"
-                      ? "bg-white text-harkonnen-black hover:bg-gray-200"
-                      : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
-                  )}
-                >
-                  Join Now
+        {/* Hero Content with staggered animations */}
+        <motion.div className="absolute inset-0 flex items-center justify-center z-10" style={{ opacity: heroOpacity }}>
+          <div className="text-center max-w-4xl px-4">
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: prefersReducedMotion ? 0 : 0.8,
+                delay: prefersReducedMotion ? 0 : 0.2,
+              }}
+              className="glass-card rounded-3xl p-8 md:p-12 backdrop-blur-lg"
+            >
+              <motion.h1
+                className="text-4xl md:text-7xl font-bold text-white mb-6 drop-shadow-lg"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: prefersReducedMotion ? 0 : 0.6,
+                  delay: prefersReducedMotion ? 0 : 0.4,
+                }}
+              >
+                Welcome to the Official{" "}
+                <span className="bg-gradient-to-r from-accent to-secondary bg-clip-text text-transparent">
+                  Erigga Live
+                </span>{" "}
+                Platform
+              </motion.h1>
+
+              <motion.p
+                className="text-xl md:text-2xl text-white/90 mb-8 drop-shadow-md"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: prefersReducedMotion ? 0 : 0.6,
+                  delay: prefersReducedMotion ? 0 : 0.6,
+                }}
+              >
+                Join the community and get exclusive access to music, videos, and events
+              </motion.p>
+
+              <motion.div
+                className="flex flex-col sm:flex-row gap-4 justify-center"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: prefersReducedMotion ? 0 : 0.6,
+                  delay: prefersReducedMotion ? 0 : 0.8,
+                }}
+              >
+                <Link href="/signup" className="inline-block">
+                  <motion.div
+                    className="bg-gradient-to-r from-accent to-secondary text-white font-bold rounded-xl py-4 px-8 text-center shadow-2xl border border-white/20"
+                    whileHover={
+                      prefersReducedMotion
+                        ? {}
+                        : {
+                            scale: 1.05,
+                            boxShadow: "0 20px 40px rgba(0,0,0,0.3)",
+                          }
+                    }
+                    whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    Join Now
+                  </motion.div>
+                </Link>
+
+                <Link href="/vault" className="inline-block">
+                  <motion.div
+                    className="glass-card text-white font-bold rounded-xl py-4 px-8 text-center border border-white/30"
+                    whileHover={
+                      prefersReducedMotion
+                        ? {}
+                        : {
+                            scale: 1.05,
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                          }
+                    }
+                    whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    Explore Content
+                  </motion.div>
+                </Link>
+              </motion.div>
+            </motion.div>
+          </div>
+        </motion.div>
+
+        <div className="absolute bottom-10 left-10 hidden md:flex space-x-1 opacity-20">
+          {[...Array(5)].map((_, i) => (
+            <div
+              key={i}
+              className="w-2 bg-accent rounded-full equalizer-bar"
+              style={{ animationDelay: `${i * 0.2}s` }}
+            />
+          ))}
+        </div>
+      </section>
+
+      {isAuthenticated && (
+        <motion.section
+          className="py-8 bg-gradient-to-r from-primary/10 to-accent/10 border-y border-border/50"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
+        >
+          <div className="container mx-auto px-4">
+            <div className="glass-card rounded-2xl p-6 flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="relative">
+                  <div className="w-12 h-12 bg-gradient-to-br from-accent to-secondary rounded-full flex items-center justify-center">
+                    <Radio className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full pulse-glow" />
                 </div>
-              </Link>
-              <Link href="/vault" className="inline-block">
-                <div
-                  className={cn(
-                    "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
-                    "transform hover:scale-105 hover:shadow-xl",
-                    theme === "dark"
-                      ? "bg-transparent border-2 border-white text-white hover:bg-white/10"
-                      : "bg-brand-teal text-white hover:bg-brand-teal-dark",
-                  )}
-                >
-                  Explore Content
+                <div>
+                  <h3 className="font-bold text-lg">Now Playing</h3>
+                  <p className="text-muted-foreground">Erigga Radio - 24/7 Street Beats</p>
                 </div>
+                <div className="hidden md:flex space-x-1 ml-4">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="w-1 bg-accent rounded-full equalizer-bar" />
+                  ))}
+                </div>
+              </div>
+              <Link href="/radio">
+                <Button className="bg-gradient-to-r from-accent to-secondary hover:from-accent/90 hover:to-secondary/90">
+                  <Play className="w-4 h-4 mr-2" />
+                  Listen Live
+                </Button>
               </Link>
             </div>
           </div>
-        </div>
-      </section>
+        </motion.section>
+      )}
 
       {/* Rest of the home page content */}
       <section className="py-12 px-4 bg-gray-50 dark:bg-gray-900">
@@ -260,50 +384,29 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-background">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Platform Features</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
+      <section className="py-20 relative overflow-hidden">
+        {/* Background gradient mesh */}
+        <div className="absolute inset-0 gradient-mesh opacity-5" />
+
+        <div className="container mx-auto px-4 relative z-10">
+          <motion.div
+            className="text-center mb-16"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.6 }}
+          >
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Platform Features
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
               Everything you need to connect with Erigga and fellow fans in one place.
             </p>
-          </div>
+          </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <Link key={index} href={feature.href}>
-                <Card
-                  className={cn(
-                    "h-full transition-all duration-300 hover:scale-105 overflow-hidden",
-                    theme === "dark" ? "harkonnen-card" : "border border-gray-200",
-                  )}
-                >
-                  <CardContent className="p-6 flex flex-col h-full">
-                    <div
-                      className={cn(
-                        "w-12 h-12 rounded-full mb-4 flex items-center justify-center bg-gradient-to-br",
-                        feature.color,
-                      )}
-                    >
-                      <feature.icon className={cn("h-6 w-6", theme === "dark" ? "text-black" : "text-white")} />
-                    </div>
-                    <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
-                    <p className="text-muted-foreground flex-grow">{feature.description}</p>
-                    <div className="mt-4 flex items-center text-sm font-medium text-brand-teal dark:text-white">
-                      Learn more
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4 ml-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+              <FeatureCard key={index} feature={feature} index={index} prefersReducedMotion={prefersReducedMotion} />
             ))}
           </div>
         </div>
@@ -451,5 +554,91 @@ export default function HomePage() {
         </div>
       </section>
     </div>
+  )
+}
+
+function FeatureCard({
+  feature,
+  index,
+  prefersReducedMotion,
+}: {
+  feature: any
+  index: number
+  prefersReducedMotion: boolean
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 50 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{
+        duration: prefersReducedMotion ? 0 : 0.6,
+        delay: prefersReducedMotion ? 0 : index * 0.1,
+      }}
+    >
+      <Link href={feature.href}>
+        <motion.div
+          className="glass-card rounded-2xl p-8 h-full group cursor-pointer overflow-hidden relative"
+          whileHover={
+            prefersReducedMotion
+              ? {}
+              : {
+                  y: -10,
+                  transition: { duration: 0.3 },
+                }
+          }
+          whileTap={prefersReducedMotion ? {} : { scale: 0.98 }}
+        >
+          {/* Gradient background on hover */}
+          <div
+            className={cn(
+              "absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-10 transition-opacity duration-300",
+              feature.gradient,
+            )}
+          />
+
+          <div className="relative z-10">
+            <motion.div
+              className={cn(
+                "w-16 h-16 rounded-2xl mb-6 flex items-center justify-center bg-gradient-to-br shadow-lg",
+                feature.gradient,
+              )}
+              whileHover={
+                prefersReducedMotion
+                  ? {}
+                  : {
+                      rotate: 5,
+                      scale: 1.1,
+                    }
+              }
+              transition={{ duration: 0.2 }}
+            >
+              <feature.icon className="h-8 w-8 text-white" />
+            </motion.div>
+
+            <h3 className="text-2xl font-bold mb-4 group-hover:text-primary transition-colors">{feature.title}</h3>
+
+            <p className="text-muted-foreground leading-relaxed mb-6">{feature.description}</p>
+
+            <motion.div
+              className="flex items-center text-primary font-medium group-hover:text-accent transition-colors"
+              whileHover={prefersReducedMotion ? {} : { x: 5 }}
+              transition={{ duration: 0.2 }}
+            >
+              Learn more
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </motion.div>
+          </div>
+        </motion.div>
+      </Link>
+    </motion.div>
   )
 }
