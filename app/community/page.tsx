@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Heart, MessageCircle, Send, Smile, Paperclip, MoreVertical, Search, Menu, X } from "lucide-react"
+import { Heart, MessageCircle, Send, Smile, Paperclip, MoreVertical, Search, Filter } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
@@ -441,328 +440,333 @@ export default function CommunityPage() {
   }, [selectedCategory, supabase, loadPosts])
 
   return (
-    <div className="h-screen bg-[#0a0a0a] flex overflow-hidden">
-      {/* Sidebar */}
-      <div
-        className={cn(
-          "w-80 bg-[#1f2937] border-r border-gray-700 flex flex-col transition-transform duration-300",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
-        )}
-      >
-        {/* Sidebar Header */}
-        <div className="p-4 bg-[#25D366] text-white">
-          <div className="flex items-center justify-between">
-            <h1 className="text-xl font-semibold">Community</h1>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="md:hidden text-white hover:bg-white/20"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <X className="h-5 w-5" />
-            </Button>
-          </div>
-          <p className="text-sm text-green-100 mt-1">Connect with fans worldwide</p>
-        </div>
-
-        {/* Search */}
-        <div className="p-3 bg-[#2f3349]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search conversations..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-[#3c4043] border-gray-600 text-white placeholder-gray-400"
-            />
-          </div>
-        </div>
-
-        {/* Categories List */}
-        <ScrollArea className="flex-1">
-          <div className="p-2">
-            {categories.map((category) => (
-              <Button
-                key={category.id}
-                variant="ghost"
-                className={cn(
-                  "w-full justify-start p-3 mb-1 text-left hover:bg-[#3c4043]",
-                  selectedCategory === category.id ? "bg-[#25D366] text-white hover:bg-[#25D366]" : "text-gray-300",
-                )}
-                onClick={() => {
-                  setSelectedCategory(category.id)
-                  setSidebarOpen(false)
-                }}
-              >
-                <div className="flex items-center space-x-3 w-full">
-                  <div className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center text-xl">
-                    {category.icon}
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Container */}
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
+                  <MessageCircle className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-white">Community Hub</h1>
+                  <p className="text-slate-400">Connect, share, and engage with fellow fans</p>
+                </div>
+              </div>
+              
+              {isAuthenticated && profile && (
+                <div className="flex items-center space-x-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+                    <Input
+                      placeholder="Search posts..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 w-64 bg-white/10 border-white/20 text-white text-sm placeholder-slate-400 backdrop-blur-sm"
+                    />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{category.name}</div>
-                    <div className="text-sm opacity-70 truncate">
-                      {posts.filter((p) => p.category.id === category.id).length} messages
+                  
+                  <div className="flex items-center space-x-3 px-4 py-2 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} />
+                      <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs">
+                        {profile.username?.charAt(0).toUpperCase() || "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="hidden md:block">
+                      <div className="text-sm font-medium text-white">{profile.full_name || profile.username}</div>
+                      <Badge className={cn("text-xs text-white px-2 py-0.5 rounded-full", getTierColor(profile.tier || "grassroot"))}>
+                        {profile.tier || "grassroot"}
+                      </Badge>
                     </div>
                   </div>
                 </div>
-              </Button>
-            ))}
-          </div>
-        </ScrollArea>
-
-        {/* User Profile */}
-        {isAuthenticated && profile && (
-          <div className="p-4 bg-[#2f3349] border-t border-gray-700">
-            <div className="flex items-center space-x-3">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} />
-                <AvatarFallback className="bg-[#25D366] text-white">
-                  {profile.username?.charAt(0).toUpperCase() || "U"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-white truncate">{profile.full_name || profile.username}</div>
-                <Badge className={cn("text-xs text-white", getTierColor(profile.tier || "grassroot"))}>
-                  {profile.tier || "grassroot"}
-                </Badge>
-              </div>
+              )}
             </div>
           </div>
-        )}
-      </div>
-
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-[#0f172a]">
-        {/* Chat Header */}
-        <div className="p-4 bg-[#1f2937] border-b border-gray-700 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Button variant="ghost" size="sm" className="md:hidden text-white" onClick={() => setSidebarOpen(true)}>
-              <Menu className="h-5 w-5" />
-            </Button>
-            <div className="w-10 h-10 rounded-full bg-[#25D366] flex items-center justify-center text-white text-lg">
-              {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
-            </div>
-            <div>
-              <h2 className="font-semibold text-white">
-                {categories.find((c) => c.id === selectedCategory)?.name || "General"}
-              </h2>
-              <p className="text-sm text-gray-400">
-                {filteredPosts.length} messages • {categories.length} members online
-              </p>
-            </div>
-          </div>
-          <Button variant="ghost" size="sm" className="text-gray-400">
-            <MoreVertical className="h-5 w-5" />
-          </Button>
         </div>
 
-        {/* Messages Area */}
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4">
-            {loading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#25D366] mx-auto mb-4"></div>
-                <p className="text-gray-400">Loading messages...</p>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Categories List */}
+          <div className="lg:col-span-1">
+            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl sticky top-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold text-white">Categories</h2>
+                <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white">
+                  <Filter className="h-4 w-4" />
+                </Button>
               </div>
-            ) : filteredPosts.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 rounded-full bg-gray-700 flex items-center justify-center text-2xl mx-auto mb-4">
-                  💬
-                </div>
-                <h3 className="text-lg font-semibold text-white mb-2">No messages yet</h3>
-                <p className="text-gray-400">Be the first to start the conversation!</p>
-              </div>
-            ) : (
-              filteredPosts.map((post) => (
-                <div key={post.id} className="group">
-                  {/* Message Bubble */}
-                  <div
+              
+              <div className="space-y-3">
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
                     className={cn(
-                      "flex items-start space-x-3 p-4 rounded-lg transition-colors",
-                      post.user.id === profile?.id ? "bg-[#25D366] ml-12" : "bg-[#1f2937] mr-12",
+                      "w-full p-4 rounded-xl transition-all duration-300 group",
+                      selectedCategory === category.id
+                        ? "bg-gradient-to-r from-blue-500/20 to-purple-600/20 border border-blue-500/30 shadow-lg"
+                        : "bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20"
                     )}
+                    onClick={() => {
+                      setSelectedCategory(category.id)
+                      setSidebarOpen(false)
+                    }}
                   >
-                    {post.user.id !== profile?.id && (
-                      <Avatar className="h-8 w-8 flex-shrink-0">
-                        <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
-                        <AvatarFallback className="bg-gray-600 text-white text-sm">
-                          {post.user.username.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                    )}
-
-                    <div className="flex-1 min-w-0">
-                      {post.user.id !== profile?.id && (
-                        <div className="flex items-center space-x-2 mb-1">
-                          <span className="font-medium text-white text-sm">
-                            {post.user.full_name || post.user.username}
-                          </span>
-                          <Badge className={cn("text-xs text-white", getTierColor(post.user.tier))}>
-                            {post.user.tier}
-                          </Badge>
-                        </div>
-                      )}
-
-                      <p
-                        className={cn(
-                          "text-sm leading-relaxed break-words",
-                          post.user.id === profile?.id ? "text-white" : "text-gray-100",
-                        )}
-                      >
-                        {post.content}
-                      </p>
-
-                      <div className="flex items-center justify-between mt-2">
-                        <span
-                          className={cn("text-xs", post.user.id === profile?.id ? "text-green-100" : "text-gray-400")}
-                        >
-                          {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                        </span>
-
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={cn(
-                              "h-6 px-2 text-xs",
-                              post.has_voted ? "text-red-400 hover:text-red-300" : "text-gray-400 hover:text-red-400",
-                            )}
-                            onClick={() => voteOnPost(post.id)}
-                          >
-                            <Heart className={cn("h-3 w-3 mr-1", post.has_voted && "fill-current")} />
-                            {post.vote_count}
-                          </Button>
-
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 px-2 text-xs text-gray-400 hover:text-blue-400"
-                            onClick={() => {
-                              if (activePost === post.id) {
-                                setActivePost(null)
-                              } else {
-                                setActivePost(post.id)
-                                loadComments(post.id)
-                              }
-                            }}
-                          >
-                            <MessageCircle className="h-3 w-3 mr-1" />
-                            {post.comment_count}
-                          </Button>
+                    <div className="flex items-center space-x-3">
+                      <div className={cn(
+                        "w-10 h-10 rounded-lg flex items-center justify-center text-lg transition-all duration-300",
+                        selectedCategory === category.id
+                          ? "bg-gradient-to-r from-blue-500 to-purple-600 shadow-lg"
+                          : "bg-white/10 group-hover:bg-white/20"
+                      )}>
+                        {category.icon}
+                      </div>
+                      <div className="flex-1 text-left">
+                        <div className="font-medium text-white">{category.name}</div>
+                        <div className="text-sm text-slate-400">
+                          {posts.filter((p) => p.category.id === category.id).length} posts
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
 
-                  {/* Comments Section */}
-                  {activePost === post.id && (
-                    <div className="ml-8 mt-2 space-y-2">
-                      {comments[post.id]?.map((comment) => (
-                        <div key={comment.id} className="flex items-start space-x-2 p-2 bg-[#2d3748] rounded-lg">
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage src={comment.user.avatar_url || "/placeholder-user.jpg"} />
-                            <AvatarFallback className="bg-gray-600 text-white text-xs">
-                              {comment.user.username.charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <span className="font-medium text-white text-xs">{comment.user.username}</span>
-                              <span className="text-xs text-gray-400">
-                                {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                              </span>
+          {/* Main Content Area */}
+          <div className="lg:col-span-3">
+            {/* Post Creation Card */}
+            {isAuthenticated && (
+              <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl mb-6">
+                <div className="flex items-start space-x-4">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
+                    <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+                      {profile?.username?.charAt(0).toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="relative">
+                      <Input
+                        ref={inputRef}
+                        placeholder="Share your thoughts with the community..."
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        className="bg-white/10 border-white/20 text-white placeholder-slate-400 backdrop-blur-sm pr-12 py-3"
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault()
+                            sendMessage()
+                          }
+                        }}
+                      />
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
+                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white p-1">
+                          <Paperclip className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white p-1">
+                          <Smile className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between mt-3">
+                      <div className="text-sm text-slate-400">
+                        Posting to {categories.find((c) => c.id === selectedCategory)?.name || "General"}
+                      </div>
+                      <Button
+                        onClick={sendMessage}
+                        disabled={!newMessage.trim()}
+                        className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-2 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+                      >
+                        <Send className="h-4 w-4 mr-2" />
+                        Post
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Posts Feed */}
+            <div className="space-y-6">
+              {loading ? (
+                <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-12 shadow-2xl text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-2 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+                  <p className="text-slate-400">Loading posts...</p>
+                </div>
+              ) : filteredPosts.length === 0 ? (
+                <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-12 shadow-2xl text-center">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-600/20 flex items-center justify-center text-3xl mx-auto mb-6">
+                    💬
+                  </div>
+                  <h3 className="text-xl font-semibold text-white mb-2">No posts yet</h3>
+                  <p className="text-slate-400">Be the first to start the conversation in this category!</p>
+                </div>
+              ) : (
+                filteredPosts.map((post) => (
+                  <div key={post.id} className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl overflow-hidden hover:bg-white/10 transition-all duration-300 group">
+                    {/* Post Card */}
+                    <div className="p-6">
+                      <div className="flex items-start space-x-4">
+                        <Avatar className="h-12 w-12 ring-2 ring-white/20">
+                          <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
+                          <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+                            {post.user.username.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-3 mb-3">
+                            <span className="font-semibold text-white">
+                              {post.user.full_name || post.user.username}
+                            </span>
+                            <Badge className={cn("text-xs text-white px-2 py-1 rounded-full", getTierColor(post.user.tier))}>
+                              {post.user.tier}
+                            </Badge>
+                            <span className="text-sm text-slate-400">
+                              {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                            </span>
+                          </div>
+                          
+                          <div className="prose prose-invert max-w-none">
+                            <p className="text-slate-100 leading-relaxed mb-4">{post.content}</p>
+                          </div>
+                          
+                          {/* Media */}
+                          {post.media_url && (
+                            <div className="mb-4 rounded-xl overflow-hidden bg-white/5">
+                              {post.media_type?.startsWith('image/') ? (
+                                <img 
+                                  src={post.media_url || "/placeholder.svg"} 
+                                  alt="Post media" 
+                                  className="w-full h-auto max-h-96 object-cover"
+                                />
+                              ) : (
+                                <div className="p-4 text-center text-slate-400">
+                                  Media content
+                                </div>
+                              )}
                             </div>
-                            <p className="text-sm text-gray-100">{comment.content}</p>
+                          )}
+                          
+                          {/* Actions */}
+                          <div className="flex items-center justify-between pt-4 border-t border-white/10">
+                            <div className="flex items-center space-x-4">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn(
+                                  "text-slate-400 hover:text-red-400 transition-all duration-300 px-3 py-2 rounded-lg",
+                                  post.has_voted && "text-red-400 bg-red-500/10"
+                                )}
+                                onClick={() => voteOnPost(post.id)}
+                              >
+                                <Heart className={cn("h-4 w-4 mr-2 transition-all duration-300", post.has_voted && "fill-current scale-110")} />
+                                {post.vote_count}
+                              </Button>
+                              
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn(
+                                  "text-slate-400 hover:text-blue-400 transition-all duration-300 px-3 py-2 rounded-lg",
+                                  activePost === post.id && "text-blue-400 bg-blue-500/10"
+                                )}
+                                onClick={() => {
+                                  if (activePost === post.id) {
+                                    setActivePost(null)
+                                  } else {
+                                    setActivePost(post.id)
+                                    loadComments(post.id)
+                                  }
+                                }}
+                              >
+                                <MessageCircle className="h-4 w-4 mr-2" />
+                                {post.comment_count} Comments
+                              </Button>
+                            </div>
+                            
+                            <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
-                      ))}
-
-                      {/* Comment Input */}
-                      {isAuthenticated && (
-                        <div className="flex items-center space-x-2 p-2">
-                          <Input
-                            placeholder="Add a comment..."
-                            value={newComment}
-                            onChange={(e) => setNewComment(e.target.value)}
-                            className="flex-1 bg-[#2d3748] border-gray-600 text-white text-sm"
-                            onKeyPress={(e) => {
-                              if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault()
-                                sendComment(post.id)
-                              }
-                            }}
-                          />
-                          <Button
-                            size="sm"
-                            onClick={() => sendComment(post.id)}
-                            disabled={!newComment.trim()}
-                            className="bg-[#25D366] hover:bg-[#20b358] text-white"
-                          >
-                            <Send className="h-3 w-3" />
-                          </Button>
+                      </div>
+                    
+                    {/* Comments Section */}
+                    {activePost === post.id && (
+                      <div className="border-t border-white/10 bg-white/5">
+                        <div className="p-6 space-y-4">
+                          {comments[post.id]?.map((comment) => (
+                            <div key={comment.id} className="flex items-start space-x-3 p-4 bg-white/5 rounded-xl border border-white/10">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={comment.user.avatar_url || "/placeholder-user.jpg"} />
+                                <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs">
+                                  {comment.user.username.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <span className="font-medium text-white text-sm">{comment.user.username}</span>
+                                  <Badge className={cn("text-xs text-white px-2 py-0.5 rounded-full", getTierColor(comment.user.tier))}>
+                                    {comment.user.tier}
+                                  </Badge>
+                                  <span className="text-xs text-slate-400">
+                                    {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-slate-100 leading-relaxed">{comment.content}</p>
+                              </div>
+                            </div>
+                          ))}
+                          
+                          {/* Comment Input */}
+                          {isAuthenticated && (
+                            <div className="flex items-start space-x-3 pt-4">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
+                                <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs">
+                                  {profile?.username?.charAt(0).toUpperCase() || "U"}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 flex items-center space-x-2">
+                                <Input
+                                  placeholder="Write a comment..."
+                                  value={newComment}
+                                  onChange={(e) => setNewComment(e.target.value)}
+                                  className="flex-1 bg-white/10 border-white/20 text-white text-sm placeholder-slate-400"
+                                  onKeyPress={(e) => {
+                                    if (e.key === "Enter" && !e.shiftKey) {
+                                      e.preventDefault()
+                                      sendComment(post.id)
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={() => sendComment(post.id)}
+                                  disabled={!newComment.trim()}
+                                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg transition-all duration-300"
+                                >
+                                  <Send className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-            <div ref={messagesEndRef} />
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-        </ScrollArea>
-
-        {/* Message Input */}
-        <div className="p-4 bg-[#1f2937] border-t border-gray-700">
-          {isAuthenticated ? (
-            <div className="flex items-center space-x-3">
-              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                <Paperclip className="h-5 w-5" />
-              </Button>
-              <div className="flex-1 relative">
-                <Input
-                  ref={inputRef}
-                  placeholder="Type a message..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  className="bg-[#2d3748] border-gray-600 text-white pr-12"
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault()
-                      sendMessage()
-                    }
-                  }}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
-                >
-                  <Smile className="h-4 w-4" />
-                </Button>
-              </div>
-              <Button
-                onClick={sendMessage}
-                disabled={!newMessage.trim()}
-                className="bg-[#25D366] hover:bg-[#20b358] text-white"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <div className="text-center py-4">
-              <p className="text-gray-400 mb-3">Sign in to join the conversation</p>
-              <Button asChild className="bg-[#25D366] hover:bg-[#20b358] text-white">
-                <a href="/login">Sign In</a>
-              </Button>
-            </div>
-          )}
         </div>
       </div>
-
-      {/* Mobile Overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
     </div>
-  )
+  )\
 }
