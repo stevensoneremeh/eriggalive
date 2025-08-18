@@ -57,7 +57,7 @@ export function DynamicLogo({ width = 120, height = 32, className = "" }: Dynami
     return <div className={`bg-muted animate-pulse rounded ${className}`} style={{ width, height }} />
   }
 
-  const logoSrc = isDark ? "/images/loggotrans-light.png" : "/images/loggotrans-dark.png"
+  const logoSrc = "/images/erigga-live-logo.png"
 
   return (
     <Image
@@ -65,7 +65,7 @@ export function DynamicLogo({ width = 120, height = 32, className = "" }: Dynami
       alt="Erigga Live Logo"
       width={width}
       height={height}
-      className={className}
+      className={`${className} ${isDark ? "brightness-0 invert" : ""}`}
       priority
       onError={() => {
         // Fallback to a simple text logo if images fail
