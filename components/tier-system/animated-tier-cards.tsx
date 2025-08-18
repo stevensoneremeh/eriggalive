@@ -47,36 +47,37 @@ const tierPlans: TierPlan[] = [
   {
     id: "pro",
     name: "Pro",
-    price: 2500,
+    price: 5000,
     period: "/month",
     icon: Crown,
-    color: "text-orange-600",
-    bgGradient: "from-orange-50 to-orange-100",
-    borderColor: "border-orange-300",
+    color: "text-blue-600",
+    bgGradient: "from-blue-50 to-blue-100",
+    borderColor: "border-blue-300",
     popular: true,
-    coinBonus: 500,
+    coinBonus: 1000,
     description: "Most popular choice for fans",
     features: [
       "Everything in Free",
       "Early access to new drops",
       "Exclusive behind-the-scenes content",
-      "10% discount on merch",
+      "15% discount on merch",
       "Priority event tickets",
       "Pro profile badge",
       "Premium vault access",
       "Monthly exclusive freestyles",
+      "Advanced community features",
     ],
   },
   {
     id: "enterprise",
     name: "Enterprise",
-    price: 10000,
+    price: 15000,
     period: "/month",
     icon: Zap,
     color: "text-purple-600",
     bgGradient: "from-purple-50 to-purple-100",
     borderColor: "border-purple-300",
-    coinBonus: 2000,
+    coinBonus: 3000,
     description: "Ultimate fan experience",
     features: [
       "Everything in Pro",
@@ -84,11 +85,13 @@ const tierPlans: TierPlan[] = [
       "30% discount on all purchases",
       "Backstage access at events",
       "Direct contact with Erigga",
-      "Enterprise badge",
+      "Custom Enterprise 'E' badge",
       "Full vault access",
       "Quarterly private sessions",
       "Input on upcoming releases",
       "Limited edition merchandise",
+      "Priority customer support",
+      "Exclusive meet & greet opportunities",
     ],
   },
 ]
@@ -102,7 +105,7 @@ export function AnimatedTierCards({ onUpgrade }: AnimatedTierCardsProps) {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
   const [selectedCard, setSelectedCard] = useState<string | null>(null)
 
-  const currentTier = profile?.tier || "grassroot"
+  const currentTier = profile?.tier || "free"
 
   const cardVariants = {
     initial: { scale: 1, y: 0 },
@@ -151,9 +154,8 @@ export function AnimatedTierCards({ onUpgrade }: AnimatedTierCardsProps) {
         const isCurrentTier = currentTier === plan.id
         const canUpgrade =
           !isCurrentTier &&
-          ((currentTier === "grassroot" && plan.id !== "free") ||
-            (currentTier === "pioneer" && plan.id === "enterprise") ||
-            currentTier === "free")
+          ((currentTier === "free" && (plan.id === "pro" || plan.id === "enterprise")) ||
+            (currentTier === "pro" && plan.id === "enterprise"))
 
         return (
           <motion.div

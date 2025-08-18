@@ -7,7 +7,7 @@ import { useTheme } from "@/contexts/theme-context"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Music, Video, Users, ShoppingBag, Calendar, Play, Radio, Star, ArrowRight } from "lucide-react"
+import { Music, Video, Users, ShoppingBag, Calendar, Play, Radio, Star, ArrowRight, Crown, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SafeHeroVideoCarousel } from "@/components/safe-hero-video-carousel"
 import { getOptimizedVideoSources } from "@/utils/video-utils"
@@ -92,84 +92,78 @@ export default function HomePage() {
     {
       quote: "Erigga's platform connects me directly with real fans. The community here is authentic.",
       author: "WarriKing23",
-      tier: "Blood Brotherhood",
+      tier: "Enterprise",
     },
     {
       quote: "The exclusive content in the vault is worth every coin. Can't get this anywhere else!",
       author: "PaperBoi99",
-      tier: "Elder",
+      tier: "Pro",
     },
     {
       quote: "Chronicles series tells Erigga's story in a way I've never seen before. Pure street wisdom.",
       author: "LagosHustler",
-      tier: "Pioneer",
+      tier: "Pro",
     },
   ]
 
   const tierPlans = [
     {
-      name: "Grassroot",
+      name: "Free",
       price: "Free",
       description: "Start your journey with basic platform access",
       features: ["Community access", "Public content", "Event announcements", "Basic profile"],
-      color: "border-emerald-200 dark:border-emerald-800",
-      bgColor: "bg-emerald-50/50 dark:bg-emerald-950/20",
-      textColor: "text-emerald-600 dark:text-emerald-400",
+      color: "border-gray-200 dark:border-gray-700",
+      bgColor: "bg-gray-50/50 dark:bg-gray-900/20",
+      textColor: "text-gray-600 dark:text-gray-400",
       href: "/signup",
+      icon: Star,
     },
     {
-      name: "Pioneer",
-      price: "₦2,500",
+      name: "Pro",
+      price: "₦5,000",
       period: "monthly",
       description: "Enhanced access with exclusive content and perks",
       features: [
-        "All Grassroot features",
+        "All Free features",
         "Early music releases",
         "Exclusive interviews",
-        "Discounted merchandise",
-        "Pioneer community badge",
+        "15% discount on merchandise",
+        "Pro community badge",
+        "Premium vault access",
+        "Monthly exclusive freestyles",
+        "Advanced community features",
       ],
       color: "border-blue-200 dark:border-blue-800",
       bgColor: "bg-blue-50/50 dark:bg-blue-950/20",
       textColor: "text-blue-600 dark:text-blue-400",
       href: "/premium",
       popular: true,
+      icon: Crown,
     },
     {
-      name: "Elder",
-      price: "₦5,000",
+      name: "Enterprise",
+      price: "₦15,000",
       period: "monthly",
-      description: "Premium access with VIP benefits and exclusive content",
+      description: "Ultimate fan experience with direct artist access",
       features: [
-        "All Pioneer features",
-        "Behind-the-scenes content",
-        "Studio session videos",
-        "Priority event access",
-        "Monthly Erigga coins",
-        "Elder community badge",
+        "All Pro features",
+        "VIP access to all events",
+        "30% discount on all purchases",
+        "Backstage access at events",
+        "Direct contact with Erigga",
+        "Custom Enterprise 'E' badge",
+        "Full vault access",
+        "Quarterly private sessions",
+        "Input on upcoming releases",
+        "Limited edition merchandise",
+        "Priority customer support",
+        "Exclusive meet & greet opportunities",
       ],
       color: "border-purple-200 dark:border-purple-800",
       bgColor: "bg-purple-50/50 dark:bg-purple-950/20",
       textColor: "text-purple-600 dark:text-purple-400",
       href: "/premium",
-    },
-    {
-      name: "Blood Brotherhood",
-      price: "₦10,000",
-      period: "monthly",
-      description: "Ultimate fan experience with direct artist access",
-      features: [
-        "All Elder features",
-        "Direct messaging with Erigga",
-        "Virtual meet & greets",
-        "Exclusive merchandise drops",
-        "Blood Brotherhood badge",
-        "Voting rights on new content",
-      ],
-      color: "border-red-200 dark:border-red-800",
-      bgColor: "bg-red-50/50 dark:bg-red-950/20",
-      textColor: "text-red-600 dark:text-red-400",
-      href: "/premium",
+      icon: Zap,
     },
   ]
 
@@ -220,8 +214,8 @@ export default function HomePage() {
             className="absolute inset-0 object-cover w-full h-full"
           />
           {/* Enhanced gradient overlays */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/60" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-black/20" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/70" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-black/30" />
           {/* Animated noise texture */}
           <motion.div
             className="absolute inset-0 noise-texture opacity-20"
@@ -232,12 +226,12 @@ export default function HomePage() {
 
         {/* Enhanced hero content with better typography and animations */}
         <motion.div className="absolute inset-0 flex items-center justify-center z-10" style={{ opacity: heroOpacity }}>
-          <div className="text-center max-w-5xl px-4">
+          <div className="text-center max-w-6xl px-4">
             <motion.div
               initial={{ opacity: 0, y: 60, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{
-                duration: prefersReducedMotion ? 0 : 1,
+                duration: prefersReducedMotion ? 0 : 1.2,
                 delay: prefersReducedMotion ? 0 : 0.3,
                 ease: [0.25, 0.46, 0.45, 0.94],
               }}
@@ -430,48 +424,6 @@ export default function HomePage() {
         </motion.section>
       )}
 
-      {/* Rest of the home page content */}
-      <section className="py-12 px-4 bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12 text-gray-900 dark:text-white">Explore the Platform</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Media Vault</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Access exclusive music, videos, and behind-the-scenes content
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/vault">Explore Vault</Link>
-                </Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Community</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Connect with others, share content, and join discussions
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/community">Join Community</Link>
-                </Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Chronicles</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Follow Erigga's journey through exclusive stories and updates
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/chronicles">Read Chronicles</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
       <section className="py-24 relative overflow-hidden bg-gradient-to-b from-background to-muted/20">
         {/* Animated background elements */}
         <motion.div
@@ -585,7 +537,7 @@ export default function HomePage() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {tierPlans.map((plan, index) => (
               <motion.div
                 key={index}
@@ -627,6 +579,16 @@ export default function HomePage() {
                   >
                     <CardContent className={cn("p-8", plan.bgColor)}>
                       <div className="text-center mb-6">
+                        <motion.div
+                          className={cn(
+                            "w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center",
+                            plan.textColor.replace("text-", "bg-").replace("dark:text-", "dark:bg-"),
+                          )}
+                          whileHover={{ rotate: 360 }}
+                          transition={{ duration: 0.6 }}
+                        >
+                          <plan.icon className="h-8 w-8 text-white" />
+                        </motion.div>
                         <h3 className={cn("text-2xl font-bold mb-2", plan.textColor)}>{plan.name}</h3>
                         <div className="mb-4">
                           <span className="text-4xl font-black">{plan.price}</span>
@@ -673,7 +635,7 @@ export default function HomePage() {
                               "text-white hover:shadow-xl",
                             )}
                           >
-                            {plan.name === "Grassroot" ? "Start Free" : "Subscribe Now"}
+                            {plan.name === "Free" ? "Start Free" : "Subscribe Now"}
                           </Button>
                         </motion.div>
                       </Link>
