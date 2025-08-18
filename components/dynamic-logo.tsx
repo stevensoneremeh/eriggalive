@@ -57,7 +57,7 @@ export function DynamicLogo({ width = 120, height = 32, className = "" }: Dynami
     return <div className={`bg-muted animate-pulse rounded ${className}`} style={{ width, height }} />
   }
 
-  const logoSrc = isDark ? "/images/loggotrans-dark.png" : "/images/loggotrans-light.png"
+  const logoSrc = isDark ? "/images/loggotrans-light.png" : "/images/loggotrans-dark.png"
 
   return (
     <Image
