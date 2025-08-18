@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Heart, MessageCircle, Send, Smile, Paperclip, MoreVertical, Search, Filter } from "lucide-react"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Heart, MessageCircle, Send, Smile, Paperclip, MoreVertical, Search, Menu, X, Filter, Zap } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
@@ -441,240 +442,256 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Container */}
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
+      <div className="absolute inset-0 bg-[url('data:image/svg+xml;utf8,%3Csvg%20width=%2260%22%20height=%2260%22%20viewBox=%220%200%2060%2060%22%20xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg%20fill=%22none%22%20fillRule=%22evenodd%22%3E%3Cg%20fill=%22%23ffffff%22%20fillOpacity=%220.02%22%3E%3Ccircle%20cx=%2230%22%20cy=%2230%22%20r=%222%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-20"></div>
+      <div className="relative flex h-screen overflow-hidden">
+        {/* Sidebar */}
+        <div
+          className={cn(
+            "w-80 backdrop-blur-xl bg-white/5 border-r border-white/10 flex flex-col transition-all duration-500 ease-out shadow-2xl",
+            sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+          )}
+        >
+          <div className="p-6 backdrop-blur-xl bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-b border-white/10">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
-                  <MessageCircle className="h-6 w-6 text-white" />
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center shadow-lg">
+                  <Zap className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-white">Community Hub</h1>
-                  <p className="text-slate-400">Connect, share, and engage with fellow fans</p>
+                  <h1 className="text-xl font-bold text-white">Community Hub</h1>
+                  <p className="text-sm text-white/70">Connect & Share</p>
                 </div>
               </div>
-              
-              {isAuthenticated && profile && (
-                <div className="flex items-center space-x-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                    <Input
-                      placeholder="Search posts..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 w-64 bg-white/10 border-white/20 text-white text-sm placeholder-slate-400 backdrop-blur-sm"
-                    />
-                  </div>
-                  
-                  <div className="flex items-center space-x-3 px-4 py-2 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} />
-                      <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs">
-                        {profile.username?.charAt(0).toUpperCase() || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="hidden md:block">
-                      <div className="text-sm font-medium text-white">{profile.full_name || profile.username}</div>
-                      <Badge className={cn("text-xs text-white px-2 py-0.5 rounded-full", getTierColor(profile.tier || "grassroot"))}>
-                        {profile.tier || "grassroot"}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="md:hidden text-white hover:bg-white/10 rounded-xl"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <X className="h-5 w-5" />
+              </Button>
             </div>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Categories List */}
-          <div className="lg:col-span-1">
-            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl sticky top-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-white">Categories</h2>
-                <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white">
-                  <Filter className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              <div className="space-y-3">
-                {categories.map((category) => (
-                  <button
-                    key={category.id}
-                    className={cn(
-                      "w-full p-4 rounded-xl transition-all duration-300 group",
-                      selectedCategory === category.id
-                        ? "bg-gradient-to-r from-blue-500/20 to-purple-600/20 border border-blue-500/30 shadow-lg"
-                        : "bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20"
-                    )}
-                    onClick={() => {
-                      setSelectedCategory(category.id)
-                      setSidebarOpen(false)
-                    }}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className={cn(
-                        "w-10 h-10 rounded-lg flex items-center justify-center text-lg transition-all duration-300",
-                        selectedCategory === category.id
-                          ? "bg-gradient-to-r from-blue-500 to-purple-600 shadow-lg"
-                          : "bg-white/10 group-hover:bg-white/20"
-                      )}>
+          <div className="p-4">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50 h-4 w-4" />
+              <Input
+                placeholder="Search conversations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-12 bg-white/5 backdrop-blur-sm border-white/10 text-white placeholder-white/50 rounded-xl h-12 text-lg focus:bg-white/10 transition-all duration-300"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg"
+              >
+                <Filter className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <ScrollArea className="flex-1 px-4">
+            <div className="space-y-2">
+              {categories.map((category, index) => (
+                <div
+                  key={category.id}
+                  className={cn(
+                    "group relative overflow-hidden rounded-2xl transition-all duration-300 hover:scale-[1.02] cursor-pointer",
+                    selectedCategory === category.id
+                      ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur-sm border border-blue-400/30 shadow-lg shadow-blue-500/10"
+                      : "bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 hover:border-white/20",
+                  )}
+                  onClick={() => {
+                    setSelectedCategory(category.id)
+                    setSidebarOpen(false)
+                  }}
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <div className="p-4">
+                    <div className="flex items-center space-x-4">
+                      <div
+                        className={cn(
+                          "w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-lg transition-all duration-300",
+                          selectedCategory === category.id
+                            ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white"
+                            : "bg-white/10 text-white/80 group-hover:bg-white/20",
+                        )}
+                      >
                         {category.icon}
                       </div>
-                      <div className="flex-1 text-left">
-                        <div className="font-medium text-white">{category.name}</div>
-                        <div className="text-sm text-slate-400">
-                          {posts.filter((p) => p.category.id === category.id).length} posts
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-white truncate text-lg">{category.name}</div>
+                        <div className="text-sm text-white/60 truncate">
+                          {posts.filter((p) => p.category.id === category.id).length} messages
                         </div>
                       </div>
+                      {selectedCategory === category.id && (
+                        <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div>
+                      )}
                     </div>
-                  </button>
-                ))}
+                  </div>
+                  {selectedCategory === category.id && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-2xl"></div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+
+          {isAuthenticated && profile && (
+            <div className="p-4 backdrop-blur-xl bg-white/5 border-t border-white/10">
+              <div className="flex items-center space-x-4 p-3 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+                <Avatar className="h-12 w-12 ring-2 ring-white/20">
+                  <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} />
+                  <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold">
+                    {profile.username?.charAt(0).toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-white truncate">{profile.full_name || profile.username}</div>
+                  <Badge
+                    className={cn(
+                      "text-xs text-white font-medium px-3 py-1 rounded-full",
+                      getTierColor(profile.tier || "grassroot"),
+                    )}
+                  >
+                    {profile.tier || "grassroot"}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col backdrop-blur-xl bg-white/5">
+          <div className="p-6 backdrop-blur-xl bg-gradient-to-r from-white/10 to-white/5 border-b border-white/10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="md:hidden text-white hover:bg-white/10 rounded-xl"
+                  onClick={() => setSidebarOpen(true)}
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-2xl shadow-lg">
+                  {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">
+                    {categories.find((c) => c.id === selectedCategory)?.name || "General"}
+                  </h2>
+                  <p className="text-white/60">
+                    {filteredPosts.length} posts • {categories.length} active members
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl"
+                >
+                  <Search className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl"
+                >
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
               </div>
             </div>
           </div>
 
-          {/* Main Content Area */}
-          <div className="lg:col-span-3">
-            {/* Post Creation Card */}
-            {isAuthenticated && (
-              <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl mb-6">
-                <div className="flex items-start space-x-4">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
-                    <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
-                      {profile?.username?.charAt(0).toUpperCase() || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="relative">
-                      <Input
-                        ref={inputRef}
-                        placeholder="Share your thoughts with the community..."
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        className="bg-white/10 border-white/20 text-white placeholder-slate-400 backdrop-blur-sm pr-12 py-3"
-                        onKeyPress={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault()
-                            sendMessage()
-                          }
-                        }}
-                      />
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
-                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white p-1">
-                          <Paperclip className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white p-1">
-                          <Smile className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between mt-3">
-                      <div className="text-sm text-slate-400">
-                        Posting to {categories.find((c) => c.id === selectedCategory)?.name || "General"}
-                      </div>
-                      <Button
-                        onClick={sendMessage}
-                        disabled={!newMessage.trim()}
-                        className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-2 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
-                      >
-                        <Send className="h-4 w-4 mr-2" />
-                        Post
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Posts Feed */}
-            <div className="space-y-6">
+          <ScrollArea className="flex-1 p-6">
+            <div className="max-w-4xl mx-auto space-y-6">
               {loading ? (
-                <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-12 shadow-2xl text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-2 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-                  <p className="text-slate-400">Loading posts...</p>
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center mx-auto mb-6 animate-pulse">
+                    <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  </div>
+                  <p className="text-white/70 text-lg">Loading conversations...</p>
                 </div>
               ) : filteredPosts.length === 0 ? (
-                <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-12 shadow-2xl text-center">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-600/20 flex items-center justify-center text-3xl mx-auto mb-6">
+                <div className="text-center py-16">
+                  <div className="w-24 h-24 rounded-3xl bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur-sm flex items-center justify-center text-4xl mx-auto mb-6 border border-white/10">
                     💬
                   </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">No posts yet</h3>
-                  <p className="text-slate-400">Be the first to start the conversation in this category!</p>
+                  <h3 className="text-2xl font-bold text-white mb-3">Start the Conversation</h3>
+                  <p className="text-white/60 text-lg">Be the first to share your thoughts with the community!</p>
                 </div>
               ) : (
-                filteredPosts.map((post) => (
-                  <div key={post.id} className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl overflow-hidden hover:bg-white/10 transition-all duration-300 group">
-                    {/* Post Card */}
-                    <div className="p-6">
+                filteredPosts.map((post, index) => (
+                  <div
+                    key={post.id}
+                    className="group animate-fade-in-up"
+                    style={{ animationDelay: `${index * 100}ms` }}
+                  >
+                    <div className="backdrop-blur-xl bg-white/5 rounded-3xl border border-white/10 p-6 shadow-2xl hover:shadow-3xl hover:bg-white/10 transition-all duration-500 hover:scale-[1.01]">
                       <div className="flex items-start space-x-4">
-                        <Avatar className="h-12 w-12 ring-2 ring-white/20">
+                        <Avatar className="h-12 w-12 ring-2 ring-white/20 shadow-lg">
                           <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
-                          <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+                          <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold">
                             {post.user.username.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        
+
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-3 mb-3">
-                            <span className="font-semibold text-white">
+                            <span className="font-bold text-white text-lg">
                               {post.user.full_name || post.user.username}
                             </span>
-                            <Badge className={cn("text-xs text-white px-2 py-1 rounded-full", getTierColor(post.user.tier))}>
+                            <Badge
+                              className={cn(
+                                "text-xs text-white font-medium px-3 py-1 rounded-full shadow-lg",
+                                getTierColor(post.user.tier),
+                              )}
+                            >
                               {post.user.tier}
                             </Badge>
-                            <span className="text-sm text-slate-400">
+                            <span className="text-white/50 text-sm">
                               {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
                             </span>
                           </div>
-                          
-                          <div className="prose prose-invert max-w-none">
-                            <p className="text-slate-100 leading-relaxed mb-4">{post.content}</p>
-                          </div>
-                          
-                          {/* Media */}
-                          {post.media_url && (
-                            <div className="mb-4 rounded-xl overflow-hidden bg-white/5">
-                              {post.media_type?.startsWith('image/') ? (
-                                <img 
-                                  src={post.media_url || "/placeholder.svg"} 
-                                  alt="Post media" 
-                                  className="w-full h-auto max-h-96 object-cover"
-                                />
-                              ) : (
-                                <div className="p-4 text-center text-slate-400">
-                                  Media content
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          
-                          {/* Actions */}
-                          <div className="flex items-center justify-between pt-4 border-t border-white/10">
+
+                          <p className="text-white/90 text-lg leading-relaxed mb-4 break-words">{post.content}</p>
+
+                          <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-4">
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className={cn(
-                                  "text-slate-400 hover:text-red-400 transition-all duration-300 px-3 py-2 rounded-lg",
-                                  post.has_voted && "text-red-400 bg-red-500/10"
+                                  "rounded-xl px-4 py-2 transition-all duration-300 hover:scale-105",
+                                  post.has_voted
+                                    ? "text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20"
+                                    : "text-white/70 hover:text-red-400 hover:bg-red-500/10",
                                 )}
                                 onClick={() => voteOnPost(post.id)}
                               >
-                                <Heart className={cn("h-4 w-4 mr-2 transition-all duration-300", post.has_voted && "fill-current scale-110")} />
+                                <Heart
+                                  className={cn(
+                                    "h-4 w-4 mr-2 transition-all duration-300",
+                                    post.has_voted && "fill-current scale-110",
+                                  )}
+                                />
                                 {post.vote_count}
                               </Button>
-                              
+
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className={cn(
-                                  "text-slate-400 hover:text-blue-400 transition-all duration-300 px-3 py-2 rounded-lg",
-                                  activePost === post.id && "text-blue-400 bg-blue-500/10"
+                                  "rounded-xl px-4 py-2 transition-all duration-300 hover:scale-105",
+                                  activePost === post.id
+                                    ? "text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20"
+                                    : "text-white/70 hover:text-blue-400 hover:bg-blue-500/10",
                                 )}
                                 onClick={() => {
                                   if (activePost === post.id) {
@@ -686,59 +703,63 @@ export default function CommunityPage() {
                                 }}
                               >
                                 <MessageCircle className="h-4 w-4 mr-2" />
-                                {post.comment_count} Comments
+                                {post.comment_count}
                               </Button>
                             </div>
-                            
-                            <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
                           </div>
                         </div>
                       </div>
-                    
-                    {/* Comments Section */}
-                    {activePost === post.id && (
-                      <div className="border-t border-white/10 bg-white/5">
-                        <div className="p-6 space-y-4">
-                          {comments[post.id]?.map((comment) => (
-                            <div key={comment.id} className="flex items-start space-x-3 p-4 bg-white/5 rounded-xl border border-white/10">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={comment.user.avatar_url || "/placeholder-user.jpg"} />
-                                <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs">
-                                  {comment.user.username.charAt(0).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <span className="font-medium text-white text-sm">{comment.user.username}</span>
-                                  <Badge className={cn("text-xs text-white px-2 py-0.5 rounded-full", getTierColor(comment.user.tier))}>
-                                    {comment.user.tier}
-                                  </Badge>
-                                  <span className="text-xs text-slate-400">
-                                    {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                                  </span>
+
+                      {activePost === post.id && (
+                        <div className="mt-6 space-y-4 animate-fade-in">
+                          {comments[post.id]?.map((comment, commentIndex) => (
+                            <div
+                              key={comment.id}
+                              className="ml-8 backdrop-blur-sm bg-white/5 rounded-2xl border border-white/10 p-4 animate-slide-in-right"
+                              style={{ animationDelay: `${commentIndex * 100}ms` }}
+                            >
+                              <div className="flex items-start space-x-3">
+                                <Avatar className="h-8 w-8 ring-1 ring-white/20">
+                                  <AvatarImage src={comment.user.avatar_url || "/placeholder-user.jpg"} />
+                                  <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-semibold">
+                                    {comment.user.username.charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-2 mb-2">
+                                    <span className="font-semibold text-white text-sm">{comment.user.username}</span>
+                                    <span className="text-xs text-white/50">
+                                      {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                    </span>
+                                  </div>
+                                  <p className="text-white/80 text-sm leading-relaxed">{comment.content}</p>
                                 </div>
-                                <p className="text-sm text-slate-100 leading-relaxed">{comment.content}</p>
                               </div>
                             </div>
                           ))}
-                          
-                          {/* Comment Input */}
+
                           {isAuthenticated && (
-                            <div className="flex items-start space-x-3 pt-4">
-                              <Avatar className="h-8 w-8">
+                            <div className="ml-8 flex items-center space-x-3 p-4 backdrop-blur-sm bg-white/5 rounded-2xl border border-white/10">
+                              <Avatar className="h-8 w-8 ring-1 ring-white/20">
                                 <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
-                                <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs">
+                                <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-semibold">
                                   {profile?.username?.charAt(0).toUpperCase() || "U"}
                                 </AvatarFallback>
                               </Avatar>
-                              <div className="flex-1 flex items-center space-x-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl"
+                              >
+                                <Paperclip className="h-5 w-5" />
+                              </Button>
+                              <div className="flex-1 relative">
                                 <Input
+                                  ref={inputRef}
                                   placeholder="Write a comment..."
                                   value={newComment}
                                   onChange={(e) => setNewComment(e.target.value)}
-                                  className="flex-1 bg-white/10 border-white/20 text-white text-sm placeholder-slate-400"
+                                  className="bg-white/5 border-white/10 text-white pr-12 rounded-2xl h-12 text-lg focus:bg-white/10 transition-all duration-300"
                                   onKeyPress={(e) => {
                                     if (e.key === "Enter" && !e.shiftKey) {
                                       e.preventDefault()
@@ -747,26 +768,104 @@ export default function CommunityPage() {
                                   }}
                                 />
                                 <Button
+                                  variant="ghost"
                                   size="sm"
-                                  onClick={() => sendComment(post.id)}
-                                  disabled={!newComment.trim()}
-                                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg transition-all duration-300"
+                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl"
                                 >
-                                  <Send className="h-3 w-3" />
+                                  <Smile className="h-5 w-5" />
                                 </Button>
                               </div>
+                              <Button
+                                onClick={() => sendComment(post.id)}
+                                disabled={!newComment.trim()}
+                                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-2xl px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <Send className="h-5 w-5" />
+                              </Button>
                             </div>
                           )}
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 ))
               )}
+              <div ref={messagesEndRef} />
             </div>
+          </ScrollArea>
+
+          <div className="p-6 backdrop-blur-xl bg-gradient-to-r from-white/10 to-white/5 border-t border-white/10">
+            {isAuthenticated ? (
+              <div className="max-w-4xl mx-auto">
+                <div className="flex items-center space-x-4 p-4 backdrop-blur-xl bg-white/10 rounded-3xl border border-white/20 shadow-2xl">
+                  <Avatar className="h-10 w-10 ring-2 ring-white/20">
+                    <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
+                    <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold">
+                      {profile?.username?.charAt(0).toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl"
+                  >
+                    <Paperclip className="h-5 w-5" />
+                  </Button>
+                  <div className="flex-1 relative">
+                    <Input
+                      ref={inputRef}
+                      placeholder="Share your thoughts..."
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      className="bg-white/5 border-white/10 text-white pr-12 rounded-2xl h-12 text-lg focus:bg-white/10 transition-all duration-300"
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault()
+                          sendMessage()
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl"
+                    >
+                      <Smile className="h-5 w-5" />
+                    </Button>
+                  </div>
+                  <Button
+                    onClick={sendMessage}
+                    disabled={!newMessage.trim()}
+                    className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-2xl px-8 py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Send className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="max-w-4xl mx-auto text-center py-8">
+                <div className="backdrop-blur-xl bg-white/5 rounded-3xl border border-white/10 p-8">
+                  <p className="text-white/70 mb-4 text-lg">Join the conversation</p>
+                  <Button
+                    asChild
+                    className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-2xl px-8 py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                  >
+                    <a href="/login">Sign In</a>
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Mobile Overlay */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
       </div>
     </div>
-  )\
+  )
 }
