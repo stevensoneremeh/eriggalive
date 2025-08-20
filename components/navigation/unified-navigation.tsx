@@ -84,7 +84,11 @@ export function UnifiedNavigation() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <DynamicLogo className="h-8 w-auto" />
+            <DynamicLogo
+              width={160}
+              height={42}
+              className="h-8 md:h-10 w-auto transition-all duration-300 hover:scale-105"
+            />
           </Link>
 
           {/* Desktop Navigation */}

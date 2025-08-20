@@ -28,7 +28,7 @@ export function DynamicLogo({ width = 180, height = 50, className = "" }: Dynami
         alt="ERIGGA Live"
         width={width}
         height={height}
-        className="object-contain w-auto h-auto max-w-full max-h-full"
+        className="object-contain w-auto h-auto max-w-full max-h-full transition-all duration-300 hover:scale-105"
         style={{
           width: "auto",
           height: "auto",
@@ -36,7 +36,7 @@ export function DynamicLogo({ width = 180, height = 50, className = "" }: Dynami
           maxHeight: `${height}px`,
         }}
         priority
-        sizes="(max-width: 640px) 100px, (max-width: 768px) 120px, 180px"
+        sizes="(max-width: 480px) 100px, (max-width: 640px) 120px, (max-width: 768px) 140px, (max-width: 1024px) 160px, 200px"
         onError={() => {
           console.warn("Logo image failed to load")
         }}

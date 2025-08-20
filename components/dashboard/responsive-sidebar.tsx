@@ -49,7 +49,7 @@ interface SidebarItem {
 
 // Updated sidebarItems: "Coins" item is removed.
 const sidebarItems: SidebarItem[] = [
-{
+  {
     name: "Home",
     href: "/",
     icon: Home, // Main dashboard uses Home icon
@@ -363,14 +363,18 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
         <div className={cn("flex items-center p-4 border-b", isCollapsed && "justify-center px-2")}>
           {!isCollapsed ? (
             <Link href="/" className="flex items-center space-x-2">
-              <DynamicLogo width={isMobile ? 120 : 100} height={isMobile ? 32 : 28} />
+              <DynamicLogo
+                width={isMobile ? 140 : 120}
+                height={isMobile ? 36 : 32}
+                className="transition-all duration-300 hover:scale-105"
+              />
             </Link>
           ) : (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Link href="/">
-                    <DynamicLogo width={32} height={32} />
+                    <DynamicLogo width={36} height={36} className="transition-all duration-300 hover:scale-110" />
                   </Link>
                 </TooltipTrigger>
                 <TooltipContent side="right">Erigga Live</TooltipContent>
@@ -436,7 +440,7 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
         <div className={cn("p-4 border-t", isCollapsed && "px-2")}>
           {!isCollapsed ? (
             <div className="space-y-2">
-              <Button variant="outline" size="sm" className="w-full justify-start" asChild>
+              <Button variant="outline" size="sm" className="w-full justify-start bg-transparent" asChild>
                 <Link href="/profile">
                   {" "}
                   {/* Assuming /profile exists or will be created */}
