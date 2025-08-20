@@ -117,7 +117,7 @@ function NavigationContent() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2 z-10">
-            <DynamicLogo width={160} height={42} className="transition-all duration-300 hover:scale-105" />
+            <DynamicLogo width={120} height={32} />
           </Link>
 
           {/* Desktop Navigation */}
@@ -235,7 +235,7 @@ function NavigationContent() {
                 <div className="flex flex-col h-full">
                   {/* Mobile Header */}
                   <div className="flex items-center justify-between p-4 border-b">
-                    <DynamicLogo width={120} height={32} />
+                    <DynamicLogo width={100} height={28} />
                     <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)}>
                       <X className="h-6 w-6" />
                     </Button>
