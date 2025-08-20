@@ -9,47 +9,11 @@ interface DynamicLogoProps {
   className?: string
 }
 
-export function DynamicLogo({ width = 120, height = 32, className = "" }: DynamicLogoProps) {
+export function DynamicLogo({ width = 180, height = 50, className = "" }: DynamicLogoProps) {
   const [mounted, setMounted] = useState(false)
-  const [isDark, setIsDark] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-
-    // Check initial theme
-    const checkTheme = () => {
-      const isDarkMode =
-        document.documentElement.classList.contains("dark") ||
-        (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches)
-      setIsDark(isDarkMode)
-    }
-
-    checkTheme()
-
-    // Listen for theme changes
-    const observer = new MutationObserver(checkTheme)
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    })
-
-    // Listen for system theme changes
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
-    const handleChange = () => {
-      if (
-        !document.documentElement.classList.contains("light") &&
-        !document.documentElement.classList.contains("dark")
-      ) {
-        checkTheme()
-      }
-    }
-
-    mediaQuery.addEventListener("change", handleChange)
-
-    return () => {
-      observer.disconnect()
-      mediaQuery.removeEventListener("change", handleChange)
-    }
   }, [])
 
   // Don't render until mounted to prevent hydration mismatch
@@ -57,20 +21,26 @@ export function DynamicLogo({ width = 120, height = 32, className = "" }: Dynami
     return <div className={`bg-muted animate-pulse rounded ${className}`} style={{ width, height }} />
   }
 
-  const logoSrc = "/images/erigga-live-logo.png"
-
   return (
-    <Image
-      src={logoSrc || "/placeholder.svg"}
-      alt="Erigga Live Logo"
-      width={width}
-      height={height}
-      className={`${className} ${isDark ? "brightness-0 invert" : ""}`}
-      priority
-      onError={() => {
-        // Fallback to a simple text logo if images fail
-        console.warn("Logo image failed to load")
-      }}
-    />
+    <div className={`relative ${className}`}>
+      <Image
+        src="/images/erigga-live-logo.png"
+        alt="ERIGGA Live"
+        width={width}
+        height={height}
+        className="object-contain w-auto h-auto max-w-full max-h-full"
+        style={{
+          width: "auto",
+          height: "auto",
+          maxWidth: `${width}px`,
+          maxHeight: `${height}px`,
+        }}
+        priority
+        sizes="(max-width: 640px) 100px, (max-width: 768px) 120px, 180px"
+        onError={() => {
+          console.warn("Logo image failed to load")
+        }}
+      />
+    </div>
   )
 }
