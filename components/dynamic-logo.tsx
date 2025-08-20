@@ -22,11 +22,12 @@ export function DynamicLogo({ width, height, className = "", responsive = true }
       return { width, height }
     }
 
+    // Default responsive sizes - increased desktop size for better visual balance
     return {
-      mobile: { width: 120, height: 32 }, // Increased from 100x28
-      tablet: { width: 160, height: 44 }, // Increased from 140x38
-      desktop: { width: 240, height: 66 }, // Increased from 200x55
-      wide: { width: 280, height: 76 }, // Increased from 220x60
+      mobile: { width: 100, height: 28 },
+      tablet: { width: 140, height: 38 },
+      desktop: { width: 200, height: 55 }, // Increased from 180x50
+      wide: { width: 220, height: 60 },
     }
   }
 
@@ -34,8 +35,8 @@ export function DynamicLogo({ width, height, className = "", responsive = true }
 
   // Don't render until mounted to prevent hydration mismatch
   if (!mounted) {
-    const skeletonWidth = responsive ? 240 : width || 180
-    const skeletonHeight = responsive ? 66 : height || 50
+    const skeletonWidth = responsive ? 200 : width || 180
+    const skeletonHeight = responsive ? 55 : height || 50
     return (
       <div
         className={`bg-muted animate-pulse rounded ${className}`}
@@ -52,11 +53,11 @@ export function DynamicLogo({ width, height, className = "", responsive = true }
       <Image
         src="/images/erigga-live-logo.png"
         alt="ERIGGA Live"
-        width={responsive ? 280 : finalWidth}
-        height={responsive ? 76 : finalHeight}
+        width={responsive ? 220 : finalWidth} // Use largest size for intrinsic dimensions
+        height={responsive ? 60 : finalHeight}
         className={
           responsive
-            ? "object-contain w-auto h-auto max-w-full max-h-full sm:w-[120px] sm:h-[32px] md:w-[160px] md:h-[44px] lg:w-[240px] lg:h-[66px] xl:w-[280px] xl:h-[76px]"
+            ? "object-contain w-auto h-auto max-w-full max-h-full sm:w-[100px] sm:h-[28px] md:w-[140px] md:h-[38px] lg:w-[200px] lg:h-[55px] xl:w-[220px] xl:h-[60px]"
             : "object-contain w-auto h-auto max-w-full max-h-full"
         }
         style={
@@ -72,7 +73,7 @@ export function DynamicLogo({ width, height, className = "", responsive = true }
         priority
         sizes={
           responsive
-            ? "(max-width: 640px) 120px, (max-width: 768px) 160px, (max-width: 1024px) 240px, 280px"
+            ? "(max-width: 640px) 100px, (max-width: 768px) 140px, (max-width: 1024px) 200px, 220px"
             : `${finalWidth}px`
         }
         onError={() => {
