@@ -363,7 +363,11 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
         <div className={cn("flex items-center p-4 border-b", isCollapsed && "justify-center px-2")}>
           {!isCollapsed ? (
             <Link href="/" className="flex items-center space-x-2">
-              <DynamicLogo responsive={false} width={isMobile ? 120 : 100} height={isMobile ? 32 : 28} />
+              <DynamicLogo
+                responsive={!isMobile}
+                width={isMobile ? 120 : undefined}
+                height={isMobile ? 32 : undefined}
+              />
             </Link>
           ) : (
             <TooltipProvider>

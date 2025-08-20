@@ -1,5 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
+
+// Initialize Supabase client
+const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 // Check if we're in preview/development mode
 const isPreviewMode = () => {
@@ -13,33 +16,38 @@ const isPreviewMode = () => {
 
 async function verifyUser(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Get the authenticated user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return { error: "Authentication required", user: null, profile: null }
+    const authHeader = request.headers.get("authorization")
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return { error: "Missing or invalid authorization header", user: null }
     }
 
-    // Get user profile with current coin balance
+    const token = authHeader.replace("Bearer ", "")
+
+    // In production, verify JWT token with Supabase
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(token)
+
+    if (error || !user) {
+      return { error: "Invalid authentication token", user: null }
+    }
+
+    // Get user profile from database
     const { data: profile, error: profileError } = await supabase
       .from("users")
-      .select("id, email, username, coins, tier")
+      .select("*")
       .eq("auth_user_id", user.id)
       .single()
 
     if (profileError || !profile) {
-      return { error: "User profile not found", user: null, profile: null }
+      return { error: "User profile not found", user: null }
     }
 
-    return { user, profile, error: null }
+    return { user: profile, error: null }
   } catch (error) {
     console.error("Authentication error:", error)
-    return { error: "Authentication failed", user: null, profile: null }
+    return { error: "Authentication failed", user: null }
   }
 }
 
@@ -105,10 +113,41 @@ async function verifyWithPaystack(reference: string, paystackSecretKey: string) 
   return await response.json()
 }
 
+async function createTransactionRecord(userId: string, transactionData: any) {
+  const { data, error } = await supabase
+    .from("coin_transactions")
+    .insert({
+      user_id: userId,
+      amount: transactionData.coinAmount,
+      transaction_type: "purchase",
+      status: "completed",
+      description: `Purchased ${transactionData.coinAmount.toLocaleString()} Erigga Coins`,
+      paystack_reference: transactionData.reference,
+      payment_method: "paystack",
+      metadata: {
+        naira_amount: transactionData.nairaAmount,
+        exchange_rate: 0.5,
+        payment_channel: transactionData.paymentData?.channel || "card",
+        paid_at: transactionData.paymentData?.paidAt,
+        is_preview_mode: isPreviewMode(),
+      },
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error("Database error creating transaction:", error)
+    throw new Error("Failed to create transaction record")
+  }
+
+  return data
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { user, profile, error: authError } = await verifyUser(request)
-    if (authError || !user || !profile) {
+    // Verify user authentication
+    const { user, error: authError } = await verifyUser(request)
+    if (authError || !user) {
       return NextResponse.json(
         {
           success: false,
@@ -149,19 +188,18 @@ export async function POST(request: NextRequest) {
 
     const { amount, reference, coins } = requestData
 
-    const supabase = await createClient()
     const { data: existingTransaction } = await supabase
-      .from("transactions")
-      .select("id")
-      .eq("reference", reference)
+      .from("coin_transactions")
+      .select("id, status")
+      .eq("paystack_reference", reference)
       .single()
 
     if (existingTransaction) {
       return NextResponse.json(
         {
           success: false,
-          error: "Transaction reference already exists",
-          code: "DUPLICATE_REFERENCE",
+          error: "Transaction already processed",
+          code: "DUPLICATE_TRANSACTION",
         },
         { status: 400 },
       )
@@ -234,104 +272,53 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    try {
-      // Start a transaction to ensure data consistency
-      const { data: transaction, error: transactionError } = await supabase
-        .from("transactions")
-        .insert({
-          user_id: user.id,
-          reference,
-          amount: Math.round(amount * 100), // Store in kobo
-          coins_credited: coins,
-          status: "success",
-          payment_method: "paystack",
-          paystack_data: paystackData.data,
-          metadata: {
-            exchange_rate: 0.5,
-            is_preview_mode: isPreviewMode(),
-            channel: paystackData.data.channel || "card",
-            currency: paystackData.data.currency || "NGN",
-          },
-          verified_at: new Date().toISOString(),
-        })
-        .select()
-        .single()
-
-      if (transactionError) {
-        console.error("Transaction creation error:", transactionError)
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Failed to create transaction record",
-            code: "DATABASE_ERROR",
-          },
-          { status: 500 },
-        )
-      }
-
-      // Update user coin balance
-      const { data: updatedProfile, error: updateError } = await supabase
-        .from("users")
-        .update({
-          coins: profile.coins + coins,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("auth_user_id", user.id)
-        .select("coins")
-        .single()
-
-      if (updateError) {
-        console.error("Balance update error:", updateError)
-        // Try to mark transaction as failed
-        await supabase.from("transactions").update({ status: "failed" }).eq("id", transaction.id)
-
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Failed to update coin balance",
-            code: "BALANCE_UPDATE_ERROR",
-          },
-          { status: 500 },
-        )
-      }
-
-      // Create coin transaction record for audit trail
-      await supabase.from("coin_transactions").insert({
-        user_id: user.id,
-        amount: coins,
-        transaction_type: "purchase",
-        description: `Purchased ${coins.toLocaleString()} coins via Paystack (${reference})`,
-        status: "completed",
-      })
-
-      console.log("Transaction completed successfully:", transaction.id)
-
-      return NextResponse.json({
-        success: true,
-        transaction: {
-          id: transaction.id,
-          reference: transaction.reference,
-          coins_credited: transaction.coins_credited,
-          amount_naira: amount,
-          status: transaction.status,
-          created_at: transaction.created_at,
-        },
-        newBalance: updatedProfile.coins,
-        message: `Successfully purchased ${coins.toLocaleString()} Erigga Coins`,
-        isPreviewMode: isPreviewMode(),
-      })
-    } catch (error) {
-      console.error("Database operation error:", error)
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Database operation failed",
-          code: "DATABASE_ERROR",
-          details: error instanceof Error ? error.message : "Unknown error",
-        },
-        { status: 500 },
-      )
+    const transactionData = {
+      coinAmount: coins,
+      nairaAmount: amount,
+      reference,
+      paymentData: {
+        channel: paystackData.data.channel || "card",
+        paidAt: paystackData.data.paid_at || new Date().toISOString(),
+        currency: paystackData.data.currency || "NGN",
+      },
     }
+
+    const transaction = await createTransactionRecord(user.id, transactionData)
+
+    const { data: updatedUser, error: balanceError } = await supabase
+      .from("users")
+      .select("coins")
+      .eq("id", user.id)
+      .single()
+
+    if (balanceError) {
+      console.error("Error fetching updated balance:", balanceError)
+    }
+
+    const newBalance = updatedUser?.coins || user.coins + coins
+
+    return NextResponse.json({
+      success: true,
+      transaction: {
+        id: transaction.id,
+        userId: user.id,
+        type: "purchase",
+        coinAmount: coins,
+        nairaAmount: amount,
+        reference,
+        status: "completed",
+        createdAt: transaction.created_at,
+        paymentData: transactionData.paymentData,
+        metadata: {
+          paymentMethod: "paystack",
+          exchangeRate: 0.5,
+          isPreviewMode: isPreviewMode(),
+        },
+      },
+      newBalance,
+      message: `Successfully purchased ${coins.toLocaleString()} Erigga Coins`,
+      isPreviewMode: isPreviewMode(),
+    })
   } catch (error) {
     console.error("Purchase API error:", error)
     return NextResponse.json(
