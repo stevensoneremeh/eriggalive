@@ -48,14 +48,14 @@ const validateAccountNumber = (accountNumber: string): string | null => {
 
 const validateWithdrawalAmount = (amount: number, balance: number): string | null => {
   if (isNaN(amount) || amount <= 0) return "Please enter a valid amount"
-  if (amount < 10000) return "Minimum withdrawal amount is 10,000 Erigga Coins"
+  if (amount < 100000) return "Minimum withdrawal amount is 100,000 Erigga Coins"
   if (amount > balance) return "Insufficient balance"
   if (amount > 1000000) return "Maximum withdrawal is 1,000,000 coins per transaction"
   return null
 }
 
 export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnhancedProps) {
-  const { profile, refreshSession } = useAuth()
+  const { profile, refreshSession, user } = useAuth()
   const { toast } = useToast()
   const [amount, setAmount] = useState("")
   const [bankCode, setBankCode] = useState("")
@@ -69,10 +69,10 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
   const [lastVerificationTime, setLastVerificationTime] = useState<number>(0)
 
   const currentBalance = profile?.coins || 0
-  const minWithdrawal = 10000
+  const minWithdrawal = 100000 // Updated minimum to 100,000 coins
   const maxWithdrawal = 1000000
   const withdrawalAmount = Number.parseInt(amount, 10) || 0
-  const nairaEquivalent = withdrawalAmount * 0.5
+  const nairaEquivalent = withdrawalAmount * 0.1 // Updated exchange rate: 100,000 coins = ₦10,000
   const processingFee = Math.max(25, nairaEquivalent * 0.01) // 1% fee, minimum ₦25
 
   const resetState = useCallback(() => {
@@ -111,25 +111,24 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
     setLastVerificationTime(now)
 
     try {
-      // Simulate API delay for account verification
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      const response = await fetch(`/api/coins/withdraw?account_number=${accountNumber}&bank_code=${bankCode}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
 
-      // Mock account verification (in production, use Paystack's account verification API)
-      const mockAccountNames = ["John Doe", "Jane Smith", "Ahmed Ibrahim", "Chioma Okafor", "Emeka Nwankwo"]
+      const result = await response.json()
 
-      const randomName = mockAccountNames[Math.floor(Math.random() * mockAccountNames.length)]
-      const mockAccountName = `${randomName} (Erigga Fan)`
-
-      // Simulate occasional verification failures
-      if (Math.random() < 0.1) {
-        throw new Error("Account verification failed. Please check your account number.")
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Bank account verification failed")
       }
 
-      setAccountName(mockAccountName)
+      setAccountName(result.account_name)
 
       toast({
         title: "Account Verified",
-        description: `Account holder: ${mockAccountName}`,
+        description: `Account holder: ${result.account_name}`,
         duration: 3000,
       })
     } catch (err) {
@@ -150,7 +149,7 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
   const validateWithdrawal = useCallback(() => {
     resetState()
 
-    if (!profile?.id) {
+    if (!user?.id) {
       setError("Please log in to withdraw coins")
       return false
     }
@@ -183,7 +182,7 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
     }
 
     return true
-  }, [profile, withdrawalAmount, currentBalance, bankCode, accountNumber, accountName, withdrawalAttempts])
+  }, [user, withdrawalAmount, currentBalance, bankCode, accountNumber, accountName, withdrawalAttempts])
 
   const handleWithdraw = useCallback(async () => {
     if (!validateWithdrawal()) return
@@ -199,7 +198,6 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
         bankName: selectedBank?.name,
         accountNumber,
         accountName,
-        recipientCode: `RCP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       }
 
       const withdrawalData = {
@@ -215,19 +213,36 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("auth_token") || "mock-token"}`,
         },
         body: JSON.stringify(withdrawalData),
       })
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
       const result = await response.json()
 
-      if (!result.success) {
-        throw new Error(result.error || "Withdrawal request failed")
+      if (!response.ok || !result.success) {
+        let errorMessage = result.error || "Withdrawal request failed"
+
+        switch (result.code) {
+          case "AUTH_ERROR":
+            errorMessage = "Please log in to complete your withdrawal"
+            break
+          case "VALIDATION_ERROR":
+            errorMessage = `Validation failed: ${result.error}`
+            break
+          case "PENDING_WITHDRAWAL_EXISTS":
+            errorMessage = "You already have a pending withdrawal request"
+            break
+          case "BANK_VERIFICATION_FAILED":
+            errorMessage = "Bank account verification failed. Please check your details."
+            break
+          case "INSUFFICIENT_BALANCE":
+            errorMessage = "Insufficient coin balance for this withdrawal"
+            break
+          default:
+            errorMessage = result.error || `Withdrawal failed (${response.status})`
+        }
+
+        throw new Error(errorMessage)
       }
 
       setSuccess(result.message || "Withdrawal request submitted successfully!")
@@ -239,7 +254,9 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
       })
 
       // Refresh user session to update coin balance
-      await refreshSession()
+      if (refreshSession) {
+        await refreshSession()
+      }
 
       if (onSuccess) onSuccess(result.withdrawal)
 

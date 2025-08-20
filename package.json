@@ -57,6 +57,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "latest",
+    "crypto": "latest",
     "date-fns": "latest",
     "dompurify": "latest",
     "eslint": "8.47.0",
