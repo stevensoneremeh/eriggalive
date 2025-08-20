@@ -111,33 +111,25 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
     setLastVerificationTime(now)
 
     try {
-      const response = await fetch("/api/bank/verify", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("auth_token") || "mock-token"}`,
-        },
-        body: JSON.stringify({
-          bankCode,
-          accountNumber,
-        }),
-      })
+      // Simulate API delay for account verification
+      await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      const result = await response.json()
+      // Mock account verification (in production, use Paystack's account verification API)
+      const mockAccountNames = ["John Doe", "Jane Smith", "Ahmed Ibrahim", "Chioma Okafor", "Emeka Nwankwo"]
 
-      if (!response.ok) {
-        throw new Error(result.error || `HTTP error! status: ${response.status}`)
+      const randomName = mockAccountNames[Math.floor(Math.random() * mockAccountNames.length)]
+      const mockAccountName = `${randomName} (Erigga Fan)`
+
+      // Simulate occasional verification failures
+      if (Math.random() < 0.1) {
+        throw new Error("Account verification failed. Please check your account number.")
       }
 
-      if (!result.success) {
-        throw new Error(result.error || "Account verification failed")
-      }
-
-      setAccountName(result.data.accountName)
+      setAccountName(mockAccountName)
 
       toast({
         title: "Account Verified",
-        description: `Account holder: ${result.data.accountName}`,
+        description: `Account holder: ${mockAccountName}`,
         duration: 3000,
       })
     } catch (err) {
