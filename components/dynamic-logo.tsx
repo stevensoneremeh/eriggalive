@@ -10,45 +10,70 @@ interface DynamicLogoProps {
   responsive?: boolean
 }
 
-export function DynamicLogo({ width = 180, height = 50, className = "", responsive = true }: DynamicLogoProps) {
+export function DynamicLogo({ width, height, className = "", responsive = true }: DynamicLogoProps) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Don't render until mounted to prevent hydration mismatch
-  if (!mounted) {
-    return <div className={`bg-muted animate-pulse rounded ${className}`} style={{ width, height }} />
+  const getResponsiveSizes = () => {
+    if (!responsive && width && height) {
+      return { width, height }
+    }
+
+    return {
+      mobile: { width: 120, height: 32 }, // Increased from 100x28
+      tablet: { width: 160, height: 44 }, // Increased from 140x38
+      desktop: { width: 240, height: 66 }, // Increased from 200x55
+      wide: { width: 280, height: 76 }, // Increased from 220x60
+    }
   }
 
-  const responsiveClasses = responsive
-    ? "w-24 h-7 sm:w-28 sm:h-8 md:w-32 md:h-9 lg:w-40 lg:h-11 xl:w-48 xl:h-13 2xl:w-52 2xl:h-14"
-    : ""
+  const sizes = getResponsiveSizes()
+
+  // Don't render until mounted to prevent hydration mismatch
+  if (!mounted) {
+    const skeletonWidth = responsive ? 240 : width || 180
+    const skeletonHeight = responsive ? 66 : height || 50
+    return (
+      <div
+        className={`bg-muted animate-pulse rounded ${className}`}
+        style={{ width: skeletonWidth, height: skeletonHeight }}
+      />
+    )
+  }
+
+  const finalWidth = responsive ? undefined : width || 180
+  const finalHeight = responsive ? undefined : height || 50
 
   return (
-    <div className={`relative ${responsiveClasses} ${className}`}>
+    <div className={`relative ${className}`}>
       <Image
         src="/images/erigga-live-logo.png"
         alt="ERIGGA Live"
-        width={responsive ? 208 : width} // Increased max width for better desktop display
-        height={responsive ? 56 : height} // Proportional height increase
-        className="object-contain w-full h-full"
+        width={responsive ? 280 : finalWidth}
+        height={responsive ? 76 : finalHeight}
+        className={
+          responsive
+            ? "object-contain w-auto h-auto max-w-full max-h-full sm:w-[120px] sm:h-[32px] md:w-[160px] md:h-[44px] lg:w-[240px] lg:h-[66px] xl:w-[280px] xl:h-[76px]"
+            : "object-contain w-auto h-auto max-w-full max-h-full"
+        }
         style={
-          !responsive
-            ? {
+          responsive
+            ? undefined
+            : {
                 width: "auto",
                 height: "auto",
-                maxWidth: `${width}px`,
-                maxHeight: `${height}px`,
+                maxWidth: `${finalWidth}px`,
+                maxHeight: `${finalHeight}px`,
               }
-            : undefined
         }
         priority
         sizes={
           responsive
-            ? "(max-width: 640px) 96px, (max-width: 768px) 112px, (max-width: 1024px) 128px, (max-width: 1280px) 160px, (max-width: 1536px) 192px, 208px"
-            : `${width}px`
+            ? "(max-width: 640px) 120px, (max-width: 768px) 160px, (max-width: 1024px) 240px, 280px"
+            : `${finalWidth}px`
         }
         onError={() => {
           console.warn("Logo image failed to load")

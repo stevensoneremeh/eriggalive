@@ -1,44 +1,45 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/server"
 
-// Initialize Supabase client
-const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+// Check if we're in preview/development mode
+const isPreviewMode = () => {
+  return (
+    process.env.NODE_ENV === "development" ||
+    process.env.VERCEL_ENV === "preview" ||
+    !process.env.PAYSTACK_SECRET_KEY ||
+    process.env.PAYSTACK_SECRET_KEY.startsWith("pk_test_")
+  )
+}
 
-// Enhanced user verification with Supabase
 async function verifyUser(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization")
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return { error: "Missing or invalid authorization header", user: null }
-    }
+    const supabase = await createClient()
 
-    const token = authHeader.replace("Bearer ", "")
-
-    // Verify JWT token with Supabase
+    // Get the authenticated user
     const {
       data: { user },
-      error,
-    } = await supabase.auth.getUser(token)
+      error: authError,
+    } = await supabase.auth.getUser()
 
-    if (error || !user) {
-      return { error: "Invalid authentication token", user: null }
+    if (authError || !user) {
+      return { error: "Authentication required", user: null, profile: null }
     }
 
-    // Get user profile from database
+    // Get user profile with current coin balance
     const { data: profile, error: profileError } = await supabase
       .from("users")
-      .select("*")
+      .select("id, email, username, coins, tier")
       .eq("auth_user_id", user.id)
       .single()
 
     if (profileError || !profile) {
-      return { error: "User profile not found", user: null }
+      return { error: "User profile not found", user: null, profile: null }
     }
 
-    return { user: profile, error: null }
+    return { user, profile, error: null }
   } catch (error) {
     console.error("Authentication error:", error)
-    return { error: "Authentication failed", user: null }
+    return { error: "Authentication failed", user: null, profile: null }
   }
 }
 
@@ -113,113 +114,75 @@ function isValidBankCode(bankCode: string): boolean {
   return validBankCodes.includes(bankCode)
 }
 
-// Verify bank account with Paystack
-async function verifyBankAccount(accountNumber: string, bankCode: string) {
-  const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY
-  if (!paystackSecretKey) {
-    throw new Error("Paystack configuration not found")
+// Get bank name from code
+function getBankName(bankCode: string): string {
+  const bankMap: Record<string, string> = {
+    "044": "Access Bank",
+    "014": "Afribank",
+    "023": "Citibank",
+    "050": "Ecobank",
+    "011": "First Bank",
+    "214": "First City Monument Bank",
+    "070": "Fidelity Bank",
+    "058": "Guaranty Trust Bank",
+    "030": "Heritage Bank",
+    "082": "Keystone Bank",
+    "076": "Polaris Bank",
+    "221": "Stanbic IBTC Bank",
+    "068": "Standard Chartered",
+    "232": "Sterling Bank",
+    "032": "Union Bank",
+    "033": "United Bank for Africa",
+    "215": "Unity Bank",
+    "035": "Wema Bank",
+    "057": "Zenith Bank",
   }
+  return bankMap[bankCode] || "Unknown Bank"
+}
 
+// Mock Paystack bank verification for preview mode
+async function mockBankVerification(accountNumber: string, bankCode: string) {
+  // Simulate API delay
+  await new Promise((resolve) => setTimeout(resolve, 1000))
+
+  const mockNames = ["John Doe", "Jane Smith", "Ahmed Ibrahim", "Chioma Okafor", "Emeka Nwankwo"]
+  const randomName = mockNames[Math.floor(Math.random() * mockNames.length)]
+
+  return {
+    status: true,
+    data: {
+      account_number: accountNumber,
+      account_name: randomName,
+      bank_id: Number.parseInt(bankCode),
+    },
+  }
+}
+
+// Real Paystack bank verification for production
+async function verifyBankAccount(accountNumber: string, bankCode: string, paystackSecretKey: string) {
   const response = await fetch("https://api.paystack.co/bank/resolve", {
     method: "GET",
     headers: {
       Authorization: `Bearer ${paystackSecretKey}`,
       "Content-Type": "application/json",
     },
-    // Add query parameters for account verification
+    body: JSON.stringify({
+      account_number: accountNumber,
+      bank_code: bankCode,
+    }),
   })
 
   if (!response.ok) {
-    throw new Error("Bank account verification failed")
+    throw new Error(`Paystack API error: ${response.status} - ${response.statusText}`)
   }
 
-  const result = await response.json()
-  return result
-}
-
-// Create bank account record
-async function createOrUpdateBankAccount(userId: string, bankDetails: any) {
-  const { data: existingAccount } = await supabase
-    .from("bank_accounts")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("account_number", bankDetails.accountNumber)
-    .eq("bank_code", bankDetails.bankCode)
-    .single()
-
-  if (existingAccount) {
-    // Update existing account
-    const { data, error } = await supabase
-      .from("bank_accounts")
-      .update({
-        account_name: bankDetails.accountName,
-        bank_name: bankDetails.bankName,
-        is_verified: true,
-        verification_data: bankDetails.verificationData || {},
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", existingAccount.id)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  } else {
-    // Create new account
-    const { data, error } = await supabase
-      .from("bank_accounts")
-      .insert({
-        user_id: userId,
-        account_number: bankDetails.accountNumber,
-        account_name: bankDetails.accountName,
-        bank_code: bankDetails.bankCode,
-        bank_name: bankDetails.bankName,
-        is_verified: true,
-        is_active: true,
-        verification_data: bankDetails.verificationData || {},
-      })
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-}
-
-// Create withdrawal request
-async function createWithdrawalRequest(userId: string, bankAccountId: string, withdrawalData: any) {
-  const { data, error } = await supabase
-    .from("withdrawals")
-    .insert({
-      user_id: userId,
-      bank_account_id: bankAccountId,
-      amount_coins: withdrawalData.amount,
-      amount_naira: Math.round(withdrawalData.nairaAmount * 100), // Convert to kobo
-      exchange_rate: 10.0, // 100,000 coins = ₦10,000
-      status: "pending",
-      metadata: {
-        processing_fee: withdrawalData.processingFee,
-        net_amount: withdrawalData.netAmount,
-        requested_via: "web_app",
-        user_agent: withdrawalData.userAgent || "unknown",
-      },
-    })
-    .select()
-    .single()
-
-  if (error) {
-    console.error("Database error creating withdrawal:", error)
-    throw new Error("Failed to create withdrawal request")
-  }
-
-  return data
+  return await response.json()
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify user authentication
-    const { user, error: authError } = await verifyUser(request)
-    if (authError || !user) {
+    const { user, profile, error: authError } = await verifyUser(request)
+    if (authError || !user || !profile) {
       return NextResponse.json(
         {
           success: false,
@@ -245,8 +208,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate request data
-    const validationErrors = validateWithdrawalRequest(requestData, user.coins)
+    const validationErrors = validateWithdrawalRequest(requestData, profile.coins)
     if (validationErrors.length > 0) {
       return NextResponse.json(
         {
@@ -272,71 +234,140 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check for recent withdrawal requests (rate limiting)
-    const { data: recentWithdrawals } = await supabase
+    const supabase = await createClient()
+
+    const { data: pendingWithdrawals } = await supabase
       .from("withdrawals")
       .select("id")
       .eq("user_id", user.id)
-      .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Last 24 hours
       .eq("status", "pending")
 
-    if (recentWithdrawals && recentWithdrawals.length >= 3) {
+    if (pendingWithdrawals && pendingWithdrawals.length > 0) {
       return NextResponse.json(
         {
           success: false,
-          error: "Too many pending withdrawal requests. Please wait for existing requests to be processed.",
-          code: "RATE_LIMITED",
+          error: "You already have a pending withdrawal request",
+          code: "PENDING_WITHDRAWAL_EXISTS",
         },
-        { status: 429 },
+        { status: 400 },
       )
     }
 
-    // Calculate withdrawal amounts (100,000 coins = ₦10,000)
-    const nairaAmount = (amount / 100000) * 10000
+    // Calculate withdrawal amounts
+    const nairaAmount = amount * 0.1 // Updated exchange rate: 100,000 coins = ₦10,000
     const processingFee = Math.max(25, nairaAmount * 0.01) // 1% fee, minimum ₦25
     const netAmount = nairaAmount - processingFee
 
     try {
-      // Create or update bank account record
-      const bankAccount = await createOrUpdateBankAccount(user.id, {
-        accountNumber: bankDetails.accountNumber,
-        accountName: bankDetails.accountName,
-        bankCode: bankDetails.bankCode,
-        bankName: bankDetails.bankName,
-        verificationData: {
-          verified_at: new Date().toISOString(),
-          verification_method: "paystack_resolve",
-        },
-      })
+      let bankVerificationData
+      if (isPreviewMode()) {
+        console.log("Using mock bank verification for preview mode")
+        bankVerificationData = await mockBankVerification(bankDetails.accountNumber, bankDetails.bankCode)
+      } else {
+        const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY
+        if (!paystackSecretKey) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "Payment gateway configuration error",
+              code: "CONFIG_ERROR",
+            },
+            { status: 500 },
+          )
+        }
 
-      // Create withdrawal request
-      const withdrawal = await createWithdrawalRequest(user.id, bankAccount.id, {
-        amount,
-        nairaAmount,
-        processingFee,
-        netAmount,
-        userAgent: request.headers.get("user-agent"),
-      })
+        bankVerificationData = await verifyBankAccount(
+          bankDetails.accountNumber,
+          bankDetails.bankCode,
+          paystackSecretKey,
+        )
+      }
+
+      if (!bankVerificationData.status) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Bank account verification failed",
+            code: "BANK_VERIFICATION_FAILED",
+          },
+          { status: 400 },
+        )
+      }
+
+      const { data: bankAccount, error: bankAccountError } = await supabase
+        .from("bank_accounts")
+        .upsert({
+          user_id: user.id,
+          account_number: bankDetails.accountNumber,
+          bank_code: bankDetails.bankCode,
+          bank_name: getBankName(bankDetails.bankCode),
+          account_name: bankVerificationData.data.account_name,
+          is_verified: true,
+          verification_data: bankVerificationData.data,
+        })
+        .select()
+        .single()
+
+      if (bankAccountError) {
+        console.error("Bank account creation error:", bankAccountError)
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Failed to save bank account details",
+            code: "BANK_ACCOUNT_ERROR",
+          },
+          { status: 500 },
+        )
+      }
+
+      const { data: withdrawal, error: withdrawalError } = await supabase
+        .from("withdrawals")
+        .insert({
+          user_id: user.id,
+          bank_account_id: bankAccount.id,
+          amount_coins: amount,
+          amount_naira: Math.round(nairaAmount * 100), // Store in kobo
+          status: "pending",
+        })
+        .select(`
+          *,
+          bank_accounts (
+            account_number,
+            bank_name,
+            account_name
+          )
+        `)
+        .single()
+
+      if (withdrawalError) {
+        console.error("Withdrawal creation error:", withdrawalError)
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Failed to create withdrawal request",
+            code: "WITHDRAWAL_CREATION_ERROR",
+          },
+          { status: 500 },
+        )
+      }
+
+      console.log("Withdrawal request created successfully:", withdrawal.id)
 
       return NextResponse.json({
         success: true,
         withdrawal: {
           id: withdrawal.id,
-          userId: user.id,
-          amount: amount,
-          nairaAmount,
-          processingFee,
-          netAmount,
-          status: "pending",
-          bankDetails: {
-            bankName: bankDetails.bankName,
-            accountNumber: bankDetails.accountNumber,
-            accountName: bankDetails.accountName,
-          },
-          createdAt: withdrawal.created_at,
-          estimatedProcessingTime: "1-3 business days",
+          amount_coins: withdrawal.amount_coins,
+          amount_naira: withdrawal.amount_naira / 100, // Convert back from kobo
+          net_amount: netAmount,
+          processing_fee: processingFee,
+          status: withdrawal.status,
+          bank_details: withdrawal.bank_accounts,
+          created_at: withdrawal.created_at,
         },
-        message: `Withdrawal request submitted successfully. You will receive ₦${netAmount.toLocaleString()} in your ${bankDetails.bankName} account within 1-3 business days after admin approval.`,
+        message: `Withdrawal request submitted successfully. You will receive ₦${netAmount.toLocaleString()} in your ${getBankName(bankDetails.bankCode)} account within 1-3 business days.`,
+        estimatedCompletionDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        isPreviewMode: isPreviewMode(),
       })
     } catch (error) {
       console.error("Withdrawal processing error:", error)
@@ -364,33 +395,108 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Helper function to get bank name from code
-function getBankName(bankCode: string): string {
-  const bankMap: Record<string, string> = {
-    "044": "Access Bank",
-    "014": "Afribank",
-    "023": "Citibank",
-    "050": "Ecobank",
-    "011": "First Bank",
-    "214": "First City Monument Bank",
-    "070": "Fidelity Bank",
-    "058": "Guaranty Trust Bank",
-    "030": "Heritage Bank",
-    "082": "Keystone Bank",
-    "076": "Polaris Bank",
-    "221": "Stanbic IBTC Bank",
-    "068": "Standard Chartered",
-    "232": "Sterling Bank",
-    "032": "Union Bank",
-    "033": "United Bank for Africa",
-    "215": "Unity Bank",
-    "035": "Wema Bank",
-    "057": "Zenith Bank",
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const accountNumber = searchParams.get("account_number")
+    const bankCode = searchParams.get("bank_code")
+
+    if (!accountNumber || !bankCode) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Account number and bank code are required",
+        },
+        { status: 400 },
+      )
+    }
+
+    const { user, error: authError } = await verifyUser(request)
+    if (authError || !user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: authError || "Unauthorized",
+        },
+        { status: 401 },
+      )
+    }
+
+    // Validate inputs
+    if (accountNumber.length !== 10 || !/^\d+$/.test(accountNumber)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid account number format",
+        },
+        { status: 400 },
+      )
+    }
+
+    if (!isValidBankCode(bankCode)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid bank code",
+        },
+        { status: 400 },
+      )
+    }
+
+    // Verify bank account
+    let bankVerificationData
+    if (isPreviewMode()) {
+      bankVerificationData = await mockBankVerification(accountNumber, bankCode)
+    } else {
+      const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY
+      if (!paystackSecretKey) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Payment gateway configuration error",
+          },
+          { status: 500 },
+        )
+      }
+
+      bankVerificationData = await verifyBankAccount(accountNumber, bankCode, paystackSecretKey)
+    }
+
+    if (!bankVerificationData.status) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Bank account verification failed",
+        },
+        { status: 400 },
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      account_name: bankVerificationData.data.account_name,
+      account_number: accountNumber,
+      bank_name: getBankName(bankCode),
+      isPreviewMode: isPreviewMode(),
+    })
+  } catch (error) {
+    console.error("Bank verification error:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Bank verification failed",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
-  return bankMap[bankCode] || "Unknown Bank"
 }
 
 // Handle unsupported methods
-export async function GET() {
+export async function PUT() {
+  return NextResponse.json({ success: false, error: "Method not allowed" }, { status: 405 })
+}
+
+export async function DELETE() {
   return NextResponse.json({ success: false, error: "Method not allowed" }, { status: 405 })
 }

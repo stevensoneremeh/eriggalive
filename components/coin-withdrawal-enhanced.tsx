@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Coins, Banknote, AlertCircle, CheckCircle, Loader2, Shield, Clock } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/components/ui/use-toast"
@@ -68,10 +69,10 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
   const [lastVerificationTime, setLastVerificationTime] = useState<number>(0)
 
   const currentBalance = profile?.coins || 0
-  const minWithdrawal = 100000
+  const minWithdrawal = 100000 // Updated minimum to 100,000 coins
   const maxWithdrawal = 1000000
   const withdrawalAmount = Number.parseInt(amount, 10) || 0
-  const nairaEquivalent = (withdrawalAmount / 100000) * 10000
+  const nairaEquivalent = withdrawalAmount * 0.1 // Updated exchange rate: 100,000 coins = ₦10,000
   const processingFee = Math.max(25, nairaEquivalent * 0.01) // 1% fee, minimum ₦25
 
   const resetState = useCallback(() => {
@@ -110,29 +111,24 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
     setLastVerificationTime(now)
 
     try {
-      const response = await fetch("/api/bank/verify", {
-        method: "POST",
+      const response = await fetch(`/api/coins/withdraw?account_number=${accountNumber}&bank_code=${bankCode}`, {
+        method: "GET",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          accountNumber,
-          bankCode,
-        }),
       })
 
       const result = await response.json()
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || "Account verification failed")
+        throw new Error(result.error || "Bank account verification failed")
       }
 
-      const verifiedAccountName = result.data.account_name
-      setAccountName(verifiedAccountName)
+      setAccountName(result.account_name)
 
       toast({
         title: "Account Verified",
-        description: `Account holder: ${verifiedAccountName}`,
+        description: `Account holder: ${result.account_name}`,
         duration: 3000,
       })
     } catch (err) {
@@ -153,7 +149,7 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
   const validateWithdrawal = useCallback(() => {
     resetState()
 
-    if (!profile?.id) {
+    if (!user?.id) {
       setError("Please log in to withdraw coins")
       return false
     }
@@ -186,7 +182,7 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
     }
 
     return true
-  }, [profile, withdrawalAmount, currentBalance, bankCode, accountNumber, accountName, withdrawalAttempts])
+  }, [user, withdrawalAmount, currentBalance, bankCode, accountNumber, accountName, withdrawalAttempts])
 
   const handleWithdraw = useCallback(async () => {
     if (!validateWithdrawal()) return
@@ -206,25 +202,24 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
 
       const withdrawalData = {
         amount: withdrawalAmount,
+        nairaAmount: nairaEquivalent,
+        processingFee,
         bankDetails,
         userId: profile?.id,
         timestamp: new Date().toISOString(),
       }
 
-      const authToken = user?.access_token || "mock-token"
-
       const response = await fetch("/api/coins/withdraw", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify(withdrawalData),
       })
 
       const result = await response.json()
 
-      if (!response.ok) {
+      if (!response.ok || !result.success) {
         let errorMessage = result.error || "Withdrawal request failed"
 
         switch (result.code) {
@@ -234,11 +229,14 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
           case "VALIDATION_ERROR":
             errorMessage = `Validation failed: ${result.error}`
             break
-          case "RATE_LIMITED":
-            errorMessage = "Too many pending withdrawal requests. Please wait for existing requests to be processed."
+          case "PENDING_WITHDRAWAL_EXISTS":
+            errorMessage = "You already have a pending withdrawal request"
             break
-          case "PROCESSING_ERROR":
-            errorMessage = "Unable to process withdrawal request. Please try again later."
+          case "BANK_VERIFICATION_FAILED":
+            errorMessage = "Bank account verification failed. Please check your details."
+            break
+          case "INSUFFICIENT_BALANCE":
+            errorMessage = "Insufficient coin balance for this withdrawal"
             break
           default:
             errorMessage = result.error || `Withdrawal failed (${response.status})`
@@ -247,15 +245,11 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
         throw new Error(errorMessage)
       }
 
-      if (!result.success) {
-        throw new Error(result.error || "Withdrawal request failed")
-      }
-
       setSuccess(result.message || "Withdrawal request submitted successfully!")
 
       toast({
         title: "Withdrawal Submitted",
-        description: `${withdrawalAmount.toLocaleString()} coins withdrawal request submitted. Processing time: 1-3 business days after admin approval.`,
+        description: `${withdrawalAmount.toLocaleString()} coins withdrawal request submitted. Processing time: 1-3 business days.`,
         duration: 5000,
       })
 
@@ -264,9 +258,7 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
         await refreshSession()
       }
 
-      if (onSuccess) {
-        onSuccess(result.withdrawal)
-      }
+      if (onSuccess) onSuccess(result.withdrawal)
 
       // Reset form
       setAmount("")
@@ -286,9 +278,7 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
         duration: 5000,
       })
 
-      if (onError) {
-        onError(errorMessage)
-      }
+      if (onError) onError(errorMessage)
     } finally {
       setIsProcessing(false)
     }
@@ -301,7 +291,6 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
     accountNumber,
     accountName,
     profile,
-    user,
     refreshSession,
     onSuccess,
     onError,
@@ -399,28 +388,91 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
                   <span>Net amount:</span>
                   <span>₦{(nairaEquivalent - processingFee).toLocaleString()}</span>
                 </div>
-                <div className="text-center text-xs text-muted-foreground mt-2">
-                  Exchange rate: 100,000 coins = ₦10,000
-                </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* ... existing code for bank selection and account verification ... */}
+        <div className="space-y-2">
+          <Label htmlFor="bank-select">Select Bank</Label>
+          <Select
+            value={bankCode}
+            onValueChange={(value) => {
+              setBankCode(value)
+              setAccountName("")
+              resetState()
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Choose your bank" />
+            </SelectTrigger>
+            <SelectContent>
+              {NIGERIAN_BANKS.map((bank) => (
+                <SelectItem key={bank.code} value={bank.code}>
+                  {bank.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="account-number">Account Number</Label>
+          <div className="flex gap-2">
+            <Input
+              id="account-number"
+              type="text"
+              maxLength={10}
+              placeholder="Enter 10-digit account number"
+              value={accountNumber}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, "")
+                setAccountNumber(value)
+                setAccountName("")
+                resetState()
+              }}
+              className={error && accountNumber ? "border-red-500" : ""}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={verifyAccountNumber}
+              disabled={!bankCode || accountNumber.length !== 10 || isVerifying}
+            >
+              {isVerifying ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                "Verify"
+              )}
+            </Button>
+          </div>
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Enter exactly 10 digits</span>
+            <span>{accountNumber.length}/10</span>
+          </div>
+          {accountName && (
+            <div className="flex items-center text-sm text-green-600 font-medium">
+              <CheckCircle className="h-4 w-4 mr-1" />
+              Account Name: {accountName}
+            </div>
+          )}
+        </div>
 
         <Alert>
           <Clock className="h-4 w-4" />
           <AlertDescription>
             <div className="space-y-1">
               <p>
-                <strong>Processing Time:</strong> 1-3 business days after admin approval
+                <strong>Processing Time:</strong> 1-3 business days
               </p>
               <p>
                 <strong>Processing Fee:</strong> 1% (minimum ₦25)
               </p>
               <p>
-                <strong>Admin Review:</strong> All withdrawals require admin approval for security
+                <strong>Business Hours:</strong> Monday - Friday, 9 AM - 5 PM
               </p>
             </div>
           </AlertDescription>
@@ -451,9 +503,8 @@ export function CoinWithdrawalEnhanced({ onSuccess, onError }: CoinWithdrawalEnh
 
       <div className="text-xs text-muted-foreground text-center space-y-1">
         <p>Withdrawals are processed securely through our banking partners.</p>
-        <p>All requests require admin approval for security and compliance.</p>
-        <p>You will receive email notifications for status updates.</p>
-        <p>Contact support if you need assistance with your withdrawal request.</p>
+        <p>You will receive SMS and email notifications for status updates.</p>
+        <p>Contact support if you don't receive your funds within 3 business days.</p>
       </div>
     </div>
   )

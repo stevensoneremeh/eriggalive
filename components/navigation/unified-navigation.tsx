@@ -84,7 +84,7 @@ export function UnifiedNavigation() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <DynamicLogo />
+            <DynamicLogo responsive={true} className="h-8 w-auto" />
           </Link>
 
           {/* Desktop Navigation */}

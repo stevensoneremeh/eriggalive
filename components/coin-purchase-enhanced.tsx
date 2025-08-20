@@ -3,7 +3,10 @@
 import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
-import { CreditCard, AlertCircle, CheckCircle, Loader2, Shield, Info } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Coins, CreditCard, AlertCircle, CheckCircle, Loader2, Shield, Info } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -109,72 +112,65 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
     setSuccess(null)
   }, [])
 
-  const verifyPayment = useCallback(
-    async (reference: string, expectedAmount: number, expectedCoins: number) => {
-      try {
-        const authToken = user?.access_token || "mock-token"
+  const verifyPayment = useCallback(async (reference: string, expectedAmount: number, expectedCoins: number) => {
+    try {
+      const response = await fetch("/api/coins/purchase", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          reference,
+          amount: expectedAmount,
+          coins: expectedCoins,
+        }),
+      })
 
-        const response = await fetch("/api/coins/purchase", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${authToken}`,
-          },
-          body: JSON.stringify({
-            reference,
-            amount: expectedAmount,
-            coins: expectedCoins,
-            userId: profile?.id,
-          }),
-        })
+      const result = await response.json()
 
-        const result = await response.json()
+      if (!response.ok) {
+        // Handle different error types
+        let errorMessage = result.error || "Payment verification failed"
 
-        if (!response.ok) {
-          // Handle different error types
-          let errorMessage = result.error || "Payment verification failed"
-
-          switch (result.code) {
-            case "AUTH_ERROR":
-              errorMessage = "Please log in to complete your purchase"
-              break
-            case "VALIDATION_ERROR":
-              errorMessage = `Validation failed: ${result.error}`
-              break
-            case "PAYMENT_FAILED":
-              errorMessage = "Payment was not successful. Please try again."
-              break
-            case "AMOUNT_MISMATCH":
-              errorMessage = "Payment amount doesn't match. Please contact support."
-              break
-            case "VERIFICATION_ERROR":
-              errorMessage = "Unable to verify payment. Please contact support if money was deducted."
-              break
-            case "CONFIG_ERROR":
-              errorMessage = "Payment system configuration error. Please try again later."
-              break
-            case "DUPLICATE_TRANSACTION":
-              errorMessage = "This transaction has already been processed."
-              break
-            default:
-              errorMessage = result.error || `Payment verification failed (${response.status})`
-          }
-
-          throw new Error(errorMessage)
+        switch (result.code) {
+          case "AUTH_ERROR":
+            errorMessage = "Please log in to complete your purchase"
+            break
+          case "VALIDATION_ERROR":
+            errorMessage = `Validation failed: ${result.error}`
+            break
+          case "PAYMENT_FAILED":
+            errorMessage = "Payment was not successful. Please try again."
+            break
+          case "AMOUNT_MISMATCH":
+            errorMessage = "Payment amount doesn't match. Please contact support."
+            break
+          case "VERIFICATION_ERROR":
+            errorMessage = "Unable to verify payment. Please contact support if money was deducted."
+            break
+          case "CONFIG_ERROR":
+            errorMessage = "Payment system configuration error. Please try again later."
+            break
+          case "DUPLICATE_REFERENCE":
+            errorMessage = "This transaction has already been processed."
+            break
+          default:
+            errorMessage = result.error || `Payment verification failed (${response.status})`
         }
 
-        if (!result.success) {
-          throw new Error(result.error || "Payment verification failed")
-        }
-
-        return result
-      } catch (err) {
-        console.error("Payment verification error:", err)
-        throw err
+        throw new Error(errorMessage)
       }
-    },
-    [profile, user],
-  )
+
+      if (!result.success) {
+        throw new Error(result.error || "Payment verification failed")
+      }
+
+      return result
+    } catch (err) {
+      console.error("Payment verification error:", err)
+      throw err
+    }
+  }, [])
 
   const handlePaymentSuccess = useCallback(
     async (response: any, totalCoins: number, nairaAmount: number) => {
@@ -191,6 +187,7 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
           duration: 5000,
         })
 
+        // Refresh user session to update coin balance
         if (refreshSession) {
           await refreshSession()
         }
@@ -233,12 +230,12 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
   const handlePurchaseValidation = useCallback(() => {
     resetState()
 
-    if (!profile?.email) {
+    if (!user?.email) {
       setError("Please log in to purchase coins")
       return false
     }
 
-    if (!validateEmail(profile.email)) {
+    if (!validateEmail(user.email)) {
       setError("Invalid email address in profile")
       return false
     }
@@ -262,7 +259,7 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
     }
 
     return true
-  }, [profile, isPaystackLoaded, isCustom, customCoins, selectedPackage, paymentAttempts, resetState])
+  }, [user, isPaystackLoaded, isCustom, customCoins, selectedPackage, paymentAttempts, resetState])
 
   const handlePurchase = useCallback(async () => {
     if (!handlePurchaseValidation()) return
@@ -282,7 +279,7 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
         // Create the configuration object with proper function references
         const paystackConfig = {
           key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_0123456789abcdef0123456789abcdef01234567",
-          email: profile?.email || "",
+          email: user?.email || "",
           amount: Math.round(nairaAmount * 100), // Convert to kobo and ensure integer
           currency: "NGN",
           ref: paymentReference,
@@ -290,7 +287,7 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
             coin_amount: totalCoins,
             base_coins: baseCoins,
             bonus_coins: bonusCoins,
-            user_id: profile?.id || "guest",
+            user_id: profile?.id || user?.id || "guest",
             package_id: isCustom ? "custom" : selectedPackage.id,
             timestamp: new Date().toISOString(),
             preview_mode: isPreviewMode,
@@ -331,6 +328,7 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
     customCoins,
     selectedPackage,
     calculateNaira,
+    user,
     profile,
     handlePaymentSuccess,
     handlePaymentClose,
@@ -382,7 +380,117 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
         </Alert>
       )}
 
-      {/* ... existing code for package selection and custom amount ... */}
+      {!isCustom ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {COIN_PACKAGES.map((pkg) => (
+            <Card
+              key={pkg.id}
+              className={`cursor-pointer transition-all relative ${
+                selectedPackage.id === pkg.id
+                  ? "border-orange-500 bg-orange-500/10 ring-2 ring-orange-500/20"
+                  : "hover:border-orange-500/50 hover:shadow-md"
+              }`}
+              onClick={() => setSelectedPackage(pkg)}
+            >
+              {pkg.popular && (
+                <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+                  <span className="bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+                    Most Popular
+                  </span>
+                </div>
+              )}
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Coins className="h-5 w-5 text-yellow-500 mr-2" />
+                    <span>{pkg.coins.toLocaleString()} Coins</span>
+                  </div>
+                  <span className="text-lg font-bold">₦{pkg.naira.toLocaleString()}</span>
+                </CardTitle>
+                {pkg.bonus && (
+                  <CardDescription className="text-green-600 font-medium">
+                    +{pkg.bonus.toLocaleString()} Bonus Coins!
+                  </CardDescription>
+                )}
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm text-muted-foreground">
+                  Total: {(pkg.coins + (pkg.bonus || 0)).toLocaleString()} coins
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Rate: ₦{(pkg.naira / pkg.coins).toFixed(2)} per coin
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Custom Amount</CardTitle>
+            <CardDescription>Enter the exact number of coins you want to purchase</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="custom-coins">Number of Coins</Label>
+              <Input
+                id="custom-coins"
+                type="number"
+                min="100"
+                max="100000"
+                placeholder="Enter amount (100 - 100,000 coins)"
+                value={customCoins}
+                onChange={(e) => {
+                  const value = e.target.value
+                  if (value === "" || (Number.parseInt(value, 10) >= 0 && Number.parseInt(value, 10) <= 100000)) {
+                    setCustomCoins(value)
+                    resetState()
+                  }
+                }}
+                className={error && isCustom ? "border-red-500" : ""}
+              />
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Min: 100 coins</span>
+                <span>Max: 100,000 coins</span>
+              </div>
+              {customCoins && !isNaN(Number.parseInt(customCoins, 10)) && (
+                <div className="p-3 bg-muted rounded-md">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Cost:</span>
+                    <span className="font-bold">
+                      ₦{calculateNaira(Number.parseInt(customCoins, 10)).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">Rate: ₦0.50 per coin</div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="flex gap-4">
+        <Button
+          variant={!isCustom ? "default" : "outline"}
+          onClick={() => {
+            setIsCustom(false)
+            resetState()
+          }}
+          className="flex-1"
+        >
+          Packages
+        </Button>
+        <Button
+          variant={isCustom ? "default" : "outline"}
+          onClick={() => {
+            setIsCustom(true)
+            resetState()
+          }}
+          className="flex-1"
+        >
+          Custom Amount
+        </Button>
+      </div>
 
       <Button
         className="w-full bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50"

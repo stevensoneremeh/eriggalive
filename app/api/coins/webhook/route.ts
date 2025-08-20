@@ -1,9 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/server"
 import crypto from "crypto"
-
-// Initialize Supabase client
-const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,96 +25,85 @@ export async function POST(request: NextRequest) {
 
     // Handle charge.success event
     if (event.event === "charge.success") {
-      const { data } = event
-      const reference = data.reference
-      const amount = data.amount // Amount in kobo
-      const email = data.customer.email
+      const { reference, amount, status, customer } = event.data
 
-      // Extract coin amount from metadata
-      const coinAmount = data.metadata?.coin_amount
-      if (!coinAmount) {
-        console.error("No coin amount in webhook metadata")
-        return NextResponse.json({ error: "Invalid metadata" }, { status: 400 })
+      if (status !== "success") {
+        console.log(`Ignoring non-successful charge: ${reference}`)
+        return NextResponse.json({ message: "Ignored non-successful charge" })
       }
 
-      // Find user by email
-      const { data: user, error: userError } = await supabase
-        .from("users")
-        .select("id, auth_user_id")
-        .eq("email", email)
+      const supabase = await createClient()
+
+      // Find existing transaction by reference
+      const { data: transaction, error: findError } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("reference", reference)
         .single()
 
-      if (userError || !user) {
-        console.error("User not found for webhook:", email)
-        return NextResponse.json({ error: "User not found" }, { status: 404 })
+      if (findError || !transaction) {
+        console.error(`Transaction not found for reference: ${reference}`)
+        return NextResponse.json({ error: "Transaction not found" }, { status: 404 })
       }
 
-      // Check if transaction already exists
-      const { data: existingTransaction } = await supabase
-        .from("coin_transactions")
-        .select("id")
-        .eq("paystack_reference", reference)
-        .single()
-
-      if (existingTransaction) {
-        console.log("Transaction already processed:", reference)
-        return NextResponse.json({ message: "Already processed" }, { status: 200 })
+      // Skip if already processed
+      if (transaction.status === "success") {
+        console.log(`Transaction already processed: ${reference}`)
+        return NextResponse.json({ message: "Already processed" })
       }
 
-      // Create transaction record (triggers will handle coin balance update)
-      const { data: transaction, error: transactionError } = await supabase
-        .from("coin_transactions")
-        .insert({
-          user_id: user.id,
-          amount: coinAmount,
-          transaction_type: "purchase",
-          status: "completed",
-          description: `Webhook: Purchased ${coinAmount.toLocaleString()} Erigga Coins`,
-          paystack_reference: reference,
-          payment_method: "paystack",
-          metadata: {
-            naira_amount: amount / 100, // Convert from kobo
-            exchange_rate: 0.5,
-            payment_channel: data.channel,
-            paid_at: data.paid_at,
-            webhook_processed: true,
-            customer_email: email,
-          },
+      // Update transaction status
+      const { error: updateError } = await supabase
+        .from("transactions")
+        .update({
+          status: "success",
+          verified_at: new Date().toISOString(),
+          paystack_data: event.data,
         })
-        .select()
-        .single()
+        .eq("id", transaction.id)
 
-      if (transactionError) {
-        console.error("Error creating transaction from webhook:", transactionError)
-        return NextResponse.json({ error: "Database error" }, { status: 500 })
+      if (updateError) {
+        console.error("Failed to update transaction:", updateError)
+        return NextResponse.json({ error: "Update failed" }, { status: 500 })
       }
 
-      console.log("Webhook processed successfully:", {
-        reference,
-        user_id: user.id,
-        coin_amount: coinAmount,
-        transaction_id: transaction.id,
+      // Credit user coins
+      const { error: balanceError } = await supabase.rpc("increment_user_coins", {
+        user_id: transaction.user_id,
+        coin_amount: transaction.coins_credited,
       })
 
-      return NextResponse.json(
-        {
-          message: "Webhook processed successfully",
-          transaction_id: transaction.id,
-        },
-        { status: 200 },
-      )
+      if (balanceError) {
+        console.error("Failed to credit coins:", balanceError)
+        // Mark transaction as failed
+        await supabase.from("transactions").update({ status: "failed" }).eq("id", transaction.id)
+
+        return NextResponse.json({ error: "Failed to credit coins" }, { status: 500 })
+      }
+
+      // Create coin transaction record
+      await supabase.from("coin_transactions").insert({
+        user_id: transaction.user_id,
+        amount: transaction.coins_credited,
+        transaction_type: "purchase",
+        description: `Webhook: Purchased ${transaction.coins_credited.toLocaleString()} coins (${reference})`,
+        status: "completed",
+      })
+
+      console.log(`Successfully processed webhook for transaction: ${reference}`)
+      return NextResponse.json({ message: "Processed successfully" })
     }
 
-    // Handle other webhook events if needed
-    console.log("Unhandled webhook event:", event.event)
-    return NextResponse.json({ message: "Event not handled" }, { status: 200 })
+    // Handle other events if needed
+    console.log(`Unhandled webhook event: ${event.event}`)
+    return NextResponse.json({ message: "Event not handled" })
   } catch (error) {
     console.error("Webhook processing error:", error)
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 })
   }
 }
 
-// Handle unsupported methods
+// Only allow POST requests
 export async function GET() {
   return NextResponse.json({ error: "Method not allowed" }, { status: 405 })
 }
