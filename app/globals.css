@@ -47,38 +47,28 @@
   }
   .dark {
     /* Updated dark mode tokens for premium design */
-    --background: 215 28% 17%;
-    --foreground: 0 0% 98%;
-    --card: 215 28% 17% / 0.8;
-    --card-foreground: 0 0% 98%;
-    --popover: 215 28% 17% / 0.9;
-    --popover-foreground: 0 0% 98%;
-    --primary: 188 100% 20%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 32 95% 44%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 215 28% 25%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 32 95% 44%;
-    --accent-foreground: 0 0% 98%;
+    --background: 28 25% 9%;
+    --foreground: 43 23% 89%;
+    --card: 28 25% 9% / 0.8;
+    --card-foreground: 43 23% 89%;
+    --popover: 28 25% 9% / 0.9;
+    --popover-foreground: 43 23% 89%;
+    --primary: 43 74% 49%; /* Bronze/amber primary */
+    --primary-foreground: 28 25% 9%;
+    --secondary: 33 43% 20%;
+    --secondary-foreground: 43 23% 89%;
+    --muted: 33 43% 15%;
+    --muted-foreground: 43 23% 65%;
+    --accent: 43 74% 49%;
+    --accent-foreground: 28 25% 9%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 215 28% 25%;
-    --input: 215 28% 25%;
-    --ring: 188 100% 20% / 0.5;
-    --chart-1: 32 95% 44%;
-    --chart-2: 16 100% 50%;
-    --chart-3: 188 100% 20%;
-    --chart-4: 215 20% 65%;
-    --chart-5: 215 28% 25%;
-    --sidebar-background: 215 28% 17% / 0.8;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 188 100% 20%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 32 95% 44%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 215 28% 25%;
-    --sidebar-ring: 188 100% 20% / 0.5;
+    --destructive-foreground: 43 23% 89%;
+    --border: 33 43% 20%;
+    --input: 33 43% 20%;
+    --ring: 43 74% 49% / 0.5;
+
+    /* Tighter letter spacing for headings in dark theme */
+    letter-spacing: -0.025em;
   }
 }
 
@@ -113,6 +103,29 @@
 
   .pulse-glow {
     animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .community-grid {
+    @apply grid gap-4;
+    grid-template-columns: 1fr;
+  }
+
+  @screen sm {
+    .community-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @screen lg {
+    .community-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .mobile-nav {
+    @apply fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t;
+    @apply flex items-center justify-around p-2;
+    @apply md:hidden;
   }
 }
 
@@ -152,4 +165,36 @@
 
 .animate-marquee {
   animation: marquee 15s linear infinite;
+}
+
+/* Responsive utilities for mobile-first design */
+@layer utilities {
+  .container-responsive {
+    @apply w-full mx-auto px-4 sm:px-6 lg:px-8;
+    max-width: 100%;
+  }
+
+  @screen sm {
+    .container-responsive {
+      max-width: 640px;
+    }
+  }
+
+  @screen md {
+    .container-responsive {
+      max-width: 768px;
+    }
+  }
+
+  @screen lg {
+    .container-responsive {
+      max-width: 1024px;
+    }
+  }
+
+  @screen xl {
+    .container-responsive {
+      max-width: 1280px;
+    }
+  }
 }

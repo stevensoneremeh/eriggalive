@@ -50,11 +50,10 @@ export function DynamicLogo({ width, height, className = "", responsive = true }
   const finalHeight = responsive ? undefined : height || 50
 
   const currentTheme = resolvedTheme || theme
-
   const logoSrc =
     currentTheme === "dark"
-      ? "/images/logo-dark.png" // Dark background logo for dark theme
-      : "/images/erigga-live-logo.png" // Light logo for light theme
+      ? "/images/erigga-live-logo-dark.png" // Dark background logo for dark nav
+      : "/images/erigga-live-logo.png" // Light logo on transparent background for light nav
 
   return (
     <div className={`relative ${className}`}>

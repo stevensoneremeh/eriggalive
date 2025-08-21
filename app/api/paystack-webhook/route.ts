@@ -17,11 +17,17 @@ async function handle(body: any) {
 
   if (!reference || !amountKobo || !email) return
 
-  // Idempotency check
   const { error: txErr } = await supabase.from("transactions").insert({
     reference,
     amount: amountKobo,
     status: "success",
+    metadata: {
+      customer_email: email,
+      payment_method: body.data?.authorization?.channel,
+      currency: body.data?.currency,
+      paid_at: body.data?.paid_at,
+      gateway_response: body.data?.gateway_response,
+    },
     raw: body,
   })
 
@@ -32,16 +38,31 @@ async function handle(body: any) {
   if (txErr) throw txErr
 
   // Find user by email
-  const { data: profile } = await supabase.from("profiles").select("id").eq("email", email).single()
+  const { data: profile } = await supabase.from("profiles").select("id, coins").eq("email", email).single()
 
   if (!profile) return
 
-  const credit = Math.floor(amountKobo / 100) // convert to base currency units
+  const coinsToAdd = Math.floor(amountKobo / 100) * 100 // Convert kobo to naira, then to coins
 
-  // Increment wallet balance atomically
-  await supabase.rpc("increment_wallet_balance", {
-    p_user_id: profile.id,
-    p_delta: credit,
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({
+      coins: (profile.coins || 0) + coinsToAdd,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", profile.id)
+
+  if (updateError) {
+    console.error("Failed to update user coins:", updateError)
+    throw updateError
+  }
+
+  await supabase.from("coin_transactions").insert({
+    user_id: profile.id,
+    amount: coinsToAdd,
+    type: "purchase",
+    description: `Coins purchased via Paystack - Reference: ${reference}`,
+    reference: reference,
   })
 }
 
