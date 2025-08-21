@@ -92,3 +92,6 @@ export function createClientComponentClient() {
     },
   })
 }
+
+export const createServerSupabaseClient = createClient
+export const createAdminSupabaseClient = createAdminClient

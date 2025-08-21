@@ -104,3 +104,113 @@ export async function fetchCommunityCategories() {
     return []
   }
 }
+
+export const createPost = createCommunityPost
+
+export async function voteOnPost(postId: string, voteType: "up" | "down") {
+  try {
+    const supabase = await createClient()
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return { error: "Authentication required" }
+    }
+
+    const { data: userProfile } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
+
+    if (!userProfile) {
+      return { error: "User profile not found" }
+    }
+
+    // Check if user already voted
+    const { data: existingVote } = await supabase
+      .from("community_post_votes")
+      .select("*")
+      .eq("post_id", postId)
+      .eq("user_id", userProfile.id)
+      .single()
+
+    if (existingVote) {
+      // Update existing vote
+      const { error } = await supabase
+        .from("community_post_votes")
+        .update({ vote_type: voteType })
+        .eq("id", existingVote.id)
+
+      if (error) {
+        return { error: "Failed to update vote" }
+      }
+    } else {
+      // Create new vote
+      const { error } = await supabase.from("community_post_votes").insert({
+        post_id: postId,
+        user_id: userProfile.id,
+        vote_type: voteType,
+      })
+
+      if (error) {
+        return { error: "Failed to create vote" }
+      }
+    }
+
+    revalidatePath("/community")
+    return { success: true }
+  } catch (error) {
+    console.error("Error in voteOnPost:", error)
+    return { error: "An unexpected error occurred" }
+  }
+}
+
+export async function bookmarkPost(postId: string) {
+  try {
+    const supabase = await createClient()
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return { error: "Authentication required" }
+    }
+
+    const { data: userProfile } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
+
+    if (!userProfile) {
+      return { error: "User profile not found" }
+    }
+
+    // Check if already bookmarked
+    const { data: existingBookmark } = await supabase
+      .from("community_bookmarks")
+      .select("*")
+      .eq("post_id", postId)
+      .eq("user_id", userProfile.id)
+      .single()
+
+    if (existingBookmark) {
+      // Remove bookmark
+      const { error } = await supabase.from("community_bookmarks").delete().eq("id", existingBookmark.id)
+
+      if (error) {
+        return { error: "Failed to remove bookmark" }
+      }
+    } else {
+      // Add bookmark
+      const { error } = await supabase.from("community_bookmarks").insert({
+        post_id: postId,
+        user_id: userProfile.id,
+      })
+
+      if (error) {
+        return { error: "Failed to add bookmark" }
+      }
+    }
+
+    revalidatePath("/community")
+    return { success: true }
+  } catch (error) {
+    console.error("Error in bookmarkPost:", error)
+    return { error: "An unexpected error occurred" }
+  }
+}
