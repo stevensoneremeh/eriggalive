@@ -1,77 +1,51 @@
 "use client"
-import { useState, useEffect, useCallback } from "react"
-import type React from "react"
-
+import { useState, useEffect } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Upload, RefreshCw, Trash2, ImageIcon, File } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import {
+  Upload,
+  Trash2,
+  Download,
+  Search,
+  Grid,
+  List,
+  ImageIcon,
+  Video,
+  Music,
+  FileText,
+  RefreshCw,
+} from "lucide-react"
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
 interface MediaFile {
   name: string
-  size?: number
-  created_at?: string
-  metadata?: any
+  id: string
+  created_at: string
+  updated_at: string
+  last_accessed_at: string
+  metadata: {
+    size: number
+    mimetype: string
+    cacheControl: string
+  }
 }
 
 export default function MediaPage() {
   const supabase = createClientComponentClient()
-  const [files, setFiles] = useState<FileList | null>(null)
-  const [listing, setListing] = useState<MediaFile[]>([])
+  const [files, setFiles] = useState<File[]>([])
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
   const [loading, setLoading] = useState(false)
-  const [dragActive, setDragActive] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([])
 
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true)
-    } else if (e.type === "dragleave") {
-      setDragActive(false)
-    }
-  }, [])
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFiles(e.dataTransfer.files)
-    }
-  }, [])
-
-  const upload = async () => {
-    if (!files) return
+  const loadMediaFiles = async () => {
     setLoading(true)
-
-    try {
-      const uploadPromises = Array.from(files).map(async (file) => {
-        const path = `${Date.now()}-${file.name}`
-        const { error } = await supabase.storage.from("media").upload(path, file, { upsert: false })
-
-        if (error) {
-          throw new Error(`Upload error for ${file.name}: ${error.message}`)
-        }
-        return path
-      })
-
-      await Promise.all(uploadPromises)
-      await load()
-      setFiles(null)
-
-      // Reset file input
-      const fileInput = document.getElementById("file-input") as HTMLInputElement
-      if (fileInput) fileInput.value = ""
-    } catch (error) {
-      console.error("Upload error:", error)
-      alert(`Upload failed: ${error}`)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const load = async () => {
     try {
       const { data, error } = await supabase.storage.from("media").list("", {
         limit: 100,
@@ -80,148 +54,327 @@ export default function MediaPage() {
 
       if (error) {
         console.error("Load error:", error)
+        toast.error("Failed to load media files")
         return
       }
 
-      setListing(data || [])
+      setMediaFiles(data || [])
     } catch (error) {
       console.error("Load error:", error)
+      toast.error("Failed to load media files")
+    } finally {
+      setLoading(false)
     }
   }
 
-  const remove = async (name: string) => {
-    if (!confirm(`Are you sure you want to delete "${name}"?`)) return
+  const handleFileUpload = async () => {
+    if (!files.length) return
+
+    setUploading(true)
+    let successCount = 0
+    let errorCount = 0
 
     try {
-      const { error } = await supabase.storage.from("media").remove([name])
+      for (const file of files) {
+        const path = `admin/${Date.now()}-${file.name}`
+        const { error } = await supabase.storage.from("media").upload(path, file, {
+          upsert: false,
+          cacheControl: "3600",
+        })
+
+        if (error) {
+          console.error(`Upload error for ${file.name}:`, error)
+          errorCount++
+        } else {
+          successCount++
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Successfully uploaded ${successCount} file(s)`)
+        await loadMediaFiles()
+        setFiles([])
+        // Reset file input
+        const fileInput = document.getElementById("file-input") as HTMLInputElement
+        if (fileInput) fileInput.value = ""
+      }
+
+      if (errorCount > 0) {
+        toast.error(`Failed to upload ${errorCount} file(s)`)
+      }
+    } catch (error) {
+      console.error("Upload error:", error)
+      toast.error("Upload failed")
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleFileDelete = async (fileName: string) => {
+    if (!confirm(`Are you sure you want to delete "${fileName}"?`)) return
+
+    try {
+      const { error } = await supabase.storage.from("media").remove([fileName])
 
       if (error) {
-        alert(`Delete error: ${error.message}`)
+        console.error("Delete error:", error)
+        toast.error(`Failed to delete ${fileName}`)
       } else {
-        await load()
+        toast.success(`Deleted ${fileName}`)
+        await loadMediaFiles()
+        setSelectedFiles((prev) => prev.filter((f) => f !== fileName))
       }
     } catch (error) {
       console.error("Delete error:", error)
+      toast.error("Delete failed")
     }
   }
 
-  const getFileUrl = (fileName: string) => {
+  const handleBulkDelete = async () => {
+    if (!selectedFiles.length) return
+
+    if (!confirm(`Are you sure you want to delete ${selectedFiles.length} selected file(s)?`)) return
+
+    try {
+      const { error } = await supabase.storage.from("media").remove(selectedFiles)
+
+      if (error) {
+        console.error("Bulk delete error:", error)
+        toast.error("Failed to delete selected files")
+      } else {
+        toast.success(`Deleted ${selectedFiles.length} file(s)`)
+        await loadMediaFiles()
+        setSelectedFiles([])
+      }
+    } catch (error) {
+      console.error("Bulk delete error:", error)
+      toast.error("Bulk delete failed")
+    }
+  }
+
+  const getFileIcon = (mimeType: string) => {
+    if (mimeType?.startsWith("image/")) return <ImageIcon className="h-5 w-5" />
+    if (mimeType?.startsWith("video/")) return <Video className="h-5 w-5" />
+    if (mimeType?.startsWith("audio/")) return <Music className="h-5 w-5" />
+    return <FileText className="h-5 w-5" />
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  }
+
+  const getPublicUrl = (fileName: string) => {
     const { data } = supabase.storage.from("media").getPublicUrl(fileName)
     return data.publicUrl
   }
 
-  const isImage = (fileName: string) => {
-    return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(fileName)
-  }
+  const filteredFiles = mediaFiles.filter((file) => file.name.toLowerCase().includes(searchQuery.toLowerCase()))
 
   useEffect(() => {
-    load()
+    loadMediaFiles()
   }, [])
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Media Management</h1>
-        <Button onClick={load} variant="outline" size="sm">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Media Management</h1>
+          <p className="text-gray-600 dark:text-gray-400">Upload and manage media files</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}>
+            {viewMode === "grid" ? <List className="h-4 w-4" /> : <Grid className="h-4 w-4" />}
+          </Button>
+          <Button variant="outline" onClick={loadMediaFiles} disabled={loading}>
+            <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
+      {/* Upload Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Upload Files</CardTitle>
+          <CardTitle className="flex items-center">
+            <Upload className="h-5 w-5 mr-2" />
+            Upload Files
+          </CardTitle>
+          <CardDescription>Upload images, videos, audio files, and documents to the media library</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div
-            className={cn(
-              "border-2 border-dashed rounded-lg p-8 text-center transition-colors",
-              dragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25",
-              "hover:border-primary hover:bg-primary/5",
-            )}
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-          >
-            <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <div className="space-y-2">
-              <p className="text-lg font-medium">{dragActive ? "Drop files here" : "Drag and drop files here"}</p>
-              <p className="text-sm text-muted-foreground">or</p>
-              <input
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <Input
                 id="file-input"
                 type="file"
                 multiple
-                onChange={(e) => setFiles(e.target.files)}
-                className="hidden"
+                onChange={(e) => setFiles(Array.from(e.target.files || []))}
+                className="cursor-pointer"
+                accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx"
               />
-              <Button variant="outline" onClick={() => document.getElementById("file-input")?.click()}>
-                Choose Files
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleFileUpload} disabled={uploading || !files.length} className="min-w-[120px]">
+                {uploading ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload
+                  </>
+                )}
               </Button>
             </div>
           </div>
 
-          {files && files.length > 0 && (
-            <div className="space-y-2">
-              <p className="font-medium">Selected files:</p>
-              <ul className="text-sm space-y-1">
-                {Array.from(files).map((file, index) => (
-                  <li key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                    <span>{file.name}</span>
-                    <span className="text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
-                  </li>
-                ))}
-              </ul>
+          {files.length > 0 && (
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              {files.length} file(s) selected: {files.map((f) => f.name).join(", ")}
             </div>
           )}
-
-          <div className="flex gap-2">
-            <Button onClick={upload} disabled={loading || !files || files.length === 0} className="flex-1">
-              {loading ? "Uploading..." : `Upload ${files?.length || 0} file(s)`}
-            </Button>
-          </div>
         </CardContent>
       </Card>
 
+      {/* Search and Actions */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search files..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        {selectedFiles.length > 0 && (
+          <Button variant="destructive" onClick={handleBulkDelete}>
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Selected ({selectedFiles.length})
+          </Button>
+        )}
+      </div>
+
+      {/* Media Files */}
       <Card>
         <CardHeader>
-          <CardTitle>Media Files ({listing.length})</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Media Files ({filteredFiles.length})</span>
+            <Badge variant="secondary">
+              {formatFileSize(filteredFiles.reduce((acc, file) => acc + (file.metadata?.size || 0), 0))} total
+            </Badge>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {listing.length === 0 ? (
-            <div className="text-center py-12">
-              <File className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">No files uploaded yet</p>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {listing.map((file) => (
-                <Card key={file.name} className="overflow-hidden">
-                  <div className="aspect-square bg-muted flex items-center justify-center">
-                    {isImage(file.name) ? (
+          ) : filteredFiles.length === 0 ? (
+            <div className="text-center py-12">
+              <ImageIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500 text-lg">No files found</p>
+              <p className="text-gray-400 text-sm">Upload some files to get started</p>
+            </div>
+          ) : viewMode === "grid" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {filteredFiles.map((file) => (
+                <div key={file.name} className="group relative border rounded-lg p-3 hover:shadow-md transition-shadow">
+                  <div className="absolute top-2 left-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedFiles.includes(file.name)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedFiles((prev) => [...prev, file.name])
+                        } else {
+                          setSelectedFiles((prev) => prev.filter((f) => f !== file.name))
+                        }
+                      }}
+                      className="rounded"
+                    />
+                  </div>
+
+                  <div className="aspect-square bg-gray-100 dark:bg-gray-800 rounded-md mb-3 flex items-center justify-center overflow-hidden">
+                    {file.metadata?.mimetype?.startsWith("image/") ? (
                       <img
-                        src={getFileUrl(file.name) || "/placeholder.svg"}
+                        src={getPublicUrl(file.name) || "/placeholder.svg"}
                         alt={file.name}
                         className="w-full h-full object-cover"
-                        loading="lazy"
                       />
                     ) : (
-                      <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                      <div className="text-gray-400">{getFileIcon(file.metadata?.mimetype)}</div>
                     )}
                   </div>
-                  <CardContent className="p-3">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium truncate" title={file.name}>
-                        {file.name}
+
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium truncate" title={file.name}>
+                      {file.name}
+                    </p>
+                    <p className="text-xs text-gray-500">{formatFileSize(file.metadata?.size || 0)}</p>
+                    <p className="text-xs text-gray-400">{new Date(file.created_at).toLocaleDateString()}</p>
+                  </div>
+
+                  <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.open(getPublicUrl(file.name), "_blank")}
+                      className="flex-1"
+                    >
+                      <Download className="h-3 w-3" />
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => handleFileDelete(file.name)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredFiles.map((file) => (
+                <div
+                  key={file.name}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                >
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedFiles.includes(file.name)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedFiles((prev) => [...prev, file.name])
+                        } else {
+                          setSelectedFiles((prev) => prev.filter((f) => f !== file.name))
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    {getFileIcon(file.metadata?.mimetype)}
+                    <div>
+                      <p className="font-medium">{file.name}</p>
+                      <p className="text-sm text-gray-500">
+                        {formatFileSize(file.metadata?.size || 0)} • {new Date(file.created_at).toLocaleDateString()}
                       </p>
-                      {file.size && <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</p>}
-                      <Button onClick={() => remove(file.name)} variant="destructive" size="sm" className="w-full">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </Button>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => window.open(getPublicUrl(file.name), "_blank")}>
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => handleFileDelete(file.name)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               ))}
             </div>
           )}

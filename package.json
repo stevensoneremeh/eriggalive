@@ -41,6 +41,7 @@
     "@supabase/auth-helpers-nextjs": "latest",
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
+    "@testing-library/jest-dom": "latest",
     "@tiptap/core": "latest",
     "@tiptap/extension-link": "latest",
     "@tiptap/extension-mention": "latest",

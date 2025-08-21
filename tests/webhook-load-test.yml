@@ -1,0 +1,28 @@
+config:
+  target: 'http://localhost:3000'
+  phases:
+    - duration: 60
+      arrivalRate: 10
+  variables:
+    paystack_secret: 'your_test_secret_key'
+
+scenarios:
+  - name: 'Paystack Webhook Load Test'
+    weight: 100
+    flow:
+      - post:
+          url: '/api/paystack-webhook'
+          headers:
+            'Content-Type': 'application/json'
+            'x-paystack-signature': '{{ $randomString() }}'
+          json:
+            event: 'charge.success'
+            data:
+              reference: 'test_{{ $randomString() }}'
+              amount: 50000
+              status: 'success'
+              customer:
+                email: 'test@example.com'
+          capture:
+            - json: '$.ok'
+              as: 'success'

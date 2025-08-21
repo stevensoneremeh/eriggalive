@@ -447,25 +447,26 @@ export default function CommunityPage() {
         {/* Sidebar */}
         <div
           className={cn(
-            "w-80 backdrop-blur-xl bg-white/5 border-r border-white/10 flex flex-col transition-all duration-500 ease-out shadow-2xl",
+            "w-full sm:w-80 md:w-80 lg:w-80 xl:w-96 backdrop-blur-xl bg-white/5 border-r border-white/10 flex flex-col transition-all duration-500 ease-out shadow-2xl",
+            "fixed md:relative z-50 md:z-auto h-full",
             sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
           )}
         >
-          <div className="p-6 backdrop-blur-xl bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-b border-white/10">
+          <div className="p-4 sm:p-6 backdrop-blur-xl bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-b border-white/10">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center shadow-lg">
-                  <Zap className="h-5 w-5 text-white" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center shadow-lg">
+                  <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-white">Community Hub</h1>
-                  <p className="text-sm text-white/70">Connect & Share</p>
+                  <h1 className="text-lg sm:text-xl font-bold text-white">Community Hub</h1>
+                  <p className="text-xs sm:text-sm text-white/70">Connect & Share</p>
                 </div>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
-                className="md:hidden text-white hover:bg-white/10 rounded-xl"
+                className="md:hidden text-white hover:bg-white/10 rounded-xl p-2 min-h-[44px] min-w-[44px]"
                 onClick={() => setSidebarOpen(false)}
               >
                 <X className="h-5 w-5" />
@@ -473,32 +474,33 @@ export default function CommunityPage() {
             </div>
           </div>
 
-          <div className="p-4">
+          <div className="p-3 sm:p-4">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50 h-4 w-4" />
+              <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-white/50 h-4 w-4" />
               <Input
                 placeholder="Search conversations..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 bg-white/5 backdrop-blur-sm border-white/10 text-white placeholder-white/50 rounded-xl h-12 text-lg focus:bg-white/10 transition-all duration-300"
+                className="pl-10 sm:pl-12 bg-white/5 backdrop-blur-sm border-white/10 text-white placeholder-white/50 rounded-xl h-11 sm:h-12 text-base sm:text-lg focus:bg-white/10 transition-all duration-300"
               />
               <Button
                 variant="ghost"
                 size="sm"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg min-h-[36px] min-w-[36px]"
               >
                 <Filter className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          <ScrollArea className="flex-1 px-4">
+          <ScrollArea className="flex-1 px-3 sm:px-4">
             <div className="space-y-2">
               {categories.map((category, index) => (
                 <div
                   key={category.id}
                   className={cn(
-                    "group relative overflow-hidden rounded-2xl transition-all duration-300 hover:scale-[1.02] cursor-pointer",
+                    "group relative overflow-hidden rounded-2xl transition-all duration-300 hover:scale-[1.02] cursor-pointer touch-manipulation",
+                    "min-h-[60px] sm:min-h-[68px]",
                     selectedCategory === category.id
                       ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur-sm border border-blue-400/30 shadow-lg shadow-blue-500/10"
                       : "bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 hover:border-white/20",
@@ -509,11 +511,11 @@ export default function CommunityPage() {
                   }}
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
-                  <div className="p-4">
-                    <div className="flex items-center space-x-4">
+                  <div className="p-3 sm:p-4">
+                    <div className="flex items-center space-x-3 sm:space-x-4">
                       <div
                         className={cn(
-                          "w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-lg transition-all duration-300",
+                          "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-lg sm:text-xl shadow-lg transition-all duration-300",
                           selectedCategory === category.id
                             ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white"
                             : "bg-white/10 text-white/80 group-hover:bg-white/20",
@@ -522,8 +524,8 @@ export default function CommunityPage() {
                         {category.icon}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-white truncate text-lg">{category.name}</div>
-                        <div className="text-sm text-white/60 truncate">
+                        <div className="font-semibold text-white truncate text-base sm:text-lg">{category.name}</div>
+                        <div className="text-xs sm:text-sm text-white/60 truncate">
                           {posts.filter((p) => p.category.id === category.id).length} messages
                         </div>
                       </div>
@@ -541,19 +543,21 @@ export default function CommunityPage() {
           </ScrollArea>
 
           {isAuthenticated && profile && (
-            <div className="p-4 backdrop-blur-xl bg-white/5 border-t border-white/10">
-              <div className="flex items-center space-x-4 p-3 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
-                <Avatar className="h-12 w-12 ring-2 ring-white/20">
+            <div className="p-3 sm:p-4 backdrop-blur-xl bg-white/5 border-t border-white/10">
+              <div className="flex items-center space-x-3 sm:space-x-4 p-3 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+                <Avatar className="h-10 w-10 sm:h-12 sm:w-12 ring-2 ring-white/20">
                   <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} />
                   <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold">
                     {profile.username?.charAt(0).toUpperCase() || "U"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-white truncate">{profile.full_name || profile.username}</div>
+                  <div className="font-semibold text-white truncate text-sm sm:text-base">
+                    {profile.full_name || profile.username}
+                  </div>
                   <Badge
                     className={cn(
-                      "text-xs text-white font-medium px-3 py-1 rounded-full",
+                      "text-xs text-white font-medium px-2 sm:px-3 py-1 rounded-full",
                       getTierColor(profile.tier || "grassroot"),
                     )}
                   >
@@ -566,65 +570,67 @@ export default function CommunityPage() {
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col backdrop-blur-xl bg-white/5">
-          <div className="p-6 backdrop-blur-xl bg-gradient-to-r from-white/10 to-white/5 border-b border-white/10">
+        <div className="flex-1 flex flex-col backdrop-blur-xl bg-white/5 min-w-0">
+          <div className="p-4 sm:p-6 backdrop-blur-xl bg-gradient-to-r from-white/10 to-white/5 border-b border-white/10">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="md:hidden text-white hover:bg-white/10 rounded-xl"
+                  className="md:hidden text-white hover:bg-white/10 rounded-xl p-2 min-h-[44px] min-w-[44px] flex-shrink-0"
                   onClick={() => setSidebarOpen(true)}
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-2xl shadow-lg">
+                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-lg sm:text-2xl shadow-lg flex-shrink-0">
                   {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
                 </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-lg sm:text-2xl font-bold text-white truncate">
                     {categories.find((c) => c.id === selectedCategory)?.name || "General"}
                   </h2>
-                  <p className="text-white/60">
+                  <p className="text-white/60 text-xs sm:text-sm truncate">
                     {filteredPosts.length} posts • {categories.length} active members
                   </p>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl"
+                  className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[40px] min-w-[40px]"
                 >
-                  <Search className="h-5 w-5" />
+                  <Search className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl"
+                  className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[40px] min-w-[40px]"
                 >
-                  <MoreVertical className="h-5 w-5" />
+                  <MoreVertical className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
               </div>
             </div>
           </div>
 
-          <ScrollArea className="flex-1 p-6">
-            <div className="max-w-4xl mx-auto space-y-6">
+          <ScrollArea className="flex-1 p-3 sm:p-6">
+            <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
               {loading ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center mx-auto mb-6 animate-pulse">
-                    <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <div className="text-center py-8 sm:py-12">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center mx-auto mb-4 sm:mb-6 animate-pulse">
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                   </div>
-                  <p className="text-white/70 text-lg">Loading conversations...</p>
+                  <p className="text-white/70 text-base sm:text-lg">Loading conversations...</p>
                 </div>
               ) : filteredPosts.length === 0 ? (
-                <div className="text-center py-16">
-                  <div className="w-24 h-24 rounded-3xl bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur-sm flex items-center justify-center text-4xl mx-auto mb-6 border border-white/10">
+                <div className="text-center py-12 sm:py-16">
+                  <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-3xl bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur-sm flex items-center justify-center text-2xl sm:text-4xl mx-auto mb-4 sm:mb-6 border border-white/10">
                     💬
                   </div>
-                  <h3 className="text-2xl font-bold text-white mb-3">Start the Conversation</h3>
-                  <p className="text-white/60 text-lg">Be the first to share your thoughts with the community!</p>
+                  <h3 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">Start the Conversation</h3>
+                  <p className="text-white/60 text-base sm:text-lg">
+                    Be the first to share your thoughts with the community!
+                  </p>
                 </div>
               ) : (
                 filteredPosts.map((post, index) => (
@@ -633,9 +639,9 @@ export default function CommunityPage() {
                     className="group animate-fade-in-up"
                     style={{ animationDelay: `${index * 100}ms` }}
                   >
-                    <div className="backdrop-blur-xl bg-white/5 rounded-3xl border border-white/10 p-6 shadow-2xl hover:shadow-3xl hover:bg-white/10 transition-all duration-500 hover:scale-[1.01]">
-                      <div className="flex items-start space-x-4">
-                        <Avatar className="h-12 w-12 ring-2 ring-white/20 shadow-lg">
+                    <div className="backdrop-blur-xl bg-white/5 rounded-2xl sm:rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl hover:shadow-3xl hover:bg-white/10 transition-all duration-500 hover:scale-[1.01]">
+                      <div className="flex items-start space-x-3 sm:space-x-4">
+                        <Avatar className="h-10 w-10 sm:h-12 sm:w-12 ring-2 ring-white/20 shadow-lg flex-shrink-0">
                           <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
                           <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold">
                             {post.user.username.charAt(0).toUpperCase()}
@@ -643,32 +649,34 @@ export default function CommunityPage() {
                         </Avatar>
 
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-3 mb-3">
-                            <span className="font-bold text-white text-lg">
+                          <div className="flex items-center space-x-2 sm:space-x-3 mb-2 sm:mb-3 flex-wrap">
+                            <span className="font-bold text-white text-base sm:text-lg truncate">
                               {post.user.full_name || post.user.username}
                             </span>
                             <Badge
                               className={cn(
-                                "text-xs text-white font-medium px-3 py-1 rounded-full shadow-lg",
+                                "text-xs text-white font-medium px-2 sm:px-3 py-1 rounded-full shadow-lg flex-shrink-0",
                                 getTierColor(post.user.tier),
                               )}
                             >
                               {post.user.tier}
                             </Badge>
-                            <span className="text-white/50 text-sm">
+                            <span className="text-white/50 text-xs sm:text-sm flex-shrink-0">
                               {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
                             </span>
                           </div>
 
-                          <p className="text-white/90 text-lg leading-relaxed mb-4 break-words">{post.content}</p>
+                          <p className="text-white/90 text-base sm:text-lg leading-relaxed mb-3 sm:mb-4 break-words">
+                            {post.content}
+                          </p>
 
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center space-x-2 sm:space-x-4">
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className={cn(
-                                  "rounded-xl px-4 py-2 transition-all duration-300 hover:scale-105",
+                                  "rounded-xl px-3 sm:px-4 py-2 transition-all duration-300 hover:scale-105 min-h-[40px] touch-manipulation",
                                   post.has_voted
                                     ? "text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20"
                                     : "text-white/70 hover:text-red-400 hover:bg-red-500/10",
@@ -677,18 +685,18 @@ export default function CommunityPage() {
                               >
                                 <Heart
                                   className={cn(
-                                    "h-4 w-4 mr-2 transition-all duration-300",
+                                    "h-4 w-4 mr-1 sm:mr-2 transition-all duration-300",
                                     post.has_voted && "fill-current scale-110",
                                   )}
                                 />
-                                {post.vote_count}
+                                <span className="text-sm sm:text-base">{post.vote_count}</span>
                               </Button>
 
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className={cn(
-                                  "rounded-xl px-4 py-2 transition-all duration-300 hover:scale-105",
+                                  "rounded-xl px-3 sm:px-4 py-2 transition-all duration-300 hover:scale-105 min-h-[40px] touch-manipulation",
                                   activePost === post.id
                                     ? "text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20"
                                     : "text-white/70 hover:text-blue-400 hover:bg-blue-500/10",
@@ -702,8 +710,8 @@ export default function CommunityPage() {
                                   }
                                 }}
                               >
-                                <MessageCircle className="h-4 w-4 mr-2" />
-                                {post.comment_count}
+                                <MessageCircle className="h-4 w-4 mr-1 sm:mr-2" />
+                                <span className="text-sm sm:text-base">{post.comment_count}</span>
                               </Button>
                             </div>
                           </div>
@@ -711,36 +719,40 @@ export default function CommunityPage() {
                       </div>
 
                       {activePost === post.id && (
-                        <div className="mt-6 space-y-4 animate-fade-in">
+                        <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4 animate-fade-in">
                           {comments[post.id]?.map((comment, commentIndex) => (
                             <div
                               key={comment.id}
-                              className="ml-8 backdrop-blur-sm bg-white/5 rounded-2xl border border-white/10 p-4 animate-slide-in-right"
+                              className="ml-4 sm:ml-8 backdrop-blur-sm bg-white/5 rounded-xl sm:rounded-2xl border border-white/10 p-3 sm:p-4 animate-slide-in-right"
                               style={{ animationDelay: `${commentIndex * 100}ms` }}
                             >
-                              <div className="flex items-start space-x-3">
-                                <Avatar className="h-8 w-8 ring-1 ring-white/20">
+                              <div className="flex items-start space-x-2 sm:space-x-3">
+                                <Avatar className="h-6 w-6 sm:h-8 sm:w-8 ring-1 ring-white/20 flex-shrink-0">
                                   <AvatarImage src={comment.user.avatar_url || "/placeholder-user.jpg"} />
                                   <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-semibold">
                                     {comment.user.username.charAt(0).toUpperCase()}
                                   </AvatarFallback>
                                 </Avatar>
-                                <div className="flex-1">
-                                  <div className="flex items-center space-x-2 mb-2">
-                                    <span className="font-semibold text-white text-sm">{comment.user.username}</span>
-                                    <span className="text-xs text-white/50">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center space-x-2 mb-1 sm:mb-2 flex-wrap">
+                                    <span className="font-semibold text-white text-xs sm:text-sm truncate">
+                                      {comment.user.username}
+                                    </span>
+                                    <span className="text-xs text-white/50 flex-shrink-0">
                                       {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
                                     </span>
                                   </div>
-                                  <p className="text-white/80 text-sm leading-relaxed">{comment.content}</p>
+                                  <p className="text-white/80 text-xs sm:text-sm leading-relaxed break-words">
+                                    {comment.content}
+                                  </p>
                                 </div>
                               </div>
                             </div>
                           ))}
 
                           {isAuthenticated && (
-                            <div className="ml-8 flex items-center space-x-3 p-4 backdrop-blur-sm bg-white/5 rounded-2xl border border-white/10">
-                              <Avatar className="h-8 w-8 ring-1 ring-white/20">
+                            <div className="ml-4 sm:ml-8 flex items-center space-x-2 sm:space-x-3 p-3 sm:p-4 backdrop-blur-sm bg-white/5 rounded-xl sm:rounded-2xl border border-white/10">
+                              <Avatar className="h-6 w-6 sm:h-8 sm:w-8 ring-1 ring-white/20 flex-shrink-0">
                                 <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
                                 <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-semibold">
                                   {profile?.username?.charAt(0).toUpperCase() || "U"}
@@ -749,17 +761,17 @@ export default function CommunityPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl"
+                                className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[36px] min-w-[36px] flex-shrink-0"
                               >
-                                <Paperclip className="h-5 w-5" />
+                                <Paperclip className="h-4 w-4" />
                               </Button>
-                              <div className="flex-1 relative">
+                              <div className="flex-1 relative min-w-0">
                                 <Input
                                   ref={inputRef}
                                   placeholder="Write a comment..."
                                   value={newComment}
                                   onChange={(e) => setNewComment(e.target.value)}
-                                  className="bg-white/5 border-white/10 text-white pr-12 rounded-2xl h-12 text-lg focus:bg-white/10 transition-all duration-300"
+                                  className="bg-white/5 border-white/10 text-white pr-10 sm:pr-12 rounded-xl sm:rounded-2xl h-10 sm:h-12 text-sm sm:text-lg focus:bg-white/10 transition-all duration-300"
                                   onKeyPress={(e) => {
                                     if (e.key === "Enter" && !e.shiftKey) {
                                       e.preventDefault()
@@ -770,17 +782,17 @@ export default function CommunityPage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl"
+                                  className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl p-1 min-h-[32px] min-w-[32px]"
                                 >
-                                  <Smile className="h-5 w-5" />
+                                  <Smile className="h-4 w-4" />
                                 </Button>
                               </div>
                               <Button
                                 onClick={() => sendComment(post.id)}
                                 disabled={!newComment.trim()}
-                                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-2xl px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-4 sm:px-6 py-2 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] flex-shrink-0"
                               >
-                                <Send className="h-5 w-5" />
+                                <Send className="h-4 w-4" />
                               </Button>
                             </div>
                           )}
@@ -794,11 +806,11 @@ export default function CommunityPage() {
             </div>
           </ScrollArea>
 
-          <div className="p-6 backdrop-blur-xl bg-gradient-to-r from-white/10 to-white/5 border-t border-white/10">
+          <div className="p-3 sm:p-6 backdrop-blur-xl bg-gradient-to-r from-white/10 to-white/5 border-t border-white/10">
             {isAuthenticated ? (
               <div className="max-w-4xl mx-auto">
-                <div className="flex items-center space-x-4 p-4 backdrop-blur-xl bg-white/10 rounded-3xl border border-white/20 shadow-2xl">
-                  <Avatar className="h-10 w-10 ring-2 ring-white/20">
+                <div className="flex items-center space-x-2 sm:space-x-4 p-3 sm:p-4 backdrop-blur-xl bg-white/10 rounded-2xl sm:rounded-3xl border border-white/20 shadow-2xl">
+                  <Avatar className="h-8 w-8 sm:h-10 sm:w-10 ring-2 ring-white/20 flex-shrink-0">
                     <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
                     <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold">
                       {profile?.username?.charAt(0).toUpperCase() || "U"}
@@ -807,17 +819,17 @@ export default function CommunityPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl"
+                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[40px] min-w-[40px] flex-shrink-0"
                   >
-                    <Paperclip className="h-5 w-5" />
+                    <Paperclip className="h-4 w-4 sm:h-5 sm:w-5" />
                   </Button>
-                  <div className="flex-1 relative">
+                  <div className="flex-1 relative min-w-0">
                     <Input
                       ref={inputRef}
                       placeholder="Share your thoughts..."
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
-                      className="bg-white/5 border-white/10 text-white pr-12 rounded-2xl h-12 text-lg focus:bg-white/10 transition-all duration-300"
+                      className="bg-white/5 border-white/10 text-white pr-10 sm:pr-12 rounded-xl sm:rounded-2xl h-10 sm:h-12 text-sm sm:text-lg focus:bg-white/10 transition-all duration-300"
                       onKeyPress={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault()
@@ -828,27 +840,27 @@ export default function CommunityPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl"
+                      className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl p-1 min-h-[32px] min-w-[32px]"
                     >
-                      <Smile className="h-5 w-5" />
+                      <Smile className="h-4 w-4" />
                     </Button>
                   </div>
                   <Button
                     onClick={sendMessage}
                     disabled={!newMessage.trim()}
-                    className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-2xl px-8 py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-4 sm:px-8 py-2 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] flex-shrink-0"
                   >
-                    <Send className="h-5 w-5" />
+                    <Send className="h-4 w-4 sm:h-5 sm:w-5" />
                   </Button>
                 </div>
               </div>
             ) : (
-              <div className="max-w-4xl mx-auto text-center py-8">
-                <div className="backdrop-blur-xl bg-white/5 rounded-3xl border border-white/10 p-8">
-                  <p className="text-white/70 mb-4 text-lg">Join the conversation</p>
+              <div className="max-w-4xl mx-auto text-center py-6 sm:py-8">
+                <div className="backdrop-blur-xl bg-white/5 rounded-2xl sm:rounded-3xl border border-white/10 p-6 sm:p-8">
+                  <p className="text-white/70 mb-3 sm:mb-4 text-base sm:text-lg">Join the conversation</p>
                   <Button
                     asChild
-                    className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-2xl px-8 py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                    className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-6 sm:px-8 py-2 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 min-h-[44px]"
                   >
                     <a href="/login">Sign In</a>
                   </Button>
@@ -861,7 +873,7 @@ export default function CommunityPage() {
         {/* Mobile Overlay */}
         {sidebarOpen && (
           <div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden touch-manipulation"
             onClick={() => setSidebarOpen(false)}
           />
         )}
