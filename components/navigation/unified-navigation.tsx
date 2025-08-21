@@ -34,7 +34,7 @@ import {
 import { useAuth } from "@/contexts/auth-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
 import { Badge } from "@/components/ui/badge"
-import { EnhancedThemeToggle } from "@/components/theme/enhanced-theme-toggle"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 const navigationItems = [
   { name: "Home", href: "/", icon: Home },
@@ -80,7 +80,7 @@ export function UnifiedNavigation() {
   }
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b theme-transition">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -107,14 +107,13 @@ export function UnifiedNavigation() {
                 </Button>
               )
             })}
+            <div className="hidden md:block">
+              <ThemeToggle variant="compact" />
+            </div>
           </div>
 
           {/* User Menu / Auth Buttons */}
           <div className="flex items-center space-x-4">
-            <div className="hidden md:block">
-              <EnhancedThemeToggle variant="compact" />
-            </div>
-
             {user ? (
               <div className="flex items-center space-x-3">
                 {/* Coins Display */}
@@ -200,6 +199,10 @@ export function UnifiedNavigation() {
               </SheetTrigger>
               <SheetContent side="right" className="w-[300px] sm:w-[400px]">
                 <div className="flex flex-col space-y-4 mt-4">
+                  <div className="px-4 py-2 border-b">
+                    <ThemeToggle variant="mobile" />
+                  </div>
+
                   {/* User Info in Mobile */}
                   {user && (
                     <div className="flex items-center space-x-3 p-4 bg-muted rounded-lg">
