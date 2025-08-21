@@ -53,7 +53,7 @@ export function DynamicLogo({ width, height, className = "", responsive = true }
 
   const logoSrc =
     currentTheme === "dark"
-      ? "/images/erigga-live-logo-dark.png" // Dark logo with dark background for dark theme
+      ? "/images/erigga-live-logo-dark.png" // Dark logo with black background for dark theme
       : "/images/erigga-live-logo.png" // Light logo with transparent background for light theme
 
   return (

@@ -231,10 +231,10 @@ function NavigationContent() {
                   <span className="sr-only">Toggle menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-80 p-0">
+              <SheetContent side="right" className="w-80 p-0 bg-background border-border">
                 <div className="flex flex-col h-full">
                   {/* Mobile Header */}
-                  <div className="flex items-center justify-between p-4 border-b">
+                  <div className="flex items-center justify-between p-4 border-b border-border">
                     <DynamicLogo responsive={true} width={100} height={28} />
                     <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)}>
                       <X className="h-6 w-6" />
@@ -243,7 +243,7 @@ function NavigationContent() {
 
                   {/* User Info (Mobile) */}
                   {isAuthenticated && profile && (
-                    <div className="p-4 border-b">
+                    <div className="p-4 border-b border-border">
                       <div className="flex items-center space-x-3 mb-4">
                         <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
                           <User className="h-6 w-6 text-primary" />
@@ -284,7 +284,7 @@ function NavigationContent() {
                   </nav>
 
                   {/* Mobile Theme Toggle */}
-                  <div className="p-4 border-t">
+                  <div className="p-4 border-t border-border">
                     <div className="mb-4">
                       <p className="text-sm font-medium mb-2">Theme</p>
                       <div className="grid grid-cols-3 gap-2">

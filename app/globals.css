@@ -46,38 +46,38 @@
     --sidebar-ring: 188 100% 20% / 0.5;
   }
   .dark {
-    /* Updated dark mode tokens for premium design */
-    --background: 215 28% 17%;
+    /* Updated dark mode to use black background matching logo */
+    --background: 0 0% 0%; /* Pure black to match logo background */
     --foreground: 0 0% 98%;
-    --card: 215 28% 17% / 0.8;
+    --card: 0 0% 0% / 0.8;
     --card-foreground: 0 0% 98%;
-    --popover: 215 28% 17% / 0.9;
+    --popover: 0 0% 0% / 0.9;
     --popover-foreground: 0 0% 98%;
     --primary: 188 100% 20%;
     --primary-foreground: 0 0% 98%;
     --secondary: 32 95% 44%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 215 28% 25%;
+    --muted: 0 0% 10%; /* Dark muted to complement black */
     --muted-foreground: 215 20% 65%;
     --accent: 32 95% 44%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 215 28% 25%;
-    --input: 215 28% 25%;
+    --border: 0 0% 15%; /* Dark border */
+    --input: 0 0% 10%;
     --ring: 188 100% 20% / 0.5;
     --chart-1: 32 95% 44%;
     --chart-2: 16 100% 50%;
     --chart-3: 188 100% 20%;
     --chart-4: 215 20% 65%;
-    --chart-5: 215 28% 25%;
-    --sidebar-background: 215 28% 17% / 0.8;
+    --chart-5: 0 0% 10%;
+    --sidebar-background: 0 0% 0% / 0.8; /* Black sidebar background */
     --sidebar-foreground: 0 0% 98%;
     --sidebar-primary: 188 100% 20%;
     --sidebar-primary-foreground: 0 0% 98%;
     --sidebar-accent: 32 95% 44%;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 215 28% 25%;
+    --sidebar-border: 0 0% 15%;
     --sidebar-ring: 188 100% 20% / 0.5;
   }
 }
