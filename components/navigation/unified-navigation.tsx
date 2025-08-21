@@ -34,6 +34,7 @@ import {
 import { useAuth } from "@/contexts/auth-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
 import { Badge } from "@/components/ui/badge"
+import { EnhancedThemeToggle } from "@/components/theme/enhanced-theme-toggle"
 
 const navigationItems = [
   { name: "Home", href: "/", icon: Home },
@@ -110,6 +111,10 @@ export function UnifiedNavigation() {
 
           {/* User Menu / Auth Buttons */}
           <div className="flex items-center space-x-4">
+            <div className="hidden md:block">
+              <EnhancedThemeToggle variant="compact" />
+            </div>
+
             {user ? (
               <div className="flex items-center space-x-3">
                 {/* Coins Display */}
