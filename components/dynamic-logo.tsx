@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Image from "next/image"
+import { useTheme } from "next-themes"
 
 interface DynamicLogoProps {
   width?: number
@@ -12,6 +13,7 @@ interface DynamicLogoProps {
 
 export function DynamicLogo({ width, height, className = "", responsive = true }: DynamicLogoProps) {
   const [mounted, setMounted] = useState(false)
+  const { theme, resolvedTheme } = useTheme()
 
   useEffect(() => {
     setMounted(true)
@@ -25,8 +27,8 @@ export function DynamicLogo({ width, height, className = "", responsive = true }
     return {
       mobile: { width: 120, height: 32 },
       tablet: { width: 160, height: 42 },
-      desktop: { width: 220, height: 58 }, // Increased from 200x55
-      wide: { width: 260, height: 68 }, // Increased from 220x60
+      desktop: { width: 220, height: 58 },
+      wide: { width: 260, height: 68 },
     }
   }
 
@@ -47,12 +49,18 @@ export function DynamicLogo({ width, height, className = "", responsive = true }
   const finalWidth = responsive ? undefined : width || 180
   const finalHeight = responsive ? undefined : height || 50
 
+  const currentTheme = resolvedTheme || theme
+  const logoSrc =
+    currentTheme === "dark"
+      ? "/images/erigga-live-logo.png" // Light logo on transparent background for dark nav
+      : "/images/erigga-live-logo-dark.png" // Dark background logo for light nav
+
   return (
     <div className={`relative ${className}`}>
       <Image
-        src="/images/erigga-live-logo.png"
+        src={logoSrc || "/placeholder.svg"}
         alt="ERIGGA Live"
-        width={responsive ? 260 : finalWidth} // Updated to use largest responsive size
+        width={responsive ? 260 : finalWidth}
         height={responsive ? 68 : finalHeight}
         className={
           responsive
