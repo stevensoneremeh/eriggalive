@@ -570,10 +570,10 @@ export default function CommunityPage() {
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col backdrop-blur-xl bg-white/5 min-w-0">
-          <div className="p-4 sm:p-6 backdrop-blur-xl bg-gradient-to-r from-white/10 to-white/5 border-b border-white/10">
+        <div className="flex-1 flex flex-col backdrop-blur-xl bg-white/5 min-w-0 h-screen">
+          <div className="sticky top-0 z-10 p-3 sm:p-4 md:p-6 backdrop-blur-xl bg-gradient-to-r from-white/10 to-white/5 border-b border-white/10 shadow-lg">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+              <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4 min-w-0 flex-1">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -582,11 +582,11 @@ export default function CommunityPage() {
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
-                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-lg sm:text-2xl shadow-lg flex-shrink-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-14 md:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm sm:text-lg md:text-2xl shadow-lg flex-shrink-0">
                   {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-lg sm:text-2xl font-bold text-white truncate">
+                  <h2 className="text-base sm:text-lg md:text-2xl font-bold text-white truncate">
                     {categories.find((c) => c.id === selectedCategory)?.name || "General"}
                   </h2>
                   <p className="text-white/60 text-xs sm:text-sm truncate">
@@ -613,8 +613,8 @@ export default function CommunityPage() {
             </div>
           </div>
 
-          <ScrollArea className="flex-1 p-3 sm:p-6">
-            <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+          <ScrollArea className="flex-1 p-2 sm:p-4 md:p-6 overflow-y-auto">
+            <div className="max-w-4xl mx-auto space-y-3 sm:space-y-4 md:space-y-6 pb-4">
               {loading ? (
                 <div className="text-center py-8 sm:py-12">
                   <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center mx-auto mb-4 sm:mb-6 animate-pulse">
@@ -806,64 +806,68 @@ export default function CommunityPage() {
             </div>
           </ScrollArea>
 
-          <div className="p-3 sm:p-6 backdrop-blur-xl bg-gradient-to-r from-white/10 to-white/5 border-t border-white/10">
+          <div className="backdrop-blur-xl bg-gradient-to-r from-white/10 to-white/5 border-t border-white/10">
             {isAuthenticated ? (
-              <div className="max-w-4xl mx-auto">
-                <div className="flex items-center space-x-2 sm:space-x-4 p-3 sm:p-4 backdrop-blur-xl bg-white/10 rounded-2xl sm:rounded-3xl border border-white/20 shadow-2xl">
-                  <Avatar className="h-8 w-8 sm:h-10 sm:w-10 ring-2 ring-white/20 flex-shrink-0">
-                    <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
-                    <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold">
-                      {profile?.username?.charAt(0).toUpperCase() || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[40px] min-w-[40px] flex-shrink-0"
-                  >
-                    <Paperclip className="h-4 w-4 sm:h-5 sm:w-5" />
-                  </Button>
-                  <div className="flex-1 relative min-w-0">
-                    <Input
-                      ref={inputRef}
-                      placeholder="Share your thoughts..."
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      className="bg-white/5 border-white/10 text-white pr-10 sm:pr-12 rounded-xl sm:rounded-2xl h-10 sm:h-12 text-sm sm:text-lg focus:bg-white/10 transition-all duration-300"
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault()
-                          sendMessage()
-                        }
-                      }}
-                    />
+              <div className="p-2 sm:p-3 md:p-4">
+                <div className="max-w-4xl mx-auto">
+                  <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4 p-2 sm:p-3 md:p-4 backdrop-blur-xl bg-white/10 rounded-xl sm:rounded-2xl md:rounded-3xl border border-white/20 shadow-2xl">
+                    <Avatar className="h-8 w-8 sm:h-10 sm:w-10 ring-2 ring-white/20 flex-shrink-0">
+                      <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
+                      <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold text-xs sm:text-sm">
+                        {profile?.username?.charAt(0).toUpperCase() || "U"}
+                      </AvatarFallback>
+                    </Avatar>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl p-1 min-h-[32px] min-w-[32px]"
+                      className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[40px] min-w-[40px] flex-shrink-0"
                     >
-                      <Smile className="h-4 w-4" />
+                      <Paperclip className="h-4 w-4 sm:h-5 sm:w-5" />
+                    </Button>
+                    <div className="flex-1 relative min-w-0">
+                      <Input
+                        ref={inputRef}
+                        placeholder="Share your thoughts..."
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        className="bg-white/5 border-white/10 text-white pr-10 sm:pr-12 rounded-xl sm:rounded-2xl h-10 sm:h-12 text-sm sm:text-base md:text-lg focus:bg-white/10 transition-all duration-300"
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault()
+                            sendMessage()
+                          }
+                        }}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl p-1 min-h-[32px] min-w-[32px]"
+                      >
+                        <Smile className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <Button
+                      onClick={sendMessage}
+                      disabled={!newMessage.trim()}
+                      className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-3 sm:px-6 md:px-8 py-2 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] flex-shrink-0"
+                    >
+                      <Send className="h-4 w-4 sm:h-5 sm:w-5" />
                     </Button>
                   </div>
-                  <Button
-                    onClick={sendMessage}
-                    disabled={!newMessage.trim()}
-                    className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-4 sm:px-8 py-2 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] flex-shrink-0"
-                  >
-                    <Send className="h-4 w-4 sm:h-5 sm:w-5" />
-                  </Button>
                 </div>
               </div>
             ) : (
-              <div className="max-w-4xl mx-auto text-center py-6 sm:py-8">
-                <div className="backdrop-blur-xl bg-white/5 rounded-2xl sm:rounded-3xl border border-white/10 p-6 sm:p-8">
-                  <p className="text-white/70 mb-3 sm:mb-4 text-base sm:text-lg">Join the conversation</p>
-                  <Button
-                    asChild
-                    className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-6 sm:px-8 py-2 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 min-h-[44px]"
-                  >
-                    <a href="/login">Sign In</a>
-                  </Button>
+              <div className="p-3 sm:p-4 md:p-6">
+                <div className="max-w-4xl mx-auto text-center">
+                  <div className="backdrop-blur-xl bg-white/5 rounded-2xl sm:rounded-3xl border border-white/10 p-4 sm:p-6 md:p-8">
+                    <p className="text-white/70 mb-3 sm:mb-4 text-sm sm:text-base md:text-lg">Join the conversation</p>
+                    <Button
+                      asChild
+                      className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-4 sm:px-6 md:px-8 py-2 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 min-h-[44px]"
+                    >
+                      <a href="/login">Sign In</a>
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
