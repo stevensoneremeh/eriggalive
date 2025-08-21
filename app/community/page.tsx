@@ -75,10 +75,13 @@ export default function CommunityPage() {
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [isScrollingDown, setIsScrollingDown] = useState(false)
+  const [lastScrollY, setLastScrollY] = useState(0)
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   // Scroll to bottom
   const scrollToBottom = () => {
@@ -440,6 +443,51 @@ export default function CommunityPage() {
     }
   }, [selectedCategory, supabase, loadPosts])
 
+  useEffect(() => {
+    const handleScroll = () => {
+      if (typeof window === "undefined") return
+
+      const currentScrollY = scrollContainerRef.current?.scrollTop || 0
+      const scrollDifference = currentScrollY - lastScrollY
+
+      // Only hide nav on mobile screens
+      if (window.innerWidth < 768) {
+        if (scrollDifference > 10 && currentScrollY > 100) {
+          setIsScrollingDown(true)
+        } else if (scrollDifference < -10) {
+          setIsScrollingDown(false)
+        }
+      } else {
+        setIsScrollingDown(false)
+      }
+
+      setLastScrollY(currentScrollY)
+    }
+
+    const scrollContainer = scrollContainerRef.current
+    if (scrollContainer) {
+      scrollContainer.addEventListener("scroll", handleScroll, { passive: true })
+      return () => scrollContainer.removeEventListener("scroll", handleScroll)
+    }
+  }, [lastScrollY])
+
+  useEffect(() => {
+    // Communicate scroll state to main navigation
+    document.documentElement.style.setProperty("--main-nav-hidden", isScrollingDown ? "1" : "0")
+
+    // Add CSS custom property for main nav hiding
+    if (isScrollingDown) {
+      document.body.classList.add("community-scrolling-down")
+    } else {
+      document.body.classList.remove("community-scrolling-down")
+    }
+
+    return () => {
+      document.body.classList.remove("community-scrolling-down")
+      document.documentElement.style.removeProperty("--main-nav-hidden")
+    }
+  }, [isScrollingDown])
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;utf8,%3Csvg%20width=%2260%22%20height=%2260%22%20viewBox=%220%200%2060%2060%22%20xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg%20fill=%22none%22%20fillRule=%22evenodd%22%3E%3Cg%20fill=%22%23ffffff%22%20fillOpacity=%220.02%22%3E%3Ccircle%20cx=%2230%22%20cy=%2230%22%20r=%222%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-20"></div>
@@ -544,49 +592,72 @@ export default function CommunityPage() {
 
           {isAuthenticated && profile && (
             <div className="p-3 sm:p-4 backdrop-blur-xl bg-white/5 border-t border-white/10">
-              <div className="flex items-center space-x-3 sm:space-x-4 p-3 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
-                <Avatar className="h-10 w-10 sm:h-12 sm:w-12 ring-2 ring-white/20">
+              <div className="flex items-center space-x-3 sm:space-x-4 md:space-x-6 p-3 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 shadow-2xl">
+                <Avatar className="h-8 w-8 sm:h-10 sm:w-10 ring-2 ring-white/20 flex-shrink-0">
                   <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} />
-                  <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold">
+                  <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold text-xs sm:text-sm">
                     {profile.username?.charAt(0).toUpperCase() || "U"}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-white truncate text-sm sm:text-base">
-                    {profile.full_name || profile.username}
-                  </div>
-                  <Badge
-                    className={cn(
-                      "text-xs text-white font-medium px-2 sm:px-3 py-1 rounded-full",
-                      getTierColor(profile.tier || "grassroot"),
-                    )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[44px] min-w-[44px] flex-shrink-0 touch-manipulation"
+                >
+                  <Paperclip className="h-4 w-4 sm:h-5 sm:w-5" />
+                </Button>
+                <div className="flex-1 relative min-w-0">
+                  <Input
+                    ref={inputRef}
+                    placeholder="Write a comment..."
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    className="bg-white/5 border-white/10 text-white pr-10 sm:pr-12 rounded-xl sm:rounded-2xl h-10 sm:h-12 text-sm sm:text-lg focus:bg-white/10 transition-all duration-300"
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault()
+                        sendComment(posts.find((p) => p.id === activePost)?.id || 0)
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl p-1 min-h-[32px] min-w-[32px]"
                   >
-                    {profile.tier || "grassroot"}
-                  </Badge>
+                    <Smile className="h-4 w-4" />
+                  </Button>
                 </div>
+                <Button
+                  onClick={() => sendComment(posts.find((p) => p.id === activePost)?.id || 0)}
+                  disabled={!newComment.trim()}
+                  className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-4 sm:px-6 py-2 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] flex-shrink-0 touch-manipulation"
+                >
+                  <Send className="h-4 w-4 sm:h-5 sm:w-5" />
+                </Button>
               </div>
             </div>
           )}
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col backdrop-blur-xl bg-white/5 min-w-0 h-screen">
-          <div className="sticky top-0 z-10 p-3 sm:p-4 md:p-6 backdrop-blur-xl bg-gradient-to-r from-white/10 to-white/5 border-b border-white/10 shadow-lg">
+        <div className="flex-1 flex flex-col backdrop-blur-xl bg-white/5 min-w-0 h-screen pb-0 md:pb-0">
+          <div className="sticky top-0 z-20 p-2 sm:p-3 md:p-4 lg:p-6 backdrop-blur-xl bg-gradient-to-r from-white/10 to-white/5 border-b border-white/10 shadow-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4 min-w-0 flex-1">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="md:hidden text-white hover:bg-white/10 rounded-xl p-2 min-h-[44px] min-w-[44px] flex-shrink-0"
+                  className="md:hidden text-white hover:bg-white/10 rounded-xl p-2 min-h-[44px] min-w-[44px] flex-shrink-0 touch-manipulation"
                   onClick={() => setSidebarOpen(true)}
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
-                <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-14 md:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm sm:text-lg md:text-2xl shadow-lg flex-shrink-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm sm:text-lg md:text-xl lg:text-2xl shadow-lg flex-shrink-0">
                   {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-base sm:text-lg md:text-2xl font-bold text-white truncate">
+                  <h2 className="text-sm sm:text-base md:text-lg lg:text-2xl font-bold text-white truncate">
                     {categories.find((c) => c.id === selectedCategory)?.name || "General"}
                   </h2>
                   <p className="text-white/60 text-xs sm:text-sm truncate">
@@ -598,14 +669,14 @@ export default function CommunityPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[40px] min-w-[40px]"
+                  className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[44px] min-w-[44px] touch-manipulation"
                 >
                   <Search className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[40px] min-w-[40px]"
+                  className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[44px] min-w-[44px] touch-manipulation"
                 >
                   <MoreVertical className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
@@ -613,27 +684,10 @@ export default function CommunityPage() {
             </div>
           </div>
 
-          <ScrollArea className="flex-1 p-2 sm:p-4 md:p-6 overflow-y-auto">
-            <div className="max-w-4xl mx-auto space-y-3 sm:space-y-4 md:space-y-6 pb-4">
-              {loading ? (
-                <div className="text-center py-8 sm:py-12">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center mx-auto mb-4 sm:mb-6 animate-pulse">
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  </div>
-                  <p className="text-white/70 text-base sm:text-lg">Loading conversations...</p>
-                </div>
-              ) : filteredPosts.length === 0 ? (
-                <div className="text-center py-12 sm:py-16">
-                  <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-3xl bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur-sm flex items-center justify-center text-2xl sm:text-4xl mx-auto mb-4 sm:mb-6 border border-white/10">
-                    💬
-                  </div>
-                  <h3 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">Start the Conversation</h3>
-                  <p className="text-white/60 text-base sm:text-lg">
-                    Be the first to share your thoughts with the community!
-                  </p>
-                </div>
-              ) : (
-                filteredPosts.map((post, index) => (
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pb-20 md:pb-4">
+            <div className="p-2 sm:p-3 md:p-4 lg:p-6">
+              <div className="max-w-4xl mx-auto space-y-3 sm:space-y-4 md:space-y-6">
+                {filteredPosts.map((post, index) => (
                   <div
                     key={post.id}
                     className="group animate-fade-in-up"
@@ -792,7 +846,7 @@ export default function CommunityPage() {
                                 disabled={!newComment.trim()}
                                 className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-4 sm:px-6 py-2 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] flex-shrink-0"
                               >
-                                <Send className="h-4 w-4" />
+                                <Send className="h-4 w-4 sm:h-5 sm:w-5" />
                               </Button>
                             </div>
                           )}
@@ -800,17 +854,17 @@ export default function CommunityPage() {
                       )}
                     </div>
                   </div>
-                ))
-              )}
-              <div ref={messagesEndRef} />
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
             </div>
-          </ScrollArea>
+          </div>
 
-          <div className="backdrop-blur-xl bg-gradient-to-r from-white/10 to-white/5 border-t border-white/10">
+          <div className="fixed md:relative bottom-0 left-0 right-0 md:bottom-auto md:left-auto md:right-auto backdrop-blur-xl bg-gradient-to-r from-white/10 to-white/5 border-t border-white/10 z-30">
             {isAuthenticated ? (
-              <div className="p-2 sm:p-3 md:p-4">
+              <div className="p-3 sm:p-3 md:p-4 safe-area-inset-bottom">
                 <div className="max-w-4xl mx-auto">
-                  <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4 p-2 sm:p-3 md:p-4 backdrop-blur-xl bg-white/10 rounded-xl sm:rounded-2xl md:rounded-3xl border border-white/20 shadow-2xl">
+                  <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4 p-3 sm:p-3 md:p-4 backdrop-blur-xl bg-white/10 rounded-2xl sm:rounded-2xl md:rounded-3xl border border-white/20 shadow-2xl">
                     <Avatar className="h-8 w-8 sm:h-10 sm:w-10 ring-2 ring-white/20 flex-shrink-0">
                       <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
                       <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold text-xs sm:text-sm">
@@ -820,7 +874,7 @@ export default function CommunityPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[40px] min-w-[40px] flex-shrink-0"
+                      className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[44px] min-w-[44px] flex-shrink-0 touch-manipulation"
                     >
                       <Paperclip className="h-4 w-4 sm:h-5 sm:w-5" />
                     </Button>
@@ -830,7 +884,7 @@ export default function CommunityPage() {
                         placeholder="Share your thoughts..."
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
-                        className="bg-white/5 border-white/10 text-white pr-10 sm:pr-12 rounded-xl sm:rounded-2xl h-10 sm:h-12 text-sm sm:text-base md:text-lg focus:bg-white/10 transition-all duration-300"
+                        className="bg-white/5 border-white/10 text-white pr-12 sm:pr-12 rounded-xl sm:rounded-2xl h-12 sm:h-12 text-base sm:text-base md:text-lg focus:bg-white/10 transition-all duration-300 touch-manipulation"
                         onKeyPress={(e) => {
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault()
@@ -841,7 +895,7 @@ export default function CommunityPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl p-1 min-h-[32px] min-w-[32px]"
+                        className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl p-1 min-h-[36px] min-w-[36px] touch-manipulation"
                       >
                         <Smile className="h-4 w-4" />
                       </Button>
@@ -849,7 +903,7 @@ export default function CommunityPage() {
                     <Button
                       onClick={sendMessage}
                       disabled={!newMessage.trim()}
-                      className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-3 sm:px-6 md:px-8 py-2 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] flex-shrink-0"
+                      className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-4 sm:px-6 md:px-8 py-3 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] flex-shrink-0 touch-manipulation"
                     >
                       <Send className="h-4 w-4 sm:h-5 sm:w-5" />
                     </Button>
@@ -857,13 +911,13 @@ export default function CommunityPage() {
                 </div>
               </div>
             ) : (
-              <div className="p-3 sm:p-4 md:p-6">
+              <div className="p-4 sm:p-4 md:p-6 safe-area-inset-bottom">
                 <div className="max-w-4xl mx-auto text-center">
                   <div className="backdrop-blur-xl bg-white/5 rounded-2xl sm:rounded-3xl border border-white/10 p-4 sm:p-6 md:p-8">
                     <p className="text-white/70 mb-3 sm:mb-4 text-sm sm:text-base md:text-lg">Join the conversation</p>
                     <Button
                       asChild
-                      className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-4 sm:px-6 md:px-8 py-2 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 min-h-[44px]"
+                      className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-6 sm:px-6 md:px-8 py-3 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 min-h-[48px] touch-manipulation"
                     >
                       <a href="/login">Sign In</a>
                     </Button>
