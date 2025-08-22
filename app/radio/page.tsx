@@ -33,6 +33,7 @@ import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { createClient } from "@/lib/supabase/client"
+import { AnimatedRadioCharacter } from "@/components/radio/animated-radio-character"
 
 interface Track {
   id: string
@@ -691,6 +692,16 @@ export default function RadioPage() {
                     <Button onClick={sendShoutout} size="sm" className="bg-white text-black hover:bg-white/90">
                       <Send className="w-4 h-4" />
                     </Button>
+                  </div>
+
+                  {/* Animated Radio Character */}
+                  <div className="flex justify-center py-4">
+                    <AnimatedRadioCharacter
+                      isPlaying={isPlaying}
+                      isLive={isLive}
+                      shoutouts={shoutouts}
+                      className="w-full"
+                    />
                   </div>
 
                   <div className="space-y-2 max-h-32 overflow-y-auto">
