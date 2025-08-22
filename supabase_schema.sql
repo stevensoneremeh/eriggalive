@@ -4,68 +4,53 @@
 -- Enable necessary extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- User profiles table (if not exists)
-CREATE TABLE IF NOT EXISTS user_profiles (
+-- Mood Categories Table
+CREATE TABLE mood_categories (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  username TEXT UNIQUE,
-  display_name TEXT,
-  avatar_url TEXT,
-  tier TEXT DEFAULT 'free' CHECK (tier IN ('free', 'pro', 'enterprise')),
+  name VARCHAR(100) NOT NULL,
+  slug VARCHAR(100) UNIQUE NOT NULL,
+  description TEXT,
+  color_scheme JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Mood categories table
-CREATE TABLE mood_categories (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  emoji TEXT NOT NULL,
-  color_gradient TEXT NOT NULL,
-  description TEXT,
-  icon_name TEXT,
-  sort_order INTEGER DEFAULT 0,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Radio tracks table
-CREATE TABLE radio_tracks (
+-- Tracks Table
+CREATE TABLE tracks (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  title TEXT NOT NULL,
-  artist TEXT NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  artist VARCHAR(255) NOT NULL,
   artwork_url TEXT,
   audio_url TEXT,
   duration_ms INTEGER,
-  mood_category TEXT REFERENCES mood_categories(id),
-  source TEXT DEFAULT 'custom' CHECK (source IN ('spotify', 'apple', 'audiomack', 'boomplay', 'youtube', 'custom')),
-  external_id TEXT,
+  mood_category UUID REFERENCES mood_categories(id),
+  source VARCHAR(50) DEFAULT 'custom', -- spotify, apple, audiomack, youtube, custom
+  external_id VARCHAR(255),
   is_active BOOLEAN DEFAULT true,
   play_count INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- User pinned tracks (persistent playlist)
+-- User Pinned Tracks (for persistent playlists)
 CREATE TABLE user_pinned_tracks (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  track_id UUID REFERENCES radio_tracks(id) ON DELETE CASCADE,
+  track_id UUID REFERENCES tracks(id) ON DELETE CASCADE,
   pinned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(user_id, track_id)
 );
 
--- Live broadcasts table
+-- Live Broadcasts Table
 CREATE TABLE live_broadcasts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  title TEXT NOT NULL,
+  title VARCHAR(255) NOT NULL,
   description TEXT,
-  is_live BOOLEAN DEFAULT false,
+  status VARCHAR(20) DEFAULT 'scheduled', -- scheduled, live, ended
   scheduled_time TIMESTAMP WITH TIME ZONE,
   started_at TIMESTAMP WITH TIME ZONE,
   ended_at TIMESTAMP WITH TIME ZONE,
   stream_url TEXT,
-  chat_room_id TEXT,
   max_listeners INTEGER DEFAULT 0,
   current_listeners INTEGER DEFAULT 0,
   created_by UUID REFERENCES auth.users(id),
@@ -73,189 +58,202 @@ CREATE TABLE live_broadcasts (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Community shout-outs / fan messages
+-- Daily Quotes Table
+CREATE TABLE daily_quotes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  text TEXT NOT NULL,
+  author VARCHAR(100) DEFAULT 'Erigga',
+  date DATE DEFAULT CURRENT_DATE,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(date)
+);
+
+-- Community Shout-outs Table
 CREATE TABLE community_shoutouts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  username TEXT,
   message TEXT NOT NULL,
   is_approved BOOLEAN DEFAULT true,
   is_featured BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Radio listening sessions (for analytics)
+-- Radio Sessions (for tracking user listening sessions)
 CREATE TABLE radio_sessions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  mood_category TEXT REFERENCES mood_categories(id),
-  track_id UUID REFERENCES radio_tracks(id) ON DELETE SET NULL,
-  duration_listened INTEGER, -- in seconds
-  session_start TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  session_end TIMESTAMP WITH TIME ZONE,
-  user_agent TEXT,
-  ip_address INET
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  mood_category UUID REFERENCES mood_categories(id),
+  started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  ended_at TIMESTAMP WITH TIME ZONE,
+  tracks_played JSONB DEFAULT '[]',
+  total_duration_ms INTEGER DEFAULT 0
 );
 
--- Daily quotes table
-CREATE TABLE daily_quotes (
+-- Playlist History (for "last played mood" feature)
+CREATE TABLE user_playlist_history (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  quote_text TEXT NOT NULL,
-  author TEXT DEFAULT 'Erigga',
-  is_active BOOLEAN DEFAULT true,
-  display_date DATE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  mood_category UUID REFERENCES mood_categories(id),
+  track_id UUID REFERENCES tracks(id),
+  played_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  session_id UUID REFERENCES radio_sessions(id)
 );
 
--- Radio settings (global configuration)
-CREATE TABLE radio_settings (
+-- Radio Analytics (for admin insights)
+CREATE TABLE radio_analytics (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  setting_key TEXT UNIQUE NOT NULL,
-  setting_value JSONB,
-  description TEXT,
-  updated_by UUID REFERENCES auth.users(id),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  date DATE DEFAULT CURRENT_DATE,
+  total_listeners INTEGER DEFAULT 0,
+  peak_listeners INTEGER DEFAULT 0,
+  total_sessions INTEGER DEFAULT 0,
+  avg_session_duration_ms INTEGER DEFAULT 0,
+  top_mood_category UUID REFERENCES mood_categories(id),
+  total_shoutouts INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(date)
 );
 
 -- Indexes for performance
-CREATE INDEX idx_radio_tracks_mood ON radio_tracks(mood_category);
-CREATE INDEX idx_radio_tracks_active ON radio_tracks(is_active);
-CREATE INDEX idx_user_pinned_tracks_user ON user_pinned_tracks(user_id);
-CREATE INDEX idx_community_shoutouts_created ON community_shoutouts(created_at DESC);
-CREATE INDEX idx_radio_sessions_user ON radio_sessions(user_id);
-CREATE INDEX idx_radio_sessions_track ON radio_sessions(track_id);
-CREATE INDEX idx_live_broadcasts_live ON live_broadcasts(is_live);
+CREATE INDEX idx_tracks_mood_category ON tracks(mood_category);
+CREATE INDEX idx_tracks_is_active ON tracks(is_active);
+CREATE INDEX idx_tracks_play_count ON tracks(play_count DESC);
+CREATE INDEX idx_user_pinned_tracks_user_id ON user_pinned_tracks(user_id);
+CREATE INDEX idx_live_broadcasts_status ON live_broadcasts(status);
+CREATE INDEX idx_live_broadcasts_scheduled_time ON live_broadcasts(scheduled_time);
+CREATE INDEX idx_community_shoutouts_created_at ON community_shoutouts(created_at DESC);
+CREATE INDEX idx_radio_sessions_user_id ON radio_sessions(user_id);
+CREATE INDEX idx_user_playlist_history_user_id ON user_playlist_history(user_id);
+CREATE INDEX idx_user_playlist_history_played_at ON user_playlist_history(played_at DESC);
 
 -- Row Level Security (RLS) Policies
-ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mood_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tracks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_pinned_tracks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE live_broadcasts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_quotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE community_shoutouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE radio_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_playlist_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE radio_analytics ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies
-CREATE POLICY "Users can view their own profile" ON user_profiles
-  FOR SELECT USING (auth.uid() = user_id);
+-- Public read access for mood categories and tracks
+CREATE POLICY "Public read access for mood_categories" ON mood_categories FOR SELECT USING (true);
+CREATE POLICY "Public read access for tracks" ON tracks FOR SELECT USING (is_active = true);
+CREATE POLICY "Public read access for daily_quotes" ON daily_quotes FOR SELECT USING (is_active = true);
+CREATE POLICY "Public read access for live_broadcasts" ON live_broadcasts FOR SELECT USING (true);
 
-CREATE POLICY "Users can update their own profile" ON user_profiles
-  FOR UPDATE USING (auth.uid() = user_id);
+-- User-specific policies
+CREATE POLICY "Users can manage their pinned tracks" ON user_pinned_tracks FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users can create shoutouts" ON community_shoutouts FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Public read access for approved shoutouts" ON community_shoutouts FOR SELECT USING (is_approved = true);
+CREATE POLICY "Users can manage their sessions" ON radio_sessions FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users can manage their history" ON user_playlist_history FOR ALL USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can manage their pinned tracks" ON user_pinned_tracks
-  FOR ALL USING (auth.uid() = user_id);
+-- Admin policies (assuming admin role in user metadata)
+CREATE POLICY "Admins can manage all content" ON tracks FOR ALL USING (
+  (auth.jwt() ->> 'role') = 'admin' OR 
+  (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+);
+CREATE POLICY "Admins can manage broadcasts" ON live_broadcasts FOR ALL USING (
+  (auth.jwt() ->> 'role') = 'admin' OR 
+  (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+);
+CREATE POLICY "Admins can manage quotes" ON daily_quotes FOR ALL USING (
+  (auth.jwt() ->> 'role') = 'admin' OR 
+  (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+);
 
-CREATE POLICY "Users can create shout-outs" ON community_shoutouts
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Everyone can view approved shout-outs" ON community_shoutouts
-  FOR SELECT USING (is_approved = true);
-
-CREATE POLICY "Users can view their own sessions" ON radio_sessions
-  FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can create their own sessions" ON radio_sessions
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
--- Public read access for reference tables
-CREATE POLICY "Everyone can view mood categories" ON mood_categories
-  FOR SELECT USING (is_active = true);
-
-CREATE POLICY "Everyone can view active tracks" ON radio_tracks
-  FOR SELECT USING (is_active = true);
-
-CREATE POLICY "Everyone can view live broadcasts" ON live_broadcasts
-  FOR SELECT USING (true);
-
-CREATE POLICY "Everyone can view daily quotes" ON daily_quotes
-  FOR SELECT USING (is_active = true);
-
-CREATE POLICY "Everyone can view radio settings" ON radio_settings
-  FOR SELECT USING (true);
-
--- Seed data for mood categories
-INSERT INTO mood_categories (id, name, emoji, color_gradient, description, icon_name, sort_order) VALUES
-('turn-up', 'Turn Up', '🔥', 'from-red-500 to-orange-500', 'Hype / Party vibes', 'Zap', 1),
-('reflective', 'Reflective', '🧠', 'from-purple-500 to-indigo-500', 'Street Wisdom', 'Brain', 2),
-('love-emotions', 'Love & Emotions', '❤️', 'from-pink-500 to-rose-500', 'Heartfelt vibes', 'Heart', 3),
-('motivation', 'Motivation & Hustle', '💪', 'from-green-500 to-emerald-500', 'Grind time', 'Dumbbell', 4),
-('freestyle', 'Freestyle / Mixed', '🎭', 'from-yellow-500 to-amber-500', 'Mixed Vibes', 'Mic', 5);
-
--- Seed data for daily quotes
-INSERT INTO daily_quotes (quote_text, author, is_active) VALUES
-('Success na journey, no be destination', 'Erigga', true),
-('Make you hustle hard, but make you smart pass', 'Paper Boi', true),
-('Street wisdom dey teach wetin school no fit teach', 'Erigga', true),
-('Your grind today na your glory tomorrow', 'Paper Boi', true),
-('Stay focused, stay hungry, stay humble', 'Erigga', true),
-('Na small small dey build castle', 'Erigga', true),
-('Every struggle get meaning, every pain get purpose', 'Paper Boi', true);
-
--- Seed data for sample tracks
-INSERT INTO radio_tracks (title, artist, artwork_url, mood_category, duration_ms) VALUES
-('Paper Boi', 'Erigga', '/placeholder.svg?height=300&width=300', 'turn-up', 240000),
-('Street Motivation', 'Erigga ft. Victor AD', '/placeholder.svg?height=300&width=300', 'motivation', 210000),
-('Love Me', 'Erigga ft. Yemi Alade', '/placeholder.svg?height=300&width=300', 'love-emotions', 195000),
-('Warri Anthem', 'Erigga', '/placeholder.svg?height=300&width=300', 'turn-up', 225000),
-('Life Philosophy', 'Erigga', '/placeholder.svg?height=300&width=300', 'reflective', 280000),
-('Hustle Hard', 'Erigga ft. Graham D', '/placeholder.svg?height=300&width=300', 'motivation', 205000),
-('Freestyle Session', 'Erigga', '/placeholder.svg?height=300&width=300', 'freestyle', 320000),
-('Street Wisdom', 'Erigga', '/placeholder.svg?height=300&width=300', 'reflective', 245000);
-
--- Initial radio settings
-INSERT INTO radio_settings (setting_key, setting_value, description) VALUES
-('default_volume', '70', 'Default volume level for new users'),
-('auto_play', 'true', 'Auto-play tracks when mood is selected'),
-('shuffle_enabled', 'false', 'Enable shuffle by default'),
-('crossfade_duration', '3000', 'Crossfade duration in milliseconds'),
-('max_pinned_tracks', '50', 'Maximum number of tracks a user can pin');
-
--- Functions for common operations
-CREATE OR REPLACE FUNCTION increment_play_count(track_uuid UUID)
-RETURNS void AS $$
-BEGIN
-  UPDATE radio_tracks 
-  SET play_count = play_count + 1, updated_at = NOW()
-  WHERE id = track_uuid;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION get_mood_playlist(mood_id TEXT, limit_count INTEGER DEFAULT 20)
-RETURNS TABLE (
-  id UUID,
-  title TEXT,
-  artist TEXT,
-  artwork_url TEXT,
-  duration_ms INTEGER,
-  play_count INTEGER
-) AS $$
-BEGIN
-  RETURN QUERY
-  SELECT rt.id, rt.title, rt.artist, rt.artwork_url, rt.duration_ms, rt.play_count
-  FROM radio_tracks rt
-  WHERE rt.mood_category = mood_id AND rt.is_active = true
-  ORDER BY rt.play_count DESC, rt.created_at DESC
-  LIMIT limit_count;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Trigger to update updated_at timestamp
+-- Functions for updating timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.updated_at = NOW();
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Triggers for updated_at columns
+CREATE TRIGGER update_mood_categories_updated_at BEFORE UPDATE ON mood_categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_tracks_updated_at BEFORE UPDATE ON tracks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_live_broadcasts_updated_at BEFORE UPDATE ON live_broadcasts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Function to increment play count
+CREATE OR REPLACE FUNCTION increment_play_count(track_uuid UUID)
+RETURNS void AS $$
+BEGIN
+    UPDATE tracks SET play_count = play_count + 1 WHERE id = track_uuid;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Seed Data for Mood Categories
+INSERT INTO mood_categories (name, slug, description, color_scheme) VALUES
+('Turn Up', 'turn-up', 'Hype / Party Vibes', '{"primary": "#ef4444", "secondary": "#f97316"}'),
+('Reflective', 'reflective', 'Street Wisdom', '{"primary": "#8b5cf6", "secondary": "#3b82f6"}'),
+('Love & Emotions', 'love-emotions', 'Heart & Soul', '{"primary": "#ec4899", "secondary": "#f43f5e"}'),
+('Motivation & Hustle', 'motivation', 'Hustle & Grind', '{"primary": "#10b981", "secondary": "#059669"}'),
+('Freestyle / Mixed Vibes', 'freestyle', 'Mixed Vibes', '{"primary": "#eab308", "secondary": "#f59e0b"}');
+
+-- Sample Daily Quote
+INSERT INTO daily_quotes (text, date) VALUES
+('The streets taught me everything I know, but music gave me everything I have.', CURRENT_DATE);
+
+-- Sample Tracks (you would populate this with actual track data)
+INSERT INTO tracks (title, artist, mood_category, artwork_url, duration_ms) 
+SELECT 
+  'Sample Track ' || generate_series,
+  'Erigga',
+  (SELECT id FROM mood_categories ORDER BY RANDOM() LIMIT 1),
+  '/placeholder.svg?height=300&width=300',
+  180000 + (RANDOM() * 120000)::INTEGER
+FROM generate_series(1, 20);
+
+-- Create a view for popular tracks
+CREATE VIEW popular_tracks AS
+SELECT 
+  t.*,
+  mc.name as mood_name,
+  mc.slug as mood_slug
+FROM tracks t
+JOIN mood_categories mc ON t.mood_category = mc.id
+WHERE t.is_active = true
+ORDER BY t.play_count DESC, t.created_at DESC;
+
+-- Create a view for user listening stats
+CREATE VIEW user_listening_stats AS
+SELECT 
+  rs.user_id,
+  COUNT(rs.id) as total_sessions,
+  SUM(rs.total_duration_ms) as total_listening_time_ms,
+  AVG(rs.total_duration_ms) as avg_session_duration_ms,
+  COUNT(DISTINCT rs.mood_category) as unique_moods_played,
+  MAX(rs.started_at) as last_session
+FROM radio_sessions rs
+GROUP BY rs.user_id;
+
+-- Realtime subscriptions setup (run these in Supabase dashboard)
+-- NOTIFY for live broadcasts
+CREATE OR REPLACE FUNCTION notify_broadcast_change()
+RETURNS trigger AS $$
+BEGIN
+  PERFORM pg_notify('broadcast_change', row_to_json(NEW)::text);
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER update_radio_tracks_updated_at
-  BEFORE UPDATE ON radio_tracks
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER broadcast_change_trigger
+  AFTER INSERT OR UPDATE ON live_broadcasts
+  FOR EACH ROW EXECUTE FUNCTION notify_broadcast_change();
 
-CREATE TRIGGER update_user_profiles_updated_at
-  BEFORE UPDATE ON user_profiles
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+-- NOTIFY for new shoutouts
+CREATE OR REPLACE FUNCTION notify_new_shoutout()
+RETURNS trigger AS $$
+BEGIN
+  PERFORM pg_notify('new_shoutout', row_to_json(NEW)::text);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
-CREATE TRIGGER update_live_broadcasts_updated_at
-  BEFORE UPDATE ON live_broadcasts
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER new_shoutout_trigger
+  AFTER INSERT ON community_shoutouts
+  FOR EACH ROW EXECUTE FUNCTION notify_new_shoutout();

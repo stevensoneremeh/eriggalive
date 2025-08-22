@@ -7,7 +7,7 @@ import { useTheme } from "@/contexts/theme-context"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Music, Video, Users, ShoppingBag, Calendar, Play, Radio, Star, ArrowRight, Crown, Zap } from "lucide-react"
+import { Music, Video, Users, ShoppingBag, Calendar, Play, Star, ArrowRight, Crown, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SafeHeroVideoCarousel } from "@/components/safe-hero-video-carousel"
 import { getOptimizedVideoSources } from "@/utils/video-utils"
@@ -349,70 +349,6 @@ export default function HomePage() {
           ))}
         </motion.div>
       </section>
-
-      {isAuthenticated && (
-        <motion.section
-          className="py-8 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10 border-y border-border/50 backdrop-blur-sm"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: prefersReducedMotion ? 0 : 0.8 }}
-        >
-          <div className="container mx-auto px-4">
-            <motion.div
-              className="glass-card rounded-3xl p-8 flex items-center justify-between border border-white/20 shadow-xl"
-              whileHover={{ scale: prefersReducedMotion ? 1 : 1.02 }}
-              transition={{ duration: 0.3 }}
-            >
-              <div className="flex items-center space-x-6">
-                <motion.div
-                  className="relative"
-                  animate={{ rotate: [0, 360] }}
-                  transition={{ duration: 20, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-                >
-                  <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
-                    <Radio className="w-8 h-8 text-white" />
-                  </div>
-                  <motion.div
-                    className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full"
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
-                  />
-                </motion.div>
-                <div>
-                  <h3 className="font-bold text-xl mb-1">Erigga Radio Live</h3>
-                  <p className="text-muted-foreground">24/7 Street Beats & Exclusive Drops</p>
-                </div>
-                <div className="hidden md:flex space-x-1 ml-8">
-                  {[...Array(5)].map((_, i) => (
-                    <motion.div
-                      key={i}
-                      className="w-1 bg-gradient-to-t from-cyan-400 to-blue-600 rounded-full"
-                      animate={{
-                        height: [15, 35, 25, 40, 20],
-                      }}
-                      transition={{
-                        duration: 1,
-                        repeat: Number.POSITIVE_INFINITY,
-                        delay: i * 0.1,
-                        ease: "easeInOut",
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-              <Link href="/radio">
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Button className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold px-8 py-3 rounded-xl shadow-lg">
-                    <Play className="w-5 h-5 mr-2" />
-                    Listen Live
-                  </Button>
-                </motion.div>
-              </Link>
-            </motion.div>
-          </div>
-        </motion.section>
-      )}
 
       <section className="py-24 relative overflow-hidden bg-gradient-to-b from-background to-muted/20">
         {/* Animated background elements */}

@@ -30,6 +30,7 @@ import {
   Radio,
   Ticket,
   Info,
+  LayoutDashboard,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
@@ -39,13 +40,14 @@ const navigationItems = [
   { name: "Home", href: "/", icon: Home },
   { name: "Mission", href: "/mission", icon: Target },
   { name: "Community", href: "/community", icon: Users },
+  { name: "Radio", href: "/radio", icon: Radio },
   { name: "Vault", href: "/vault", icon: Music },
-  { name: "Coins", href: "/coins", icon: Coins },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Chat", href: "/chat", icon: MessageCircle },
   { name: "Meet & Greet", href: "/meet-and-greet", icon: Phone },
   { name: "Merch", href: "/merch", icon: ShoppingBag },
   { name: "Chronicles", href: "/chronicles", icon: Calendar },
-  { name: "Radio", href: "/rooms/freebies", icon: Radio },
+  { name: "Coins", href: "/coins", icon: Coins },
   { name: "Tickets", href: "/tickets", icon: Ticket },
   { name: "About", href: "/about", icon: Info },
 ]
@@ -78,6 +80,23 @@ export function UnifiedNavigation() {
     }
   }
 
+  const getDesktopNavItems = () => {
+    if (user) {
+      // For authenticated users, show: Home, Mission, Community, Radio, Vault, Dashboard
+      return navigationItems.slice(0, 6)
+    } else {
+      // For unauthenticated users, show: Home, Mission, Community, Radio, Vault, About
+      return [
+        navigationItems[0], // Home
+        navigationItems[1], // Mission
+        navigationItems[2], // Community
+        navigationItems[3], // Radio
+        navigationItems[4], // Vault
+        navigationItems[12], // About
+      ]
+    }
+  }
+
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
       <div className="container mx-auto px-4">
@@ -89,8 +108,9 @@ export function UnifiedNavigation() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-1">
-            {navigationItems.slice(0, 6).map((item) => {
-              const isActive = pathname === item.href
+            {getDesktopNavItems().map((item) => {
+              const isActive =
+                pathname === item.href || (item.href === "/dashboard" && pathname?.startsWith("/dashboard"))
               return (
                 <Button
                   key={item.name}
@@ -226,7 +246,8 @@ export function UnifiedNavigation() {
                   {/* Navigation Items */}
                   <div className="space-y-2">
                     {navigationItems.map((item) => {
-                      const isActive = pathname === item.href
+                      const isActive =
+                        pathname === item.href || (item.href === "/dashboard" && pathname?.startsWith("/dashboard"))
                       return (
                         <Button
                           key={item.name}
