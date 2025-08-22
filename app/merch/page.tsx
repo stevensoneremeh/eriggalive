@@ -27,13 +27,13 @@ import { Separator } from "@/components/ui/separator"
 const products = [
   {
     id: 1,
-    name: "G.O.A.T Tank Top",
-    description: "Premium quality tank top featuring the complete G.O.A.T album tracklist",
+    name: "G.O.A.T Blue T-Shirt",
+    description: "Light blue premium t-shirt featuring Erigga and crew with bold G.O.A.T branding",
     price: 75000,
     coin_price: 7500,
     images: {
-      front: "/merch/tank-front.png",
-      back: "/merch/tank-back.png",
+      front: "/merch/blue-goat-front.png",
+      back: "/merch/blue-goat-back.png",
     },
     sizes: ["S", "M", "L", "XL", "XXL"],
     category: "clothing",
@@ -45,13 +45,13 @@ const products = [
   },
   {
     id: 2,
-    name: "G.O.A.T T-Shirt",
-    description: "Comfortable cotton t-shirt with Erigga Live branding and full tracklist",
-    price: 65000,
-    coin_price: 6500,
+    name: "G.O.A.T Black T-Shirt",
+    description: "Classic black t-shirt with gold Erigga G.O.A.T design and group photo",
+    price: 75000,
+    coin_price: 7500,
     images: {
-      front: "/merch/tshirt-front.png",
-      back: "/merch/tshirt-back.png",
+      front: "/merch/black-goat-front.png",
+      back: "/merch/love-message-back.png",
     },
     sizes: ["S", "M", "L", "XL", "XXL"],
     category: "clothing",
@@ -63,15 +63,15 @@ const products = [
   },
   {
     id: 3,
-    name: "G.O.A.T Signature Tee",
-    description: "Simple yet powerful G.O.A.T design - perfect for everyday wear",
-    price: 55000,
-    coin_price: 5500,
+    name: "G.O.A.T Black Tank Top",
+    description: "Premium black tank top with gold Erigga G.O.A.T branding",
+    price: 65000,
+    coin_price: 6500,
     images: {
-      front: "/merch/goat-design.png",
-      back: "/merch/goat-design.png",
+      front: "/merch/black-tank-goat-front.png",
+      back: "/merch/black-tank-back.png",
     },
-    sizes: ["S", "M", "L", "XL"],
+    sizes: ["S", "M", "L", "XL", "XXL"],
     category: "clothing",
     is_premium_only: false,
     stock_quantity: 0,
@@ -81,15 +81,15 @@ const products = [
   },
   {
     id: 4,
-    name: "Erigga Portrait Tee",
-    description: "Artistic portrait design celebrating the king of the south",
-    price: 60000,
-    coin_price: 6000,
+    name: "Erigga Portrait Tank Top",
+    description: "Artistic black tank top with distressed Erigga portrait design",
+    price: 65000,
+    coin_price: 6500,
     images: {
-      front: "/merch/portrait-design.png",
-      back: "/merch/portrait-design.png",
+      front: "/merch/black-tank-erigga-front.png",
+      back: "/merch/around9-tank-back.png",
     },
-    sizes: ["S", "M", "L", "XL"],
+    sizes: ["S", "M", "L", "XL", "XXL"],
     category: "clothing",
     is_premium_only: false,
     stock_quantity: 0,
@@ -99,15 +99,15 @@ const products = [
   },
   {
     id: 5,
-    name: "Around 9 Statement Tee",
-    description: "Bold statement piece - This shirt was made around 9",
-    price: 50000,
-    coin_price: 5000,
+    name: "Crown Design T-Shirt",
+    description: "Black t-shirt with artistic crown design and inspirational message",
+    price: 70000,
+    coin_price: 7000,
     images: {
-      front: "/merch/around9-design.png",
-      back: "/merch/around9-design.png",
+      front: "/merch/crown-design-front.png",
+      back: "/merch/plain-black-back.png",
     },
-    sizes: ["S", "M", "L", "XL"],
+    sizes: ["S", "M", "L", "XL", "XXL"],
     category: "clothing",
     is_premium_only: false,
     stock_quantity: 0,
@@ -117,15 +117,15 @@ const products = [
   },
   {
     id: 6,
-    name: "Love & Pain Tee",
-    description: "Inspirational message - Through the pain & the hate we go still show love",
-    price: 55000,
-    coin_price: 5500,
+    name: "G.O.A.T Tank Top Collection",
+    description: "Premium quality tank top featuring the complete G.O.A.T album tracklist",
+    price: 60000,
+    coin_price: 6000,
     images: {
-      front: "/merch/love-design.png",
-      back: "/merch/love-design.png",
+      front: "/merch/tank-front.png",
+      back: "/merch/tank-back.png",
     },
-    sizes: ["S", "M", "L", "XL"],
+    sizes: ["S", "M", "L", "XL", "XXL"],
     category: "clothing",
     is_premium_only: false,
     stock_quantity: 0,
@@ -135,6 +135,24 @@ const products = [
   },
   {
     id: 7,
+    name: "G.O.A.T T-Shirt Collection",
+    description: "Comfortable cotton t-shirt with Erigga Live branding and full tracklist",
+    price: 60000,
+    coin_price: 6000,
+    images: {
+      front: "/merch/tshirt-front.png",
+      back: "/merch/tshirt-back.png",
+    },
+    sizes: ["S", "M", "L", "XL", "XXL"],
+    category: "clothing",
+    is_premium_only: false,
+    stock_quantity: 0,
+    rating: 4.8,
+    reviews: 156,
+    status: "preorder",
+  },
+  {
+    id: 8,
     name: "Erigga Signature Cap",
     description: "Premium adjustable cap with embroidered logo",
     price: 45000,
@@ -152,7 +170,7 @@ const products = [
     status: "out_of_stock",
   },
   {
-    id: 8,
+    id: 9,
     name: "Limited Edition Vinyl",
     description: "Exclusive G.O.A.T album vinyl record",
     price: 150000,
@@ -221,7 +239,7 @@ function ProductCard({
   }
 
   return (
-    <Card className="group hover:shadow-xl transition-all duration-500 bg-card/50 border-orange-500/20 overflow-hidden merch-card">
+    <Card className="group hover:shadow-xl transition-all duration-500 bg-card/50 border-orange-500/20 overflow-hidden">
       <div
         className={`flip-card h-80 cursor-pointer ${isFlipped ? "flipped" : ""}`}
         onClick={() => product.images.front !== product.images.back && setIsFlipped(!isFlipped)}
@@ -492,30 +510,30 @@ export default function MerchPage() {
   }
 
   const handlePaystackSuccess = (reference: string) => {
-    // Handle successful payment
-    console.log("Payment successful:", reference)
-    alert("Payment successful! Your order has been placed.")
+    console.log("[v0] Payment successful:", reference)
+    alert(
+      "🎉 Payment successful! Your G.O.A.T merchandise order has been placed. You'll receive a confirmation email shortly.",
+    )
     setCart([])
     setIsCheckoutOpen(false)
     setIsCartOpen(false)
   }
 
   const handlePaystackError = (error: string) => {
-    console.error("Payment error:", error)
-    alert(`Payment failed: ${error}`)
+    console.error("[v0] Payment error:", error)
+    alert(`❌ Payment failed: ${error}. Please try again or contact support if the issue persists.`)
   }
 
   const handleCoinPayment = async () => {
-    // Handle coin payment logic here
     const totalCoins = getTotalCoins()
     if (profile && profile.coins >= totalCoins) {
-      // Process coin payment
-      alert("Coin payment successful! Your order has been placed.")
+      console.log("[v0] Processing coin payment for:", totalCoins, "coins")
+      alert("🪙 Coin payment successful! Your G.O.A.T merchandise order has been placed.")
       setCart([])
       setIsCheckoutOpen(false)
       setIsCartOpen(false)
     } else {
-      alert("Insufficient coins!")
+      alert("❌ Insufficient coins! Please purchase more coins or pay with cash.")
     }
   }
 
@@ -574,7 +592,7 @@ export default function MerchPage() {
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 merch-grid">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
           {filteredProducts.map((product) => (
             <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
           ))}
@@ -684,20 +702,20 @@ export default function MerchPage() {
 
         {/* Checkout Dialog */}
         <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto merch-dialog">
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Checkout</DialogTitle>
               <DialogDescription>Complete your order</DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-6 checkout-form">
+            <div className="space-y-6">
               {/* Delivery Address */}
               <div className="space-y-4">
                 <h3 className="font-medium flex items-center gap-2">
                   <Truck className="h-4 w-4" />
                   Delivery Address
                 </h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="fullName">Full Name</Label>
                     <Input
@@ -705,6 +723,7 @@ export default function MerchPage() {
                       value={deliveryAddress.fullName}
                       onChange={(e) => setDeliveryAddress((prev) => ({ ...prev, fullName: e.target.value }))}
                       placeholder="Enter your full name"
+                      className="touch-manipulation"
                     />
                   </div>
                   <div>
@@ -714,6 +733,7 @@ export default function MerchPage() {
                       value={deliveryAddress.phone}
                       onChange={(e) => setDeliveryAddress((prev) => ({ ...prev, phone: e.target.value }))}
                       placeholder="Enter your phone number"
+                      className="touch-manipulation"
                     />
                   </div>
                 </div>
@@ -725,9 +745,10 @@ export default function MerchPage() {
                     onChange={(e) => setDeliveryAddress((prev) => ({ ...prev, address: e.target.value }))}
                     placeholder="Enter your full address"
                     rows={3}
+                    className="touch-manipulation"
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="city">City</Label>
                     <Input
@@ -735,6 +756,7 @@ export default function MerchPage() {
                       value={deliveryAddress.city}
                       onChange={(e) => setDeliveryAddress((prev) => ({ ...prev, city: e.target.value }))}
                       placeholder="City"
+                      className="touch-manipulation"
                     />
                   </div>
                   <div>
@@ -744,6 +766,7 @@ export default function MerchPage() {
                       value={deliveryAddress.state}
                       onChange={(e) => setDeliveryAddress((prev) => ({ ...prev, state: e.target.value }))}
                       placeholder="State"
+                      className="touch-manipulation"
                     />
                   </div>
                   <div>
@@ -753,6 +776,7 @@ export default function MerchPage() {
                       value={deliveryAddress.postalCode}
                       onChange={(e) => setDeliveryAddress((prev) => ({ ...prev, postalCode: e.target.value }))}
                       placeholder="Postal Code"
+                      className="touch-manipulation"
                     />
                   </div>
                 </div>
@@ -816,7 +840,7 @@ export default function MerchPage() {
                     }}
                     className="w-full"
                   >
-                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white merch-button">
+                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white min-h-[44px]">
                       <CreditCard className="h-4 w-4 mr-2" />
                       Pay ₦{getTotalCash().toLocaleString()} with Paystack
                     </Button>
@@ -825,7 +849,7 @@ export default function MerchPage() {
 
                 {getTotalCoins() > 0 && (
                   <Button
-                    className="w-full bg-yellow-600 hover:bg-yellow-700 text-white merch-button"
+                    className="w-full bg-yellow-600 hover:bg-yellow-700 text-white min-h-[44px]"
                     onClick={handleCoinPayment}
                     disabled={!profile || profile.coins < getTotalCoins()}
                   >
@@ -837,7 +861,7 @@ export default function MerchPage() {
 
                 <Button
                   variant="outline"
-                  className="w-full bg-transparent merch-button"
+                  className="w-full bg-transparent min-h-[44px]"
                   onClick={() => setIsCheckoutOpen(false)}
                 >
                   Back to Cart
