@@ -114,37 +114,6 @@
   .pulse-glow {
     animation: pulse-glow 2s ease-in-out infinite;
   }
-
-  /* 3D Flip Animation for Merch Cards */
-  .flip-card {
-    perspective: 1000px;
-  }
-
-  .flip-card-inner {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    text-align: center;
-    transition: transform 0.8s;
-    transform-style: preserve-3d;
-  }
-
-  .flip-card.flipped .flip-card-inner {
-    transform: rotateY(180deg);
-  }
-
-  .flip-card-front,
-  .flip-card-back {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    -webkit-backface-visibility: hidden;
-    backface-visibility: hidden;
-  }
-
-  .flip-card-back {
-    transform: rotateY(180deg);
-  }
 }
 
 /* Added premium animations */
@@ -208,63 +177,6 @@
   .touch-manipulation {
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
-  }
-
-  /* Enhanced mobile responsiveness for merch */
-  .merch-grid {
-    grid-template-columns: repeat(1, 1fr);
-    gap: 1rem;
-  }
-
-  .merch-card {
-    max-width: 100%;
-  }
-
-  .flip-card-inner {
-    transition: transform 0.6s; /* Faster animation on mobile */
-  }
-
-  /* Better touch targets for mobile */
-  .merch-button {
-    min-height: 44px;
-    padding: 12px 16px;
-  }
-
-  /* Improved dialog sizing on mobile */
-  .merch-dialog {
-    max-width: 95vw;
-    max-height: 90vh;
-  }
-
-  /* Enhanced cart display on mobile */
-  .cart-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-
-  .cart-item-image {
-    width: 60px;
-    height: 60px;
-  }
-
-  .cart-controls {
-    align-self: flex-end;
-  }
-}
-
-/* Improved checkout form on mobile */
-@media (max-width: 640px) {
-  .checkout-form .grid-cols-2 {
-    grid-template-columns: 1fr;
-  }
-
-  .checkout-form .grid-cols-3 {
-    grid-template-columns: 1fr;
-  }
-
-  .payment-method-card {
-    padding: 1rem;
   }
 }
 

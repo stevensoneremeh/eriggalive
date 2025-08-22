@@ -27,13 +27,13 @@ import { Separator } from "@/components/ui/separator"
 const products = [
   {
     id: 1,
-    name: "G.O.A.T Blue T-Shirt",
-    description: "Light blue premium t-shirt featuring Erigga and crew with bold G.O.A.T branding",
+    name: "G.O.A.T Tank Top",
+    description: "Premium quality tank top featuring the complete G.O.A.T album tracklist",
     price: 75000,
     coin_price: 7500,
     images: {
-      front: "/merch/blue-goat-front.png",
-      back: "/merch/blue-goat-back.png",
+      front: "/merch/tank-front.png",
+      back: "/merch/tank-back.png",
     },
     sizes: ["S", "M", "L", "XL", "XXL"],
     category: "clothing",
@@ -45,13 +45,13 @@ const products = [
   },
   {
     id: 2,
-    name: "G.O.A.T Black T-Shirt",
-    description: "Classic black t-shirt with gold Erigga G.O.A.T design and group photo",
-    price: 75000,
-    coin_price: 7500,
+    name: "G.O.A.T T-Shirt",
+    description: "Comfortable cotton t-shirt with Erigga Live branding and full tracklist",
+    price: 65000,
+    coin_price: 6500,
     images: {
-      front: "/merch/black-goat-front.png",
-      back: "/merch/love-message-back.png",
+      front: "/merch/tshirt-front.png",
+      back: "/merch/tshirt-back.png",
     },
     sizes: ["S", "M", "L", "XL", "XXL"],
     category: "clothing",
@@ -63,15 +63,15 @@ const products = [
   },
   {
     id: 3,
-    name: "G.O.A.T Black Tank Top",
-    description: "Premium black tank top with gold Erigga G.O.A.T branding",
-    price: 65000,
-    coin_price: 6500,
+    name: "G.O.A.T Signature Tee",
+    description: "Simple yet powerful G.O.A.T design - perfect for everyday wear",
+    price: 55000,
+    coin_price: 5500,
     images: {
-      front: "/merch/black-tank-goat-front.png",
-      back: "/merch/black-tank-back.png",
+      front: "/merch/goat-design.png",
+      back: "/merch/goat-design.png",
     },
-    sizes: ["S", "M", "L", "XL", "XXL"],
+    sizes: ["S", "M", "L", "XL"],
     category: "clothing",
     is_premium_only: false,
     stock_quantity: 0,
@@ -81,15 +81,15 @@ const products = [
   },
   {
     id: 4,
-    name: "Erigga Portrait Tank Top",
-    description: "Artistic black tank top with distressed Erigga portrait design",
-    price: 65000,
-    coin_price: 6500,
+    name: "Erigga Portrait Tee",
+    description: "Artistic portrait design celebrating the king of the south",
+    price: 60000,
+    coin_price: 6000,
     images: {
-      front: "/merch/black-tank-erigga-front.png",
-      back: "/merch/around9-tank-back.png",
+      front: "/merch/portrait-design.png",
+      back: "/merch/portrait-design.png",
     },
-    sizes: ["S", "M", "L", "XL", "XXL"],
+    sizes: ["S", "M", "L", "XL"],
     category: "clothing",
     is_premium_only: false,
     stock_quantity: 0,
@@ -99,15 +99,15 @@ const products = [
   },
   {
     id: 5,
-    name: "Crown Design T-Shirt",
-    description: "Black t-shirt with artistic crown design and inspirational message",
-    price: 70000,
-    coin_price: 7000,
+    name: "Around 9 Statement Tee",
+    description: "Bold statement piece - This shirt was made around 9",
+    price: 50000,
+    coin_price: 5000,
     images: {
-      front: "/merch/crown-design-front.png",
-      back: "/merch/plain-black-back.png",
+      front: "/merch/around9-design.png",
+      back: "/merch/around9-design.png",
     },
-    sizes: ["S", "M", "L", "XL", "XXL"],
+    sizes: ["S", "M", "L", "XL"],
     category: "clothing",
     is_premium_only: false,
     stock_quantity: 0,
@@ -117,15 +117,15 @@ const products = [
   },
   {
     id: 6,
-    name: "G.O.A.T Tank Top Collection",
-    description: "Premium quality tank top featuring the complete G.O.A.T album tracklist",
-    price: 60000,
-    coin_price: 6000,
+    name: "Love & Pain Tee",
+    description: "Inspirational message - Through the pain & the hate we go still show love",
+    price: 55000,
+    coin_price: 5500,
     images: {
-      front: "/merch/tank-front.png",
-      back: "/merch/tank-back.png",
+      front: "/merch/love-design.png",
+      back: "/merch/love-design.png",
     },
-    sizes: ["S", "M", "L", "XL", "XXL"],
+    sizes: ["S", "M", "L", "XL"],
     category: "clothing",
     is_premium_only: false,
     stock_quantity: 0,
@@ -135,24 +135,6 @@ const products = [
   },
   {
     id: 7,
-    name: "G.O.A.T T-Shirt Collection",
-    description: "Comfortable cotton t-shirt with Erigga Live branding and full tracklist",
-    price: 60000,
-    coin_price: 6000,
-    images: {
-      front: "/merch/tshirt-front.png",
-      back: "/merch/tshirt-back.png",
-    },
-    sizes: ["S", "M", "L", "XL", "XXL"],
-    category: "clothing",
-    is_premium_only: false,
-    stock_quantity: 0,
-    rating: 4.8,
-    reviews: 156,
-    status: "preorder",
-  },
-  {
-    id: 8,
     name: "Erigga Signature Cap",
     description: "Premium adjustable cap with embroidered logo",
     price: 45000,
@@ -170,7 +152,7 @@ const products = [
     status: "out_of_stock",
   },
   {
-    id: 9,
+    id: 8,
     name: "Limited Edition Vinyl",
     description: "Exclusive G.O.A.T album vinyl record",
     price: 150000,
@@ -241,12 +223,14 @@ function ProductCard({
   return (
     <Card className="group hover:shadow-xl transition-all duration-500 bg-card/50 border-orange-500/20 overflow-hidden">
       <div
-        className={`flip-card h-80 cursor-pointer ${isFlipped ? "flipped" : ""}`}
+        className="relative h-80 cursor-pointer perspective-1000"
         onClick={() => product.images.front !== product.images.back && setIsFlipped(!isFlipped)}
       >
-        <div className="flip-card-inner">
+        <div
+          className={`relative w-full h-full transition-transform duration-700 transform-style-preserve-3d ${isFlipped ? "rotate-y-180" : ""}`}
+        >
           {/* Front */}
-          <div className="flip-card-front">
+          <div className="absolute inset-0 backface-hidden">
             <img
               src={product.images.front || "/placeholder.svg"}
               alt={`${product.name} - Front`}
@@ -261,7 +245,7 @@ function ProductCard({
           </div>
 
           {/* Back */}
-          <div className="flip-card-back">
+          <div className="absolute inset-0 backface-hidden rotate-y-180">
             <img
               src={product.images.back || "/placeholder.svg"}
               alt={`${product.name} - Back`}
@@ -277,7 +261,7 @@ function ProductCard({
         </div>
 
         {/* Status badges */}
-        <div className="absolute top-2 left-2 flex flex-col gap-2 z-10">
+        <div className="absolute top-2 left-2 flex flex-col gap-2">
           {product.status === "preorder" && <Badge className="bg-blue-500 text-white">PREORDER</Badge>}
           {product.status === "out_of_stock" && <Badge className="bg-gray-500 text-white">OUT OF STOCK</Badge>}
           {product.is_premium_only && (
@@ -285,7 +269,7 @@ function ProductCard({
           )}
         </div>
 
-        <Button variant="ghost" size="icon" className="absolute top-2 right-2 bg-white/80 hover:bg-white z-10">
+        <Button variant="ghost" size="icon" className="absolute top-2 right-2 bg-white/80 hover:bg-white">
           <Heart className="h-4 w-4" />
         </Button>
       </div>
@@ -323,12 +307,12 @@ function ProductCard({
         {canPurchase() ? (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full bg-orange-500 hover:bg-orange-600 text-black merch-button">
+              <Button className="w-full bg-orange-500 hover:bg-orange-600 text-black">
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 {product.status === "preorder" ? "Preorder Now" : "Add to Cart"}
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md merch-dialog">
+            <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Add to Cart</DialogTitle>
                 <DialogDescription>Configure your purchase options for {product.name}</DialogDescription>
@@ -422,7 +406,7 @@ function ProductCard({
             </DialogContent>
           </Dialog>
         ) : (
-          <Button disabled className="w-full merch-button">
+          <Button disabled className="w-full">
             {product.status === "out_of_stock"
               ? "Out of Stock"
               : `${product.required_tier?.toUpperCase()} Members Only`}
@@ -510,30 +494,30 @@ export default function MerchPage() {
   }
 
   const handlePaystackSuccess = (reference: string) => {
-    console.log("[v0] Payment successful:", reference)
-    alert(
-      "🎉 Payment successful! Your G.O.A.T merchandise order has been placed. You'll receive a confirmation email shortly.",
-    )
+    // Handle successful payment
+    console.log("Payment successful:", reference)
+    alert("Payment successful! Your order has been placed.")
     setCart([])
     setIsCheckoutOpen(false)
     setIsCartOpen(false)
   }
 
   const handlePaystackError = (error: string) => {
-    console.error("[v0] Payment error:", error)
-    alert(`❌ Payment failed: ${error}. Please try again or contact support if the issue persists.`)
+    console.error("Payment error:", error)
+    alert(`Payment failed: ${error}`)
   }
 
   const handleCoinPayment = async () => {
+    // Handle coin payment logic here
     const totalCoins = getTotalCoins()
     if (profile && profile.coins >= totalCoins) {
-      console.log("[v0] Processing coin payment for:", totalCoins, "coins")
-      alert("🪙 Coin payment successful! Your G.O.A.T merchandise order has been placed.")
+      // Process coin payment
+      alert("Coin payment successful! Your order has been placed.")
       setCart([])
       setIsCheckoutOpen(false)
       setIsCartOpen(false)
     } else {
-      alert("❌ Insufficient coins! Please purchase more coins or pay with cash.")
+      alert("Insufficient coins!")
     }
   }
 
@@ -592,7 +576,7 @@ export default function MerchPage() {
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {filteredProducts.map((product) => (
             <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
           ))}
@@ -600,7 +584,7 @@ export default function MerchPage() {
 
         {/* Cart Dialog */}
         <Dialog open={isCartOpen} onOpenChange={setIsCartOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto merch-dialog">
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Shopping Cart</DialogTitle>
               <DialogDescription>Review your items before checkout</DialogDescription>
@@ -614,11 +598,11 @@ export default function MerchPage() {
             ) : (
               <div className="space-y-4">
                 {cart.map((item, index) => (
-                  <div key={index} className="flex items-center gap-4 p-4 border rounded-lg cart-item">
+                  <div key={index} className="flex items-center gap-4 p-4 border rounded-lg">
                     <img
                       src={item.product.images.front || "/placeholder.svg"}
                       alt={item.product.name}
-                      className="w-16 h-16 object-cover rounded cart-item-image"
+                      className="w-16 h-16 object-cover rounded"
                     />
                     <div className="flex-1">
                       <h4 className="font-medium">{item.product.name}</h4>
@@ -646,7 +630,7 @@ export default function MerchPage() {
                         </Button>
                       </div>
                     </div>
-                    <div className="text-right cart-controls">
+                    <div className="text-right">
                       <p className="font-medium">
                         {item.paymentMethod === "coins"
                           ? `${(item.product.coin_price * item.quantity).toLocaleString()} coins`
@@ -715,7 +699,7 @@ export default function MerchPage() {
                   <Truck className="h-4 w-4" />
                   Delivery Address
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="fullName">Full Name</Label>
                     <Input
@@ -723,7 +707,6 @@ export default function MerchPage() {
                       value={deliveryAddress.fullName}
                       onChange={(e) => setDeliveryAddress((prev) => ({ ...prev, fullName: e.target.value }))}
                       placeholder="Enter your full name"
-                      className="touch-manipulation"
                     />
                   </div>
                   <div>
@@ -733,7 +716,6 @@ export default function MerchPage() {
                       value={deliveryAddress.phone}
                       onChange={(e) => setDeliveryAddress((prev) => ({ ...prev, phone: e.target.value }))}
                       placeholder="Enter your phone number"
-                      className="touch-manipulation"
                     />
                   </div>
                 </div>
@@ -745,10 +727,9 @@ export default function MerchPage() {
                     onChange={(e) => setDeliveryAddress((prev) => ({ ...prev, address: e.target.value }))}
                     placeholder="Enter your full address"
                     rows={3}
-                    className="touch-manipulation"
                   />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="city">City</Label>
                     <Input
@@ -756,7 +737,6 @@ export default function MerchPage() {
                       value={deliveryAddress.city}
                       onChange={(e) => setDeliveryAddress((prev) => ({ ...prev, city: e.target.value }))}
                       placeholder="City"
-                      className="touch-manipulation"
                     />
                   </div>
                   <div>
@@ -766,7 +746,6 @@ export default function MerchPage() {
                       value={deliveryAddress.state}
                       onChange={(e) => setDeliveryAddress((prev) => ({ ...prev, state: e.target.value }))}
                       placeholder="State"
-                      className="touch-manipulation"
                     />
                   </div>
                   <div>
@@ -776,7 +755,6 @@ export default function MerchPage() {
                       value={deliveryAddress.postalCode}
                       onChange={(e) => setDeliveryAddress((prev) => ({ ...prev, postalCode: e.target.value }))}
                       placeholder="Postal Code"
-                      className="touch-manipulation"
                     />
                   </div>
                 </div>
@@ -828,19 +806,12 @@ export default function MerchPage() {
                       cart: JSON.stringify(cart.filter((item) => item.paymentMethod === "cash")),
                       delivery_address: JSON.stringify(deliveryAddress),
                       user_id: user?.id,
-                      order_type: "merch_preorder",
                     }}
-                    onSuccess={(reference) => {
-                      console.log("[v0] Paystack payment successful:", reference)
-                      handlePaystackSuccess(reference)
-                    }}
-                    onError={(error) => {
-                      console.log("[v0] Paystack payment error:", error)
-                      handlePaystackError(error)
-                    }}
+                    onSuccess={handlePaystackSuccess}
+                    onError={handlePaystackError}
                     className="w-full"
                   >
-                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white min-h-[44px]">
+                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
                       <CreditCard className="h-4 w-4 mr-2" />
                       Pay ₦{getTotalCash().toLocaleString()} with Paystack
                     </Button>
@@ -849,7 +820,7 @@ export default function MerchPage() {
 
                 {getTotalCoins() > 0 && (
                   <Button
-                    className="w-full bg-yellow-600 hover:bg-yellow-700 text-white min-h-[44px]"
+                    className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
                     onClick={handleCoinPayment}
                     disabled={!profile || profile.coins < getTotalCoins()}
                   >
@@ -859,11 +830,7 @@ export default function MerchPage() {
                   </Button>
                 )}
 
-                <Button
-                  variant="outline"
-                  className="w-full bg-transparent min-h-[44px]"
-                  onClick={() => setIsCheckoutOpen(false)}
-                >
+                <Button variant="outline" className="w-full bg-transparent" onClick={() => setIsCheckoutOpen(false)}>
                   Back to Cart
                 </Button>
               </div>
@@ -918,52 +885,17 @@ export default function MerchPage() {
       </div>
 
       <style jsx>{`
-        .flip-card {
+        .perspective-1000 {
           perspective: 1000px;
         }
-        .flip-card-inner {
-          position: relative;
-          width: 100%;
-          height: 100%;
-          text-align: center;
-          transition: transform 0.6s;
+        .transform-style-preserve-3d {
           transform-style: preserve-3d;
         }
-        .flip-card-front, .flip-card-back {
-          position: absolute;
-          width: 100%;
-          height: 100%;
+        .backface-hidden {
           backface-visibility: hidden;
         }
-        .flip-card-front {
-          z-index: 2;
-        }
-        .flip-card-back {
+        .rotate-y-180 {
           transform: rotateY(180deg);
-        }
-        .flipped .flip-card-inner {
-          transform: rotateY(180deg);
-        }
-        .merch-button {
-          /* Additional styles for buttons */
-        }
-        .merch-dialog {
-          /* Additional styles for dialogs */
-        }
-        .merch-grid {
-          /* Additional styles for grid */
-        }
-        .cart-item {
-          /* Additional styles for cart items */
-        }
-        .cart-item-image {
-          /* Additional styles for cart item images */
-        }
-        .cart-controls {
-          /* Additional styles for cart controls */
-        }
-        .checkout-form {
-          /* Additional styles for checkout form */
         }
       `}</style>
     </div>
