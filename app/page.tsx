@@ -11,7 +11,6 @@ import { Music, Video, Users, ShoppingBag, Calendar, Play, Radio, Star, ArrowRig
 import { cn } from "@/lib/utils"
 import { SafeHeroVideoCarousel } from "@/components/safe-hero-video-carousel"
 import { getOptimizedVideoSources } from "@/utils/video-utils"
-import EriggaRadio from "@/components/erigga-radio"
 
 export default function HomePage() {
   const { theme } = useTheme()
@@ -196,15 +195,6 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen overflow-x-hidden">
-      {/* Erigga Radio Widget - Enhanced positioning */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.2 }}
-      >
-        <EriggaRadio />
-      </motion.div>
-
       <section className="relative h-[100vh] w-full overflow-hidden">
         {/* Background with enhanced parallax effect */}
         <motion.div className="absolute inset-0" style={{ y: heroY, scale: heroScale }}>
@@ -228,6 +218,7 @@ export default function HomePage() {
         <motion.div className="absolute inset-0 flex items-center justify-center z-10" style={{ opacity: heroOpacity }}>
           <div className="text-center max-w-6xl px-4">
             <motion.div
+              className="glass-card rounded-3xl p-8 md:p-16 backdrop-blur-xl border border-white/20 shadow-2xl"
               initial={{ opacity: 0, y: 60, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{
@@ -235,7 +226,6 @@ export default function HomePage() {
                 delay: prefersReducedMotion ? 0 : 0.3,
                 ease: [0.25, 0.46, 0.45, 0.94],
               }}
-              className="glass-card rounded-3xl p-8 md:p-16 backdrop-blur-xl border border-white/20 shadow-2xl"
             >
               <motion.h1
                 className="text-5xl md:text-8xl font-black text-white mb-8 drop-shadow-2xl leading-tight"

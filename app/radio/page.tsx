@@ -37,6 +37,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { createClient } from "@/lib/supabase/client"
+import EriggaRadio from "@/components/erigga-radio"
 
 interface Track {
   id: string
@@ -604,6 +605,14 @@ export default function RadioPage() {
               )}
             </div>
           </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+        >
+          <EriggaRadio />
         </motion.div>
 
         <AnimatePresence>
