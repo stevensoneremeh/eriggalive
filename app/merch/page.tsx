@@ -221,16 +221,14 @@ function ProductCard({
   }
 
   return (
-    <Card className="group hover:shadow-xl transition-all duration-500 bg-card/50 border-orange-500/20 overflow-hidden">
+    <Card className="group hover:shadow-xl transition-all duration-500 bg-card/50 border-orange-500/20 overflow-hidden merch-card">
       <div
-        className="relative h-80 cursor-pointer perspective-1000"
+        className={`flip-card h-80 cursor-pointer ${isFlipped ? "flipped" : ""}`}
         onClick={() => product.images.front !== product.images.back && setIsFlipped(!isFlipped)}
       >
-        <div
-          className={`relative w-full h-full transition-transform duration-700 transform-style-preserve-3d ${isFlipped ? "rotate-y-180" : ""}`}
-        >
+        <div className="flip-card-inner">
           {/* Front */}
-          <div className="absolute inset-0 backface-hidden">
+          <div className="flip-card-front">
             <img
               src={product.images.front || "/placeholder.svg"}
               alt={`${product.name} - Front`}
@@ -245,7 +243,7 @@ function ProductCard({
           </div>
 
           {/* Back */}
-          <div className="absolute inset-0 backface-hidden rotate-y-180">
+          <div className="flip-card-back">
             <img
               src={product.images.back || "/placeholder.svg"}
               alt={`${product.name} - Back`}
@@ -261,7 +259,7 @@ function ProductCard({
         </div>
 
         {/* Status badges */}
-        <div className="absolute top-2 left-2 flex flex-col gap-2">
+        <div className="absolute top-2 left-2 flex flex-col gap-2 z-10">
           {product.status === "preorder" && <Badge className="bg-blue-500 text-white">PREORDER</Badge>}
           {product.status === "out_of_stock" && <Badge className="bg-gray-500 text-white">OUT OF STOCK</Badge>}
           {product.is_premium_only && (
@@ -269,7 +267,7 @@ function ProductCard({
           )}
         </div>
 
-        <Button variant="ghost" size="icon" className="absolute top-2 right-2 bg-white/80 hover:bg-white">
+        <Button variant="ghost" size="icon" className="absolute top-2 right-2 bg-white/80 hover:bg-white z-10">
           <Heart className="h-4 w-4" />
         </Button>
       </div>
@@ -307,12 +305,12 @@ function ProductCard({
         {canPurchase() ? (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full bg-orange-500 hover:bg-orange-600 text-black">
+              <Button className="w-full bg-orange-500 hover:bg-orange-600 text-black merch-button">
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 {product.status === "preorder" ? "Preorder Now" : "Add to Cart"}
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md merch-dialog">
               <DialogHeader>
                 <DialogTitle>Add to Cart</DialogTitle>
                 <DialogDescription>Configure your purchase options for {product.name}</DialogDescription>
@@ -406,7 +404,7 @@ function ProductCard({
             </DialogContent>
           </Dialog>
         ) : (
-          <Button disabled className="w-full">
+          <Button disabled className="w-full merch-button">
             {product.status === "out_of_stock"
               ? "Out of Stock"
               : `${product.required_tier?.toUpperCase()} Members Only`}
@@ -576,7 +574,7 @@ export default function MerchPage() {
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 merch-grid">
           {filteredProducts.map((product) => (
             <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
           ))}
@@ -584,7 +582,7 @@ export default function MerchPage() {
 
         {/* Cart Dialog */}
         <Dialog open={isCartOpen} onOpenChange={setIsCartOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto merch-dialog">
             <DialogHeader>
               <DialogTitle>Shopping Cart</DialogTitle>
               <DialogDescription>Review your items before checkout</DialogDescription>
@@ -598,11 +596,11 @@ export default function MerchPage() {
             ) : (
               <div className="space-y-4">
                 {cart.map((item, index) => (
-                  <div key={index} className="flex items-center gap-4 p-4 border rounded-lg">
+                  <div key={index} className="flex items-center gap-4 p-4 border rounded-lg cart-item">
                     <img
                       src={item.product.images.front || "/placeholder.svg"}
                       alt={item.product.name}
-                      className="w-16 h-16 object-cover rounded"
+                      className="w-16 h-16 object-cover rounded cart-item-image"
                     />
                     <div className="flex-1">
                       <h4 className="font-medium">{item.product.name}</h4>
@@ -630,7 +628,7 @@ export default function MerchPage() {
                         </Button>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right cart-controls">
                       <p className="font-medium">
                         {item.paymentMethod === "coins"
                           ? `${(item.product.coin_price * item.quantity).toLocaleString()} coins`
@@ -686,13 +684,13 @@ export default function MerchPage() {
 
         {/* Checkout Dialog */}
         <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto merch-dialog">
             <DialogHeader>
               <DialogTitle>Checkout</DialogTitle>
               <DialogDescription>Complete your order</DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-6">
+            <div className="space-y-6 checkout-form">
               {/* Delivery Address */}
               <div className="space-y-4">
                 <h3 className="font-medium flex items-center gap-2">
@@ -806,12 +804,19 @@ export default function MerchPage() {
                       cart: JSON.stringify(cart.filter((item) => item.paymentMethod === "cash")),
                       delivery_address: JSON.stringify(deliveryAddress),
                       user_id: user?.id,
+                      order_type: "merch_preorder",
                     }}
-                    onSuccess={handlePaystackSuccess}
-                    onError={handlePaystackError}
+                    onSuccess={(reference) => {
+                      console.log("[v0] Paystack payment successful:", reference)
+                      handlePaystackSuccess(reference)
+                    }}
+                    onError={(error) => {
+                      console.log("[v0] Paystack payment error:", error)
+                      handlePaystackError(error)
+                    }}
                     className="w-full"
                   >
-                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
+                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white merch-button">
                       <CreditCard className="h-4 w-4 mr-2" />
                       Pay ₦{getTotalCash().toLocaleString()} with Paystack
                     </Button>
@@ -820,7 +825,7 @@ export default function MerchPage() {
 
                 {getTotalCoins() > 0 && (
                   <Button
-                    className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
+                    className="w-full bg-yellow-600 hover:bg-yellow-700 text-white merch-button"
                     onClick={handleCoinPayment}
                     disabled={!profile || profile.coins < getTotalCoins()}
                   >
@@ -830,7 +835,11 @@ export default function MerchPage() {
                   </Button>
                 )}
 
-                <Button variant="outline" className="w-full bg-transparent" onClick={() => setIsCheckoutOpen(false)}>
+                <Button
+                  variant="outline"
+                  className="w-full bg-transparent merch-button"
+                  onClick={() => setIsCheckoutOpen(false)}
+                >
                   Back to Cart
                 </Button>
               </div>
@@ -885,17 +894,52 @@ export default function MerchPage() {
       </div>
 
       <style jsx>{`
-        .perspective-1000 {
+        .flip-card {
           perspective: 1000px;
         }
-        .transform-style-preserve-3d {
+        .flip-card-inner {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          text-align: center;
+          transition: transform 0.6s;
           transform-style: preserve-3d;
         }
-        .backface-hidden {
+        .flip-card-front, .flip-card-back {
+          position: absolute;
+          width: 100%;
+          height: 100%;
           backface-visibility: hidden;
         }
-        .rotate-y-180 {
+        .flip-card-front {
+          z-index: 2;
+        }
+        .flip-card-back {
           transform: rotateY(180deg);
+        }
+        .flipped .flip-card-inner {
+          transform: rotateY(180deg);
+        }
+        .merch-button {
+          /* Additional styles for buttons */
+        }
+        .merch-dialog {
+          /* Additional styles for dialogs */
+        }
+        .merch-grid {
+          /* Additional styles for grid */
+        }
+        .cart-item {
+          /* Additional styles for cart items */
+        }
+        .cart-item-image {
+          /* Additional styles for cart item images */
+        }
+        .cart-controls {
+          /* Additional styles for cart controls */
+        }
+        .checkout-form {
+          /* Additional styles for checkout form */
         }
       `}</style>
     </div>
