@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Menu, Home, Users, CreditCard, ImageIcon, Settings, LogOut, Shield, X, Scan } from "lucide-react"
+import { Menu, Home, Users, CreditCard, ImageIcon, Settings, LogOut, Shield, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 
@@ -17,7 +17,6 @@ const adminNavItems = [
   { name: "Transactions", href: "/admin/transactions", icon: CreditCard },
   { name: "Media", href: "/admin/media", icon: ImageIcon },
   { name: "Branding", href: "/admin/branding", icon: Settings },
-  { name: "Check-in Scanner", href: "/admin/checkin", icon: Scan },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
