@@ -11,6 +11,7 @@
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
     "@hookform/resolvers": "^3.3.4",
+    "@jest/globals": "latest",
     "@next/font": "13.4.19",
     "@radix-ui/react-alert-dialog": "latest",
     "@radix-ui/react-avatar": "latest",

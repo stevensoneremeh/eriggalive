@@ -22,8 +22,8 @@ declare global {
 
 const TIER_PRICES = {
   free: 0,
-  pro: 5000, // Updated to match API pricing (was 2500)
-  enterprise: 15000, // Updated to match API pricing (was 5000)
+  pro: 2500, // ₦2,500
+  enterprise: 5000, // ₦5,000
 }
 
 const TIER_FEATURES = {

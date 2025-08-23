@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type React from "react"
 
 import { motion, AnimatePresence } from "framer-motion"
@@ -30,6 +30,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createClient } from "@/lib/supabase/client"
 import { PaystackIntegration } from "@/components/paystack/paystack-integration"
+import { TicketQRDisplay } from "@/components/tickets/ticket-qr-display"
 
 interface TicketData {
   id: string
@@ -314,10 +315,10 @@ const glowVariants = {
 export default function TicketsPage() {
   const { user, profile } = useAuth()
   const [activeTab, setActiveTab] = useState("my-tickets")
-  const [tickets, setTickets] = useState<TicketData[]>(mockTickets)
-  const [events, setEvents] = useState<Event[]>(mockEvents)
+  const [tickets, setTickets] = useState<any[]>([])
+  const [events, setEvents] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState("")
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [purchaseLoading, setPurchaseLoading] = useState<string | null>(null)
   const supabase = createClient()
   const [selectedEvent, setSelectedEvent] = useState<(typeof eventsData)[0] | null>(null)
@@ -493,14 +494,82 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
     }
   }
 
+  useEffect(() => {
+    if (user) {
+      fetchUserTickets()
+      fetchEvents()
+    }
+  }, [user])
+
+  const fetchUserTickets = async () => {
+    try {
+      const { data: tickets, error } = await supabase
+        .from("tickets")
+        .select(`
+          *,
+          events (
+            title,
+            description,
+            event_date,
+            event_time,
+            venue,
+            location
+          )
+        `)
+        .eq("user_id", user?.id)
+        .order("created_at", { ascending: false })
+
+      if (error) throw error
+      setTickets(tickets || [])
+    } catch (error) {
+      console.error("Error fetching tickets:", error)
+    }
+  }
+
+  const fetchEvents = async () => {
+    try {
+      setLoading(true)
+      const { data: events, error } = await supabase
+        .from("events")
+        .select("*")
+        .eq("status", "active")
+        .gte("event_date", new Date().toISOString())
+        .order("event_date", { ascending: true })
+
+      if (error) throw error
+      setEvents(events || [])
+    } catch (error) {
+      console.error("Error fetching events:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleTicketPurchase = async (eventId: string, paymentReference: string) => {
     try {
       setPurchaseLoading(eventId)
-      // Here you would implement the ticket purchase logic
-      // For now, we'll just simulate a successful purchase
-      console.log("Purchasing ticket for event:", eventId, "with reference:", paymentReference)
 
-      // Add success notification here
+      const response = await fetch("/api/tickets/purchase", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          eventId,
+          paymentReference,
+          paymentMethod: "paystack",
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to purchase ticket")
+      }
+
+      const result = await response.json()
+
+      // Refresh tickets after successful purchase
+      await fetchUserTickets()
+
       alert("Ticket purchased successfully!")
     } catch (error) {
       console.error("Error purchasing ticket:", error)
@@ -686,20 +755,22 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
                                 <CardHeader className="pb-4">
                                   <div className="flex justify-between items-start">
                                     <div className="flex-1">
-                                      <CardTitle className="text-white text-lg mb-2">{ticket.eventTitle}</CardTitle>
+                                      <CardTitle className="text-white text-lg mb-2">{ticket.events?.title}</CardTitle>
                                       <div className="flex items-center gap-2 mb-2">
                                         <Badge className={getStatusColor(ticket.status)}>
                                           {getStatusIcon(ticket.status)}
                                           {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
                                         </Badge>
                                         <Badge variant="outline" className="text-gray-300 border-gray-500">
-                                          {ticket.ticketType}
+                                          {ticket.ticket_type}
                                         </Badge>
                                       </div>
                                     </div>
                                     <div className="text-right">
-                                      <p className="text-2xl font-bold text-white">₦{ticket.price.toLocaleString()}</p>
-                                      <p className="text-xs text-gray-400">#{ticket.id}</p>
+                                      <p className="text-2xl font-bold text-white">
+                                        {ticket.price_paid ? `₦${(ticket.price_paid / 100).toLocaleString()}` : "FREE"}
+                                      </p>
+                                      <p className="text-xs text-gray-400">#{ticket.ticket_number}</p>
                                     </div>
                                   </div>
                                 </CardHeader>
@@ -707,32 +778,31 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                                     <div className="flex items-center gap-2 text-gray-300">
                                       <Calendar className="w-4 h-4 text-purple-400" />
-                                      <span>{new Date(ticket.eventDate).toLocaleDateString()}</span>
+                                      <span>{new Date(ticket.events?.event_date).toLocaleDateString()}</span>
                                     </div>
                                     <div className="flex items-center gap-2 text-gray-300">
                                       <Clock className="w-4 h-4 text-blue-400" />
-                                      <span>{ticket.eventTime}</span>
+                                      <span>{ticket.events?.event_time}</span>
                                     </div>
                                     <div className="flex items-center gap-2 text-gray-300 sm:col-span-2">
                                       <MapPin className="w-4 h-4 text-orange-400" />
-                                      <span className="truncate">{ticket.venue}</span>
+                                      <span className="truncate">
+                                        {ticket.events?.venue}, {ticket.events?.location}
+                                      </span>
                                     </div>
                                   </div>
 
-                                  {ticket.seatNumber && (
-                                    <div className="bg-white/5 rounded-lg p-3">
-                                      <p className="text-sm text-gray-300">Seat Number</p>
-                                      <p className="text-lg font-bold text-white">{ticket.seatNumber}</p>
-                                    </div>
-                                  )}
-
-                                  {ticket.description && <p className="text-sm text-gray-300">{ticket.description}</p>}
+                                  <TicketQRDisplay ticket={ticket} />
 
                                   <div className="flex gap-2 pt-4">
                                     <Button
                                       size="sm"
                                       variant="outline"
                                       className="flex-1 border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white bg-transparent"
+                                      onClick={() => {
+                                        // Show QR code modal or expand QR display
+                                        console.log("Show QR for ticket:", ticket.id)
+                                      }}
                                     >
                                       <QrCode className="w-4 h-4 mr-2" />
                                       View QR
@@ -741,6 +811,25 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
                                       size="sm"
                                       variant="outline"
                                       className="flex-1 border-blue-500 text-blue-400 hover:bg-blue-500 hover:text-white bg-transparent"
+                                      onClick={() => {
+                                        // Download ticket functionality
+                                        const ticketData = `
+ERIGGA FAN PLATFORM - TICKET
+${ticket.events?.title}
+Venue: ${ticket.events?.venue}, ${ticket.events?.location}
+Date: ${new Date(ticket.events?.event_date).toLocaleDateString()}
+Time: ${ticket.events?.event_time}
+Ticket #: ${ticket.ticket_number}
+Status: ${ticket.status.toUpperCase()}
+                                        `
+                                        const blob = new Blob([ticketData], { type: "text/plain" })
+                                        const url = URL.createObjectURL(blob)
+                                        const a = document.createElement("a")
+                                        a.href = url
+                                        a.download = `erigga-ticket-${ticket.ticket_number}.txt`
+                                        a.click()
+                                        URL.revokeObjectURL(url)
+                                      }}
                                     >
                                       <Download className="w-4 h-4 mr-2" />
                                       Download
@@ -793,7 +882,7 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
 
                       {/* Events Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredEvents.map((event, index) => (
+                        {events.map((event, index) => (
                           <motion.div key={event.id} variants={itemVariants} whileHover={cardHoverVariants.hover}>
                             <Card className="bg-white/5 backdrop-blur-xl border-white/10 hover:bg-white/10 transition-all duration-300 overflow-hidden">
                               <div className="relative h-48 bg-gradient-to-br from-purple-500/20 to-blue-500/20">
@@ -834,35 +923,39 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
                                 <div className="space-y-2 text-sm">
                                   <div className="flex items-center gap-2 text-gray-300">
                                     <Calendar className="w-4 h-4 text-purple-400" />
-                                    <span>{new Date(event.date).toLocaleDateString()}</span>
+                                    <span>{new Date(event.event_date).toLocaleDateString()}</span>
                                   </div>
                                   <div className="flex items-center gap-2 text-gray-300">
                                     <Clock className="w-4 h-4 text-blue-400" />
-                                    <span>{event.time}</span>
+                                    <span>{event.event_time}</span>
                                   </div>
                                   <div className="flex items-center gap-2 text-gray-300">
                                     <MapPin className="w-4 h-4 text-orange-400" />
-                                    <span className="truncate">{event.venue}</span>
+                                    <span className="truncate">
+                                      {event.venue}, {event.location}
+                                    </span>
                                   </div>
                                   <div className="flex items-center gap-2 text-gray-300">
                                     <Users className="w-4 h-4 text-green-400" />
-                                    <span>{event.capacity - event.sold} spots left</span>
+                                    <span>{event.capacity - (event.tickets_sold || 0)} spots left</span>
                                   </div>
                                 </div>
 
                                 <div className="flex justify-between items-center pt-4">
                                   <div>
-                                    <p className="text-2xl font-bold text-white">₦{event.price.toLocaleString()}</p>
+                                    <p className="text-2xl font-bold text-white">
+                                      {event.price ? `₦${(event.price / 100).toLocaleString()}` : "FREE"}
+                                    </p>
                                     <p className="text-xs text-gray-400">per ticket</p>
                                   </div>
 
-                                  {event.sold >= event.capacity ? (
+                                  {(event.tickets_sold || 0) >= event.capacity ? (
                                     <Button disabled className="bg-gray-600">
                                       Sold Out
                                     </Button>
                                   ) : profile?.email ? (
                                     <PaystackIntegration
-                                      amount={event.price}
+                                      amount={event.price || 0}
                                       email={profile.email}
                                       metadata={{
                                         event_id: event.id,
