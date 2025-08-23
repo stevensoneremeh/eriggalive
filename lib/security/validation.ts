@@ -1,4 +1,5 @@
 import { z } from "zod"
+import crypto from "crypto"
 
 // Ticket purchase validation schema
 export const ticketPurchaseSchema = z.object({
@@ -45,4 +46,33 @@ export const rateLimits = {
   qrValidation: { requests: 100, window: 60000 }, // 100 scans per minute
   membershipPurchase: { requests: 3, window: 300000 }, // 3 requests per 5 minutes
   walletOperations: { requests: 10, window: 60000 }, // 10 requests per minute
+}
+
+export const generateSecureToken = (userId: string, eventId: string, ticketNumber: string): string => {
+  const timestamp = Date.now()
+  const randomBytes = crypto.randomBytes(16).toString("hex")
+  const payload = `${userId}:${eventId}:${ticketNumber}:${timestamp}`
+  const hash = crypto
+    .createHash("sha256")
+    .update(payload + randomBytes)
+    .digest("hex")
+  return `${hash.substring(0, 32)}-${timestamp.toString(36)}-${randomBytes.substring(0, 8)}`
+}
+
+export const validateSecureToken = (token: string, userId: string, eventId: string, ticketNumber: string): boolean => {
+  try {
+    const parts = token.split("-")
+    if (parts.length !== 3) return false
+
+    const [hash, timestampHex, randomPart] = parts
+    const timestamp = Number.parseInt(timestampHex, 36)
+
+    // Check if token is not too old (24 hours)
+    const maxAge = 24 * 60 * 60 * 1000
+    if (Date.now() - timestamp > maxAge) return false
+
+    return hash.length === 32 && randomPart.length === 8
+  } catch {
+    return false
+  }
 }

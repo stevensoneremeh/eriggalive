@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import type React from "react"
 
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -15,21 +14,17 @@ import {
   Clock,
   QrCode,
   Download,
-  Sparkles,
   Music,
   Gift,
-  Zap,
   Shield,
   Search,
   Filter,
   Ticket,
-  Star,
 } from "lucide-react"
 import { AuthGuard } from "@/components/auth-guard"
 import { useAuth } from "@/contexts/auth-context"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createClient } from "@/lib/supabase/client"
-import { PaystackIntegration } from "@/components/paystack/paystack-integration"
 import { TicketQRDisplay } from "@/components/tickets/ticket-qr-display"
 
 interface TicketData {
@@ -289,25 +284,8 @@ const itemVariants = {
 const cardHoverVariants = {
   hover: {
     scale: 1.02,
-    y: -5,
-    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
     transition: {
       duration: 0.2,
-    },
-  },
-}
-
-const glowVariants = {
-  animate: {
-    boxShadow: [
-      "0 0 20px rgba(168, 85, 247, 0.4)",
-      "0 0 40px rgba(168, 85, 247, 0.6)",
-      "0 0 20px rgba(168, 85, 247, 0.4)",
-    ],
-    transition: {
-      duration: 2,
-      repeat: Number.POSITIVE_INFINITY,
-      ease: "easeInOut",
     },
   },
 }
@@ -321,19 +299,15 @@ export default function TicketsPage() {
   const [loading, setLoading] = useState(true)
   const [purchaseLoading, setPurchaseLoading] = useState<string | null>(null)
   const supabase = createClient()
-  const [selectedEvent, setSelectedEvent] = useState<(typeof eventsData)[0] | null>(null)
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [showReservationModal, setShowReservationModal] = useState(false)
-  const [reservationData, setReservationData] = useState({
-    fullName: "",
-    email: "",
-    location: "",
-    password: "",
-    favoriteTrack: "",
-    message: "",
+  const filteredEvents = events.filter((event) => {
+    const query = searchQuery.toLowerCase()
+    return (
+      event.title?.toLowerCase().includes(query) ||
+      event.location?.toLowerCase().includes(query) ||
+      event.venue?.toLowerCase().includes(query) ||
+      new Date(event.event_date).toLocaleDateString().includes(query)
+    )
   })
-  const [generatedTicket, setGeneratedTicket] = useState<any>(null)
-  const [showConfetti, setShowConfetti] = useState(false)
 
   const formatPrice = (priceInKobo: number) => {
     if (priceInKobo === 0) return "FREE"
@@ -354,173 +328,59 @@ export default function TicketsPage() {
     })
   }
 
-  const handleReservation = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsProcessing(true)
-
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // Generate QR code and ticket
-      const qrCode = generateQRCode(reservationData.email, reservationData.fullName)
-      const newTicket = {
-        id: `ticket-${Date.now()}`,
-        eventId: "erigga-september-2025",
-        eventTitle: "Erigga Live – September 2025",
-        venue: "The Playground",
-        location: "Warri, Nigeria",
-        date: "2025-09-03T20:00:00Z",
-        ticketNumber: qrCode,
-        qrCode: qrCode,
-        status: "confirmed",
-        purchasedAt: new Date().toISOString(),
-        holderName: reservationData.fullName,
-        specialAccess: true,
-        reservationDetails: {
-          location: reservationData.location,
-          favoriteTrack: reservationData.favoriteTrack,
-          message: reservationData.message,
-        },
-      }
-
-      setGeneratedTicket(newTicket)
-      setShowReservationModal(false)
-      setShowConfetti(true)
-
-      // Hide confetti after 3 seconds
-      setTimeout(() => setShowConfetti(false), 3000)
-
-      // Reset form
-      setReservationData({
-        fullName: "",
-        email: "",
-        location: "",
-        password: "",
-        favoriteTrack: "",
-        message: "",
-      })
-    } catch (error) {
-      console.error("Reservation error:", error)
-    } finally {
-      setIsProcessing(false)
-    }
-  }
-
-  const handleTicketPurchaseOld = async (event: (typeof eventsData)[0]) => {
-    setIsProcessing(true)
-
-    try {
-      // Initialize Paystack payment for paid events
-      const handler = (window as any).PaystackPop.setup({
-        key: "pk_test_0123456789abcdef0123456789abcdef01234567",
-        email: "user@example.com",
-        amount: event.price,
-        currency: "NGN",
-        ref: `ticket_${event.id}_${Date.now()}`,
-        metadata: {
-          event_id: event.id,
-          event_title: event.title,
-          ticket_type: "general",
-        },
-        callback: (response: any) => {
-          console.log("Payment successful:", response)
-          alert(`Payment successful! Reference: ${response.reference}`)
-        },
-        onClose: () => {
-          console.log("Payment window closed")
-        },
-      })
-
-      handler.openIframe()
-    } catch (error) {
-      console.error("Payment error:", error)
-      alert("Payment failed. Please try again.")
-    } finally {
-      setIsProcessing(false)
-    }
-  }
-
-  const downloadTicket = (ticket: any) => {
-    const ticketData = `
-ERIGGA FAN PLATFORM - EXCLUSIVE TICKET
-${ticket.eventTitle}
-Venue: ${ticket.venue}, ${ticket.location}
-Date: ${formatDate(ticket.date)}
-Ticket #: ${ticket.ticketNumber}
-Holder: ${ticket.holderName}
-Status: ${ticket.status.toUpperCase()}
-${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
-    `
-
-    const blob = new Blob([ticketData], { type: "text/plain" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `erigga-ticket-${ticket.ticketNumber}.txt`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const allTickets = generatedTicket ? [...userTickets, generatedTicket] : userTickets
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "confirmed":
+      case "active":
         return "bg-green-500 text-white"
-      case "pending":
-        return "bg-yellow-500 text-white"
       case "used":
         return "bg-gray-500 text-white"
       case "expired":
         return "bg-red-500 text-white"
       default:
-        return "bg-gray-500 text-white"
+        return "bg-blue-500 text-white"
     }
   }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "confirmed":
-        return <Sparkles className="w-4 h-4" />
-      case "pending":
-        return <Clock className="w-4 h-4" />
+      case "active":
+        return <Shield className="w-3 h-3 mr-1" />
       case "used":
-        return <Star className="w-4 h-4" />
+        return <QrCode className="w-3 h-3 mr-1" />
       case "expired":
-        return <Zap className="w-4 h-4" />
+        return <Clock className="w-3 h-3 mr-1" />
       default:
-        return <Ticket className="w-4 h-4" />
+        return <Ticket className="w-3 h-3 mr-1" />
     }
   }
 
   useEffect(() => {
     if (user) {
-      fetchUserTickets()
+      fetchTickets()
       fetchEvents()
     }
   }, [user])
 
-  const fetchUserTickets = async () => {
+  const fetchTickets = async () => {
     try {
-      const { data: tickets, error } = await supabase
+      const { data, error } = await supabase
         .from("tickets")
         .select(`
           *,
           events (
             title,
-            description,
             event_date,
             event_time,
             venue,
-            location
+            location,
+            description
           )
         `)
         .eq("user_id", user?.id)
         .order("created_at", { ascending: false })
 
       if (error) throw error
-      setTickets(tickets || [])
+      setTickets(data || [])
     } catch (error) {
       console.error("Error fetching tickets:", error)
     }
@@ -528,16 +388,26 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
 
   const fetchEvents = async () => {
     try {
-      setLoading(true)
-      const { data: events, error } = await supabase
+      const { data, error } = await supabase
         .from("events")
-        .select("*")
+        .select(`
+          *,
+          tickets!inner(count)
+        `)
         .eq("status", "active")
         .gte("event_date", new Date().toISOString())
         .order("event_date", { ascending: true })
 
       if (error) throw error
-      setEvents(events || [])
+
+      const eventsWithSoldCount =
+        data?.map((event) => ({
+          ...event,
+          sold: event.tickets?.length || 0,
+          tickets_sold: event.tickets?.length || 0,
+        })) || []
+
+      setEvents(eventsWithSoldCount)
     } catch (error) {
       console.error("Error fetching events:", error)
     } finally {
@@ -545,51 +415,22 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
     }
   }
 
-  const handleTicketPurchase = async (eventId: string, paymentReference: string) => {
+  const handleTicketPurchase = async (eventId: string, reference: string) => {
+    setPurchaseLoading(eventId)
     try {
-      setPurchaseLoading(eventId)
-
-      const response = await fetch("/api/tickets/purchase", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          eventId,
-          paymentReference,
-          paymentMethod: "paystack",
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to purchase ticket")
-      }
-
-      const result = await response.json()
-
-      // Refresh tickets after successful purchase
-      await fetchUserTickets()
-
-      alert("Ticket purchased successfully!")
+      // Redirect to survey page for this event
+      window.location.href = `/events/survey?event=${eventId}`
     } catch (error) {
-      console.error("Error purchasing ticket:", error)
-      alert("Failed to purchase ticket. Please try again.")
+      console.error("Error initiating purchase:", error)
     } finally {
       setPurchaseLoading(null)
     }
   }
 
-  const handlePaymentError = (error: string) => {
+  const handlePaymentError = (error: any) => {
     console.error("Payment error:", error)
-    alert(`Payment failed: ${error}`)
+    setPurchaseLoading(null)
   }
-
-  const filteredEvents = events.filter(
-    (event) =>
-      event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.venue.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
 
   if (loading) {
     return (
@@ -800,7 +641,6 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
                                       variant="outline"
                                       className="flex-1 border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white bg-transparent"
                                       onClick={() => {
-                                        // Show QR code modal or expand QR display
                                         console.log("Show QR for ticket:", ticket.id)
                                       }}
                                     >
@@ -812,7 +652,6 @@ ${ticket.specialAccess ? "VIP ACCESS GRANTED" : ""}
                                       variant="outline"
                                       className="flex-1 border-blue-500 text-blue-400 hover:bg-blue-500 hover:text-white bg-transparent"
                                       onClick={() => {
-                                        // Download ticket functionality
                                         const ticketData = `
 ERIGGA FAN PLATFORM - TICKET
 ${ticket.events?.title}
@@ -862,7 +701,7 @@ Status: ${ticket.status.toUpperCase()}
                               <div className="flex-1 relative">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                                 <Input
-                                  placeholder="Search events..."
+                                  placeholder="Search events by name, location, or date..."
                                   value={searchQuery}
                                   onChange={(e) => setSearchQuery(e.target.value)}
                                   className="pl-10 bg-white/5 border-white/10 text-white placeholder-gray-400"
@@ -882,7 +721,7 @@ Status: ${ticket.status.toUpperCase()}
 
                       {/* Events Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {events.map((event, index) => (
+                        {filteredEvents.map((event, index) => (
                           <motion.div key={event.id} variants={itemVariants} whileHover={cardHoverVariants.hover}>
                             <Card className="bg-white/5 backdrop-blur-xl border-white/10 hover:bg-white/10 transition-all duration-300 overflow-hidden">
                               <div className="relative h-48 bg-gradient-to-br from-purple-500/20 to-blue-500/20">
@@ -890,23 +729,23 @@ Status: ${ticket.status.toUpperCase()}
                                   <Music className="w-12 h-12 text-white/60" />
                                 </div>
                                 <Badge className="absolute top-3 right-3 bg-orange-500 text-white">
-                                  {event.category}
+                                  {event.category || "Concert"}
                                 </Badge>
                                 <div className="absolute bottom-3 left-3 right-3">
                                   <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2">
                                     <div className="flex justify-between items-center">
                                       <span className="text-white text-sm font-medium">
-                                        {event.sold}/{event.capacity} sold
+                                        {event.sold || 0}/{event.capacity} sold
                                       </span>
                                       <span className="text-white text-sm">
-                                        {Math.round((event.sold / event.capacity) * 100)}%
+                                        {Math.round(((event.sold || 0) / event.capacity) * 100)}%
                                       </span>
                                     </div>
                                     <div className="w-full bg-white/20 rounded-full h-2 mt-1">
                                       <motion.div
                                         className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full"
                                         initial={{ width: 0 }}
-                                        animate={{ width: `${(event.sold / event.capacity) * 100}%` }}
+                                        animate={{ width: `${((event.sold || 0) / event.capacity) * 100}%` }}
                                         transition={{ duration: 1, delay: index * 0.1 }}
                                       />
                                     </div>
@@ -953,41 +792,26 @@ Status: ${ticket.status.toUpperCase()}
                                     <Button disabled className="bg-gray-600">
                                       Sold Out
                                     </Button>
-                                  ) : profile?.email ? (
-                                    <PaystackIntegration
-                                      amount={event.price || 0}
-                                      email={profile.email}
-                                      metadata={{
-                                        event_id: event.id,
-                                        event_title: event.title,
-                                        user_id: profile.id,
-                                      }}
-                                      onSuccess={(reference) => handleTicketPurchase(event.id, reference)}
-                                      onError={handlePaymentError}
-                                    >
-                                      <Button
-                                        className="bg-gradient-to-r from-purple-500 to-blue-500 hover:opacity-90"
-                                        disabled={purchaseLoading === event.id}
-                                      >
-                                        {purchaseLoading === event.id ? (
-                                          <motion.div
-                                            animate={{ rotate: 360 }}
-                                            transition={{
-                                              duration: 1,
-                                              repeat: Number.POSITIVE_INFINITY,
-                                              ease: "linear",
-                                            }}
-                                            className="w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"
-                                          />
-                                        ) : (
-                                          <Ticket className="w-4 h-4 mr-2" />
-                                        )}
-                                        {purchaseLoading === event.id ? "Processing..." : "Buy Ticket"}
-                                      </Button>
-                                    </PaystackIntegration>
                                   ) : (
-                                    <Button disabled className="bg-gray-600">
-                                      Login Required
+                                    <Button
+                                      onClick={() => handleTicketPurchase(event.id, "")}
+                                      className="bg-gradient-to-r from-purple-500 to-blue-500 hover:opacity-90"
+                                      disabled={purchaseLoading === event.id}
+                                    >
+                                      {purchaseLoading === event.id ? (
+                                        <motion.div
+                                          animate={{ rotate: 360 }}
+                                          transition={{
+                                            duration: 1,
+                                            repeat: Number.POSITIVE_INFINITY,
+                                            ease: "linear",
+                                          }}
+                                          className="w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"
+                                        />
+                                      ) : (
+                                        <Ticket className="w-4 h-4 mr-2" />
+                                      )}
+                                      {purchaseLoading === event.id ? "Processing..." : "Buy Ticket"}
                                     </Button>
                                   )}
                                 </div>
