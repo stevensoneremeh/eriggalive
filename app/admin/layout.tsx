@@ -17,7 +17,7 @@ const adminNavItems = [
   { name: "Transactions", href: "/admin/transactions", icon: CreditCard },
   { name: "Media", href: "/admin/media", icon: ImageIcon },
   { name: "Branding", href: "/admin/branding", icon: Settings },
-  { name: "Scanner", href: "/admin/scanner", icon: Scan },
+  { name: "Check-in Scanner", href: "/admin/checkin", icon: Scan },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

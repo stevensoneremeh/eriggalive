@@ -1,147 +1,169 @@
-export interface Event {
-  id: number
-  slug?: string
-  title: string
-  description?: string
-  starts_at: string
-  venue: string
-  capacity: number
-  status: "draft" | "active" | "archived"
-  cover_image_url?: string
-  created_at: string
-  updated_at: string
-}
+// TypeScript types for the ticketing system
+import { z } from "zod"
 
-export interface MembershipTier {
-  id: string
-  code: "FREE" | "PRO" | "ENT"
-  name: string
-  description?: string
-  is_paid: boolean
-  plan_codes: Record<string, any>
-  min_amount_ngn?: number
-  billing_cycles: Record<string, boolean>
-  created_at: string
-  updated_at: string
-}
+// Event types
+export const EventStatusSchema = z.enum(["draft", "active", "archived"])
+export const EventSchema = z.object({
+  id: z.string().uuid(),
+  slug: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  starts_at: z.string().datetime(),
+  venue: z.string(),
+  capacity: z.number().int().min(0),
+  status: EventStatusSchema,
+  cover_image_url: z.string().nullable(),
+  ticket_price_ngn: z.number().int().min(0),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+})
 
-export interface Payment {
-  id: string
-  user_id: string
-  context: "ticket" | "membership"
-  context_id?: string
-  provider: "paystack" | "coin"
-  provider_ref?: string
-  amount_ngn: number
-  currency: string
-  status: "pending" | "paid" | "failed" | "refunded"
-  metadata: Record<string, any>
-  created_at: string
-  updated_at: string
-}
+// Payment types
+export const PaymentContextSchema = z.enum(["ticket", "membership"])
+export const PaymentProviderSchema = z.enum(["paystack", "coin"])
+export const PaymentStatusSchema = z.enum(["pending", "paid", "failed", "refunded"])
 
-export interface Ticket {
-  id: string
-  event_id: number
-  user_id: string
-  purchase_id?: string
-  status: "unused" | "admitted" | "refunded" | "invalid"
-  qr_token_hash: string
-  qr_expires_at?: string
-  admitted_at?: string
-  created_at: string
-  updated_at: string
-  event?: Event
-  payment?: Payment
-}
+export const PaymentSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  context: PaymentContextSchema,
+  context_id: z.string().uuid().nullable(),
+  provider: PaymentProviderSchema,
+  provider_ref: z.string().nullable(),
+  amount_ngn: z.number().int(),
+  currency: z.string().default("NGN"),
+  status: PaymentStatusSchema,
+  metadata: z.record(z.any()).default({}),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+})
 
-export interface Membership {
-  id: string
-  user_id: string
-  tier_code: string
-  started_at: string
-  expires_at?: string
-  status: "active" | "expired" | "canceled"
-  total_months_purchased: number
-  created_at: string
-  updated_at: string
-}
+// Ticket types
+export const TicketStatusSchema = z.enum(["unused", "admitted", "refunded", "invalid"])
+export const TicketSchema = z.object({
+  id: z.string().uuid(),
+  event_id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  purchase_id: z.string().uuid(),
+  status: TicketStatusSchema,
+  qr_token_hash: z.string(),
+  qr_expires_at: z.string().datetime().nullable(),
+  admitted_at: z.string().datetime().nullable(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+})
 
-export interface Subscription {
-  id: string
-  user_id: string
-  tier_code: string
-  interval: "monthly" | "quarterly" | "yearly" | "annual_custom"
-  months_purchased: number
-  amount_paid_ngn: number
-  status: "pending" | "active" | "failed" | "canceled"
-  created_at: string
-  updated_at: string
-}
+// Membership types
+export const MembershipTierCodeSchema = z.enum(["FREE", "PRO", "ENT"])
+export const MembershipStatusSchema = z.enum(["active", "expired", "canceled"])
 
-export interface Wallet {
-  id: string
-  user_id: string
-  balance_coins: number
-  created_at: string
-  updated_at: string
-}
+export const MembershipTierSchema = z.object({
+  id: z.string().uuid(),
+  code: MembershipTierCodeSchema,
+  name: z.string(),
+  description: z.string().nullable(),
+  is_paid: z.boolean(),
+  plan_codes: z.record(z.any()).default({}),
+  min_amount_ngn: z.number().int().nullable(),
+  billing_cycles: z.record(z.any()).default({}),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+})
 
-export interface WalletLedgerEntry {
-  id: string
-  wallet_id: string
-  type: "credit" | "debit"
-  amount_coins: number
-  reason: "membership_bonus" | "ticket_purchase" | "admin_adjustment" | "refund"
-  ref_id?: string
-  created_at: string
-}
+export const MembershipSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  tier_code: z.string(),
+  started_at: z.string().datetime(),
+  expires_at: z.string().datetime().nullable(),
+  status: MembershipStatusSchema,
+  total_months_purchased: z.number().int().default(0),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+})
 
-export interface ScanLog {
-  id: string
-  ticket_id: string
-  admin_user_id?: string
-  scan_result: "admitted" | "duplicate" | "invalid"
-  device_fingerprint?: string
-  location_hint?: string
-  scanned_at: string
-  created_at: string
-}
+// Wallet types
+export const WalletLedgerTypeSchema = z.enum(["credit", "debit"])
+export const WalletLedgerReasonSchema = z.enum(["membership_bonus", "ticket_purchase", "admin_adjustment", "refund"])
 
-export interface Settings {
-  key: string
-  value_json: Record<string, any>
-  created_at: string
-  updated_at: string
-}
+export const WalletSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  balance_coins: z.number().int().min(0),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+})
 
-// Request/Response types for API endpoints
-export interface TicketPurchaseRequest {
-  event_id: number
-  method: "paystack" | "coin"
-}
+export const WalletLedgerSchema = z.object({
+  id: z.string().uuid(),
+  wallet_id: z.string().uuid(),
+  type: WalletLedgerTypeSchema,
+  amount_coins: z.number().int(),
+  reason: WalletLedgerReasonSchema,
+  ref_id: z.string().uuid().nullable(),
+  created_at: z.string().datetime(),
+})
 
-export interface PaymentInitiateRequest {
-  context: "ticket" | "membership"
-  context_id?: string
-  amount_ngn?: number
-  plan_code?: string
-  interval?: string
-  tier_code?: string
-  custom_amount?: number
-}
+// Scan log types
+export const ScanResultSchema = z.enum(["admitted", "duplicate", "invalid"])
+export const ScanLogSchema = z.object({
+  id: z.string().uuid(),
+  ticket_id: z.string().uuid(),
+  admin_user_id: z.string().uuid(),
+  scan_result: ScanResultSchema,
+  device_fingerprint: z.string().nullable(),
+  location_hint: z.string().nullable(),
+  scanned_at: z.string().datetime(),
+  created_at: z.string().datetime(),
+})
 
-export interface CheckinRequest {
-  token: string
-  device_fingerprint?: string
-  gate?: string
-}
+// API request/response schemas
+export const TicketPurchaseRequestSchema = z.object({
+  event_id: z.string().uuid(),
+  method: z.enum(["paystack", "coin"]),
+})
 
-export interface CheckinResponse {
-  result: "admit" | "reject"
-  ticket_id: string
-  user_masked: string
-  event: Partial<Event>
-  warnings?: string[]
-  previous_status?: string
-}
+export const PaymentInitiateRequestSchema = z.object({
+  context: PaymentContextSchema,
+  context_id: z.string().uuid().optional(),
+  amount_ngn: z.number().int().optional(),
+  plan_code: z.string().optional(),
+  interval: z.enum(["monthly", "quarterly", "yearly", "annual_custom"]).optional(),
+  tier_code: MembershipTierCodeSchema.optional(),
+  custom_amount: z.number().int().optional(),
+})
+
+export const CheckinRequestSchema = z.object({
+  token: z.string(),
+  device_fingerprint: z.string().optional(),
+  gate: z.string().optional(),
+})
+
+export const CheckinResponseSchema = z.object({
+  result: ScanResultSchema,
+  ticket_id: z.string().uuid(),
+  user_masked: z.string(),
+  event: z.object({
+    title: z.string(),
+    venue: z.string(),
+    starts_at: z.string().datetime(),
+  }),
+  previous_status: TicketStatusSchema,
+  decision: z.enum(["admit", "reject"]),
+  warnings: z.array(z.string()).default([]),
+})
+
+// Inferred types
+export type Event = z.infer<typeof EventSchema>
+export type Payment = z.infer<typeof PaymentSchema>
+export type Ticket = z.infer<typeof TicketSchema>
+export type MembershipTier = z.infer<typeof MembershipTierSchema>
+export type Membership = z.infer<typeof MembershipSchema>
+export type Wallet = z.infer<typeof WalletSchema>
+export type WalletLedger = z.infer<typeof WalletLedgerSchema>
+export type ScanLog = z.infer<typeof ScanLogSchema>
+
+export type TicketPurchaseRequest = z.infer<typeof TicketPurchaseRequestSchema>
+export type PaymentInitiateRequest = z.infer<typeof PaymentInitiateRequestSchema>
+export type CheckinRequest = z.infer<typeof CheckinRequestSchema>
+export type CheckinResponse = z.infer<typeof CheckinResponseSchema>
