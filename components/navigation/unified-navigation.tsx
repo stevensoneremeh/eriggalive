@@ -41,6 +41,7 @@ const navigationItems = [
   { name: "Mission", href: "/mission", icon: Target },
   { name: "Community", href: "/community", icon: Users },
   { name: "Radio", href: "/radio", icon: Radio },
+  { name: "Events", href: "/events", icon: Calendar },
   { name: "Vault", href: "/vault", icon: Music },
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Chat", href: "/chat", icon: MessageCircle },
@@ -82,17 +83,18 @@ export function UnifiedNavigation() {
 
   const getDesktopNavItems = () => {
     if (user) {
-      // For authenticated users, show: Home, Mission, Community, Radio, Vault, Dashboard
-      return navigationItems.slice(0, 6)
+      // For authenticated users, show: Home, Mission, Community, Radio, Events, Vault, Dashboard
+      return navigationItems.slice(0, 7)
     } else {
-      // For unauthenticated users, show: Home, Mission, Community, Radio, Vault, About
+      // For unauthenticated users, show: Home, Mission, Community, Radio, Events, Vault, About
       return [
         navigationItems[0], // Home
         navigationItems[1], // Mission
         navigationItems[2], // Community
         navigationItems[3], // Radio
-        navigationItems[4], // Vault
-        navigationItems[12], // About
+        navigationItems[4], // Events
+        navigationItems[5], // Vault
+        navigationItems[13], // About
       ]
     }
   }
