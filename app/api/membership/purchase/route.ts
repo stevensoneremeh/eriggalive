@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import crypto from "crypto"
 
 // Check if we're in preview/development mode
 const isPreviewMode = () => {
@@ -10,6 +9,18 @@ const isPreviewMode = () => {
     !process.env.PAYSTACK_SECRET_KEY ||
     process.env.PAYSTACK_SECRET_KEY.startsWith("pk_test_")
   )
+}
+
+// Membership pricing (in NGN and coins)
+const MEMBERSHIP_PRICING = {
+  pro: {
+    monthly: { naira: 5000, coins: 10000 },
+    yearly: { naira: 50000, coins: 100000 },
+  },
+  enterprise: {
+    monthly: { naira: 15000, coins: 30000 },
+    yearly: { naira: 150000, coins: 300000 },
+  },
 }
 
 async function verifyUser(request: NextRequest) {
@@ -39,21 +50,6 @@ async function verifyUser(request: NextRequest) {
     console.error("Authentication error:", error)
     return { error: "Authentication failed", user: null, profile: null }
   }
-}
-
-// Generate unique ticket number and QR code
-function generateTicketData(eventId: string, userId: string) {
-  const timestamp = Date.now()
-  const random = Math.random().toString(36).substr(2, 9)
-
-  const ticketNumber = `TKT-${timestamp}-${random}`.toUpperCase()
-  const qrCode = `ERIGGA-${eventId.substr(0, 8)}-${userId.substr(0, 8)}-${timestamp}`
-  const qrToken = crypto
-    .createHmac("sha256", process.env.NEXTAUTH_SECRET || "erigga-live-secret")
-    .update(`${eventId}${userId}${timestamp}`)
-    .digest("hex")
-
-  return { ticketNumber, qrCode, qrToken }
 }
 
 // Mock Paystack verification for preview mode
@@ -97,65 +93,43 @@ export async function POST(request: NextRequest) {
     }
 
     const requestData = await request.json()
-    const { eventId, ticketType, quantity = 1, paymentMethod, paymentReference } = requestData
+    const { tier, duration, paymentMethod, paymentReference } = requestData
 
-    if (!eventId || !ticketType || !paymentMethod) {
+    // Validate input
+    if (!tier || !duration || !paymentMethod) {
       return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 })
     }
 
+    if (!["pro", "enterprise"].includes(tier)) {
+      return NextResponse.json({ success: false, error: "Invalid membership tier" }, { status: 400 })
+    }
+
+    if (!["monthly", "yearly"].includes(duration)) {
+      return NextResponse.json({ success: false, error: "Invalid duration" }, { status: 400 })
+    }
+
+    // Check if user already has this tier or higher
+    const tierLevels = { free: 0, pro: 1, enterprise: 2 }
+    const currentTierLevel = tierLevels[profile.membership_tier as keyof typeof tierLevels] || 0
+    const requestedTierLevel = tierLevels[tier as keyof typeof tierLevels]
+
+    if (
+      currentTierLevel >= requestedTierLevel &&
+      profile.membership_expires_at &&
+      new Date(profile.membership_expires_at) > new Date()
+    ) {
+      return NextResponse.json(
+        { success: false, error: "You already have this membership tier or higher" },
+        { status: 400 },
+      )
+    }
+
+    const pricing =
+      MEMBERSHIP_PRICING[tier as keyof typeof MEMBERSHIP_PRICING][duration as keyof typeof MEMBERSHIP_PRICING.pro]
+    const totalPrice = pricing.naira
+    const totalCoins = pricing.coins
+
     const supabase = await createClient()
-
-    // Get event details
-    const { data: event, error: eventError } = await supabase.from("events").select("*").eq("id", eventId).single()
-
-    if (eventError || !event) {
-      return NextResponse.json({ success: false, error: "Event not found" }, { status: 404 })
-    }
-
-    // Check event capacity
-    if (event.current_attendance + quantity > event.max_capacity) {
-      return NextResponse.json({ success: false, error: "Event is sold out" }, { status: 400 })
-    }
-
-    // Check membership requirements
-    if (event.requires_membership && event.requires_membership !== "free") {
-      const membershipTiers = ["free", "pro", "enterprise"]
-      const requiredTierIndex = membershipTiers.indexOf(event.requires_membership)
-      const userTierIndex = membershipTiers.indexOf(profile.membership_tier)
-
-      if (userTierIndex < requiredTierIndex) {
-        return NextResponse.json(
-          { success: false, error: `This event requires ${event.requires_membership} membership` },
-          { status: 403 },
-        )
-      }
-    }
-
-    // Calculate price based on ticket type and membership
-    let ticketPrice = 0
-    let coinPrice = 0
-
-    if (ticketType === "early_bird" && event.early_bird_ends && new Date() < new Date(event.early_bird_ends)) {
-      ticketPrice = event.early_bird_price_naira || 0
-      coinPrice = event.early_bird_price_coins || 0
-    } else if (ticketType === "vip") {
-      ticketPrice = event.vip_price_naira || 0
-      coinPrice = event.vip_price_coins || 0
-    } else {
-      ticketPrice = event.ticket_price_naira || 0
-      coinPrice = event.ticket_price_coins || 0
-    }
-
-    // Apply membership discount
-    const discountPercentage =
-      profile.membership_tier === "pro" ? 10 : profile.membership_tier === "enterprise" ? 20 : 0
-    if (discountPercentage > 0) {
-      ticketPrice = Math.floor(ticketPrice * (1 - discountPercentage / 100))
-      coinPrice = Math.floor(coinPrice * (1 - discountPercentage / 100))
-    }
-
-    const totalPrice = ticketPrice * quantity
-    const totalCoins = coinPrice * quantity
 
     // Process payment based on method
     if (paymentMethod === "paystack") {
@@ -206,96 +180,82 @@ export async function POST(request: NextRequest) {
       if (coinsError) {
         return NextResponse.json({ success: false, error: "Failed to deduct coins" }, { status: 500 })
       }
-    } else if (paymentMethod === "free") {
-      if (totalPrice > 0 || totalCoins > 0) {
-        return NextResponse.json({ success: false, error: "This event is not free" }, { status: 400 })
-      }
     }
 
-    // Create tickets
-    const tickets = []
-    for (let i = 0; i < quantity; i++) {
-      const { ticketNumber, qrCode, qrToken } = generateTicketData(eventId, user.id)
+    // Calculate membership expiry
+    const now = new Date()
+    const currentExpiry = profile.membership_expires_at ? new Date(profile.membership_expires_at) : now
+    const startDate = currentExpiry > now ? currentExpiry : now
+    const expiryDate = new Date(startDate)
 
-      const { data: ticket, error: ticketError } = await supabase
-        .from("tickets")
-        .insert({
-          event_id: eventId,
-          user_id: user.id,
-          ticket_type: ticketType,
-          ticket_number: ticketNumber,
-          qr_code: qrCode,
-          qr_token: qrToken,
-          price_paid_naira: paymentMethod === "paystack" ? ticketPrice : null,
-          price_paid_coins: paymentMethod === "coins" ? coinPrice : null,
-          payment_method: paymentMethod,
-          payment_reference: paymentReference,
-          status: "valid",
-          metadata: {
-            discount_applied: discountPercentage,
-            original_price_naira: event.ticket_price_naira,
-            original_price_coins: event.ticket_price_coins,
-          },
-        })
-        .select()
-        .single()
-
-      if (ticketError) {
-        console.error("Ticket creation error:", ticketError)
-        return NextResponse.json({ success: false, error: "Failed to create ticket" }, { status: 500 })
-      }
-
-      tickets.push(ticket)
+    if (duration === "monthly") {
+      expiryDate.setMonth(expiryDate.getMonth() + 1)
+    } else {
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1)
     }
 
-    // Update event attendance
-    await supabase
-      .from("events")
+    // Update user membership
+    const { error: updateError } = await supabase
+      .from("profiles")
       .update({
-        current_attendance: event.current_attendance + quantity,
+        membership_tier: tier,
+        membership_expires_at: expiryDate.toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq("id", eventId)
+      .eq("id", user.id)
+
+    if (updateError) {
+      console.error("Membership update error:", updateError)
+      return NextResponse.json({ success: false, error: "Failed to update membership" }, { status: 500 })
+    }
+
+    // Create membership transaction record
+    await supabase.from("membership_transactions").insert({
+      user_id: user.id,
+      from_tier: profile.membership_tier,
+      to_tier: tier,
+      duration_months: duration === "monthly" ? 1 : 12,
+      amount_paid_naira: paymentMethod === "paystack" ? totalPrice : null,
+      amount_paid_coins: paymentMethod === "coins" ? totalCoins : null,
+      payment_method: paymentMethod,
+      payment_reference: paymentReference,
+      starts_at: startDate.toISOString(),
+      expires_at: expiryDate.toISOString(),
+      status: "active",
+    })
 
     // Create transaction record
     await supabase.from("transactions").insert({
       user_id: user.id,
       type: "purchase",
-      category: "ticket",
+      category: "membership",
       amount_naira: paymentMethod === "paystack" ? totalPrice : null,
       amount_coins: paymentMethod === "coins" ? totalCoins : null,
       payment_method: paymentMethod,
       paystack_reference: paymentReference,
       status: "completed",
-      description: `Purchased ${quantity} ${ticketType} ticket(s) for ${event.title}`,
-      reference_id: eventId,
-      reference_type: "event",
+      description: `Upgraded to ${tier} membership (${duration})`,
+      reference_type: "membership",
       metadata: {
-        ticket_ids: tickets.map((t) => t.id),
-        event_title: event.title,
-        ticket_type: ticketType,
-        quantity: quantity,
+        tier,
+        duration,
+        expires_at: expiryDate.toISOString(),
       },
     })
 
     return NextResponse.json({
       success: true,
-      tickets: tickets.map((ticket) => ({
-        id: ticket.id,
-        ticket_number: ticket.ticket_number,
-        qr_code: ticket.qr_code,
-        event_title: event.title,
-        event_date: event.event_date,
-        ticket_type: ticket.ticket_type,
-        venue: event.venue,
-        status: ticket.status,
-      })),
-      message: `Successfully purchased ${quantity} ticket(s)`,
-      totalPaid: paymentMethod === "paystack" ? totalPrice : totalCoins,
-      paymentMethod,
+      membership: {
+        tier,
+        expires_at: expiryDate.toISOString(),
+        duration,
+        amount_paid: paymentMethod === "paystack" ? totalPrice : totalCoins,
+        payment_method: paymentMethod,
+      },
+      message: `Successfully upgraded to ${tier} membership`,
     })
   } catch (error) {
-    console.error("Ticket purchase error:", error)
+    console.error("Membership purchase error:", error)
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }
 }

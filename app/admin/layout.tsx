@@ -7,12 +7,13 @@ import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Menu, Home, Users, CreditCard, ImageIcon, Settings, LogOut, Shield, X } from "lucide-react"
+import { Menu, Home, Users, CreditCard, ImageIcon, Settings, LogOut, Shield, X, Scan } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 
 const adminNavItems = [
   { name: "Overview", href: "/admin", icon: Home },
+  { name: "Scanner", href: "/admin/scanner", icon: Scan }, // Added scanner navigation item
   { name: "Users", href: "/admin/users", icon: Users },
   { name: "Transactions", href: "/admin/transactions", icon: CreditCard },
   { name: "Media", href: "/admin/media", icon: ImageIcon },
