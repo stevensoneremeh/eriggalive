@@ -62,12 +62,40 @@ async function handle(body: any) {
 
   try {
     // Handle different types of purchases based on metadata
-    if (metadata.purchase_type === "ticket") {
+    if (metadata.purchase_type === "membership") {
+      const { tier_code, interval, months_purchased, user_id } = metadata
+
+      // Update payment status
+      const { error: paymentError } = await supabase
+        .from("payments")
+        .update({
+          status: "completed",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("provider_ref", reference)
+
+      if (paymentError) {
+        console.error("Error updating payment status:", paymentError)
+        throw paymentError
+      }
+
+      // Process membership purchase
+      const { error: membershipError } = await supabase.rpc("process_membership_purchase", {
+        user_uuid: user_id,
+        tier_code_param: tier_code,
+        months_count: months_purchased,
+        payment_id: reference,
+      })
+
+      if (membershipError) {
+        console.error("Error processing membership purchase:", membershipError)
+        throw membershipError
+      }
+
+      console.log(`Membership purchase processed: ${reference} - ${tier_code} for ${months_purchased} months`)
+    } else if (metadata.purchase_type === "ticket") {
       // Ticket purchase - already handled by ticket purchase API
       console.log(`Ticket purchase webhook processed: ${reference}`)
-    } else if (metadata.purchase_type === "membership") {
-      // Membership purchase - already handled by membership purchase API
-      console.log(`Membership purchase webhook processed: ${reference}`)
     } else if (metadata.coin_purchase || metadata.purchase_type === "coins") {
       // Coin purchase
       const coinsToCredit = metadata.coins_amount || Math.floor((amountKobo / 100) * 2) // Default 2:1 ratio

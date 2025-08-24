@@ -1,42 +1,92 @@
-import { Crown, Star, Shield, Droplet } from "lucide-react"
+import { Crown, Shield, Users, Building } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useMembershipData } from "@/hooks/useMembership"
+import { isMembershipFeatureEnabled } from "@/lib/membership"
+import type { MembershipTierCode } from "@/lib/membership"
 
 interface UserTierBadgeProps {
   tier: string
   size?: "sm" | "md" | "lg"
   showLabel?: boolean
+  membershipTier?: MembershipTierCode // New membership tier prop
 }
 
-export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierBadgeProps) {
-  const tierInfo = {
-    grassroot: {
-      label: "Grassroot",
-      icon: Star,
+export function UserTierBadge({ tier, size = "md", showLabel = true, membershipTier }: UserTierBadgeProps) {
+  const { membership } = useMembershipData()
+  const membershipEnabled = isMembershipFeatureEnabled()
+
+  const effectiveTier =
+    membershipEnabled && (membershipTier || membership?.membership?.tier_code)
+      ? membershipTier || membership?.membership?.tier_code
+      : tier
+
+  const membershipTierInfo = {
+    FREE: {
+      label: "ECor Erigga Citizen",
+      icon: Users,
       color: "bg-gray-500/20 text-gray-500 border-gray-500",
-      tooltip: "Grassroot tier member",
+      tooltip: "ECor Erigga Citizen - Basic community member",
     },
-    pioneer: {
-      label: "Pioneer",
+    PRO: {
+      label: "Erigga Indigen",
       icon: Crown,
-      color: "bg-orange-500/20 text-orange-500 border-orange-500",
-      tooltip: "Pioneer tier member with premium access",
+      color: "bg-blue-500/20 text-blue-500 border-blue-500",
+      tooltip: "Erigga Indigen - Pro member with premium access",
     },
-    elder: {
-      label: "Elder",
-      icon: Shield,
-      color: "bg-gold-400/20 text-gold-400 border-gold-400",
-      tooltip: "Elder tier member with enhanced premium access",
-    },
-    blood: {
-      label: "Blood",
-      icon: Droplet,
-      color: "bg-red-500/20 text-red-500 border-red-500",
-      tooltip: "Blood tier member with exclusive access",
+    ENT: {
+      label: "E",
+      icon: Building,
+      color: "bg-yellow-500/20 text-yellow-500 border-yellow-500",
+      tooltip: "Enterprise member with exclusive VIP access",
     },
   }
 
-  const tierData = tierInfo[tier as keyof typeof tierInfo] || tierInfo.grassroot
+  const legacyTierInfo = {
+    grassroot: {
+      label: "ECor Erigga Citizen", // Updated label
+      icon: Users, // Updated icon
+      color: "bg-gray-500/20 text-gray-500 border-gray-500",
+      tooltip: "ECor Erigga Citizen - Community member",
+    },
+    pioneer: {
+      label: "Erigga Indigen", // Updated label
+      icon: Crown,
+      color: "bg-blue-500/20 text-blue-500 border-blue-500", // Updated color
+      tooltip: "Erigga Indigen - Premium member with enhanced access",
+    },
+    elder: {
+      label: "E", // Updated label
+      icon: Building, // Updated icon
+      color: "bg-yellow-500/20 text-yellow-500 border-yellow-500", // Updated to gold
+      tooltip: "Enterprise member with exclusive VIP access",
+    },
+    blood_brotherhood: {
+      label: "E", // Updated label
+      icon: Building, // Updated icon
+      color: "bg-yellow-500/20 text-yellow-500 border-yellow-500", // Updated to gold
+      tooltip: "Enterprise member with exclusive VIP access",
+    },
+    blood: {
+      label: "E", // Updated label
+      icon: Building, // Updated icon
+      color: "bg-yellow-500/20 text-yellow-500 border-yellow-500", // Updated to gold
+      tooltip: "Enterprise member with exclusive VIP access",
+    },
+    admin: {
+      label: "Admin",
+      icon: Shield,
+      color: "bg-red-500/20 text-red-500 border-red-500",
+      tooltip: "Administrator with full system access",
+    },
+  }
+
+  let tierData
+  if (membershipEnabled && membershipTierInfo[effectiveTier as MembershipTierCode]) {
+    tierData = membershipTierInfo[effectiveTier as MembershipTierCode]
+  } else {
+    tierData = legacyTierInfo[effectiveTier as keyof typeof legacyTierInfo] || legacyTierInfo.grassroot
+  }
 
   const IconComponent = tierData.icon
 
