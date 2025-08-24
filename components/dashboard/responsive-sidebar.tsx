@@ -37,7 +37,6 @@ import { DynamicLogo } from "@/components/dynamic-logo"
 import { CoinBalance } from "@/components/coin-balance"
 import { UserTierBadge } from "@/components/user-tier-badge"
 import { cn } from "@/lib/utils"
-import { useMembershipData } from "@/hooks/useMembership"
 
 interface SidebarItem {
   name: string
@@ -138,7 +137,6 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
   const pathname = usePathname()
   const { user, profile, signOut } = useAuth()
   const { theme, setTheme, resolvedTheme } = useTheme()
-  const { membership } = useMembershipData()
 
   // Screen size detection with debouncing
   const updateScreenSize = useCallback(() => {
@@ -288,11 +286,7 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
             <p className="font-semibold truncate text-sm">{profile?.username || "User"}</p>
             <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>
             <div className="flex items-center gap-2 mt-1">
-              <UserTierBadge
-                tier={profile?.tier || "grassroot"}
-                membershipTier={membership?.membership?.tier_code}
-                size="sm"
-              />
+              <UserTierBadge tier={profile?.tier || "grassroot"} size="sm" />
             </div>
           </div>
         )}

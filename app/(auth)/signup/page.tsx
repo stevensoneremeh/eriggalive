@@ -11,13 +11,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Eye, EyeOff, Check, Crown, Building, Users } from "lucide-react"
+import { Loader2, Eye, EyeOff, User, Crown, Building, Coins } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useMembershipTiers } from "@/hooks/useMembership"
-import { getMembershipPricing, formatPrice, isMembershipFeatureEnabled } from "@/lib/membership"
-import type { MembershipTierCode, BillingInterval } from "@/lib/membership"
-import { generateMembershipReference } from "@/lib/paystack"
 
 declare global {
   interface Window {
@@ -25,10 +21,20 @@ declare global {
   }
 }
 
-const LEGACY_TIER_PRICES = {
-  free: 0,
-  pro: 2500, // ₦2,500
-  enterprise: 5000, // ₦5,000
+const TIER_PRICES = {
+  FREE: {
+    monthly: 0,
+    quarterly: 0,
+    annually: 0,
+  },
+  PRO: {
+    monthly: 9900, // ₦9,900 (discounted from ₦10,000)
+    quarterly: 29700, // ₦29,700 (₦9,900 × 3 - ₦300 discount)
+    annually: 118800, // ₦118,800 (₦9,900 × 12 - ₦1,000 discount)
+  },
+  ENT: {
+    annually: 119900, // ₦119,900 (annual only, ends in 9)
+  },
 }
 
 const TIER_FEATURES = {
@@ -39,7 +45,7 @@ const TIER_FEATURES = {
     "Priority support",
     "Unlimited downloads",
     "Exclusive events access",
-    "1,000 coins per month",
+    "1,000 Erigga Coins per month",
   ],
   ENT: [
     "All Pro features",
@@ -48,8 +54,8 @@ const TIER_FEATURES = {
     "Early content access",
     "Merchandise discounts",
     "Meet & greet opportunities",
-    "Custom gold dashboard",
-    "12,000 coins annually",
+    "12,000 Erigga Coins bonus",
+    "Gold dashboard theme",
   ],
 }
 
@@ -60,8 +66,8 @@ export default function SignupPage() {
     confirmPassword: "",
     username: "",
     fullName: "",
-    tier: "FREE" as MembershipTierCode,
-    billingInterval: "monthly" as BillingInterval,
+    tier: "FREE",
+    interval: "monthly",
   })
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -71,9 +77,6 @@ export default function SignupPage() {
   const { signUp } = useAuth()
   const router = useRouter()
 
-  const { tiers, isLoading: tiersLoading } = useMembershipTiers()
-  const membershipEnabled = isMembershipFeatureEnabled()
-
   useEffect(() => {
     const script = document.createElement("script")
     script.src = "https://js.paystack.co/v1/inline.js"
@@ -81,9 +84,7 @@ export default function SignupPage() {
     document.head.appendChild(script)
 
     return () => {
-      if (document.head.contains(script)) {
-        document.head.removeChild(script)
-      }
+      document.head.removeChild(script)
     }
   }, [])
 
@@ -122,34 +123,24 @@ export default function SignupPage() {
     return true
   }
 
-  const handleMembershipPayment = async (tierCode: MembershipTierCode, interval: BillingInterval) => {
-    const pricing = getMembershipPricing(tierCode, interval)
-    if (!pricing) {
-      throw new Error("Invalid tier or billing interval")
-    }
-
+  const handlePaystackPayment = (amount: number, tier: string, interval: string) => {
     return new Promise((resolve, reject) => {
       if (!window.PaystackPop) {
         reject(new Error("Paystack not loaded"))
         return
       }
 
-      const reference = generateMembershipReference(tierCode, formData.email)
-
       const handler = window.PaystackPop.setup({
         key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_your_key_here",
         email: formData.email,
-        amount: pricing.amount_ngn * 100, // Convert to kobo
+        amount: amount * 100, // Convert to kobo
         currency: "NGN",
-        ref: reference,
+        ref: `erigga_${tier}_${interval}_${Date.now()}`,
         metadata: {
-          purchase_type: "membership",
-          tier_code: tierCode,
+          tier: tier,
           interval: interval,
-          months_purchased: pricing.months,
           username: formData.username,
           full_name: formData.fullName,
-          user_id: formData.email, // Will be updated after user creation
         },
         callback: (response: any) => {
           resolve(response.reference)
@@ -176,26 +167,31 @@ export default function SignupPage() {
     try {
       let paymentReference = undefined
 
-      if (membershipEnabled && formData.tier !== "FREE") {
-        setPaymentLoading(true)
-        try {
-          paymentReference = (await handleMembershipPayment(formData.tier, formData.billingInterval)) as string
-        } catch (paymentError: any) {
-          setError(paymentError.message || "Payment failed")
+      // Handle payment for paid tiers
+      if (formData.tier !== "FREE") {
+        const tierPrices = TIER_PRICES[formData.tier as keyof typeof TIER_PRICES]
+        const amount = tierPrices[formData.interval as keyof typeof tierPrices] || 0
+
+        if (amount > 0) {
+          setPaymentLoading(true)
+          try {
+            paymentReference = (await handlePaystackPayment(amount, formData.tier, formData.interval)) as string
+          } catch (paymentError: any) {
+            setError(paymentError.message || "Payment failed")
+            setPaymentLoading(false)
+            setIsLoading(false)
+            return
+          }
           setPaymentLoading(false)
-          setIsLoading(false)
-          return
         }
-        setPaymentLoading(false)
       }
 
       // Create account
       const { error } = await signUp(formData.email, formData.password, {
         username: formData.username,
         full_name: formData.fullName,
-        tier: membershipEnabled ? formData.tier : "free", // Use legacy tier for backward compatibility
-        membership_tier: membershipEnabled ? formData.tier : undefined,
-        billing_interval: membershipEnabled ? formData.billingInterval : undefined,
+        tier: formData.tier,
+        interval: formData.interval,
         payment_reference: paymentReference,
       })
 
@@ -213,20 +209,20 @@ export default function SignupPage() {
     }
   }
 
-  const getTierIcon = (tier: MembershipTierCode) => {
+  const getTierIcon = (tier: string) => {
     switch (tier) {
       case "FREE":
-        return <Users className="h-5 w-5" />
+        return <User className="h-5 w-5" />
       case "PRO":
         return <Crown className="h-5 w-5" />
       case "ENT":
         return <Building className="h-5 w-5" />
       default:
-        return <Check className="h-5 w-5" />
+        return <User className="h-5 w-5" />
     }
   }
 
-  const getTierColor = (tier: MembershipTierCode) => {
+  const getTierColor = (tier: string) => {
     switch (tier) {
       case "FREE":
         return "border-gray-500/30 bg-gray-500/10"
@@ -239,20 +235,45 @@ export default function SignupPage() {
     }
   }
 
-  const getCurrentPricing = () => {
-    if (!membershipEnabled || formData.tier === "FREE") {
-      return null
-    }
-    return getMembershipPricing(formData.tier, formData.billingInterval)
+  const getCurrentPrice = () => {
+    if (formData.tier === "FREE") return 0
+    const tierPrices = TIER_PRICES[formData.tier as keyof typeof TIER_PRICES]
+    return tierPrices[formData.interval as keyof typeof tierPrices] || 0
   }
 
-  const currentPricing = getCurrentPricing()
+  const getOriginalPrice = () => {
+    if (formData.tier === "FREE") return 0
+    if (formData.tier === "PRO") {
+      switch (formData.interval) {
+        case "monthly":
+          return 10000
+        case "quarterly":
+          return 30000
+        case "annually":
+          return 120000
+        default:
+          return 0
+      }
+    }
+    return getCurrentPrice()
+  }
 
-  const getAvailableBillingOptions = (tierCode: MembershipTierCode): BillingInterval[] => {
-    if (tierCode === "FREE") return []
-    if (tierCode === "PRO") return ["monthly", "quarterly", "annually"]
-    if (tierCode === "ENT") return ["annually"]
-    return []
+  const getCoinsBonus = () => {
+    if (formData.tier === "FREE") return 0
+    if (formData.tier === "PRO") {
+      switch (formData.interval) {
+        case "monthly":
+          return 1000
+        case "quarterly":
+          return 3000
+        case "annually":
+          return 12000
+        default:
+          return 0
+      }
+    }
+    if (formData.tier === "ENT") return 12000
+    return 0
   }
 
   return (
@@ -375,167 +396,95 @@ export default function SignupPage() {
               </div>
             </div>
 
+            {/* Tier Selection */}
             <div className="space-y-4">
               <Label className="text-gray-200 text-lg font-semibold">Choose Your Membership Tier</Label>
-
-              {membershipEnabled && !tiersLoading ? (
-                <RadioGroup
-                  value={formData.tier}
-                  onValueChange={(value) => handleInputChange("tier", value)}
-                  className="grid grid-cols-1 gap-4"
-                >
-                  {(["FREE", "PRO", "ENT"] as MembershipTierCode[]).map((tierCode) => {
-                    const pricing = getMembershipPricing(tierCode, formData.billingInterval)
-                    return (
-                      <div key={tierCode} className="flex items-center space-x-2">
-                        <RadioGroupItem value={tierCode} id={tierCode} className="text-purple-400" />
-                        <Label
-                          htmlFor={tierCode}
-                          className={`flex-1 cursor-pointer rounded-lg border p-4 transition-all ${
-                            formData.tier === tierCode ? getTierColor(tierCode) : "border-gray-600/30 bg-gray-800/20"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              {getTierIcon(tierCode)}
-                              <div>
-                                <div className="font-semibold text-white">
-                                  {tierCode === "FREE"
-                                    ? "ECor Erigga Citizen"
-                                    : tierCode === "PRO"
-                                      ? "Erigga Indigen"
-                                      : "Enterprise"}
-                                </div>
-                                <div className="text-sm text-gray-400">
-                                  {TIER_FEATURES[tierCode].slice(0, 2).join(", ")}
-                                </div>
-                              </div>
+              <RadioGroup
+                value={formData.tier}
+                onValueChange={(value) => handleInputChange("tier", value)}
+                className="grid grid-cols-1 gap-4"
+              >
+                {Object.entries(TIER_PRICES).map(([tier, prices]) => (
+                  <div key={tier} className="flex items-center space-x-2">
+                    <RadioGroupItem value={tier} id={tier} className="text-purple-400" />
+                    <Label
+                      htmlFor={tier}
+                      className={`flex-1 cursor-pointer rounded-lg border p-4 transition-all ${
+                        formData.tier === tier ? getTierColor(tier) : "border-gray-600/30 bg-gray-800/20"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          {getTierIcon(tier)}
+                          <div>
+                            <div className="font-semibold text-white">
+                              {tier === "FREE"
+                                ? "ECor Erigga Citizen"
+                                : tier === "PRO"
+                                  ? "Erigga Indigen"
+                                  : "Enterprise (E)"}
                             </div>
-                            {pricing && (
-                              <div className="text-right">
-                                <div className="text-lg font-bold text-purple-400">
-                                  {formatPrice(pricing.amount_ngn)}
-                                </div>
-                                {pricing.original_price && pricing.original_price > pricing.amount_ngn && (
-                                  <div className="text-xs text-gray-400 line-through">
-                                    {formatPrice(pricing.original_price)}
-                                  </div>
-                                )}
-                                <div className="text-xs text-gray-400">
-                                  {pricing.coins_bonus.toLocaleString()} coins
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </Label>
-                      </div>
-                    )
-                  })}
-                </RadioGroup>
-              ) : (
-                // Fallback to legacy tier system
-                <RadioGroup
-                  value={formData.tier === "FREE" ? "free" : formData.tier === "PRO" ? "pro" : "enterprise"}
-                  onValueChange={(value) =>
-                    handleInputChange("tier", value === "free" ? "FREE" : value === "pro" ? "PRO" : "ENT")
-                  }
-                  className="grid grid-cols-1 gap-4"
-                >
-                  {Object.entries(LEGACY_TIER_PRICES).map(([tier, price]) => (
-                    <div key={tier} className="flex items-center space-x-2">
-                      <RadioGroupItem value={tier} id={tier} className="text-purple-400" />
-                      <Label
-                        htmlFor={tier}
-                        className={`flex-1 cursor-pointer rounded-lg border p-4 transition-all ${
-                          (formData.tier === "FREE" ? "free" : formData.tier === "PRO" ? "pro" : "enterprise") === tier
-                            ? getTierColor(tier.toUpperCase() as MembershipTierCode)
-                            : "border-gray-600/30 bg-gray-800/20"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            {getTierIcon(tier.toUpperCase() as MembershipTierCode)}
-                            <div>
-                              <div className="font-semibold text-white capitalize">
-                                {tier} {price > 0 && `- ₦${price.toLocaleString()}`}
-                              </div>
-                              <div className="text-sm text-gray-400">
-                                {TIER_FEATURES[tier.toUpperCase() as MembershipTierCode].slice(0, 2).join(", ")}
-                              </div>
+                            <div className="text-sm text-gray-400">
+                              {TIER_FEATURES[tier as keyof typeof TIER_FEATURES].slice(0, 2).join(", ")}
                             </div>
                           </div>
-                          {price > 0 && (
-                            <div className="text-right">
-                              <div className="text-lg font-bold text-purple-400">₦{price.toLocaleString()}</div>
-                              <div className="text-xs text-gray-400">one-time</div>
+                        </div>
+                        {tier !== "FREE" && (
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-purple-400">
+                              {tier === "ENT" ? "₦119,900" : "From ₦9,900"}
                             </div>
-                          )}
-                        </div>
-                      </Label>
-                    </div>
-                  ))}
-                </RadioGroup>
-              )}
-
-              {membershipEnabled && formData.tier !== "FREE" && (
-                <div className="space-y-2">
-                  <Label className="text-gray-200">Billing Interval</Label>
-                  <Select
-                    value={formData.billingInterval}
-                    onValueChange={(value) => handleInputChange("billingInterval", value)}
-                  >
-                    <SelectTrigger className="bg-black/20 border-purple-500/30 text-white">
-                      <SelectValue placeholder="Select billing interval" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-900 border-purple-500/30">
-                      {getAvailableBillingOptions(formData.tier).map((interval) => {
-                        const pricing = getMembershipPricing(formData.tier, interval)
-                        return (
-                          <SelectItem key={interval} value={interval} className="text-white hover:bg-purple-500/20">
-                            <div className="flex items-center justify-between w-full">
-                              <span className="capitalize">{interval}</span>
-                              {pricing && (
-                                <div className="ml-4 text-right">
-                                  {pricing.original_price && pricing.original_price > pricing.amount_ngn && (
-                                    <span className="text-xs text-gray-400 line-through mr-2">
-                                      {formatPrice(pricing.original_price)}
-                                    </span>
-                                  )}
-                                  <span className="text-purple-400 font-semibold">
-                                    {formatPrice(pricing.amount_ngn)}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </SelectItem>
-                        )
-                      })}
-                    </SelectContent>
-                  </Select>
-
-                  {/* Show pricing details */}
-                  {currentPricing && (
-                    <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-                      <div className="text-sm text-gray-300">
-                        <div className="flex justify-between items-center">
-                          <span>Duration:</span>
-                          <span>
-                            {currentPricing.months} month{currentPricing.months > 1 ? "s" : ""}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span>Coin Bonus:</span>
-                          <span className="text-yellow-400">{currentPricing.coins_bonus.toLocaleString()} coins</span>
-                        </div>
-                        {currentPricing.discount_amount && currentPricing.discount_amount > 0 && (
-                          <div className="flex justify-between items-center text-green-400">
-                            <span>Savings:</span>
-                            <span>{formatPrice(currentPricing.discount_amount)}</span>
+                            <div className="text-xs text-gray-400">{tier === "ENT" ? "annual only" : "per month"}</div>
                           </div>
                         )}
                       </div>
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+
+              {formData.tier === "PRO" && (
+                <div className="space-y-2">
+                  <Label className="text-gray-200">Billing Interval</Label>
+                  <Select value={formData.interval} onValueChange={(value) => handleInputChange("interval", value)}>
+                    <SelectTrigger className="bg-black/20 border-purple-500/30 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monthly">
+                        Monthly - <span className="line-through text-gray-400">₦10,000</span> ₦9,900
+                      </SelectItem>
+                      <SelectItem value="quarterly">
+                        Quarterly - ₦29,700 <span className="text-green-400">(Save ₦300)</span>
+                      </SelectItem>
+                      <SelectItem value="annually">
+                        Annually - ₦118,800 <span className="text-green-400">(Save ₦1,000)</span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {formData.tier !== "FREE" && (
+                <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-gray-300">Price:</span>
+                    <div className="text-right">
+                      {getOriginalPrice() > getCurrentPrice() && (
+                        <span className="line-through text-gray-400 text-sm mr-2">
+                          ₦{getOriginalPrice().toLocaleString()}
+                        </span>
+                      )}
+                      <span className="text-xl font-bold text-purple-400">₦{getCurrentPrice().toLocaleString()}</span>
                     </div>
-                  )}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-300 flex items-center">
+                      <Coins className="h-4 w-4 mr-1 text-yellow-400" />
+                      Coins Bonus:
+                    </span>
+                    <span className="text-yellow-400 font-semibold">{getCoinsBonus().toLocaleString()} coins</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -545,7 +494,7 @@ export default function SignupPage() {
             <Button
               type="submit"
               className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200"
-              disabled={isLoading || paymentLoading || tiersLoading}
+              disabled={isLoading || paymentLoading}
             >
               {paymentLoading ? (
                 <>
@@ -561,9 +510,7 @@ export default function SignupPage() {
                 <>
                   {formData.tier === "FREE"
                     ? "Create Free Account"
-                    : currentPricing
-                      ? `Pay ${formatPrice(currentPricing.amount_ngn)} & Create Account`
-                      : `Pay & Create Account`}
+                    : `Pay ₦${getCurrentPrice().toLocaleString()} & Create Account`}
                 </>
               )}
             </Button>
