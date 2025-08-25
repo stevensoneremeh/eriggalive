@@ -6,8 +6,9 @@ import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Users, Lock, MessageCircle, Crown } from "lucide-react"
+import { Users, Lock, MessageCircle, Star, Building } from "lucide-react"
 import Link from "next/link"
+import { UserTierBadge } from "@/components/user-tier-badge" // Fixed import to use named export
 
 interface ChatRoom {
   id: string
@@ -25,57 +26,47 @@ const CHAT_ROOMS: ChatRoom[] = [
     id: "general",
     name: "General Chat",
     description: "Open discussion for all community members",
-    requiredTier: "grassroot",
+    requiredTier: "free",
     memberCount: 1250,
     isActive: true,
     icon: <MessageCircle className="h-6 w-6" />,
     color: "bg-blue-500",
   },
   {
-    id: "grassroot",
-    name: "Grassroot Lounge",
-    description: "For Grassroot tier members and above",
-    requiredTier: "grassroot",
+    id: "citizen",
+    name: "Erigga Citizen Lounge", // Updated room name
+    description: "For Erigga Citizen members and above",
+    requiredTier: "free",
     memberCount: 890,
     isActive: true,
     icon: <Users className="h-6 w-6" />,
     color: "bg-green-500",
   },
   {
-    id: "pioneer",
-    name: "Pioneer Hub",
-    description: "Exclusive to Pioneer tier members and above",
-    requiredTier: "pioneer",
+    id: "indigen",
+    name: "Erigga Indigen Hub", // Updated room name
+    description: "Exclusive to Erigga Indigen members and above",
+    requiredTier: "pro",
     memberCount: 340,
     isActive: true,
-    icon: <Crown className="h-6 w-6" />,
+    icon: <Star className="h-6 w-6" />,
     color: "bg-blue-600",
   },
   {
-    id: "elder",
-    name: "Elder Council",
-    description: "For Elder tier members and above",
-    requiredTier: "elder",
-    memberCount: 120,
-    isActive: true,
-    icon: <Crown className="h-6 w-6" />,
-    color: "bg-purple-600",
-  },
-  {
-    id: "blood",
-    name: "Blood Brotherhood",
-    description: "The most exclusive tier - Blood members only",
-    requiredTier: "blood",
+    id: "enterprise",
+    name: "Enterprise Elite", // Updated room name
+    description: "The most exclusive tier - Enterprise members only",
+    requiredTier: "enterprise",
     memberCount: 45,
     isActive: true,
-    icon: <Crown className="h-6 w-6" />,
-    color: "bg-red-600",
+    icon: <Building className="h-6 w-6" />,
+    color: "bg-gradient-to-r from-yellow-400 to-yellow-600",
   },
   {
     id: "freebies",
     name: "Freebies Room",
     description: "Vote on and access free content",
-    requiredTier: "grassroot",
+    requiredTier: "free",
     memberCount: 2100,
     isActive: true,
     icon: <MessageCircle className="h-6 w-6" />,
@@ -84,11 +75,10 @@ const CHAT_ROOMS: ChatRoom[] = [
 ]
 
 const TIER_HIERARCHY = {
-  grassroot: 1,
-  pioneer: 2,
-  elder: 3,
-  blood: 4,
-  admin: 5,
+  free: 1,
+  pro: 2,
+  enterprise: 3,
+  admin: 4,
 }
 
 export default function ChatPage() {
@@ -145,7 +135,7 @@ export default function ChatPage() {
             Connect with community members in tier-based chat rooms
           </p>
           <div className="mt-4">
-            <Badge className="bg-gradient-to-r from-purple-600 to-blue-600 text-white">Your Tier: {profile.tier}</Badge>
+            <UserTierBadge tier={profile.tier} /> {/* Updated badge display */}
           </div>
         </div>
 

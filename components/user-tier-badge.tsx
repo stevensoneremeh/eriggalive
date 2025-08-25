@@ -1,4 +1,4 @@
-import { Crown, Shield, Droplet, User, Building } from "lucide-react"
+import { User, Building, Star } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
@@ -10,62 +10,72 @@ interface UserTierBadgeProps {
 
 export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierBadgeProps) {
   const tierInfo = {
-    // Legacy grassroot system (keeping for backward compatibility)
+    // Legacy grassroot system (keeping for backward compatibility) - Updated to use new badge names
     grassroot: {
-      label: "ECor Erigga Citizen",
+      label: "Erigga Citizen",
       icon: User,
-      color: "bg-gray-500/20 text-gray-500 border-gray-500",
-      tooltip: "Free tier member - ECor Erigga Citizen",
+      color: "bg-green-500/20 text-green-600 border-green-500",
+      tooltip: "Free tier member - Erigga Citizen",
     },
     pioneer: {
       label: "Erigga Indigen",
-      icon: Crown,
-      color: "bg-blue-500/20 text-blue-500 border-blue-500",
+      icon: Star,
+      color: "bg-blue-500/20 text-blue-600 border-blue-500",
       tooltip: "Pro tier member - Erigga Indigen with premium access",
     },
     elder: {
-      label: "Elder",
-      icon: Shield,
-      color: "bg-gold-400/20 text-gold-400 border-gold-400",
-      tooltip: "Elder tier member with enhanced premium access",
+      label: "Erigga Indigen",
+      icon: Star,
+      color: "bg-blue-500/20 text-blue-600 border-blue-500",
+      tooltip: "Pro tier member - Erigga Indigen with premium access",
     },
     blood: {
-      label: "Blood",
-      icon: Droplet,
-      color: "bg-red-500/20 text-red-500 border-red-500",
-      tooltip: "Blood tier member with exclusive access",
+      label: "E",
+      icon: Building,
+      color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",
+      tooltip: "Enterprise tier member with VIP gold access",
     },
-    // New membership tier system
+    // New membership tier system - Updated with new badge colors and names
     FREE: {
-      label: "ECor Erigga Citizen",
+      label: "Erigga Citizen",
       icon: User,
-      color: "bg-gray-500/20 text-gray-500 border-gray-500",
-      tooltip: "Free tier member - ECor Erigga Citizen",
+      color: "bg-green-500/20 text-green-600 border-green-500",
+      tooltip: "Free tier member - Erigga Citizen",
+    },
+    free: {
+      label: "Erigga Citizen",
+      icon: User,
+      color: "bg-green-500/20 text-green-600 border-green-500",
+      tooltip: "Free tier member - Erigga Citizen",
     },
     PRO: {
       label: "Erigga Indigen",
-      icon: Crown,
-      color: "bg-blue-500/20 text-blue-500 border-blue-500",
+      icon: Star,
+      color: "bg-blue-500/20 text-blue-600 border-blue-500",
+      tooltip: "Pro tier member - Erigga Indigen with premium access",
+    },
+    pro: {
+      label: "Erigga Indigen",
+      icon: Star,
+      color: "bg-blue-500/20 text-blue-600 border-blue-500",
       tooltip: "Pro tier member - Erigga Indigen with premium access",
     },
     ENT: {
       label: "E",
       icon: Building,
-      color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-400 border-yellow-400",
+      color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",
+      tooltip: "Enterprise tier member with VIP gold access",
+    },
+    enterprise: {
+      label: "E",
+      icon: Building,
+      color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",
       tooltip: "Enterprise tier member with VIP gold access",
     },
   }
 
-  const normalizedTier =
-    tier?.toLowerCase() === "free" || tier?.toLowerCase() === "grassroot"
-      ? "FREE"
-      : tier?.toLowerCase() === "pro" || tier?.toLowerCase() === "pioneer"
-        ? "PRO"
-        : tier?.toLowerCase() === "enterprise" || tier?.toLowerCase() === "ent"
-          ? "ENT"
-          : tier?.toUpperCase()
-
-  const tierData = tierInfo[normalizedTier as keyof typeof tierInfo] || tierInfo.FREE
+  const normalizedTier = tier?.toLowerCase() || "free"
+  const tierData = tierInfo[normalizedTier as keyof typeof tierInfo] || tierInfo.free
 
   const IconComponent = tierData.icon
 
@@ -85,11 +95,13 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
     lg: "h-5 w-5",
   }
 
-  const isEnterprise = normalizedTier === "ENT"
+  const isEnterprise = normalizedTier === "ent" || normalizedTier === "enterprise" || normalizedTier === "blood"
 
   const enterpriseClasses = isEnterprise
-    ? "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-400 border-yellow-400 shadow-lg shadow-yellow-400/25 hover:shadow-yellow-400/40 hover:from-yellow-400/40 hover:to-amber-500/40"
+    ? "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500 shadow-lg shadow-yellow-400/25 hover:shadow-yellow-400/40 hover:from-yellow-400/40 hover:to-amber-500/40 font-bold"
     : ""
+
+  const enterpriseTextStyle = isEnterprise && tierData.label === "E" ? "font-black text-xl tracking-wider" : ""
 
   return (
     <TooltipProvider>
@@ -100,7 +112,7 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
             className={`${isEnterprise ? enterpriseClasses : tierData.color} ${sizeClasses[size]} font-medium transition-all duration-300 ${isEnterprise ? "animate-pulse" : ""}`}
           >
             <IconComponent className={`${iconSizes[size]} ${showLabel ? "mr-1" : ""}`} />
-            {showLabel && tierData.label}
+            {showLabel && <span className={enterpriseTextStyle}>{tierData.label}</span>}
           </Badge>
         </TooltipTrigger>
         <TooltipContent>
@@ -110,3 +122,5 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
     </TooltipProvider>
   )
 }
+
+export default UserTierBadge

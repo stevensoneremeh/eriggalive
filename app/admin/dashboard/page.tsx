@@ -23,32 +23,81 @@ export default function DashboardPage() {
   }
 
   const getTierColor = (tier: string) => {
-    switch (tier) {
-      case "grassroot":
+    const normalizedTier = tier?.toLowerCase().replace(/[_\s]/g, "") || "free"
+
+    // Map legacy tiers to new system
+    const tierMapping: Record<string, string> = {
+      grassroot: "free",
+      grassroots: "free",
+      pioneer: "pro",
+      elder: "pro",
+      bloodbrotherhood: "enterprise",
+      blood: "enterprise",
+    }
+
+    const mappedTier = tierMapping[normalizedTier] || normalizedTier
+
+    switch (mappedTier) {
+      case "free":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-      case "pioneer":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
-      case "elder":
+      case "pro":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-      case "blood_brotherhood":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+      case "enterprise":
+        return "bg-gradient-to-r from-yellow-400 to-yellow-600 text-yellow-900 dark:from-yellow-500 dark:to-yellow-700 dark:text-yellow-100"
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
     }
   }
 
   const getTierProgress = (tier: string) => {
-    switch (tier) {
-      case "grassroot":
-        return 25
-      case "pioneer":
-        return 50
-      case "elder":
-        return 75
-      case "blood_brotherhood":
+    const normalizedTier = tier?.toLowerCase().replace(/[_\s]/g, "") || "free"
+
+    const tierMapping: Record<string, string> = {
+      grassroot: "free",
+      grassroots: "free",
+      pioneer: "pro",
+      elder: "pro",
+      bloodbrotherhood: "enterprise",
+      blood: "enterprise",
+    }
+
+    const mappedTier = tierMapping[normalizedTier] || normalizedTier
+
+    switch (mappedTier) {
+      case "free":
+        return 33
+      case "pro":
+        return 66
+      case "enterprise":
         return 100
       default:
         return 0
+    }
+  }
+
+  const getTierDisplayName = (tier: string) => {
+    const normalizedTier = tier?.toLowerCase().replace(/[_\s]/g, "") || "free"
+
+    const tierMapping: Record<string, string> = {
+      grassroot: "free",
+      grassroots: "free",
+      pioneer: "pro",
+      elder: "pro",
+      bloodbrotherhood: "enterprise",
+      blood: "enterprise",
+    }
+
+    const mappedTier = tierMapping[normalizedTier] || normalizedTier
+
+    switch (mappedTier) {
+      case "free":
+        return "ERIGGA CITIZEN"
+      case "pro":
+        return "ERIGGA INDIGEN"
+      case "enterprise":
+        return "E"
+      default:
+        return "ERIGGA CITIZEN"
     }
   }
 
@@ -68,9 +117,9 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div className="mt-4 sm:mt-0">
-                <Badge className={`px-3 py-1 ${getTierColor(profile?.subscription_tier || "grassroot")}`}>
+                <Badge className={`px-3 py-1 ${getTierColor(profile?.subscription_tier || "free")}`}>
                   <Crown className="w-4 h-4 mr-1" />
-                  {profile?.subscription_tier?.replace("_", " ").toUpperCase() || "GRASSROOT"}
+                  {getTierDisplayName(profile?.subscription_tier || "free")}
                 </Badge>
               </div>
             </div>
@@ -155,53 +204,39 @@ export default function DashboardPage() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">
-                        {profile?.subscription_tier?.replace("_", " ").toUpperCase() || "GRASSROOT"} Member
+                        {getTierDisplayName(profile?.subscription_tier || "free")} Member
                       </span>
                       <span className="text-sm text-gray-500">
-                        {getTierProgress(profile?.subscription_tier || "grassroot")}% Complete
+                        {getTierProgress(profile?.subscription_tier || "free")}% Complete
                       </span>
                     </div>
-                    <Progress value={getTierProgress(profile?.subscription_tier || "grassroot")} className="h-2" />
-                    <div className="grid grid-cols-4 gap-2 text-xs">
+                    <Progress value={getTierProgress(profile?.subscription_tier || "free")} className="h-2" />
+                    <div className="grid grid-cols-3 gap-2 text-xs">
                       <div className="text-center">
                         <div
                           className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.subscription_tier || "grassroot") >= 25
-                              ? "bg-green-500"
-                              : "bg-gray-300"
+                            getTierProgress(profile?.subscription_tier || "free") >= 33 ? "bg-green-500" : "bg-gray-300"
                           }`}
                         />
-                        <span>Grassroot</span>
+                        <span>Erigga Citizen</span>
                       </div>
                       <div className="text-center">
                         <div
                           className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.subscription_tier || "grassroot") >= 50
-                              ? "bg-purple-500"
-                              : "bg-gray-300"
+                            getTierProgress(profile?.subscription_tier || "free") >= 66 ? "bg-blue-500" : "bg-gray-300"
                           }`}
                         />
-                        <span>Pioneer</span>
+                        <span>Erigga Indigen</span>
                       </div>
                       <div className="text-center">
                         <div
                           className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.subscription_tier || "grassroot") >= 75
-                              ? "bg-blue-500"
-                              : "bg-gray-300"
-                          }`}
-                        />
-                        <span>Elder</span>
-                      </div>
-                      <div className="text-center">
-                        <div
-                          className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.subscription_tier || "grassroot") >= 100
+                            getTierProgress(profile?.subscription_tier || "free") >= 100
                               ? "bg-yellow-500"
                               : "bg-gray-300"
                           }`}
                         />
-                        <span>Blood Brotherhood</span>
+                        <span className="font-bold">E</span>
                       </div>
                     </div>
                   </div>
