@@ -332,42 +332,6 @@ export function UnifiedNavigation() {
                     </div>
                   </div>
 
-                  {/* Theme Toggle Section for Mobile */}
-                  <div className="p-4 border-t bg-muted/20">
-                    <div className="mb-4">
-                      <p className="text-sm font-medium mb-3 text-muted-foreground">Theme</p>
-                      <div className="grid grid-cols-3 gap-2">
-                        <Button
-                          variant={theme === "light" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTheme("light")}
-                          className="flex flex-col items-center py-3 h-auto text-xs"
-                        >
-                          <Sun className="h-4 w-4 mb-1" />
-                          Light
-                        </Button>
-                        <Button
-                          variant={theme === "dark" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTheme("dark")}
-                          className="flex flex-col items-center py-3 h-auto text-xs"
-                        >
-                          <Moon className="h-4 w-4 mb-1" />
-                          Dark
-                        </Button>
-                        <Button
-                          variant={theme === "system" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTheme("system")}
-                          className="flex flex-col items-center py-3 h-auto text-xs"
-                        >
-                          <Monitor className="h-4 w-4 mb-1" />
-                          Auto
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Auth Buttons for Mobile */}
                   <div className="p-4 border-t">
                     {user ? (
@@ -421,6 +385,42 @@ export function UnifiedNavigation() {
                         </Button>
                       </div>
                     )}
+                  </div>
+
+                  {/* Theme Toggle Section for Mobile */}
+                  <div className="p-4 border-t bg-muted/20">
+                    <div className="mb-4">
+                      <p className="text-sm font-medium mb-3 text-muted-foreground">Theme</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button
+                          variant={theme === "light" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setTheme("light")}
+                          className="flex flex-col items-center py-3 h-auto text-xs"
+                        >
+                          <Sun className="h-4 w-4 mb-1" />
+                          Light
+                        </Button>
+                        <Button
+                          variant={theme === "dark" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setTheme("dark")}
+                          className="flex flex-col items-center py-3 h-auto text-xs"
+                        >
+                          <Moon className="h-4 w-4 mb-1" />
+                          Dark
+                        </Button>
+                        <Button
+                          variant={theme === "system" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setTheme("system")}
+                          className="flex flex-col items-center py-3 h-auto text-xs"
+                        >
+                          <Monitor className="h-4 w-4 mb-1" />
+                          Auto
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </SheetContent>
