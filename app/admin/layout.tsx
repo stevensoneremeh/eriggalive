@@ -13,7 +13,8 @@ import { useAuth } from "@/contexts/auth-context"
 
 const adminNavItems = [
   { name: "Overview", href: "/admin", icon: Home },
-  { name: "Scanner", href: "/admin/scanner", icon: Scan }, // Added scanner navigation item
+  { name: "Scanner", href: "/admin/scanner", icon: Scan },
+  { name: "Withdrawals", href: "/admin/withdrawals", icon: CreditCard },
   { name: "Users", href: "/admin/users", icon: Users },
   { name: "Transactions", href: "/admin/transactions", icon: CreditCard },
   { name: "Media", href: "/admin/media", icon: ImageIcon },

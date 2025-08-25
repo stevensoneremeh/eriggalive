@@ -13,15 +13,18 @@ import {
   Plus,
   Minus,
   History,
-  CreditCard,
   ArrowUpRight,
   ArrowDownLeft,
   Eye,
   EyeOff,
+  Building2,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useUserBalance } from "@/hooks/useUserBalance"
 import { CoinPurchaseEnhanced } from "@/components/coin-purchase-enhanced"
+import { WithdrawalRequestForm } from "@/components/withdrawal/withdrawal-request-form"
+import { WithdrawalHistory } from "@/components/withdrawal/withdrawal-history"
+import { BankAccountManager } from "@/components/bank/bank-account-manager"
 
 interface Transaction {
   id: string
@@ -196,10 +199,12 @@ export function WalletDashboard() {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="purchase">Buy Coins</TabsTrigger>
+          <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
+          <TabsTrigger value="banks">Bank Accounts</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -218,21 +223,29 @@ export function WalletDashboard() {
                   <Plus className="h-5 w-5" />
                   Buy Coins
                 </Button>
-                <Button variant="outline" className="h-20 flex-col gap-2 bg-transparent" disabled>
+                <Button
+                  variant="outline"
+                  className="h-20 flex-col gap-2 bg-transparent"
+                  onClick={() => setActiveTab("withdraw")}
+                >
                   <Minus className="h-5 w-5" />
                   Withdraw
                 </Button>
                 <Button
                   variant="outline"
                   className="h-20 flex-col gap-2 bg-transparent"
-                  onClick={() => setActiveTab("transactions")}
+                  onClick={() => setActiveTab("banks")}
+                >
+                  <Building2 className="h-5 w-5" />
+                  Bank Accounts
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-20 flex-col gap-2 bg-transparent"
+                  onClick={() => setActiveTab("history")}
                 >
                   <History className="h-5 w-5" />
                   History
-                </Button>
-                <Button variant="outline" className="h-20 flex-col gap-2 bg-transparent" disabled>
-                  <CreditCard className="h-5 w-5" />
-                  Cards
                 </Button>
               </div>
             </CardContent>
@@ -242,7 +255,7 @@ export function WalletDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Recent Transactions</CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => setActiveTab("transactions")}>
+              <Button variant="ghost" size="sm" onClick={() => setActiveTab("history")}>
                 View All
               </Button>
             </CardHeader>
@@ -277,53 +290,6 @@ export function WalletDashboard() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="transactions" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Transaction History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loadingTransactions ? (
-                <div className="text-center py-8 text-muted-foreground">Loading transactions...</div>
-              ) : transactions.length > 0 ? (
-                <div className="space-y-4">
-                  {transactions.map((transaction) => (
-                    <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center gap-4">
-                        {getTransactionIcon(transaction.type, transaction.category)}
-                        <div>
-                          <p className="font-medium">{transaction.description}</p>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span>{formatDate(transaction.created_at)}</span>
-                            <span>•</span>
-                            <span className="capitalize">{transaction.payment_method}</span>
-                            {transaction.reference_type && (
-                              <>
-                                <span>•</span>
-                                <span className="capitalize">{transaction.reference_type}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-medium">
-                          {transaction.type === "purchase" || transaction.type === "withdrawal" ? "-" : "+"}
-                          {transaction.amount_naira && formatCurrency(transaction.amount_naira)}
-                          {transaction.amount_coins && `${transaction.amount_coins} coins`}
-                        </div>
-                        <Badge className={getStatusColor(transaction.status)}>{transaction.status}</Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">No transactions found</div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="purchase" className="space-y-6">
           <Card>
             <CardHeader>
@@ -342,6 +308,28 @@ export function WalletDashboard() {
               />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="withdraw" className="space-y-6">
+          <WithdrawalRequestForm
+            onSuccess={(withdrawal) => {
+              // Store withdrawal data for success page
+              localStorage.setItem("lastWithdrawal", JSON.stringify(withdrawal))
+              // Redirect to success page
+              window.location.href = `/wallet/withdrawal/success?ref=${withdrawal.reference_code}&amount=${withdrawal.amount_coins}&bank=${encodeURIComponent(withdrawal.bank_account.bank_name)}`
+            }}
+            onError={(error) => {
+              console.error("Withdrawal error:", error)
+            }}
+          />
+        </TabsContent>
+
+        <TabsContent value="banks" className="space-y-6">
+          <BankAccountManager />
+        </TabsContent>
+
+        <TabsContent value="history" className="space-y-6">
+          <WithdrawalHistory />
         </TabsContent>
       </Tabs>
     </div>
