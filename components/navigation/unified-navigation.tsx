@@ -31,6 +31,7 @@ import {
   Ticket,
   Info,
   LayoutDashboard,
+  Wallet,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
@@ -49,6 +50,7 @@ const navigationItems = [
   { name: "Merch", href: "/merch", icon: ShoppingBag },
   { name: "Chronicles", href: "/chronicles", icon: Calendar },
   { name: "Coins", href: "/coins", icon: Coins },
+  { name: "Wallet", href: "/wallet", icon: Wallet },
   { name: "Tickets", href: "/tickets", icon: Ticket },
   { name: "About", href: "/about", icon: Info },
 ]
@@ -83,10 +85,6 @@ export function UnifiedNavigation() {
 
   const getDesktopNavItems = () => {
     if (user) {
-      // For authenticated users, show: Home, Mission, Community, Radio, Events, Vault, Dashboard
-      return navigationItems.slice(0, 7)
-    } else {
-      // For unauthenticated users, show: Home, Mission, Community, Radio, Events, Vault, About
       return [
         navigationItems[0], // Home
         navigationItems[1], // Mission
@@ -94,7 +92,18 @@ export function UnifiedNavigation() {
         navigationItems[3], // Radio
         navigationItems[4], // Events
         navigationItems[5], // Vault
-        navigationItems[13], // About
+        navigationItems[6], // Dashboard
+        navigationItems[12], // Wallet
+      ]
+    } else {
+      return [
+        navigationItems[0], // Home
+        navigationItems[1], // Mission
+        navigationItems[2], // Community
+        navigationItems[3], // Radio
+        navigationItems[4], // Events
+        navigationItems[5], // Vault
+        navigationItems[14], // About
       ]
     }
   }
@@ -180,6 +189,12 @@ export function UnifiedNavigation() {
                       <Link href="/dashboard" className="flex items-center">
                         <User className="mr-2 h-4 w-4" />
                         <span>Dashboard</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/wallet" className="flex items-center">
+                        <Wallet className="mr-2 h-4 w-4" />
+                        <span>Wallet</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
@@ -276,6 +291,12 @@ export function UnifiedNavigation() {
                         <Link href="/dashboard" onClick={() => setIsOpen(false)}>
                           <User className="mr-2 h-4 w-4" />
                           Dashboard
+                        </Link>
+                      </Button>
+                      <Button asChild variant="outline" className="w-full justify-start bg-transparent">
+                        <Link href="/wallet" onClick={() => setIsOpen(false)}>
+                          <Wallet className="mr-2 h-4 w-4" />
+                          Wallet
                         </Link>
                       </Button>
                       <Button asChild variant="outline" className="w-full justify-start bg-transparent">

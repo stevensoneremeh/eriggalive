@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/supabase/server"
 import crypto from "crypto"
 
 export async function POST(request: NextRequest) {
@@ -7,15 +7,17 @@ export async function POST(request: NextRequest) {
     const body = await request.text()
     const signature = request.headers.get("x-paystack-signature")
 
+    // Verify webhook signature
     const secret = process.env.PAYSTACK_WEBHOOK_SECRET
-    if (secret && signature) {
-      const hash = crypto.createHmac("sha512", secret).update(body).digest("hex")
-      if (hash !== signature) {
-        console.error("Invalid webhook signature")
-        return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
-      }
-    } else if (!secret) {
-      console.warn("PAYSTACK_WEBHOOK_SECRET not configured - webhook verification skipped")
+    if (!secret) {
+      console.error("PAYSTACK_WEBHOOK_SECRET not configured")
+      return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 })
+    }
+
+    const hash = crypto.createHmac("sha512", secret).update(body).digest("hex")
+    if (hash !== signature) {
+      console.error("Invalid webhook signature")
+      return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
     }
 
     const event = JSON.parse(body)
@@ -31,12 +33,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Payment not successful" })
     }
 
-    const supabase = await createClient()
+    const supabase = createServerClient()
 
+    // Find payment record
     const { data: payment, error: paymentError } = await supabase
       .from("payments")
       .select("*")
-      .eq("reference", reference)
+      .eq("provider_ref", reference)
       .single()
 
     if (paymentError || !payment) {
@@ -49,66 +52,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Payment already processed" })
     }
 
-    const expectedAmount = Math.round(payment.amount * 100) // Convert to kobo
-    if (Math.abs(amount - expectedAmount) > 100) {
-      // Allow small rounding differences
-      console.error("Amount mismatch:", { expected: expectedAmount, received: amount })
+    // Validate amount
+    if (amount !== payment.amount_ngn * 100) {
+      // Paystack sends amount in kobo
+      console.error("Amount mismatch:", { expected: payment.amount_ngn * 100, received: amount })
       return NextResponse.json({ error: "Amount mismatch" }, { status: 400 })
     }
 
-    const { tier, billing_interval } = payment.metadata as any
+    // Calculate months based on interval
+    const months =
+      payment.interval === "monthly"
+        ? 1
+        : payment.interval === "quarterly"
+          ? 3
+          : payment.interval === "annually"
+            ? 12
+            : 1
 
-    // Calculate expiry date
-    const now = new Date()
-    const expiryDate = new Date(now)
-
-    if (billing_interval === "monthly") {
-      expiryDate.setMonth(expiryDate.getMonth() + 1)
-    } else if (billing_interval === "quarterly") {
-      expiryDate.setMonth(expiryDate.getMonth() + 3)
-    } else if (billing_interval === "annually") {
-      expiryDate.setFullYear(expiryDate.getFullYear() + 1)
-    }
-
-    // Update or create membership
-    const { error: membershipError } = await supabase.from("memberships").upsert({
-      user_id: payment.user_id,
-      tier_id: tier,
-      status: "active",
-      billing_interval: billing_interval,
-      amount_paid: payment.amount,
-      expires_at: expiryDate.toISOString(),
-      updated_at: new Date().toISOString(),
+    // Process membership upgrade using database function
+    const { error: upgradeError } = await supabase.rpc("process_membership_upgrade", {
+      user_uuid: payment.user_id,
+      tier_code: payment.tier_code,
+      months: months,
+      payment_ref: reference,
     })
 
-    if (membershipError) {
-      console.error("Membership update error:", membershipError)
-      return NextResponse.json({ error: "Failed to update membership" }, { status: 500 })
-    }
-
-    const coinBonus =
-      tier === "PRO"
-        ? billing_interval === "monthly"
-          ? 1000
-          : billing_interval === "quarterly"
-            ? 3000
-            : 12000
-        : tier === "ENT"
-          ? 12000
-          : 0
-
-    if (coinBonus > 0) {
-      // Add coins using the database function
-      const { error: coinsError } = await supabase.rpc("add_coins", {
-        user_id: payment.user_id,
-        amount: coinBonus,
-        description: `${tier} membership bonus - ${billing_interval}`,
-      })
-
-      if (coinsError) {
-        console.error("Coins bonus error:", coinsError)
-        // Don't fail the webhook for coin errors, just log
-      }
+    if (upgradeError) {
+      console.error("Membership upgrade error:", upgradeError)
+      return NextResponse.json({ error: "Failed to upgrade membership" }, { status: 500 })
     }
 
     // Update payment status
@@ -116,7 +87,6 @@ export async function POST(request: NextRequest) {
       .from("payments")
       .update({
         status: "completed",
-        verified_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", payment.id)

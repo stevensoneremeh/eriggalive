@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 
 async function verifyUser(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = createClient()
     const {
       data: { user },
       error: authError,
@@ -13,17 +13,7 @@ async function verifyUser(request: NextRequest) {
       return { error: "Authentication required", user: null, profile: null }
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single()
-
-    if (profileError || !profile) {
-      return { error: "User profile not found", user: null, profile: null }
-    }
-
-    return { user, profile, error: null }
+    return { user, profile: null, error: null }
   } catch (error) {
     console.error("Authentication error:", error)
     return { error: "Authentication failed", user: null, profile: null }
@@ -32,7 +22,7 @@ async function verifyUser(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const { user, profile, error: authError } = await verifyUser(request)
+    const { user, error: authError } = await verifyUser(request)
     if (authError || !user) {
       return NextResponse.json({ success: false, error: authError || "Unauthorized" }, { status: 401 })
     }
@@ -40,33 +30,63 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const limit = Number.parseInt(searchParams.get("limit") || "50")
     const offset = Number.parseInt(searchParams.get("offset") || "0")
+    const type = searchParams.get("type")
+    const category = searchParams.get("category")
 
-    const supabase = await createClient()
+    const supabase = createClient()
 
-    const { data: transactions, error: transactionsError } = await supabase
-      .from("wallet_ledger")
+    let query = supabase
+      .from("wallet_transactions")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1)
+
+    // Apply filters
+    if (type) {
+      query = query.eq("type", type)
+    }
+
+    const { data: transactions, error: transactionsError } = await query
 
     if (transactionsError) {
       console.error("Error fetching transactions:", transactionsError)
       return NextResponse.json({ success: false, error: "Failed to fetch transactions" }, { status: 500 })
     }
 
-    const { count, error: countError } = await supabase
-      .from("wallet_ledger")
+    // Get transaction count for pagination
+    let countQuery = supabase
+      .from("wallet_transactions")
       .select("*", { count: "exact", head: true })
       .eq("user_id", user.id)
+
+    if (type) {
+      countQuery = countQuery.eq("type", type)
+    }
+
+    const { count, error: countError } = await countQuery
 
     if (countError) {
       console.error("Error counting transactions:", countError)
     }
 
+    const formattedTransactions = (transactions || []).map((transaction) => ({
+      id: transaction.id,
+      type: transaction.type,
+      category: "coins", // Default category for wallet transactions
+      amount_naira: transaction.type === "bonus" ? null : Math.abs(transaction.amount),
+      amount_coins: transaction.type === "bonus" ? transaction.amount : null,
+      payment_method: "wallet",
+      status: "completed",
+      description: transaction.description || `${transaction.type} transaction`,
+      created_at: transaction.created_at,
+      reference_type: transaction.reference_id ? "membership" : null,
+      metadata: transaction.metadata || {},
+    }))
+
     return NextResponse.json({
       success: true,
-      transactions: transactions || [],
+      transactions: formattedTransactions,
       pagination: {
         total: count || 0,
         limit,
