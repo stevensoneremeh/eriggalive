@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -37,7 +37,7 @@ interface Transaction {
   description: string
   created_at: string
   reference_type?: string
-  metadata?: any
+  metadata?: Record<string, string | number | boolean>
 }
 
 export function WalletDashboard() {
@@ -48,27 +48,85 @@ export function WalletDashboard() {
   const [activeTab, setActiveTab] = useState("overview")
   const [loadingTransactions, setLoadingTransactions] = useState(false)
 
+  const fetchTransactions = useCallback(async () => {
+    if (!profile?.id) return
+
+    setLoadingTransactions(true)
+    try {
+      const response = await fetch("/api/wallet/transactions?limit=50")
+      if (response.ok) {
+        const data = await response.json()
+        const sanitizedTransactions = (data.transactions || []).map((t: any) => ({
+          id: t.id,
+          type: t.type,
+          category: t.category,
+          amount_naira: t.amount_naira,
+          amount_coins: t.amount_coins,
+          payment_method: t.payment_method,
+          status: t.status,
+          description: t.description,
+          created_at: t.created_at,
+          reference_type: t.reference_type,
+          metadata:
+            t.metadata && typeof t.metadata === "object"
+              ? Object.fromEntries(
+                  Object.entries(t.metadata).filter(
+                    ([_, value]) =>
+                      typeof value === "string" || typeof value === "number" || typeof value === "boolean",
+                  ),
+                )
+              : undefined,
+        }))
+        setTransactions(sanitizedTransactions)
+      }
+    } catch (error) {
+      console.error("Error fetching transactions:", error)
+      setTransactions([])
+    } finally {
+      setLoadingTransactions(false)
+    }
+  }, [profile?.id])
+
   // Fetch transaction history
   useEffect(() => {
-    const fetchTransactions = async () => {
-      if (!profile?.id) return
+    fetchTransactions()
 
-      setLoadingTransactions(true)
-      try {
-        const response = await fetch("/api/wallet/transactions")
-        if (response.ok) {
-          const data = await response.json()
-          setTransactions(data.transactions || [])
-        }
-      } catch (error) {
-        console.error("Error fetching transactions:", error)
-      } finally {
-        setLoadingTransactions(false)
-      }
+    return () => {
+      setTransactions([])
+      setLoadingTransactions(false)
+    }
+  }, [fetchTransactions])
+
+  const handlePurchaseSuccess = useCallback(
+    (transaction: any) => {
+      refresh()
+      fetchTransactions()
+    },
+    [refresh, fetchTransactions],
+  )
+
+  const handleWithdrawalSuccess = useCallback((withdrawal: any) => {
+    const sanitizedWithdrawal = {
+      reference_code: withdrawal.reference_code,
+      amount_coins: withdrawal.amount_coins,
+      bank_name: withdrawal.bank_account?.bank_name || "Unknown Bank",
+      created_at: withdrawal.created_at,
     }
 
-    fetchTransactions()
-  }, [profile?.id])
+    try {
+      localStorage.setItem("lastWithdrawal", JSON.stringify(sanitizedWithdrawal))
+      const params = new URLSearchParams({
+        ref: sanitizedWithdrawal.reference_code,
+        amount: sanitizedWithdrawal.amount_coins.toString(),
+        bank: sanitizedWithdrawal.bank_name,
+      })
+      window.location.href = `/wallet/withdrawal/success?${params.toString()}`
+    } catch (error) {
+      console.error("Error storing withdrawal data:", error)
+      // Fallback navigation without params
+      window.location.href = "/wallet/withdrawal/success"
+    }
+  }, [])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-NG", {
@@ -297,11 +355,7 @@ export function WalletDashboard() {
             </CardHeader>
             <CardContent>
               <CoinPurchaseEnhanced
-                onSuccess={(transaction) => {
-                  refresh()
-                  // Refresh transactions
-                  window.location.reload()
-                }}
+                onSuccess={handlePurchaseSuccess}
                 onError={(error) => {
                   console.error("Purchase error:", error)
                 }}
@@ -312,12 +366,7 @@ export function WalletDashboard() {
 
         <TabsContent value="withdraw" className="space-y-6">
           <WithdrawalRequestForm
-            onSuccess={(withdrawal) => {
-              // Store withdrawal data for success page
-              localStorage.setItem("lastWithdrawal", JSON.stringify(withdrawal))
-              // Redirect to success page
-              window.location.href = `/wallet/withdrawal/success?ref=${withdrawal.reference_code}&amount=${withdrawal.amount_coins}&bank=${encodeURIComponent(withdrawal.bank_account.bank_name)}`
-            }}
+            onSuccess={handleWithdrawalSuccess}
             onError={(error) => {
               console.error("Withdrawal error:", error)
             }}
