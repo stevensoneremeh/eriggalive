@@ -28,34 +28,33 @@ const TIER_PRICES = {
     annually: 0,
   },
   PRO: {
-    monthly: 9900, // ₦9,900 (discounted from ₦10,000)
-    quarterly: 29700, // ₦29,700 (₦9,900 × 3 - ₦300 discount)
-    annually: 118800, // ₦118,800 (₦9,900 × 12 - ₦1,000 discount)
+    monthly: 25000, // ₦25,000 per month
+    quarterly: 72000, // ₦72,000 (₦24,000 × 3 - save ₦3,000)
+    annually: 280000, // ₦280,000 (₦25,000 × 12 - save ₦20,000)
   },
   ENT: {
-    annually: 119900, // ₦119,900 (annual only, ends in 9)
+    annually: 150000, // ₦150,000 minimum annually (custom amount)
   },
 }
 
 const TIER_FEATURES = {
-  FREE: ["Access to basic content", "Community participation", "Basic profile features", "Limited downloads"],
+  FREE: ["Basic community access", "General chat rooms", "Limited content access", "ECor Erigga Citizen badge"],
   PRO: [
     "All Free features",
-    "Premium content access",
+    "Premium chat rooms",
+    "Exclusive content access",
     "Priority support",
-    "Unlimited downloads",
-    "Exclusive events access",
-    "1,000 Erigga Coins per month",
+    "1,000 coins per month",
+    "Erigga Indigen badge",
   ],
   ENT: [
     "All Pro features",
     "VIP community access",
     "Direct artist interaction",
-    "Early content access",
-    "Merchandise discounts",
-    "Meet & greet opportunities",
-    "12,000 Erigga Coins bonus",
-    "Gold dashboard theme",
+    "Custom gold dashboard",
+    "12,000 coins annually",
+    "Enterprise 'E' badge in gold",
+    "Custom amount (min ₦150,000)",
   ],
 }
 
@@ -68,6 +67,7 @@ export default function SignupPage() {
     fullName: "",
     tier: "FREE",
     interval: "monthly",
+    customAmount: "150000", // Default minimum for Enterprise
   })
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -91,6 +91,13 @@ export default function SignupPage() {
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
     setError("")
+
+    if (field === "customAmount" && formData.tier === "ENT") {
+      const amount = Number.parseInt(value.replace(/,/g, ""))
+      if (amount < 150000) {
+        setError("Enterprise tier minimum is ₦150,000 annually")
+      }
+    }
   }
 
   const validateForm = () => {
@@ -120,38 +127,27 @@ export default function SignupPage() {
       return false
     }
 
+    if (formData.tier === "ENT") {
+      const amount = Number.parseInt(formData.customAmount.replace(/,/g, ""))
+      if (amount < 150000) {
+        setError("Enterprise tier minimum is ₦150,000 annually")
+        return false
+      }
+    }
+
     return true
   }
 
-  const handlePaystackPayment = (amount: number, tier: string, interval: string) => {
-    return new Promise((resolve, reject) => {
-      if (!window.PaystackPop) {
-        reject(new Error("Paystack not loaded"))
-        return
-      }
+  const handlePayment = async () => {
+    if (formData.tier === "FREE") {
+      return null // No payment needed for free tier
+    }
 
-      const handler = window.PaystackPop.setup({
-        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_your_key_here",
-        email: formData.email,
-        amount: amount * 100, // Convert to kobo
-        currency: "NGN",
-        ref: `erigga_${tier}_${interval}_${Date.now()}`,
-        metadata: {
-          tier: tier,
-          interval: interval,
-          username: formData.username,
-          full_name: formData.fullName,
-        },
-        callback: (response: any) => {
-          resolve(response.reference)
-        },
-        onClose: () => {
-          reject(new Error("Payment cancelled"))
-        },
-      })
+    const amount = getCurrentPrice()
 
-      handler.openIframe()
-    })
+    const paymentUrl = `/payment?tier=${formData.tier}&billing=${formData.interval}&amount=${amount}`
+    router.push(paymentUrl)
+    return "redirect_to_payment"
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -165,47 +161,30 @@ export default function SignupPage() {
     setError("")
 
     try {
-      let paymentReference = undefined
-
-      // Handle payment for paid tiers
       if (formData.tier !== "FREE") {
-        const tierPrices = TIER_PRICES[formData.tier as keyof typeof TIER_PRICES]
-        const amount = tierPrices[formData.interval as keyof typeof tierPrices] || 0
-
-        if (amount > 0) {
-          setPaymentLoading(true)
-          try {
-            paymentReference = (await handlePaystackPayment(amount, formData.tier, formData.interval)) as string
-          } catch (paymentError: any) {
-            setError(paymentError.message || "Payment failed")
-            setPaymentLoading(false)
-            setIsLoading(false)
-            return
-          }
-          setPaymentLoading(false)
+        const paymentResult = await handlePayment()
+        if (paymentResult === "redirect_to_payment") {
+          localStorage.setItem("signupData", JSON.stringify(formData))
+          return
         }
       }
 
-      // Create account
       const { error } = await signUp(formData.email, formData.password, {
         username: formData.username,
         full_name: formData.fullName,
         tier: formData.tier,
         interval: formData.interval,
-        payment_reference: paymentReference,
       })
 
       if (error) {
         setError(error.message || "Failed to create account")
       } else {
-        // Success - redirect will be handled by auth context
         router.push("/dashboard")
       }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred")
     } finally {
       setIsLoading(false)
-      setPaymentLoading(false)
     }
   }
 
@@ -229,7 +208,7 @@ export default function SignupPage() {
       case "PRO":
         return "border-blue-500/30 bg-blue-500/10"
       case "ENT":
-        return "border-yellow-500/30 bg-yellow-500/10"
+        return "border-yellow-500/30 bg-gradient-to-br from-yellow-500/10 to-yellow-600/10"
       default:
         return "border-gray-500/30 bg-gray-500/10"
     }
@@ -237,25 +216,11 @@ export default function SignupPage() {
 
   const getCurrentPrice = () => {
     if (formData.tier === "FREE") return 0
+    if (formData.tier === "ENT") {
+      return Number.parseInt(formData.customAmount.replace(/,/g, ""))
+    }
     const tierPrices = TIER_PRICES[formData.tier as keyof typeof TIER_PRICES]
     return tierPrices[formData.interval as keyof typeof tierPrices] || 0
-  }
-
-  const getOriginalPrice = () => {
-    if (formData.tier === "FREE") return 0
-    if (formData.tier === "PRO") {
-      switch (formData.interval) {
-        case "monthly":
-          return 10000
-        case "quarterly":
-          return 30000
-        case "annually":
-          return 120000
-        default:
-          return 0
-      }
-    }
-    return getCurrentPrice()
   }
 
   const getCoinsBonus = () => {
@@ -298,7 +263,6 @@ export default function SignupPage() {
               </Alert>
             )}
 
-            {/* Personal Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="fullName" className="text-gray-200">
@@ -396,7 +360,6 @@ export default function SignupPage() {
               </div>
             </div>
 
-            {/* Tier Selection */}
             <div className="space-y-4">
               <Label className="text-gray-200 text-lg font-semibold">Choose Your Membership Tier</Label>
               <RadioGroup
@@ -432,7 +395,7 @@ export default function SignupPage() {
                         {tier !== "FREE" && (
                           <div className="text-right">
                             <div className="text-lg font-bold text-purple-400">
-                              {tier === "ENT" ? "₦119,900" : "From ₦9,900"}
+                              {tier === "ENT" ? "From ₦150,000" : "From ₦25,000"}
                             </div>
                             <div className="text-xs text-gray-400">{tier === "ENT" ? "annual only" : "per month"}</div>
                           </div>
@@ -451,17 +414,33 @@ export default function SignupPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="monthly">
-                        Monthly - <span className="line-through text-gray-400">₦10,000</span> ₦9,900
-                      </SelectItem>
+                      <SelectItem value="monthly">Monthly - ₦25,000</SelectItem>
                       <SelectItem value="quarterly">
-                        Quarterly - ₦29,700 <span className="text-green-400">(Save ₦300)</span>
+                        Quarterly - ₦72,000 <span className="text-green-400">(Save ₦3,000)</span>
                       </SelectItem>
                       <SelectItem value="annually">
-                        Annually - ₦118,800 <span className="text-green-400">(Save ₦1,000)</span>
+                        Annually - ₦280,000 <span className="text-green-400">(Save ₦20,000)</span>
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              )}
+
+              {formData.tier === "ENT" && (
+                <div className="space-y-2">
+                  <Label className="text-gray-200">Custom Annual Amount (Minimum ₦150,000)</Label>
+                  <Input
+                    type="text"
+                    placeholder="150,000"
+                    value={formData.customAmount}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, "")
+                      const formatted = Number.parseInt(value || "0").toLocaleString()
+                      handleInputChange("customAmount", formatted)
+                    }}
+                    className="bg-black/20 border-purple-500/30 text-white placeholder:text-gray-400 focus:border-purple-400"
+                  />
+                  <p className="text-xs text-gray-400">Enter your desired annual amount. Minimum is ₦150,000.</p>
                 </div>
               )}
 
@@ -470,11 +449,6 @@ export default function SignupPage() {
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-gray-300">Price:</span>
                     <div className="text-right">
-                      {getOriginalPrice() > getCurrentPrice() && (
-                        <span className="line-through text-gray-400 text-sm mr-2">
-                          ₦{getOriginalPrice().toLocaleString()}
-                        </span>
-                      )}
                       <span className="text-xl font-bold text-purple-400">₦{getCurrentPrice().toLocaleString()}</span>
                     </div>
                   </div>
@@ -496,12 +470,7 @@ export default function SignupPage() {
               className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200"
               disabled={isLoading || paymentLoading}
             >
-              {paymentLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing Payment...
-                </>
-              ) : isLoading ? (
+              {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Creating Account...
@@ -510,7 +479,7 @@ export default function SignupPage() {
                 <>
                   {formData.tier === "FREE"
                     ? "Create Free Account"
-                    : `Pay ₦${getCurrentPrice().toLocaleString()} & Create Account`}
+                    : `Continue to Payment - ₦${getCurrentPrice().toLocaleString()}`}
                 </>
               )}
             </Button>

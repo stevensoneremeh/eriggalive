@@ -13,44 +13,49 @@ async function verifyUser(request: NextRequest) {
       return { error: "Authentication required", user: null, profile: null }
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
+    const { data: wallet, error: walletError } = await supabase
+      .from("wallets")
       .select("*")
-      .eq("id", user.id)
+      .eq("user_id", user.id)
       .single()
 
-    if (profileError || !profile) {
-      return { error: "User profile not found", user: null, profile: null }
-    }
+    const { data: membership, error: membershipError } = await supabase
+      .from("memberships")
+      .select("*, membership_tiers(*)")
+      .eq("user_id", user.id)
+      .single()
 
-    return { user, profile, error: null }
+    return {
+      user,
+      wallet: wallet || { balance: 0 },
+      membership: membership || { tier_id: "FREE" },
+      error: null,
+    }
   } catch (error) {
     console.error("Authentication error:", error)
-    return { error: "Authentication failed", user: null, profile: null }
+    return { error: "Authentication failed", user: null, wallet: null, membership: null }
   }
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const { user, profile, error: authError } = await verifyUser(request)
-    if (authError || !user || !profile) {
+    const { user, wallet, membership, error: authError } = await verifyUser(request)
+    if (authError || !user) {
       return NextResponse.json({ success: false, error: authError || "Unauthorized" }, { status: 401 })
     }
 
     return NextResponse.json({
       success: true,
-      balance: {
-        coins_balance: profile.coins_balance || 0,
-        wallet_balance: profile.wallet_balance || 0,
-        membership_tier: profile.membership_tier || "free",
-        membership_expires_at: profile.membership_expires_at,
-        total_spent: profile.total_spent || 0,
+      balance: wallet?.balance || 0,
+      membership: {
+        tier: membership?.tier_id || "FREE",
+        label: membership?.membership_tiers?.label || "ECor Erigga Citizen",
+        expires_at: membership?.expires_at,
+        status: membership?.status || "active",
       },
       user: {
-        id: profile.id,
-        email: profile.email,
-        full_name: profile.full_name,
-        membership_tier: profile.membership_tier,
+        id: user.id,
+        email: user.email,
       },
     })
   } catch (error) {

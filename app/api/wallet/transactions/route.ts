@@ -33,52 +33,32 @@ async function verifyUser(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const { user, profile, error: authError } = await verifyUser(request)
-    if (authError || !user || !profile) {
+    if (authError || !user) {
       return NextResponse.json({ success: false, error: authError || "Unauthorized" }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
     const limit = Number.parseInt(searchParams.get("limit") || "50")
     const offset = Number.parseInt(searchParams.get("offset") || "0")
-    const type = searchParams.get("type")
-    const category = searchParams.get("category")
 
     const supabase = await createClient()
 
-    // Build query
-    let query = supabase
-      .from("transactions")
+    const { data: transactions, error: transactionsError } = await supabase
+      .from("wallet_ledger")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1)
-
-    // Apply filters
-    if (type) {
-      query = query.eq("type", type)
-    }
-    if (category) {
-      query = query.eq("category", category)
-    }
-
-    const { data: transactions, error: transactionsError } = await query
 
     if (transactionsError) {
       console.error("Error fetching transactions:", transactionsError)
       return NextResponse.json({ success: false, error: "Failed to fetch transactions" }, { status: 500 })
     }
 
-    // Get transaction count for pagination
-    let countQuery = supabase.from("transactions").select("*", { count: "exact", head: true }).eq("user_id", user.id)
-
-    if (type) {
-      countQuery = countQuery.eq("type", type)
-    }
-    if (category) {
-      countQuery = countQuery.eq("category", category)
-    }
-
-    const { count, error: countError } = await countQuery
+    const { count, error: countError } = await supabase
+      .from("wallet_ledger")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
 
     if (countError) {
       console.error("Error counting transactions:", countError)
