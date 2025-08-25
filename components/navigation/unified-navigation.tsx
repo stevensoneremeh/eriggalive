@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -33,8 +33,12 @@ import {
   LayoutDashboard,
   Wallet,
   X,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
+import { useTheme } from "@/contexts/theme-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -59,8 +63,22 @@ const navigationItems = [
 
 export function UnifiedNavigation() {
   const { user, profile, signOut } = useAuth()
+  const { theme, setTheme, resolvedTheme } = useTheme()
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10)
+    }
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
+
+  useEffect(() => {
+    setIsOpen(false)
+  }, [pathname])
 
   const handleSignOut = async () => {
     try {
@@ -111,12 +129,17 @@ export function UnifiedNavigation() {
   }
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
+    <nav
+      className={cn(
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b",
+        isScrolled ? "bg-background/95 backdrop-blur-md shadow-lg" : "bg-background/80 backdrop-blur-sm",
+      )}
+    >
+      <div className="container mx-auto px-3 sm:px-4">
+        <div className="flex items-center justify-between h-14 sm:h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2 flex-shrink-0">
-            <DynamicLogo responsive={true} className="h-8 w-auto" />
+            <DynamicLogo responsive={true} className="h-6 w-auto sm:h-8" />
           </Link>
 
           {/* Desktop Navigation */}
@@ -145,12 +168,11 @@ export function UnifiedNavigation() {
           </div>
 
           {/* User Menu / Auth Buttons */}
-          <div className="flex items-center space-x-2 md:space-x-4 flex-shrink-0">
+          <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4 flex-shrink-0">
             {user ? (
-              <div className="flex items-center space-x-2 md:space-x-3">
-                {/* Coins Display - Hidden on mobile */}
+              <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3">
                 {profile?.coins !== undefined && (
-                  <div className="hidden md:flex items-center space-x-1 bg-yellow-100 dark:bg-yellow-900/20 px-2 md:px-3 py-1 rounded-full">
+                  <div className="hidden sm:flex items-center space-x-1 bg-yellow-100 dark:bg-yellow-900/20 px-2 md:px-3 py-1 rounded-full">
                     <Coins className="h-3 w-3 md:h-4 md:w-4 text-yellow-600" />
                     <span className="text-xs md:text-sm font-medium text-yellow-700 dark:text-yellow-400">
                       {profile.coins.toLocaleString()}
@@ -161,13 +183,13 @@ export function UnifiedNavigation() {
                 {/* User Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-8 w-8 md:h-10 md:w-10 rounded-full">
-                      <Avatar className="h-8 w-8 md:h-10 md:w-10">
+                    <Button variant="ghost" className="relative h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 rounded-full p-0">
+                      <Avatar className="h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10">
                         <AvatarImage
                           src={profile?.profile_image_url || profile?.avatar_url || "/placeholder-user.jpg"}
                           alt={profile?.username || "User"}
                         />
-                        <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold text-xs md:text-sm">
+                        <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold text-xs sm:text-sm">
                           {profile?.full_name?.charAt(0) ||
                             profile?.username?.charAt(0) ||
                             user?.email?.charAt(0) ||
@@ -217,7 +239,7 @@ export function UnifiedNavigation() {
                 </DropdownMenu>
               </div>
             ) : (
-              <div className="hidden md:flex items-center space-x-2">
+              <div className="hidden sm:flex items-center space-x-2">
                 <Button asChild variant="ghost" size="sm">
                   <Link href="/login">Sign In</Link>
                 </Button>
@@ -230,12 +252,12 @@ export function UnifiedNavigation() {
             {/* Mobile Menu */}
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8 md:h-10 md:w-10">
-                  <Menu className="h-4 w-4 md:h-5 md:w-5" />
+                <Button variant="ghost" size="icon" className="lg:hidden h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 p-0">
+                  <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
                   <span className="sr-only">Toggle menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[280px] sm:w-[350px] p-0">
+              <SheetContent side="right" className="w-[280px] sm:w-[350px] p-0 bg-background/95 backdrop-blur-md">
                 <div className="flex flex-col h-full">
                   {/* Mobile Header */}
                   <div className="flex items-center justify-between p-4 border-b">
@@ -247,7 +269,7 @@ export function UnifiedNavigation() {
 
                   {/* User Info in Mobile */}
                   {user && (
-                    <div className="flex items-center space-x-3 p-4 bg-muted/50">
+                    <div className="flex items-center space-x-3 p-4 bg-muted/30 backdrop-blur-sm">
                       <Avatar className="h-12 w-12">
                         <AvatarImage
                           src={profile?.profile_image_url || profile?.avatar_url || "/placeholder-user.jpg"}
@@ -263,7 +285,7 @@ export function UnifiedNavigation() {
                       <div className="flex flex-col flex-1 min-w-0">
                         <p className="font-medium truncate">{profile?.full_name || profile?.username || "User"}</p>
                         <p className="text-sm text-muted-foreground truncate">{user.email}</p>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                           {profile?.tier && (
                             <Badge className={`text-xs ${getTierColor(profile.tier)}`}>
                               <Crown className="w-3 h-3 mr-1" />
@@ -271,7 +293,7 @@ export function UnifiedNavigation() {
                             </Badge>
                           )}
                           {profile?.coins !== undefined && (
-                            <div className="flex items-center space-x-1 text-xs">
+                            <div className="flex items-center space-x-1 text-xs bg-yellow-100 dark:bg-yellow-900/20 px-2 py-0.5 rounded-full">
                               <Coins className="h-3 w-3 text-yellow-600" />
                               <span className="font-medium text-yellow-700 dark:text-yellow-400">
                                 {profile.coins.toLocaleString()}
@@ -285,7 +307,7 @@ export function UnifiedNavigation() {
 
                   {/* Navigation Items */}
                   <div className="flex-1 overflow-y-auto p-4">
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       {navigationItems.map((item) => {
                         const isActive =
                           pathname === item.href || (item.href === "/dashboard" && pathname?.startsWith("/dashboard"))
@@ -295,18 +317,54 @@ export function UnifiedNavigation() {
                             asChild
                             variant={isActive ? "default" : "ghost"}
                             className={cn(
-                              "w-full justify-start h-12",
-                              isActive ? "bg-lime-500 text-teal-900 hover:bg-lime-600" : "hover:bg-accent",
+                              "w-full justify-start h-11 transition-all duration-200",
+                              isActive ? "bg-lime-500 text-teal-900 hover:bg-lime-600 shadow-sm" : "hover:bg-accent/50",
                             )}
                             onClick={() => setIsOpen(false)}
                           >
                             <Link href={item.href} className="flex items-center space-x-3">
-                              <item.icon className="h-5 w-5" />
+                              <item.icon className="h-5 w-5 flex-shrink-0" />
                               <span className="font-medium">{item.name}</span>
                             </Link>
                           </Button>
                         )
                       })}
+                    </div>
+                  </div>
+
+                  {/* Theme Toggle Section for Mobile */}
+                  <div className="p-4 border-t bg-muted/20">
+                    <div className="mb-4">
+                      <p className="text-sm font-medium mb-3 text-muted-foreground">Theme</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button
+                          variant={theme === "light" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setTheme("light")}
+                          className="flex flex-col items-center py-3 h-auto text-xs"
+                        >
+                          <Sun className="h-4 w-4 mb-1" />
+                          Light
+                        </Button>
+                        <Button
+                          variant={theme === "dark" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setTheme("dark")}
+                          className="flex flex-col items-center py-3 h-auto text-xs"
+                        >
+                          <Moon className="h-4 w-4 mb-1" />
+                          Dark
+                        </Button>
+                        <Button
+                          variant={theme === "system" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setTheme("system")}
+                          className="flex flex-col items-center py-3 h-auto text-xs"
+                        >
+                          <Monitor className="h-4 w-4 mb-1" />
+                          Auto
+                        </Button>
+                      </div>
                     </div>
                   </div>
 
@@ -334,7 +392,7 @@ export function UnifiedNavigation() {
                         </Button>
                         <Button
                           variant="outline"
-                          className="w-full justify-start text-red-600 hover:text-red-600 bg-transparent border-red-200 hover:bg-red-50"
+                          className="w-full justify-start text-red-600 hover:text-red-600 bg-transparent border-red-200 hover:bg-red-50 dark:hover:bg-red-950"
                           onClick={() => {
                             handleSignOut()
                             setIsOpen(false)
