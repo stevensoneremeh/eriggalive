@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
-    "@hookform/resolvers": "^3.3.4",
+    "@hookform/resolvers": "latest",
     "@jest/globals": "latest",
     "@next/font": "13.4.19",
     "@radix-ui/react-alert-dialog": "latest",
@@ -78,7 +78,7 @@
     "react": "^18",
     "react-day-picker": "latest",
     "react-dom": "^18",
-    "react-hook-form": "^7.51.4",
+    "react-hook-form": "latest",
     "react-native": "latest",
     "sonner": "latest",
     "swr": "latest",

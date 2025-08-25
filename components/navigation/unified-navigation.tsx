@@ -32,10 +32,12 @@ import {
   Info,
   LayoutDashboard,
   Wallet,
+  X,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 const navigationItems = [
   { name: "Home", href: "/", icon: Home },
@@ -113,12 +115,12 @@ export function UnifiedNavigation() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
+          <Link href="/" className="flex items-center space-x-2 flex-shrink-0">
             <DynamicLogo responsive={true} className="h-8 w-auto" />
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-1">
+          <div className="hidden lg:flex items-center space-x-1 flex-1 justify-center max-w-2xl">
             {getDesktopNavItems().map((item) => {
               const isActive =
                 pathname === item.href || (item.href === "/dashboard" && pathname?.startsWith("/dashboard"))
@@ -128,11 +130,14 @@ export function UnifiedNavigation() {
                   asChild
                   variant={isActive ? "default" : "ghost"}
                   size="sm"
-                  className={isActive ? "bg-lime-500 text-teal-900 hover:bg-lime-600" : ""}
+                  className={cn(
+                    "flex items-center space-x-2 transition-all duration-200",
+                    isActive ? "bg-lime-500 text-teal-900 hover:bg-lime-600" : "hover:bg-accent",
+                  )}
                 >
-                  <Link href={item.href} className="flex items-center space-x-2">
+                  <Link href={item.href}>
                     <item.icon className="h-4 w-4" />
-                    <span>{item.name}</span>
+                    <span className="hidden xl:inline">{item.name}</span>
                   </Link>
                 </Button>
               )
@@ -140,14 +145,14 @@ export function UnifiedNavigation() {
           </div>
 
           {/* User Menu / Auth Buttons */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 md:space-x-4 flex-shrink-0">
             {user ? (
-              <div className="flex items-center space-x-3">
-                {/* Coins Display */}
+              <div className="flex items-center space-x-2 md:space-x-3">
+                {/* Coins Display - Hidden on mobile */}
                 {profile?.coins !== undefined && (
-                  <div className="hidden sm:flex items-center space-x-1 bg-yellow-100 dark:bg-yellow-900/20 px-3 py-1 rounded-full">
-                    <Coins className="h-4 w-4 text-yellow-600" />
-                    <span className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                  <div className="hidden md:flex items-center space-x-1 bg-yellow-100 dark:bg-yellow-900/20 px-2 md:px-3 py-1 rounded-full">
+                    <Coins className="h-3 w-3 md:h-4 md:w-4 text-yellow-600" />
+                    <span className="text-xs md:text-sm font-medium text-yellow-700 dark:text-yellow-400">
                       {profile.coins.toLocaleString()}
                     </span>
                   </div>
@@ -156,13 +161,13 @@ export function UnifiedNavigation() {
                 {/* User Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                      <Avatar className="h-10 w-10">
+                    <Button variant="ghost" className="relative h-8 w-8 md:h-10 md:w-10 rounded-full">
+                      <Avatar className="h-8 w-8 md:h-10 md:w-10">
                         <AvatarImage
-                          src={profile?.avatar_url || "/placeholder-user.jpg"}
+                          src={profile?.profile_image_url || profile?.avatar_url || "/placeholder-user.jpg"}
                           alt={profile?.username || "User"}
                         />
-                        <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold">
+                        <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold text-xs md:text-sm">
                           {profile?.full_name?.charAt(0) ||
                             profile?.username?.charAt(0) ||
                             user?.email?.charAt(0) ||
@@ -225,19 +230,27 @@ export function UnifiedNavigation() {
             {/* Mobile Menu */}
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden">
-                  <Menu className="h-5 w-5" />
+                <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8 md:h-10 md:w-10">
+                  <Menu className="h-4 w-4 md:h-5 md:w-5" />
                   <span className="sr-only">Toggle menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-                <div className="flex flex-col space-y-4 mt-4">
+              <SheetContent side="right" className="w-[280px] sm:w-[350px] p-0">
+                <div className="flex flex-col h-full">
+                  {/* Mobile Header */}
+                  <div className="flex items-center justify-between p-4 border-b">
+                    <DynamicLogo responsive={false} className="h-8 w-auto" />
+                    <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
+                      <X className="h-5 w-5" />
+                    </Button>
+                  </div>
+
                   {/* User Info in Mobile */}
                   {user && (
-                    <div className="flex items-center space-x-3 p-4 bg-muted rounded-lg">
+                    <div className="flex items-center space-x-3 p-4 bg-muted/50">
                       <Avatar className="h-12 w-12">
                         <AvatarImage
-                          src={profile?.avatar_url || "/placeholder-user.jpg"}
+                          src={profile?.profile_image_url || profile?.avatar_url || "/placeholder-user.jpg"}
                           alt={profile?.username || "User"}
                         />
                         <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold">
@@ -247,95 +260,110 @@ export function UnifiedNavigation() {
                             "U"}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex flex-col">
-                        <p className="font-medium">{profile?.full_name || profile?.username || "User"}</p>
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <p className="font-medium truncate">{profile?.full_name || profile?.username || "User"}</p>
                         <p className="text-sm text-muted-foreground truncate">{user.email}</p>
-                        {profile?.tier && (
-                          <Badge className={`w-fit text-xs mt-1 ${getTierColor(profile.tier)}`}>
-                            <Crown className="w-3 h-3 mr-1" />
-                            {profile.tier.replace("_", " ").toUpperCase()}
-                          </Badge>
-                        )}
+                        <div className="flex items-center gap-2 mt-1">
+                          {profile?.tier && (
+                            <Badge className={`text-xs ${getTierColor(profile.tier)}`}>
+                              <Crown className="w-3 h-3 mr-1" />
+                              {profile.tier.replace("_", " ").toUpperCase()}
+                            </Badge>
+                          )}
+                          {profile?.coins !== undefined && (
+                            <div className="flex items-center space-x-1 text-xs">
+                              <Coins className="h-3 w-3 text-yellow-600" />
+                              <span className="font-medium text-yellow-700 dark:text-yellow-400">
+                                {profile.coins.toLocaleString()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
 
                   {/* Navigation Items */}
-                  <div className="space-y-2">
-                    {navigationItems.map((item) => {
-                      const isActive =
-                        pathname === item.href || (item.href === "/dashboard" && pathname?.startsWith("/dashboard"))
-                      return (
-                        <Button
-                          key={item.name}
-                          asChild
-                          variant={isActive ? "default" : "ghost"}
-                          className={`w-full justify-start ${
-                            isActive ? "bg-lime-500 text-teal-900 hover:bg-lime-600" : ""
-                          }`}
-                          onClick={() => setIsOpen(false)}
-                        >
-                          <Link href={item.href} className="flex items-center space-x-2">
-                            <item.icon className="h-4 w-4" />
-                            <span>{item.name}</span>
-                          </Link>
-                        </Button>
-                      )
-                    })}
+                  <div className="flex-1 overflow-y-auto p-4">
+                    <div className="space-y-2">
+                      {navigationItems.map((item) => {
+                        const isActive =
+                          pathname === item.href || (item.href === "/dashboard" && pathname?.startsWith("/dashboard"))
+                        return (
+                          <Button
+                            key={item.name}
+                            asChild
+                            variant={isActive ? "default" : "ghost"}
+                            className={cn(
+                              "w-full justify-start h-12",
+                              isActive ? "bg-lime-500 text-teal-900 hover:bg-lime-600" : "hover:bg-accent",
+                            )}
+                            onClick={() => setIsOpen(false)}
+                          >
+                            <Link href={item.href} className="flex items-center space-x-3">
+                              <item.icon className="h-5 w-5" />
+                              <span className="font-medium">{item.name}</span>
+                            </Link>
+                          </Button>
+                        )
+                      })}
+                    </div>
                   </div>
 
                   {/* Auth Buttons for Mobile */}
-                  {user ? (
-                    <div className="space-y-2 pt-4 border-t">
-                      <Button asChild variant="outline" className="w-full justify-start bg-transparent">
-                        <Link href="/dashboard" onClick={() => setIsOpen(false)}>
-                          <User className="mr-2 h-4 w-4" />
-                          Dashboard
-                        </Link>
-                      </Button>
-                      <Button asChild variant="outline" className="w-full justify-start bg-transparent">
-                        <Link href="/wallet" onClick={() => setIsOpen(false)}>
-                          <Wallet className="mr-2 h-4 w-4" />
-                          Wallet
-                        </Link>
-                      </Button>
-                      <Button asChild variant="outline" className="w-full justify-start bg-transparent">
-                        <Link href="/profile" onClick={() => setIsOpen(false)}>
-                          <Settings className="mr-2 h-4 w-4" />
-                          Settings
-                        </Link>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-red-600 hover:text-red-600 bg-transparent"
-                        onClick={() => {
-                          handleSignOut()
-                          setIsOpen(false)
-                        }}
-                      >
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Log out
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 pt-4 border-t">
-                      <Button
-                        asChild
-                        variant="outline"
-                        className="w-full bg-transparent"
-                        onClick={() => setIsOpen(false)}
-                      >
-                        <Link href="/login">Sign In</Link>
-                      </Button>
-                      <Button
-                        asChild
-                        className="w-full bg-lime-500 text-teal-900 hover:bg-lime-600"
-                        onClick={() => setIsOpen(false)}
-                      >
-                        <Link href="/signup">Join Now</Link>
-                      </Button>
-                    </div>
-                  )}
+                  <div className="p-4 border-t">
+                    {user ? (
+                      <div className="space-y-2">
+                        <Button asChild variant="outline" className="w-full justify-start bg-transparent">
+                          <Link href="/dashboard" onClick={() => setIsOpen(false)}>
+                            <User className="mr-2 h-4 w-4" />
+                            Dashboard
+                          </Link>
+                        </Button>
+                        <Button asChild variant="outline" className="w-full justify-start bg-transparent">
+                          <Link href="/wallet" onClick={() => setIsOpen(false)}>
+                            <Wallet className="mr-2 h-4 w-4" />
+                            Wallet
+                          </Link>
+                        </Button>
+                        <Button asChild variant="outline" className="w-full justify-start bg-transparent">
+                          <Link href="/profile" onClick={() => setIsOpen(false)}>
+                            <Settings className="mr-2 h-4 w-4" />
+                            Settings
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-red-600 hover:text-red-600 bg-transparent border-red-200 hover:bg-red-50"
+                          onClick={() => {
+                            handleSignOut()
+                            setIsOpen(false)
+                          }}
+                        >
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Log out
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Button
+                          asChild
+                          variant="outline"
+                          className="w-full bg-transparent"
+                          onClick={() => setIsOpen(false)}
+                        >
+                          <Link href="/login">Sign In</Link>
+                        </Button>
+                        <Button
+                          asChild
+                          className="w-full bg-lime-500 text-teal-900 hover:bg-lime-600"
+                          onClick={() => setIsOpen(false)}
+                        >
+                          <Link href="/signup">Join Now</Link>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </SheetContent>
             </Sheet>
