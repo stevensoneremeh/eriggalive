@@ -29,10 +29,11 @@ export default function HomePage() {
 
   // Hero images
   const heroImages = [
-    "/images/hero/erigga1.jpeg",
-    "/images/hero/erigga2.jpeg",
-    "/images/hero/erigga3.jpeg",
-    "/images/hero/erigga4.jpeg",
+    "/images/hero/erigga-aitiv-poster.jpeg",
+    "/images/hero/erigga-vintage-monitors.jpeg",
+    "/images/hero/erigga-metallic-mask.jpeg",
+    "/images/hero/erigga-denim-hoodie.jpeg",
+    "/images/hero/erigga-metallic-chain.jpeg",
   ]
 
   const features = [
