@@ -53,8 +53,10 @@ export function DynamicLogo({ width, height, className = "", responsive = true }
 
   const logoSrc =
     currentTheme === "dark"
-      ? "/images/erigga-live-logo-dark.png" // Exact uploaded logo with red text on black background
-      : "/images/erigga-live-logo.png" // Light logo with transparent background for light theme
+      ? "/images/erigga-live-logo-dark.png" // User's exact uploaded logo with red ERIGGA and white Live text
+      : "/images/erigga-live-logo.png" // Light theme logo
+
+  console.log("[v0] Current theme:", currentTheme, "Logo src:", logoSrc) // Debug theme switching
 
   return (
     <div className={`relative ${className}`}>
@@ -87,7 +89,10 @@ export function DynamicLogo({ width, height, className = "", responsive = true }
             : `${finalWidth}px`
         }
         onError={() => {
-          console.warn("Logo image failed to load")
+          console.warn("[v0] Logo image failed to load:", logoSrc)
+        }}
+        onLoad={() => {
+          console.log("[v0] Logo loaded successfully:", logoSrc)
         }}
       />
     </div>
