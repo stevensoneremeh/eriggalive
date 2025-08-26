@@ -5,13 +5,13 @@ import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Heart, MessageCircle, Send, Smile, Paperclip, MoreVertical, Search, Menu, X, Filter, Zap } from "lucide-react"
+import { Heart, MessageCircle, Smile, Paperclip, MoreVertical, Search, Menu, X, Filter, Zap } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
 import { cn } from "@/lib/utils"
+import { UserTierBadge } from "@/components/user-tier-badge"
 
 interface Category {
   id: number
@@ -489,32 +489,30 @@ export default function CommunityPage() {
   }, [isScrollingDown])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml;utf8,%3Csvg%20width=%2260%22%20height=%2260%22%20viewBox=%220%200%2060%2060%22%20xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg%20fill=%22none%22%20fillRule=%22evenodd%22%3E%3Cg%20fill=%22%23ffffff%22%20fillOpacity=%220.02%22%3E%3Ccircle%20cx=%2230%22%20cy=%2230%22%20r=%222%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-20"></div>
-      <div className="relative flex h-screen overflow-hidden">
-        {/* Sidebar */}
+    <div className="min-h-screen bg-background">
+      <div className="flex h-screen overflow-hidden">
         <div
           className={cn(
-            "w-full sm:w-80 md:w-80 lg:w-80 xl:w-96 backdrop-blur-xl bg-white/5 border-r border-white/10 flex flex-col transition-all duration-500 ease-out shadow-2xl",
+            "w-full sm:w-80 md:w-80 lg:w-80 xl:w-96 bg-card border-r border-border flex flex-col transition-all duration-300",
             "fixed md:relative z-50 md:z-auto h-full",
             sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
           )}
         >
-          <div className="p-4 sm:p-6 backdrop-blur-xl bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-b border-white/10">
+          <div className="p-4 sm:p-6 bg-card border-b border-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center shadow-lg">
-                  <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary flex items-center justify-center">
+                  <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
                 </div>
                 <div>
-                  <h1 className="text-lg sm:text-xl font-bold text-white">Community Hub</h1>
-                  <p className="text-xs sm:text-sm text-white/70">Connect & Share</p>
+                  <h1 className="text-lg sm:text-xl font-bold text-foreground">Community</h1>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Connect & Share</p>
                 </div>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
-                className="md:hidden text-white hover:bg-white/10 rounded-xl p-2 min-h-[44px] min-w-[44px]"
+                className="md:hidden rounded-full p-2 min-h-[44px] min-w-[44px]"
                 onClick={() => setSidebarOpen(false)}
               >
                 <X className="h-5 w-5" />
@@ -524,17 +522,17 @@ export default function CommunityPage() {
 
           <div className="p-3 sm:p-4">
             <div className="relative">
-              <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-white/50 h-4 w-4" />
+              <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder="Search conversations..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 sm:pl-12 bg-white/5 backdrop-blur-sm border-white/10 text-white placeholder-white/50 rounded-xl h-11 sm:h-12 text-base sm:text-lg focus:bg-white/10 transition-all duration-300"
+                className="pl-10 sm:pl-12 bg-background border-border rounded-full h-11 sm:h-12 text-base sm:text-lg focus:ring-2 focus:ring-primary/20"
               />
               <Button
                 variant="ghost"
                 size="sm"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg min-h-[36px] min-w-[36px]"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 rounded-full min-h-[36px] min-w-[36px]"
               >
                 <Filter className="h-4 w-4" />
               </Button>
@@ -542,349 +540,253 @@ export default function CommunityPage() {
           </div>
 
           <ScrollArea className="flex-1 px-3 sm:px-4">
-            <div className="space-y-2">
+            <div className="space-y-1">
               {categories.map((category, index) => (
                 <div
                   key={category.id}
                   className={cn(
-                    "group relative overflow-hidden rounded-2xl transition-all duration-300 hover:scale-[1.02] cursor-pointer touch-manipulation",
-                    "min-h-[60px] sm:min-h-[68px]",
-                    selectedCategory === category.id
-                      ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur-sm border border-blue-400/30 shadow-lg shadow-blue-500/10"
-                      : "bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 hover:border-white/20",
+                    "group relative overflow-hidden rounded-full transition-all duration-200 hover:bg-accent cursor-pointer",
+                    "min-h-[56px] sm:min-h-[60px]",
+                    selectedCategory === category.id ? "bg-primary/10 border border-primary/20" : "hover:bg-accent",
                   )}
                   onClick={() => {
                     setSelectedCategory(category.id)
                     setSidebarOpen(false)
                   }}
-                  style={{ animationDelay: `${index * 100}ms` }}
                 >
                   <div className="p-3 sm:p-4">
                     <div className="flex items-center space-x-3 sm:space-x-4">
                       <div
                         className={cn(
-                          "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-lg sm:text-xl shadow-lg transition-all duration-300",
+                          "w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-lg sm:text-xl",
                           selectedCategory === category.id
-                            ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white"
-                            : "bg-white/10 text-white/80 group-hover:bg-white/20",
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-accent text-accent-foreground",
                         )}
                       >
                         {category.icon}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-white truncate text-base sm:text-lg">{category.name}</div>
-                        <div className="text-xs sm:text-sm text-white/60 truncate">
+                        <div className="font-semibold text-foreground truncate text-base sm:text-lg">
+                          {category.name}
+                        </div>
+                        <div className="text-xs sm:text-sm text-muted-foreground truncate">
                           {posts.filter((p) => p.category.id === category.id).length} messages
                         </div>
                       </div>
-                      {selectedCategory === category.id && (
-                        <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div>
-                      )}
+                      {selectedCategory === category.id && <div className="w-2 h-2 rounded-full bg-primary"></div>}
                     </div>
                   </div>
-                  {selectedCategory === category.id && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-2xl"></div>
-                  )}
                 </div>
               ))}
             </div>
           </ScrollArea>
 
           {isAuthenticated && profile && (
-            <div className="p-3 sm:p-4 backdrop-blur-xl bg-white/5 border-t border-white/10">
-              <div className="flex items-center space-x-3 sm:space-x-4 md:space-x-6 p-3 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 shadow-2xl">
-                <Avatar className="h-8 w-8 sm:h-10 sm:w-10 ring-2 ring-white/20 flex-shrink-0">
+            <div className="p-3 sm:p-4 border-t border-border">
+              <div className="flex items-center space-x-3 sm:space-x-4 p-3 rounded-full bg-accent/50">
+                <Avatar className="h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0">
                   <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} />
-                  <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold text-xs sm:text-sm">
+                  <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-xs sm:text-sm">
                     {profile.username?.charAt(0).toUpperCase() || "U"}
                   </AvatarFallback>
                 </Avatar>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[44px] min-w-[44px] flex-shrink-0 touch-manipulation"
-                >
-                  <Paperclip className="h-4 w-4 sm:h-5 sm:w-5" />
-                </Button>
-                <div className="flex-1 relative min-w-0">
-                  <Input
-                    ref={inputRef}
-                    placeholder="Write a comment..."
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    className="bg-white/5 border-white/10 text-white pr-10 sm:pr-12 rounded-xl sm:rounded-2xl h-10 sm:h-12 text-sm sm:text-lg focus:bg-white/10 transition-all duration-300"
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault()
-                        sendComment(posts.find((p) => p.id === activePost)?.id || 0)
-                      }
-                    }}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl p-1 min-h-[32px] min-w-[32px]"
-                  >
-                    <Smile className="h-4 w-4" />
-                  </Button>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-foreground text-sm truncate">{profile.username}</div>
+                  <UserTierBadge tier={profile.tier} size="sm" />
                 </div>
-                <Button
-                  onClick={() => sendComment(posts.find((p) => p.id === activePost)?.id || 0)}
-                  disabled={!newComment.trim()}
-                  className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-4 sm:px-6 py-2 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] flex-shrink-0 touch-manipulation"
-                >
-                  <Send className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Button variant="ghost" size="sm" className="rounded-full p-2 min-h-[36px] min-w-[36px]">
+                  <MoreVertical className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col backdrop-blur-xl bg-white/5 min-w-0 h-screen pb-0 md:pb-0">
-          <div className="sticky top-0 z-20 p-2 sm:p-3 md:p-4 lg:p-6 backdrop-blur-xl bg-gradient-to-r from-white/10 to-white/5 border-b border-white/10 shadow-lg">
+        <div className="flex-1 flex flex-col bg-background min-w-0 h-screen">
+          <div className="sticky top-0 z-20 p-4 bg-background/80 backdrop-blur-md border-b border-border">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4 min-w-0 flex-1">
+              <div className="flex items-center space-x-3 min-w-0 flex-1">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="md:hidden text-white hover:bg-white/10 rounded-xl p-2 min-h-[44px] min-w-[44px] flex-shrink-0 touch-manipulation"
+                  className="md:hidden rounded-full p-2 min-h-[44px] min-w-[44px]"
                   onClick={() => setSidebarOpen(true)}
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
-                <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm sm:text-lg md:text-xl lg:text-2xl shadow-lg flex-shrink-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-lg sm:text-xl flex-shrink-0">
                   {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-sm sm:text-base md:text-lg lg:text-2xl font-bold text-white truncate">
+                  <h2 className="text-lg sm:text-xl font-bold text-foreground truncate">
                     {categories.find((c) => c.id === selectedCategory)?.name || "General"}
                   </h2>
-                  <p className="text-white/60 text-xs sm:text-sm truncate">
-                    {filteredPosts.length} posts • {categories.length} active members
-                  </p>
+                  <p className="text-muted-foreground text-sm truncate">{filteredPosts.length} posts</p>
                 </div>
               </div>
-              <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[44px] min-w-[44px] touch-manipulation"
-                >
+              <div className="flex items-center space-x-1 flex-shrink-0">
+                <Button variant="ghost" size="sm" className="rounded-full p-2 min-h-[44px] min-w-[44px]">
                   <Search className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[44px] min-w-[44px] touch-manipulation"
-                >
+                <Button variant="ghost" size="sm" className="rounded-full p-2 min-h-[44px] min-w-[44px]">
                   <MoreVertical className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
               </div>
             </div>
           </div>
 
-          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pb-20 md:pb-4">
-            <div className="p-2 sm:p-3 md:p-4 lg:p-6">
-              <div className="max-w-4xl mx-auto space-y-3 sm:space-y-4 md:space-y-6">
-                {filteredPosts.map((post, index) => (
-                  <div
-                    key={post.id}
-                    className="group animate-fade-in-up"
-                    style={{ animationDelay: `${index * 100}ms` }}
-                  >
-                    <div className="backdrop-blur-xl bg-white/5 rounded-2xl sm:rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl hover:shadow-3xl hover:bg-white/10 transition-all duration-500 hover:scale-[1.01]">
-                      <div className="flex items-start space-x-3 sm:space-x-4">
-                        <Avatar className="h-10 w-10 sm:h-12 sm:w-12 ring-2 ring-white/20 shadow-lg flex-shrink-0">
-                          <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
-                          <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold">
-                            {post.user.username.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+            <div className="max-w-2xl mx-auto">
+              {filteredPosts.map((post, index) => (
+                <div
+                  key={post.id}
+                  className="border-b border-border hover:bg-accent/30 transition-colors duration-200 cursor-pointer"
+                >
+                  <div className="p-4 sm:p-6">
+                    <div className="flex space-x-3">
+                      <Avatar className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0">
+                        <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
+                        <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                          {post.user.username.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
 
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2 sm:space-x-3 mb-2 sm:mb-3 flex-wrap">
-                            <span className="font-bold text-white text-base sm:text-lg truncate">
-                              {post.user.full_name || post.user.username}
-                            </span>
-                            <Badge
-                              className={cn(
-                                "text-xs text-white font-medium px-2 sm:px-3 py-1 rounded-full shadow-lg flex-shrink-0",
-                                getTierColor(post.user.tier),
-                              )}
-                            >
-                              {post.user.tier}
-                            </Badge>
-                            <span className="text-white/50 text-xs sm:text-sm flex-shrink-0">
-                              {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                            </span>
-                          </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-1 flex-wrap">
+                          <span className="font-bold text-foreground text-base">
+                            {post.user.full_name || post.user.username}
+                          </span>
+                          <UserTierBadge tier={post.user.tier} size="sm" />
+                          <span className="text-muted-foreground text-sm">
+                            · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                          </span>
+                        </div>
 
-                          <p className="text-white/90 text-base sm:text-lg leading-relaxed mb-3 sm:mb-4 break-words">
-                            {post.content}
-                          </p>
+                        <p className="text-foreground text-base leading-relaxed mb-3 break-words">{post.content}</p>
 
-                          <div className="flex items-center justify-between flex-wrap gap-2">
-                            <div className="flex items-center space-x-2 sm:space-x-4">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className={cn(
-                                  "rounded-xl px-3 sm:px-4 py-2 transition-all duration-300 hover:scale-105 min-h-[40px] touch-manipulation",
-                                  post.has_voted
-                                    ? "text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20"
-                                    : "text-white/70 hover:text-red-400 hover:bg-red-500/10",
-                                )}
-                                onClick={() => voteOnPost(post.id)}
-                              >
-                                <Heart
-                                  className={cn(
-                                    "h-4 w-4 mr-1 sm:mr-2 transition-all duration-300",
-                                    post.has_voted && "fill-current scale-110",
-                                  )}
-                                />
-                                <span className="text-sm sm:text-base">{post.vote_count}</span>
-                              </Button>
+                        <div className="flex items-center justify-between max-w-md">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "rounded-full px-3 py-2 h-9 transition-colors",
+                              post.has_voted
+                                ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
+                                : "text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950",
+                            )}
+                            onClick={() => voteOnPost(post.id)}
+                          >
+                            <Heart className={cn("h-4 w-4 mr-2", post.has_voted && "fill-current")} />
+                            <span className="text-sm">{post.vote_count}</span>
+                          </Button>
 
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className={cn(
-                                  "rounded-xl px-3 sm:px-4 py-2 transition-all duration-300 hover:scale-105 min-h-[40px] touch-manipulation",
-                                  activePost === post.id
-                                    ? "text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20"
-                                    : "text-white/70 hover:text-blue-400 hover:bg-blue-500/10",
-                                )}
-                                onClick={() => {
-                                  if (activePost === post.id) {
-                                    setActivePost(null)
-                                  } else {
-                                    setActivePost(post.id)
-                                    loadComments(post.id)
-                                  }
-                                }}
-                              >
-                                <MessageCircle className="h-4 w-4 mr-1 sm:mr-2" />
-                                <span className="text-sm sm:text-base">{post.comment_count}</span>
-                              </Button>
-                            </div>
-                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "rounded-full px-3 py-2 h-9 transition-colors",
+                              activePost === post.id
+                                ? "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950"
+                                : "text-muted-foreground hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950",
+                            )}
+                            onClick={() => {
+                              if (activePost === post.id) {
+                                setActivePost(null)
+                              } else {
+                                setActivePost(post.id)
+                                loadComments(post.id)
+                              }
+                            }}
+                          >
+                            <MessageCircle className="h-4 w-4 mr-2" />
+                            <span className="text-sm">{post.comment_count}</span>
+                          </Button>
                         </div>
                       </div>
+                    </div>
 
-                      {activePost === post.id && (
-                        <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4 animate-fade-in">
-                          {comments[post.id]?.map((comment, commentIndex) => (
-                            <div
-                              key={comment.id}
-                              className="ml-4 sm:ml-8 backdrop-blur-sm bg-white/5 rounded-xl sm:rounded-2xl border border-white/10 p-3 sm:p-4 animate-slide-in-right"
-                              style={{ animationDelay: `${commentIndex * 100}ms` }}
-                            >
-                              <div className="flex items-start space-x-2 sm:space-x-3">
-                                <Avatar className="h-6 w-6 sm:h-8 sm:w-8 ring-1 ring-white/20 flex-shrink-0">
-                                  <AvatarImage src={comment.user.avatar_url || "/placeholder-user.jpg"} />
-                                  <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-semibold">
-                                    {comment.user.username.charAt(0).toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center space-x-2 mb-1 sm:mb-2 flex-wrap">
-                                    <span className="font-semibold text-white text-xs sm:text-sm truncate">
-                                      {comment.user.username}
-                                    </span>
-                                    <span className="text-xs text-white/50 flex-shrink-0">
-                                      {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                                    </span>
-                                  </div>
-                                  <p className="text-white/80 text-xs sm:text-sm leading-relaxed break-words">
-                                    {comment.content}
-                                  </p>
-                                </div>
+                    {activePost === post.id && (
+                      <div className="mt-4 space-y-3 border-t border-border pt-4">
+                        {comments[post.id]?.map((comment) => (
+                          <div key={comment.id} className="flex space-x-3">
+                            <Avatar className="h-8 w-8 flex-shrink-0">
+                              <AvatarImage src={comment.user.avatar_url || "/placeholder-user.jpg"} />
+                              <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+                                {comment.user.username.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <span className="font-semibold text-foreground text-sm">{comment.user.username}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                </span>
                               </div>
+                              <p className="text-foreground text-sm leading-relaxed break-words">{comment.content}</p>
                             </div>
-                          ))}
+                          </div>
+                        ))}
 
-                          {isAuthenticated && (
-                            <div className="ml-4 sm:ml-8 flex items-center space-x-2 sm:space-x-3 p-3 sm:p-4 backdrop-blur-sm bg-white/5 rounded-xl sm:rounded-2xl border border-white/10">
-                              <Avatar className="h-6 w-6 sm:h-8 sm:w-8 ring-1 ring-white/20 flex-shrink-0">
-                                <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
-                                <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-semibold">
-                                  {profile?.username?.charAt(0).toUpperCase() || "U"}
-                                </AvatarFallback>
-                              </Avatar>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[36px] min-w-[36px] flex-shrink-0"
-                              >
-                                <Paperclip className="h-4 w-4" />
-                              </Button>
-                              <div className="flex-1 relative min-w-0">
-                                <Input
-                                  ref={inputRef}
-                                  placeholder="Write a comment..."
-                                  value={newComment}
-                                  onChange={(e) => setNewComment(e.target.value)}
-                                  className="bg-white/5 border-white/10 text-white pr-10 sm:pr-12 rounded-xl sm:rounded-2xl h-10 sm:h-12 text-sm sm:text-lg focus:bg-white/10 transition-all duration-300"
-                                  onKeyPress={(e) => {
-                                    if (e.key === "Enter" && !e.shiftKey) {
-                                      e.preventDefault()
-                                      sendComment(post.id)
-                                    }
-                                  }}
-                                />
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl p-1 min-h-[32px] min-w-[32px]"
-                                >
-                                  <Smile className="h-4 w-4" />
-                                </Button>
-                              </div>
+                        {isAuthenticated && (
+                          <div className="flex space-x-3 pt-3">
+                            <Avatar className="h-8 w-8 flex-shrink-0">
+                              <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
+                              <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+                                {profile?.username?.charAt(0).toUpperCase() || "U"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 flex space-x-2">
+                              <Input
+                                placeholder="Tweet your reply"
+                                value={newComment}
+                                onChange={(e) => setNewComment(e.target.value)}
+                                className="flex-1 rounded-full border-border focus:ring-2 focus:ring-primary/20"
+                                onKeyPress={(e) => {
+                                  if (e.key === "Enter" && !e.shiftKey) {
+                                    e.preventDefault()
+                                    sendComment(post.id)
+                                  }
+                                }}
+                              />
                               <Button
                                 onClick={() => sendComment(post.id)}
                                 disabled={!newComment.trim()}
-                                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-4 sm:px-6 py-2 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] flex-shrink-0"
+                                size="sm"
+                                className="rounded-full px-4"
                               >
-                                <Send className="h-4 w-4 sm:h-5 sm:w-5" />
+                                Reply
                               </Button>
                             </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                ))}
-                <div ref={messagesEndRef} />
-              </div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
             </div>
           </div>
 
-          <div className="fixed md:relative bottom-0 left-0 right-0 md:bottom-auto md:left-auto md:right-auto backdrop-blur-xl bg-gradient-to-r from-white/10 to-white/5 border-t border-white/10 z-30">
+          <div className="border-t border-border bg-background">
             {isAuthenticated ? (
-              <div className="p-3 sm:p-3 md:p-4 safe-area-inset-bottom">
-                <div className="max-w-4xl mx-auto">
-                  <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4 p-3 sm:p-3 md:p-4 backdrop-blur-xl bg-white/10 rounded-2xl sm:rounded-2xl md:rounded-3xl border border-white/20 shadow-2xl">
-                    <Avatar className="h-8 w-8 sm:h-10 sm:w-10 ring-2 ring-white/20 flex-shrink-0">
+              <div className="p-4">
+                <div className="max-w-2xl mx-auto">
+                  <div className="flex space-x-3">
+                    <Avatar className="h-10 w-10 flex-shrink-0">
                       <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
-                      <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold text-xs sm:text-sm">
+                      <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
                         {profile?.username?.charAt(0).toUpperCase() || "U"}
                       </AvatarFallback>
                     </Avatar>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl p-2 min-h-[44px] min-w-[44px] flex-shrink-0 touch-manipulation"
-                    >
-                      <Paperclip className="h-4 w-4 sm:h-5 sm:w-5" />
-                    </Button>
-                    <div className="flex-1 relative min-w-0">
+                    <div className="flex-1 space-y-3">
                       <Input
                         ref={inputRef}
-                        placeholder="Share your thoughts..."
+                        placeholder="What's happening?"
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
-                        className="bg-white/5 border-white/10 text-white pr-12 sm:pr-12 rounded-xl sm:rounded-2xl h-12 sm:h-12 text-base sm:text-base md:text-lg focus:bg-white/10 transition-all duration-300 touch-manipulation"
+                        className="text-lg border-none bg-transparent focus:ring-0 p-0 h-auto min-h-[48px] resize-none"
                         onKeyPress={(e) => {
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault()
@@ -892,33 +794,29 @@ export default function CommunityPage() {
                           }
                         }}
                       />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl p-1 min-h-[36px] min-w-[36px] touch-manipulation"
-                      >
-                        <Smile className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Button variant="ghost" size="sm" className="rounded-full p-2">
+                            <Paperclip className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="rounded-full p-2">
+                            <Smile className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <Button onClick={sendMessage} disabled={!newMessage.trim()} className="rounded-full px-6">
+                          Post
+                        </Button>
+                      </div>
                     </div>
-                    <Button
-                      onClick={sendMessage}
-                      disabled={!newMessage.trim()}
-                      className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-4 sm:px-6 md:px-8 py-3 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] flex-shrink-0 touch-manipulation"
-                    >
-                      <Send className="h-4 w-4 sm:h-5 sm:w-5" />
-                    </Button>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="p-4 sm:p-4 md:p-6 safe-area-inset-bottom">
-                <div className="max-w-4xl mx-auto text-center">
-                  <div className="backdrop-blur-xl bg-white/5 rounded-2xl sm:rounded-3xl border border-white/10 p-4 sm:p-6 md:p-8">
-                    <p className="text-white/70 mb-3 sm:mb-4 text-sm sm:text-base md:text-lg">Join the conversation</p>
-                    <Button
-                      asChild
-                      className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl sm:rounded-2xl px-6 sm:px-6 md:px-8 py-3 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 min-h-[48px] touch-manipulation"
-                    >
+              <div className="p-4">
+                <div className="max-w-2xl mx-auto text-center">
+                  <div className="bg-card rounded-2xl border border-border p-6">
+                    <p className="text-muted-foreground mb-4">Join the conversation</p>
+                    <Button asChild className="rounded-full px-8">
                       <a href="/login">Sign In</a>
                     </Button>
                   </div>
@@ -928,12 +826,8 @@ export default function CommunityPage() {
           </div>
         </div>
 
-        {/* Mobile Overlay */}
         {sidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden touch-manipulation"
-            onClick={() => setSidebarOpen(false)}
-          />
+          <div className="fixed inset-0 bg-black/20 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
         )}
       </div>
     </div>
