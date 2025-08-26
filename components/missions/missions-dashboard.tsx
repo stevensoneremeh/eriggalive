@@ -99,7 +99,7 @@ export function MissionsDashboard() {
   }
 
   const copyReferralCode = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/signup?ref=${referralCode}`)
+    navigator.clipboard.writeText(`https://www.eriggalive.com/signup?ref=${referralCode}`)
     toast({
       title: "Copied!",
       description: "Referral link copied to clipboard",

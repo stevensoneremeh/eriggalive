@@ -6,14 +6,17 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies })
 
-    // Check authentication
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
+
     if (authError || !user) {
+      console.log("[v0] Authentication failed:", authError?.message || "No user found")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    console.log("[v0] User authenticated:", user.id)
 
     const formData = await request.formData()
     const file = formData.get("file") as File
@@ -37,7 +40,8 @@ export async function POST(request: NextRequest) {
     const fileExt = file.name.split(".").pop()
     const fileName = `${user.id}/profile-${Date.now()}.${fileExt}`
 
-    // Upload to Supabase Storage
+    console.log("[v0] Uploading file:", fileName)
+
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("user-uploads")
       .upload(fileName, file, {
@@ -46,35 +50,44 @@ export async function POST(request: NextRequest) {
       })
 
     if (uploadError) {
-      console.error("Upload error:", uploadError)
-      return NextResponse.json({ error: "Upload failed" }, { status: 500 })
+      console.error("[v0] Upload error:", uploadError)
+      return NextResponse.json({ error: "Upload failed: " + uploadError.message }, { status: 500 })
     }
+
+    console.log("[v0] File uploaded successfully:", uploadData.path)
 
     // Get public URL
     const {
       data: { publicUrl },
     } = supabase.storage.from("user-uploads").getPublicUrl(fileName)
 
-    // Update user profile with new image URL
-    const { error: updateError } = await supabase
-      .from("users")
-      .update({
-        profile_image_url: publicUrl,
-        avatar_url: publicUrl, // Keep both for compatibility
-      })
-      .eq("id", user.id)
+    console.log("[v0] Public URL generated:", publicUrl)
+
+    const { error: updateError } = await supabase.from("user_profiles").upsert({
+      user_id: user.id,
+      profile_image_url: publicUrl,
+      avatar_url: publicUrl, // Keep both for compatibility
+      updated_at: new Date().toISOString(),
+    })
 
     if (updateError) {
-      console.error("Profile update error:", updateError)
-      return NextResponse.json({ error: "Failed to update profile" }, { status: 500 })
+      console.error("[v0] Profile update error:", updateError)
+      // Try updating users table as fallback
+      const { error: usersUpdateError } = await supabase
+        .from("users")
+        .update({
+          profile_image_url: publicUrl,
+          avatar_url: publicUrl,
+        })
+        .eq("id", user.id)
+
+      if (usersUpdateError) {
+        console.error("[v0] Users table update error:", usersUpdateError)
+        return NextResponse.json({ error: "Failed to update profile" }, { status: 500 })
+      }
     }
 
-    // Log activity
-    await supabase.rpc("log_profile_activity", {
-      p_user_id: user.id,
-      p_activity_type: "profile_image_updated",
-      p_activity_data: { image_url: publicUrl },
-    })
+    console.log("[v0] Profile updated successfully")
 
     return NextResponse.json({
       success: true,
@@ -82,7 +95,7 @@ export async function POST(request: NextRequest) {
       message: "Profile image updated successfully",
     })
   } catch (error) {
-    console.error("Profile image upload error:", error)
+    console.error("[v0] Profile image upload error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
