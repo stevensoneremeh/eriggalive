@@ -21,7 +21,6 @@ import {
   Shuffle,
   Pin,
   PinOff,
-  Calendar,
   Clock,
   Send,
 } from "lucide-react"
@@ -54,6 +53,11 @@ interface MoodCategory {
   gradient: string
   description: string
   icon: React.ReactNode
+}
+
+interface NextShow {
+  title: string
+  time: string
 }
 
 const moodCategories: MoodCategory[] = [
@@ -104,6 +108,9 @@ const moodCategories: MoodCategory[] = [
   },
 ]
 
+const ERIGGA_AUDIO_URL =
+  "https://yor5bfsajnljnrjg.public.blob.vercel-storage.com/Erigga-Ft-Great-Adamz-Around-9-%28TrendyBeatz.com%29.mp3"
+
 export default function RadioPage() {
   const { isAuthenticated, user } = useAuth()
   const { theme } = useTheme()
@@ -128,7 +135,7 @@ export default function RadioPage() {
   const [dailyQuote, setDailyQuote] = useState("")
   const [shoutouts, setShoutouts] = useState<string[]>([])
   const [newShoutout, setNewShoutout] = useState("")
-  const [nextShow, setNextShow] = useState<{ title: string; time: string } | null>(null)
+  const [nextShow, setNextShow] = useState<NextShow | null>(null)
 
   // Visual state
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
@@ -225,18 +232,24 @@ export default function RadioPage() {
 
   const loadMoodPlaylist = async (mood: string) => {
     try {
-      const { data: tracks } = await supabase
-        .from("tracks")
-        .select("*")
-        .eq("mood_category", mood)
-        .order("created_at", { ascending: false })
-        .limit(20)
+      // Create a mock track for the selected mood using the provided audio
+      const mockTrack: Track = {
+        id: `${mood}-track`,
+        title: "Around 9",
+        artist: "Erigga Ft. Great Adamz",
+        artwork_url: "/erigga-album-cover.png",
+        duration_ms: 180000, // 3 minutes placeholder
+        mood_category: mood,
+        is_pinned: false,
+      }
 
-      if (tracks) {
-        setPlaylist(tracks)
-        if (tracks.length > 0 && !currentTrack) {
-          setCurrentTrack(tracks[0])
-        }
+      setPlaylist([mockTrack])
+      setCurrentTrack(mockTrack)
+
+      // Update audio source
+      if (audioRef.current) {
+        audioRef.current.src = ERIGGA_AUDIO_URL
+        audioRef.current.load()
       }
     } catch (error) {
       console.error("Error loading playlist:", error)
@@ -257,7 +270,7 @@ export default function RadioPage() {
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "community_shoutouts" }, (payload) => {
         if (payload.new) {
-          setShoutouts((prev) => [payload.new.message, ...prev.slice(0, 9)])
+          setShoutouts((prev) => [payload.new.message, ...prev.slice(0, 9)]) // Keep only 10 most recent
         }
       })
       .subscribe()
@@ -304,38 +317,36 @@ export default function RadioPage() {
     }
   }
 
-  const sendShoutout = async () => {
-    if (!newShoutout.trim() || !user) {
-      console.log("[v0] Cannot send shoutout: missing message or user not authenticated")
-      return
-    }
+  const submitShoutout = async () => {
+    if (!newShoutout.trim() || !user) return
 
-    if (newShoutout.length > 280) {
-      console.log("[v0] Shoutout too long, limiting to 280 characters")
-      setNewShoutout(newShoutout.slice(0, 280))
+    if (newShoutout.length > 200) {
+      alert("Shoutout must be 200 characters or less")
       return
     }
 
     try {
-      console.log("[v0] Sending shoutout:", newShoutout.trim())
-      const { data, error } = await supabase.from("community_shoutouts").insert({
+      const shoutoutText = `${user.user_metadata?.full_name || user.email}: ${newShoutout.trim()}`
+
+      // Add to local state immediately for better UX
+      setShoutouts((prev) => [shoutoutText, ...prev.slice(0, 9)]) // Keep only 10 most recent
+      setNewShoutout("")
+
+      // Save to database
+      const { error } = await supabase.from("fan_shoutouts").insert({
         user_id: user.id,
         message: newShoutout.trim(),
-        username: user.user_metadata?.full_name || user.email?.split("@")[0] || "Anonymous",
+        created_at: new Date().toISOString(),
       })
 
       if (error) {
-        console.error("[v0] Error sending shoutout:", error)
-        return
+        console.error("Error saving shoutout:", error)
+        // Remove from local state if database save failed
+        setShoutouts((prev) => prev.slice(1))
       }
-
-      console.log("[v0] Shoutout sent successfully")
-      setNewShoutout("")
-
-      // Add to local state immediately for better UX
-      setShoutouts((prev) => [newShoutout.trim(), ...prev.slice(0, 9)])
     } catch (error) {
-      console.error("[v0] Error sending shoutout:", error)
+      console.error("Error submitting shoutout:", error)
+      setShoutouts((prev) => prev.slice(1))
     }
   }
 
@@ -751,20 +762,6 @@ export default function RadioPage() {
                         <span>{listenerCount} listeners</span>
                       </div>
                     </div>
-                  ) : nextShow ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 text-sm text-white/70">
-                        <Calendar className="w-4 h-4" />
-                        <span>Next Show</span>
-                      </div>
-                      <p className={cn("text-white font-bold", theme === "dark" ? "text-white" : "text-gray-900")}>
-                        {nextShow.title}
-                      </p>
-                      <div className="flex items-center gap-2 text-sm text-white/70">
-                        <Clock className="w-4 h-4" />
-                        <span>{nextShow.time}</span>
-                      </div>
-                    </div>
                   ) : (
                     <p className={cn("text-white/70", theme === "dark" ? "text-white/70" : "text-gray-600")}>
                       No live broadcasts scheduled
@@ -801,11 +798,11 @@ export default function RadioPage() {
                           ? "bg-white/10 border-white/20 text-white placeholder:text-white/50"
                           : "bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-500",
                       )}
-                      onKeyPress={(e) => e.key === "Enter" && sendShoutout()}
-                      maxLength={280}
+                      onKeyPress={(e) => e.key === "Enter" && submitShoutout()}
+                      maxLength={200}
                     />
                     <Button
-                      onClick={sendShoutout}
+                      onClick={submitShoutout}
                       size="sm"
                       className={cn(
                         theme === "dark"
@@ -820,7 +817,7 @@ export default function RadioPage() {
 
                   {/* Character count indicator */}
                   <div className={cn("text-xs text-right", theme === "dark" ? "text-white/50" : "text-gray-500")}>
-                    {newShoutout.length}/280
+                    {newShoutout.length}/200
                   </div>
 
                   {/* Animated Radio Character */}
@@ -996,6 +993,41 @@ export default function RadioPage() {
             </Card>
           </motion.div>
         )}
+
+        {/* Next Scheduled Show */}
+        {nextShow && (
+          <motion.div
+            className="mt-12"
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.6 }}
+          >
+            <Card
+              className={cn(
+                theme === "dark" ? "glass-card" : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg",
+              )}
+            >
+              <CardHeader>
+                <CardTitle className={cn("text-white", theme === "dark" ? "text-white" : "text-gray-900")}>
+                  Next Scheduled Show
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-5 h-5" />
+                    <span className={cn("text-sm", theme === "dark" ? "text-white/70" : "text-gray-600")}>
+                      {nextShow.time}
+                    </span>
+                  </div>
+                  <p className={cn("text-sm", theme === "dark" ? "text-white/70" : "text-gray-600")}>
+                    {nextShow.title}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
       </div>
 
       {/* Audio Element */}
@@ -1006,8 +1038,9 @@ export default function RadioPage() {
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onError={(e) => console.error("[v0] Audio playback error:", e)}
+        onLoadedMetadata={() => console.log("[v0] Audio loaded successfully")}
       >
-        <source src="/placeholder-audio.mp3" type="audio/mpeg" />
+        <source src={ERIGGA_AUDIO_URL} type="audio/mpeg" />
       </audio>
     </div>
   )
