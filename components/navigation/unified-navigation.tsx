@@ -132,7 +132,9 @@ export function UnifiedNavigation() {
     <nav
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b",
-        isScrolled ? "bg-background/95 backdrop-blur-md shadow-lg" : "bg-background/80 backdrop-blur-sm",
+        isScrolled
+          ? "bg-background/95 backdrop-blur-md shadow-lg dark:bg-gray-950/95"
+          : "bg-background/80 backdrop-blur-sm dark:bg-gray-950/80",
       )}
     >
       <div className="container mx-auto px-3 sm:px-4">
