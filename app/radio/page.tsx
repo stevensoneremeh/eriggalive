@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { createClient } from "@/lib/supabase/client"
 import { AnimatedRadioCharacter } from "@/components/radio/animated-radio-character"
+import { useTheme } from "next-themes"
 
 interface Track {
   id: string
@@ -105,6 +106,7 @@ const moodCategories: MoodCategory[] = [
 
 export default function RadioPage() {
   const { isAuthenticated, user } = useAuth()
+  const { theme } = useTheme()
   const supabase = createClient()
   const audioRef = useRef<HTMLAudioElement>(null)
 
@@ -303,16 +305,37 @@ export default function RadioPage() {
   }
 
   const sendShoutout = async () => {
-    if (!newShoutout.trim() || !user) return
+    if (!newShoutout.trim() || !user) {
+      console.log("[v0] Cannot send shoutout: missing message or user not authenticated")
+      return
+    }
+
+    if (newShoutout.length > 280) {
+      console.log("[v0] Shoutout too long, limiting to 280 characters")
+      setNewShoutout(newShoutout.slice(0, 280))
+      return
+    }
 
     try {
-      await supabase.from("community_shoutouts").insert({
+      console.log("[v0] Sending shoutout:", newShoutout.trim())
+      const { data, error } = await supabase.from("community_shoutouts").insert({
         user_id: user.id,
         message: newShoutout.trim(),
+        username: user.user_metadata?.full_name || user.email?.split("@")[0] || "Anonymous",
       })
+
+      if (error) {
+        console.error("[v0] Error sending shoutout:", error)
+        return
+      }
+
+      console.log("[v0] Shoutout sent successfully")
       setNewShoutout("")
+
+      // Add to local state immediately for better UX
+      setShoutouts((prev) => [newShoutout.trim(), ...prev.slice(0, 9)])
     } catch (error) {
-      console.error("Error sending shoutout:", error)
+      console.error("[v0] Error sending shoutout:", error)
     }
   }
 
@@ -344,10 +367,17 @@ export default function RadioPage() {
   }
 
   return (
-    <div className={cn("min-h-screen transition-all duration-1000", selectedMoodData.gradient)}>
+    <div
+      className={cn(
+        "min-h-screen transition-all duration-1000",
+        theme === "dark"
+          ? selectedMoodData.gradient
+          : `bg-gradient-to-br from-gray-50 to-gray-100 dark:${selectedMoodData.gradient}`,
+      )}
+    >
       {/* Animated Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 opacity-5">
+        <div className="absolute inset-0 opacity-5 dark:opacity-5">
           {/* Lagos Skyline Silhouettes */}
           <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/20 to-transparent" />
 
@@ -355,7 +385,10 @@ export default function RadioPage() {
           {[...Array(8)].map((_, i) => (
             <motion.div
               key={i}
-              className={cn("absolute rounded-lg", selectedMoodData.color.replace("from-", "bg-"))}
+              className={cn(
+                "absolute rounded-lg",
+                theme === "dark" ? selectedMoodData.color.replace("from-", "bg-") : "bg-gray-300/30",
+              )}
               style={{
                 width: `${20 + i * 10}px`,
                 height: `${20 + i * 10}px`,
@@ -391,9 +424,12 @@ export default function RadioPage() {
           transition={{ duration: 0.8 }}
         >
           <motion.h1
-            className="text-6xl md:text-8xl font-black mb-4 bg-gradient-to-r from-white via-gray-200 to-white bg-clip-text text-transparent"
+            className={cn(
+              "text-6xl md:text-8xl font-black mb-4 bg-gradient-to-r bg-clip-text text-transparent",
+              theme === "dark" ? "from-white via-gray-200 to-white" : "from-gray-900 via-gray-700 to-gray-900",
+            )}
             style={{
-              textShadow: "2px 2px 4px rgba(0,0,0,0.5)",
+              textShadow: theme === "dark" ? "2px 2px 4px rgba(0,0,0,0.5)" : "2px 2px 4px rgba(255,255,255,0.5)",
               fontFamily: "Impact, Arial Black, sans-serif",
               letterSpacing: "0.1em",
             }}
@@ -401,11 +437,18 @@ export default function RadioPage() {
               prefersReducedMotion
                 ? {}
                 : {
-                    textShadow: [
-                      "2px 2px 4px rgba(0,0,0,0.5)",
-                      "4px 4px 8px rgba(255,0,0,0.3)",
-                      "2px 2px 4px rgba(0,0,0,0.5)",
-                    ],
+                    textShadow:
+                      theme === "dark"
+                        ? [
+                            "2px 2px 4px rgba(0,0,0,0.5)",
+                            "4px 4px 8px rgba(255,0,0,0.3)",
+                            "2px 2px 4px rgba(0,0,0,0.5)",
+                          ]
+                        : [
+                            "2px 2px 4px rgba(255,255,255,0.5)",
+                            "4px 4px 8px rgba(255,0,0,0.2)",
+                            "2px 2px 4px rgba(255,255,255,0.5)",
+                          ],
                   }
             }
             transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY }}
@@ -413,7 +456,7 @@ export default function RadioPage() {
             ERIGGA RADIO
           </motion.h1>
           <motion.p
-            className="text-2xl md:text-3xl font-bold text-white/90 mb-2"
+            className={cn("text-2xl md:text-3xl font-bold mb-2", theme === "dark" ? "text-white/90" : "text-gray-800")}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
@@ -444,13 +487,18 @@ export default function RadioPage() {
         {/* Daily Quote */}
         {dailyQuote && (
           <motion.div
-            className="glass-card rounded-2xl p-6 mb-8 text-center"
+            className={cn(
+              "glass-card rounded-2xl p-6 mb-8 text-center",
+              theme === "dark"
+                ? "bg-white/10 backdrop-blur-md border-white/20"
+                : "bg-white/80 backdrop-blur-md border-gray-200/50 shadow-lg",
+            )}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.3 }}
           >
-            <p className="text-lg italic text-white/90">"{dailyQuote}"</p>
-            <p className="text-sm text-white/70 mt-2">- Erigga</p>
+            <p className={cn("text-lg italic", theme === "dark" ? "text-white/90" : "text-gray-800")}>"{dailyQuote}"</p>
+            <p className={cn("text-sm mt-2", theme === "dark" ? "text-white/70" : "text-gray-600")}>- Erigga</p>
           </motion.div>
         )}
 
@@ -461,15 +509,20 @@ export default function RadioPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          <h2 className="text-3xl font-bold text-white mb-6 text-center">Choose Your Vibe</h2>
+          <h2 className={cn("text-3xl font-bold mb-6 text-center", theme === "dark" ? "text-white" : "text-gray-900")}>
+            Choose Your Vibe
+          </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {moodCategories.map((mood, index) => (
               <motion.div
                 key={mood.id}
                 className={cn(
-                  "glass-card rounded-2xl p-6 cursor-pointer transition-all duration-300",
+                  "rounded-2xl p-6 cursor-pointer transition-all duration-300",
                   "hover:scale-105 hover:shadow-2xl",
-                  selectedMood === mood.id ? "ring-4 ring-white/50 scale-105" : "",
+                  selectedMood === mood.id ? "ring-4 scale-105" : "",
+                  theme === "dark"
+                    ? "glass-card ring-white/50"
+                    : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg ring-gray-400/50",
                 )}
                 onClick={() => handleMoodSelect(mood.id)}
                 initial={{ opacity: 0, y: 20 }}
@@ -486,8 +539,17 @@ export default function RadioPage() {
                 >
                   {mood.icon}
                 </div>
-                <h3 className="text-lg font-bold text-white text-center mb-2">{mood.name}</h3>
-                <p className="text-sm text-white/70 text-center">{mood.description}</p>
+                <h3
+                  className={cn(
+                    "text-lg font-bold text-center mb-2",
+                    theme === "dark" ? "text-white" : "text-gray-900",
+                  )}
+                >
+                  {mood.name}
+                </h3>
+                <p className={cn("text-sm text-center", theme === "dark" ? "text-white/70" : "text-gray-600")}>
+                  {mood.description}
+                </p>
               </motion.div>
             ))}
           </div>
@@ -497,7 +559,10 @@ export default function RadioPage() {
           {/* Main Player */}
           <div className="lg:col-span-2">
             <motion.div
-              className="glass-card rounded-2xl p-8"
+              className={cn(
+                "rounded-2xl p-8",
+                theme === "dark" ? "glass-card" : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-xl",
+              )}
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.6 }}
@@ -579,10 +644,12 @@ export default function RadioPage() {
 
               {/* Track Info */}
               <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-white mb-2">
+                <h2 className={cn("text-2xl font-bold mb-2", theme === "dark" ? "text-white" : "text-gray-900")}>
                   {currentTrack?.title || "Select a mood to start"}
                 </h2>
-                <p className="text-lg text-white/70">{currentTrack?.artist || "Erigga Radio"}</p>
+                <p className={cn("text-lg", theme === "dark" ? "text-white/70" : "text-gray-600")}>
+                  {currentTrack?.artist || "Erigga Radio"}
+                </p>
                 <Badge className={cn("mt-2", selectedMoodData.color)}>
                   {selectedMoodData.name} {selectedMoodData.emoji}
                 </Badge>
@@ -590,26 +657,48 @@ export default function RadioPage() {
 
               {/* Controls */}
               <div className="flex items-center justify-center space-x-6 mb-6">
-                <Button variant="ghost" size="lg" className="text-white hover:text-white/80">
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className={cn(
+                    theme === "dark" ? "text-white hover:text-white/80" : "text-gray-700 hover:text-gray-900",
+                  )}
+                >
                   <SkipBack className="w-6 h-6" />
                 </Button>
 
                 <Button
                   size="lg"
-                  className="rounded-full w-16 h-16 bg-white text-black hover:bg-white/90"
+                  className={cn(
+                    "rounded-full w-16 h-16",
+                    theme === "dark"
+                      ? "bg-white text-black hover:bg-white/90"
+                      : "bg-gray-900 text-white hover:bg-gray-800",
+                  )}
                   onClick={togglePlayPause}
                 >
                   {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
                 </Button>
 
-                <Button variant="ghost" size="lg" className="text-white hover:text-white/80">
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className={cn(
+                    theme === "dark" ? "text-white hover:text-white/80" : "text-gray-700 hover:text-gray-900",
+                  )}
+                >
                   <SkipForward className="w-6 h-6" />
                 </Button>
               </div>
 
               {/* Volume Control */}
               <div className="flex items-center space-x-4">
-                <Button variant="ghost" size="sm" onClick={() => setIsMuted(!isMuted)} className="text-white">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsMuted(!isMuted)}
+                  className={cn(theme === "dark" ? "text-white" : "text-gray-700")}
+                >
                   {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                 </Button>
                 <Slider
@@ -619,7 +708,9 @@ export default function RadioPage() {
                   onValueChange={(value) => setVolume(value[0])}
                   className="flex-1"
                 />
-                <span className="text-sm text-white/70 w-12">{volume}%</span>
+                <span className={cn("text-sm w-12", theme === "dark" ? "text-white/70" : "text-gray-600")}>
+                  {volume}%
+                </span>
               </div>
             </motion.div>
           </div>
@@ -628,9 +719,15 @@ export default function RadioPage() {
           <div className="space-y-6">
             {/* Live Broadcast Card */}
             <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8 }}>
-              <Card className="glass-card">
+              <Card
+                className={cn(
+                  theme === "dark" ? "glass-card" : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg",
+                )}
+              >
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-white">
+                  <CardTitle
+                    className={cn("flex items-center gap-2", theme === "dark" ? "text-white" : "text-gray-900")}
+                  >
                     <Radio className="w-5 h-5" />
                     Live Broadcast
                   </CardTitle>
@@ -646,7 +743,9 @@ export default function RadioPage() {
                         />
                         <span className="text-white font-bold">LIVE NOW</span>
                       </div>
-                      <p className="text-white/90">{liveTitle}</p>
+                      <p className={cn("text-white/90", theme === "dark" ? "text-white/90" : "text-gray-800")}>
+                        {liveTitle}
+                      </p>
                       <div className="flex items-center gap-2 text-sm text-white/70">
                         <Users className="w-4 h-4" />
                         <span>{listenerCount} listeners</span>
@@ -654,18 +753,22 @@ export default function RadioPage() {
                     </div>
                   ) : nextShow ? (
                     <div className="space-y-4">
-                      <div className="flex items-center gap-2 text-white/70">
+                      <div className="flex items-center gap-2 text-sm text-white/70">
                         <Calendar className="w-4 h-4" />
                         <span>Next Show</span>
                       </div>
-                      <p className="text-white font-bold">{nextShow.title}</p>
+                      <p className={cn("text-white font-bold", theme === "dark" ? "text-white" : "text-gray-900")}>
+                        {nextShow.title}
+                      </p>
                       <div className="flex items-center gap-2 text-sm text-white/70">
                         <Clock className="w-4 h-4" />
                         <span>{nextShow.time}</span>
                       </div>
                     </div>
                   ) : (
-                    <p className="text-white/70">No live broadcasts scheduled</p>
+                    <p className={cn("text-white/70", theme === "dark" ? "text-white/70" : "text-gray-600")}>
+                      No live broadcasts scheduled
+                    </p>
                   )}
                 </CardContent>
               </Card>
@@ -673,9 +776,15 @@ export default function RadioPage() {
 
             {/* Community Shout-outs */}
             <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.0 }}>
-              <Card className="glass-card">
+              <Card
+                className={cn(
+                  theme === "dark" ? "glass-card" : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg",
+                )}
+              >
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-white">
+                  <CardTitle
+                    className={cn("flex items-center gap-2", theme === "dark" ? "text-white" : "text-gray-900")}
+                  >
                     <MessageCircle className="w-5 h-5" />
                     Fan Shout-outs
                   </CardTitle>
@@ -686,12 +795,32 @@ export default function RadioPage() {
                       value={newShoutout}
                       onChange={(e) => setNewShoutout(e.target.value)}
                       placeholder="Send a shout-out..."
-                      className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                      className={cn(
+                        "flex-1",
+                        theme === "dark"
+                          ? "bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                          : "bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-500",
+                      )}
                       onKeyPress={(e) => e.key === "Enter" && sendShoutout()}
+                      maxLength={280}
                     />
-                    <Button onClick={sendShoutout} size="sm" className="bg-white text-black hover:bg-white/90">
+                    <Button
+                      onClick={sendShoutout}
+                      size="sm"
+                      className={cn(
+                        theme === "dark"
+                          ? "bg-white text-black hover:bg-white/90"
+                          : "bg-gray-900 text-white hover:bg-gray-800",
+                      )}
+                      disabled={!newShoutout.trim()}
+                    >
                       <Send className="w-4 h-4" />
                     </Button>
+                  </div>
+
+                  {/* Character count indicator */}
+                  <div className={cn("text-xs text-right", theme === "dark" ? "text-white/50" : "text-gray-500")}>
+                    {newShoutout.length}/280
                   </div>
 
                   {/* Animated Radio Character */}
@@ -705,17 +834,28 @@ export default function RadioPage() {
                   </div>
 
                   <div className="space-y-2 max-h-32 overflow-y-auto">
-                    {shoutouts.map((shoutout, index) => (
-                      <motion.div
-                        key={index}
-                        className="text-sm text-white/80 p-2 bg-white/5 rounded-lg"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
+                    {shoutouts.length === 0 ? (
+                      <p
+                        className={cn("text-sm text-center py-4", theme === "dark" ? "text-white/50" : "text-gray-500")}
                       >
-                        {shoutout}
-                      </motion.div>
-                    ))}
+                        No shout-outs yet. Be the first to send one!
+                      </p>
+                    ) : (
+                      shoutouts.map((shoutout, index) => (
+                        <motion.div
+                          key={index}
+                          className={cn(
+                            "text-sm p-2 rounded-lg",
+                            theme === "dark" ? "text-white/80 bg-white/5" : "text-gray-700 bg-gray-100/50",
+                          )}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                        >
+                          {shoutout}
+                        </motion.div>
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -724,9 +864,17 @@ export default function RadioPage() {
             {/* Pinned Tracks */}
             {pinnedTracks.length > 0 && (
               <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.2 }}>
-                <Card className="glass-card">
+                <Card
+                  className={cn(
+                    theme === "dark"
+                      ? "glass-card"
+                      : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg",
+                  )}
+                >
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-white">
+                    <CardTitle
+                      className={cn("flex items-center gap-2", theme === "dark" ? "text-white" : "text-gray-900")}
+                    >
                       <Pin className="w-5 h-5" />
                       Pinned Tracks
                     </CardTitle>
@@ -734,21 +882,38 @@ export default function RadioPage() {
                   <CardContent>
                     <div className="space-y-2 max-h-40 overflow-y-auto">
                       {pinnedTracks.map((track) => (
-                        <div key={track.id} className="flex items-center gap-3 p-2 bg-white/5 rounded-lg">
+                        <div
+                          key={track.id}
+                          className={cn(
+                            "flex items-center gap-3 p-2 rounded-lg",
+                            theme === "dark" ? "bg-white/5" : "bg-gray-100/50",
+                          )}
+                        >
                           <img
                             src={track.artwork_url || "/placeholder.svg"}
                             alt={track.title}
                             className="w-8 h-8 rounded object-cover"
                           />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-white truncate">{track.title}</p>
-                            <p className="text-xs text-white/70 truncate">{track.artist}</p>
+                            <p
+                              className={cn(
+                                "text-sm font-medium truncate",
+                                theme === "dark" ? "text-white" : "text-gray-900",
+                              )}
+                            >
+                              {track.title}
+                            </p>
+                            <p className={cn("text-xs truncate", theme === "dark" ? "text-white/70" : "text-gray-600")}>
+                              {track.artist}
+                            </p>
                           </div>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => togglePinTrack(track)}
-                            className="text-white/70 hover:text-white"
+                            className={cn(
+                              theme === "dark" ? "text-white/70 hover:text-white" : "text-gray-700 hover:text-gray-900",
+                            )}
                           >
                             <PinOff className="w-4 h-4" />
                           </Button>
@@ -770,9 +935,13 @@ export default function RadioPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 1.4 }}
           >
-            <Card className="glass-card">
+            <Card
+              className={cn(
+                theme === "dark" ? "glass-card" : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg",
+              )}
+            >
               <CardHeader>
-                <CardTitle className="text-white">
+                <CardTitle className={cn("text-white", theme === "dark" ? "text-white" : "text-gray-900")}>
                   {selectedMoodData.name} Playlist {selectedMoodData.emoji}
                 </CardTitle>
               </CardHeader>
@@ -781,7 +950,10 @@ export default function RadioPage() {
                   {playlist.slice(0, 6).map((track, index) => (
                     <motion.div
                       key={track.id}
-                      className="flex items-center gap-3 p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg hover:cursor-pointer",
+                        theme === "dark" ? "bg-white/5" : "bg-gray-100/50",
+                      )}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.1 * index }}
@@ -793,8 +965,12 @@ export default function RadioPage() {
                         className="w-12 h-12 rounded-lg object-cover"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-white truncate">{track.title}</p>
-                        <p className="text-sm text-white/70 truncate">{track.artist}</p>
+                        <p className={cn("font-medium truncate", theme === "dark" ? "text-white" : "text-gray-900")}>
+                          {track.title}
+                        </p>
+                        <p className={cn("text-sm truncate", theme === "dark" ? "text-white/70" : "text-gray-600")}>
+                          {track.artist}
+                        </p>
                       </div>
                       <Button
                         variant="ghost"
@@ -803,7 +979,9 @@ export default function RadioPage() {
                           e.stopPropagation()
                           togglePinTrack(track)
                         }}
-                        className="text-white/70 hover:text-white"
+                        className={cn(
+                          theme === "dark" ? "text-white/70 hover:text-white" : "text-gray-700 hover:text-gray-900",
+                        )}
                       >
                         {pinnedTracks.some((t) => t.id === track.id) ? (
                           <PinOff className="w-4 h-4" />
@@ -827,6 +1005,7 @@ export default function RadioPage() {
         onDurationChange={() => setDuration(audioRef.current?.duration || 0)}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
+        onError={(e) => console.error("[v0] Audio playback error:", e)}
       >
         <source src="/placeholder-audio.mp3" type="audio/mpeg" />
       </audio>
