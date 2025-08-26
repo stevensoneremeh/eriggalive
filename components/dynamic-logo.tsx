@@ -53,7 +53,7 @@ export function DynamicLogo({ width, height, className = "", responsive = true }
 
   const logoSrc =
     currentTheme === "dark"
-      ? "/images/erigga-live-logo-dark.png" // New dark logo with red text on black background
+      ? "/images/erigga-live-logo-dark.png" // Exact uploaded logo with red text on black background
       : "/images/erigga-live-logo.png" // Light logo with transparent background for light theme
 
   return (
@@ -65,8 +65,9 @@ export function DynamicLogo({ width, height, className = "", responsive = true }
         height={responsive ? 68 : finalHeight}
         className={
           responsive
-            ? "object-contain w-auto h-auto max-w-full max-h-full sm:w-[120px] sm:h-[32px] md:w-[160px] md:h-[42px] lg:w-[220px] lg:h-[58px] xl:w-[260px] xl:h-[68px]"
-            : "object-contain w-auto h-auto max-w-full max-h-full"
+            ? // Enhanced responsive classes for better logo scaling across all devices
+              "object-contain w-auto h-auto max-w-full max-h-full transition-all duration-200 sm:w-[120px] sm:h-[32px] md:w-[160px] md:h-[42px] lg:w-[220px] lg:h-[58px] xl:w-[260px] xl:h-[68px] 2xl:w-[280px] 2xl:h-[72px]"
+            : "object-contain w-auto h-auto max-w-full max-h-full transition-all duration-200"
         }
         style={
           responsive
@@ -81,7 +82,8 @@ export function DynamicLogo({ width, height, className = "", responsive = true }
         priority
         sizes={
           responsive
-            ? "(max-width: 640px) 120px, (max-width: 768px) 160px, (max-width: 1024px) 220px, 260px"
+            ? // Updated sizes for better responsive image loading
+              "(max-width: 640px) 120px, (max-width: 768px) 160px, (max-width: 1024px) 220px, (max-width: 1536px) 260px, 280px"
             : `${finalWidth}px`
         }
         onError={() => {
