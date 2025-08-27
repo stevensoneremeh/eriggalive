@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 
+export const dynamic = "force-dynamic"
+
 function verifyUser(request: NextRequest) {
   const authHeader = request.headers.get("authorization")
   if (!authHeader) return null

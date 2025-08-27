@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+
+export const dynamic = "force-dynamic"
 
 export async function GET() {
   try {
@@ -12,7 +13,7 @@ export async function GET() {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
+      return { success: false, error: "Authentication required" }, { status: 401 }
     }
 
     // Fetch user's withdrawal history
@@ -34,15 +35,15 @@ export async function GET() {
 
     if (error) {
       console.error("Error fetching withdrawals:", error)
-      return NextResponse.json({ success: false, error: "Failed to fetch withdrawal history" }, { status: 500 })
+      return { success: false, error: "Failed to fetch withdrawal history" }, { status: 500 }
     }
 
-    return NextResponse.json({
+    return {
       success: true,
       withdrawals: withdrawals || [],
-    })
+    }
   } catch (error) {
     console.error("Withdrawal history API error:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
+    return { success: false, error: "Internal server error" }, { status: 500 }
   }
 }

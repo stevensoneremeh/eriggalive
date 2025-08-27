@@ -3,6 +3,8 @@ import { cookies } from "next/headers"
 import { type NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
+export const dynamic = "force-dynamic"
+
 const updateProfileSchema = z.object({
   full_name: z.string().min(1).max(100).optional(),
   username: z
@@ -30,7 +32,6 @@ export async function PUT(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies })
 
-    // Check authentication
     const {
       data: { user },
       error: authError,
@@ -42,7 +43,6 @@ export async function PUT(request: NextRequest) {
     const body = await request.json()
     const validatedData = updateProfileSchema.parse(body)
 
-    // Check if username is already taken (if updating username)
     if (validatedData.username) {
       const { data: existingUser } = await supabase
         .from("users")
@@ -56,7 +56,6 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Validate date of birth (must be 13+ years old)
     if (validatedData.date_of_birth) {
       const birthDate = new Date(validatedData.date_of_birth)
       const thirteenYearsAgo = new Date()
@@ -67,7 +66,6 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Update profile
     const { data: updatedUser, error: updateError } = await supabase
       .from("users")
       .update(validatedData)
@@ -80,7 +78,6 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Failed to update profile" }, { status: 500 })
     }
 
-    // Log activity
     await supabase.rpc("log_profile_activity", {
       p_user_id: user.id,
       p_activity_type: "profile_updated",
@@ -112,7 +109,6 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies })
 
-    // Check authentication
     const {
       data: { user },
       error: authError,
@@ -121,7 +117,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get user profile
     const { data: profile, error: profileError } = await supabase.from("users").select("*").eq("id", user.id).single()
 
     if (profileError) {

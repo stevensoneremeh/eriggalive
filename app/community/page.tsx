@@ -79,6 +79,7 @@ export default function CommunityPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedMedia, setSelectedMedia] = useState<File[]>([])
   const [mediaPreview, setMediaPreview] = useState<string[]>([])
+  const [isClient, setIsClient] = useState(false)
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -87,10 +88,14 @@ export default function CommunityPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    // Add community-specific styling to body when on community page
+    setIsClient(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isClient) return
+
     document.body.classList.add("community-page")
 
-    // Communicate to main navigation that we're on community page
     const communityNavEvent = new CustomEvent("communityPageActive", {
       detail: { categories, selectedCategory },
     })
@@ -101,7 +106,7 @@ export default function CommunityPage() {
       const communityNavEvent = new CustomEvent("communityPageInactive")
       window.dispatchEvent(communityNavEvent)
     }
-  }, [categories, selectedCategory])
+  }, [categories, selectedCategory, isClient])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -123,7 +128,6 @@ export default function CommunityPage() {
       }
     } catch (error) {
       console.error("Error loading categories:", error)
-      // Fallback categories
       const fallbackCategories = [
         { id: 1, name: "General", slug: "general", icon: "💬", color: "#25D366", is_active: true },
         { id: 2, name: "Music", slug: "music", icon: "🎵", color: "#128C7E", is_active: true },
@@ -349,7 +353,7 @@ export default function CommunityPage() {
     const validFiles = files.filter((file) => {
       const isValidType =
         file.type.startsWith("image/") || file.type.startsWith("video/") || file.type.startsWith("audio/")
-      const isValidSize = file.size <= 10 * 1024 * 1024 // 10MB limit
+      const isValidSize = file.size <= 10 * 1024 * 1024
 
       if (!isValidType) {
         toast.error(`${file.name} is not a supported media type`)
@@ -468,7 +472,7 @@ export default function CommunityPage() {
       <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
         <motion.div
           initial={{ x: -300 }}
-          animate={{ x: sidebarOpen || window.innerWidth >= 768 ? 0 : -300 }}
+          animate={{ x: sidebarOpen || (isClient && window.innerWidth >= 768) ? 0 : -300 }}
           transition={{ type: "spring", damping: 25, stiffness: 200 }}
           className={cn(
             "w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col",
