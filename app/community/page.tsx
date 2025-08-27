@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Heart, MessageCircle, Smile, Paperclip, MoreVertical, Search, Menu, X, Filter, Zap } from "lucide-react"
+import { Heart, MessageCircle, Smile, Paperclip, MoreVertical, Search, Menu, X, Zap, Send } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
 import { cn } from "@/lib/utils"
 import { UserTierBadge } from "@/components/user-tier-badge"
+import { motion, AnimatePresence } from "framer-motion"
 
 interface Category {
   id: number
@@ -69,19 +70,33 @@ export default function CommunityPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [comments, setComments] = useState<{ [postId: number]: Comment[] }>({})
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
-  const [newMessage, setNewMessage] = useState("")
-  const [newComment, setNewComment] = useState("")
+  const [unifiedInput, setUnifiedInput] = useState("")
   const [activePost, setActivePost] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const [isScrollingDown, setIsScrollingDown] = useState(false)
-  const [lastScrollY, setLastScrollY] = useState(0)
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    // Add community-specific styling to body when on community page
+    document.body.classList.add("community-page")
+
+    // Communicate to main navigation that we're on community page
+    const communityNavEvent = new CustomEvent("communityPageActive", {
+      detail: { categories, selectedCategory },
+    })
+    window.dispatchEvent(communityNavEvent)
+
+    return () => {
+      document.body.classList.remove("community-page")
+      const communityNavEvent = new CustomEvent("communityPageInactive")
+      window.dispatchEvent(communityNavEvent)
+    }
+  }, [categories, selectedCategory])
 
   // Scroll to bottom
   const scrollToBottom = () => {
@@ -150,45 +165,20 @@ export default function CommunityPage() {
           username: "Unknown User",
           full_name: "Unknown User",
           avatar_url: null,
-          tier: "grassroot",
+          tier: "FREE",
         },
         category: post.category || {
           id: selectedCategory,
           name: "General",
           slug: "general",
         },
-        has_voted: false, // TODO: Check actual vote status
+        has_voted: false,
       }))
 
       setPosts(transformedPosts)
       setTimeout(scrollToBottom, 100)
     } catch (error) {
       console.error("Error loading posts:", error)
-      // Show sample posts on error
-      const samplePosts = [
-        {
-          id: 1,
-          content:
-            "Welcome to the Erigga community! 🎵 This is where real music lovers connect and share their passion.",
-          created_at: new Date().toISOString(),
-          vote_count: 12,
-          comment_count: 3,
-          user: {
-            id: "sample-1",
-            username: "eriggaofficial",
-            full_name: "Erigga Official",
-            avatar_url: "/placeholder-user.jpg",
-            tier: "blood",
-          },
-          category: {
-            id: selectedCategory,
-            name: "General",
-            slug: "general",
-          },
-          has_voted: false,
-        },
-      ]
-      setPosts(samplePosts)
     } finally {
       setLoading(false)
     }
@@ -220,9 +210,9 @@ export default function CommunityPage() {
             username: "Unknown User",
             full_name: "Unknown User",
             avatar_url: null,
-            tier: "grassroot",
+            tier: "FREE",
           },
-          has_liked: false, // TODO: Check actual like status
+          has_liked: false,
         }))
 
         setComments((prev) => ({ ...prev, [postId]: transformedComments }))
@@ -233,105 +223,94 @@ export default function CommunityPage() {
     [supabase],
   )
 
-  // Send message
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !isAuthenticated || !profile || !selectedCategory) {
+  const handleUnifiedSubmit = async () => {
+    if (!unifiedInput.trim() || !isAuthenticated || !profile) {
       if (!isAuthenticated) {
-        toast.error("Please sign in to post messages")
+        toast.error("Please sign in to participate")
       }
       return
     }
 
     try {
-      const { data, error } = await supabase
-        .from("community_posts")
-        .insert({
-          content: newMessage.trim(),
-          user_id: profile.id,
-          category_id: selectedCategory,
-          is_published: true,
-          is_deleted: false,
-        })
-        .select(`
-          *,
-          user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
-          category:community_categories!community_posts_category_id_fkey(id, name, slug)
-        `)
-        .single()
+      if (activePost) {
+        // Comment mode - add comment to active post
+        const { data, error } = await supabase
+          .from("community_comments")
+          .insert({
+            content: unifiedInput.trim(),
+            user_id: profile.id,
+            post_id: activePost,
+            is_deleted: false,
+          })
+          .select(`
+            *,
+            user:users!community_comments_user_id_fkey(id, username, full_name, avatar_url, tier)
+          `)
+          .single()
 
-      if (error) throw error
+        if (error) throw error
 
-      const newPost = {
-        id: data.id,
-        content: data.content,
-        created_at: data.created_at,
-        vote_count: 0,
-        comment_count: 0,
-        user: data.user,
-        category: data.category,
-        has_voted: false,
+        const newComment = {
+          id: data.id,
+          content: data.content,
+          created_at: data.created_at,
+          like_count: 0,
+          user: data.user,
+          has_liked: false,
+        }
+
+        setComments((prev) => ({
+          ...prev,
+          [activePost]: [...(prev[activePost] || []), newComment],
+        }))
+
+        setPosts((prev) =>
+          prev.map((post) => (post.id === activePost ? { ...post, comment_count: post.comment_count + 1 } : post)),
+        )
+
+        toast.success("Comment added!")
+      } else {
+        // Post mode - create new post
+        if (!selectedCategory) return
+
+        const { data, error } = await supabase
+          .from("community_posts")
+          .insert({
+            content: unifiedInput.trim(),
+            user_id: profile.id,
+            category_id: selectedCategory,
+            is_published: true,
+            is_deleted: false,
+          })
+          .select(`
+            *,
+            user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
+            category:community_categories!community_posts_category_id_fkey(id, name, slug)
+          `)
+          .single()
+
+        if (error) throw error
+
+        const newPost = {
+          id: data.id,
+          content: data.content,
+          created_at: data.created_at,
+          vote_count: 0,
+          comment_count: 0,
+          user: data.user,
+          category: data.category,
+          has_voted: false,
+        }
+
+        setPosts((prev) => [...prev, newPost])
+        setTimeout(scrollToBottom, 100)
+        toast.success("Message sent!")
       }
 
-      setPosts((prev) => [...prev, newPost])
-      setNewMessage("")
-      setTimeout(scrollToBottom, 100)
-      toast.success("Message sent!")
+      setUnifiedInput("")
     } catch (error) {
-      console.error("Error sending message:", error)
-      toast.error("Failed to send message")
-    }
-  }
-
-  // Send comment
-  const sendComment = async (postId: number) => {
-    if (!newComment.trim() || !isAuthenticated || !profile) {
-      if (!isAuthenticated) {
-        toast.error("Please sign in to comment")
-      }
-      return
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from("community_comments")
-        .insert({
-          content: newComment.trim(),
-          user_id: profile.id,
-          post_id: postId,
-          is_deleted: false,
-        })
-        .select(`
-          *,
-          user:users!community_comments_user_id_fkey(id, username, full_name, avatar_url, tier)
-        `)
-        .single()
-
-      if (error) throw error
-
-      const newCommentObj = {
-        id: data.id,
-        content: data.content,
-        created_at: data.created_at,
-        like_count: 0,
-        user: data.user,
-        has_liked: false,
-      }
-
-      setComments((prev) => ({
-        ...prev,
-        [postId]: [...(prev[postId] || []), newCommentObj],
-      }))
-
-      // Update comment count
-      setPosts((prev) =>
-        prev.map((post) => (post.id === postId ? { ...post, comment_count: post.comment_count + 1 } : post)),
-      )
-
-      setNewComment("")
-      toast.success("Comment added!")
-    } catch (error) {
-      console.error("Error sending comment:", error)
-      toast.error("Failed to send comment")
+      console.error("Error submitting:", error)
+      toast.error("Failed to send")
     }
   }
 
@@ -347,17 +326,14 @@ export default function CommunityPage() {
       if (!post) return
 
       if (post.has_voted) {
-        // Remove vote
         await supabase.from("community_post_votes").delete().eq("post_id", postId).eq("user_id", profile.id)
       } else {
-        // Add vote
         await supabase.from("community_post_votes").insert({
           post_id: postId,
           user_id: profile.id,
         })
       }
 
-      // Update local state optimistically
       setPosts((prev) =>
         prev.map((p) =>
           p.id === postId
@@ -374,23 +350,6 @@ export default function CommunityPage() {
     } catch (error) {
       console.error("Error voting:", error)
       toast.error("Failed to vote")
-    }
-  }
-
-  // Get tier color
-  const getTierColor = (tier: string) => {
-    switch (tier?.toLowerCase()) {
-      case "blood":
-      case "blood_brotherhood":
-        return "bg-red-500"
-      case "elder":
-        return "bg-purple-500"
-      case "pioneer":
-        return "bg-blue-500"
-      case "grassroot":
-        return "bg-green-500"
-      default:
-        return "bg-gray-500"
     }
   }
 
@@ -432,7 +391,6 @@ export default function CommunityPage() {
           filter: `category_id=eq.${selectedCategory}`,
         },
         (payload) => {
-          // Reload posts when new ones are added
           loadPosts()
         },
       )
@@ -443,389 +401,330 @@ export default function CommunityPage() {
     }
   }, [selectedCategory, supabase, loadPosts])
 
-  useEffect(() => {
-    const handleScroll = () => {
-      if (typeof window === "undefined") return
-
-      const currentScrollY = scrollContainerRef.current?.scrollTop || 0
-      const scrollDifference = currentScrollY - lastScrollY
-
-      // Only hide nav on mobile screens
-      if (window.innerWidth < 768) {
-        if (scrollDifference > 10 && currentScrollY > 100) {
-          setIsScrollingDown(true)
-        } else if (scrollDifference < -10) {
-          setIsScrollingDown(false)
-        }
-      } else {
-        setIsScrollingDown(false)
-      }
-
-      setLastScrollY(currentScrollY)
-    }
-
-    const scrollContainer = scrollContainerRef.current
-    if (scrollContainer) {
-      scrollContainer.addEventListener("scroll", handleScroll, { passive: true })
-      return () => scrollContainer.removeEventListener("scroll", handleScroll)
-    }
-  }, [lastScrollY])
-
-  useEffect(() => {
-    // Communicate scroll state to main navigation
-    document.documentElement.style.setProperty("--main-nav-hidden", isScrollingDown ? "1" : "0")
-
-    // Add CSS custom property for main nav hiding
-    if (isScrollingDown) {
-      document.body.classList.add("community-scrolling-down")
-    } else {
-      document.body.classList.remove("community-scrolling-down")
-    }
-
-    return () => {
-      document.body.classList.remove("community-scrolling-down")
-      document.documentElement.style.removeProperty("--main-nav-hidden")
-    }
-  }, [isScrollingDown])
-
   return (
     <div className="min-h-screen bg-background">
-      <div className="flex h-screen overflow-hidden">
-        <div
+      <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+        {/* Sidebar - WhatsApp style */}
+        <motion.div
+          initial={{ x: -300 }}
+          animate={{ x: sidebarOpen || window.innerWidth >= 768 ? 0 : -300 }}
+          transition={{ type: "spring", damping: 25, stiffness: 200 }}
           className={cn(
-            "w-full sm:w-80 md:w-80 lg:w-80 xl:w-96 bg-card border-r border-border flex flex-col transition-all duration-300",
-            "fixed md:relative z-50 md:z-auto h-full",
-            sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+            "w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col",
+            "fixed md:relative z-50 md:z-auto h-full shadow-lg md:shadow-none",
           )}
         >
-          <div className="p-4 sm:p-6 bg-card border-b border-border">
+          {/* Header */}
+          <div className="p-4 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary flex items-center justify-center">
-                  <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
+                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+                  <Zap className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-lg sm:text-xl font-bold text-foreground">Community</h1>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Connect & Share</p>
+                  <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Community</h1>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Stay connected</p>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="md:hidden rounded-full p-2 min-h-[44px] min-w-[44px]"
-                onClick={() => setSidebarOpen(false)}
-              >
+              <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setSidebarOpen(false)}>
                 <X className="h-5 w-5" />
               </Button>
             </div>
           </div>
 
-          <div className="p-3 sm:p-4">
+          {/* Search */}
+          <div className="p-3">
             <div className="relative">
-              <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
                 placeholder="Search conversations..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 sm:pl-12 bg-background border-border rounded-full h-11 sm:h-12 text-base sm:text-lg focus:ring-2 focus:ring-primary/20"
+                className="pl-10 bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600 rounded-full"
               />
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 rounded-full min-h-[36px] min-w-[36px]"
-              >
-                <Filter className="h-4 w-4" />
-              </Button>
             </div>
           </div>
 
-          <ScrollArea className="flex-1 px-3 sm:px-4">
+          {/* Categories - WhatsApp chat list style */}
+          <ScrollArea className="flex-1 px-2">
             <div className="space-y-1">
-              {categories.map((category, index) => (
-                <div
+              {categories.map((category) => (
+                <motion.div
                   key={category.id}
+                  whileHover={{ backgroundColor: "rgba(0,0,0,0.05)" }}
+                  whileTap={{ scale: 0.98 }}
                   className={cn(
-                    "group relative overflow-hidden rounded-full transition-all duration-200 hover:bg-accent cursor-pointer",
-                    "min-h-[56px] sm:min-h-[60px]",
-                    selectedCategory === category.id ? "bg-primary/10 border border-primary/20" : "hover:bg-accent",
+                    "flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-colors",
+                    selectedCategory === category.id
+                      ? "bg-green-100 dark:bg-green-900/20 border-l-4 border-green-500"
+                      : "hover:bg-gray-100 dark:hover:bg-gray-700",
                   )}
                   onClick={() => {
                     setSelectedCategory(category.id)
                     setSidebarOpen(false)
+                    setActivePost(null) // Reset to post mode when switching categories
                   }}
                 >
-                  <div className="p-3 sm:p-4">
-                    <div className="flex items-center space-x-3 sm:space-x-4">
-                      <div
-                        className={cn(
-                          "w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-lg sm:text-xl",
-                          selectedCategory === category.id
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-accent text-accent-foreground",
-                        )}
-                      >
-                        {category.icon}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-foreground truncate text-base sm:text-lg">
-                          {category.name}
-                        </div>
-                        <div className="text-xs sm:text-sm text-muted-foreground truncate">
-                          {posts.filter((p) => p.category.id === category.id).length} messages
-                        </div>
-                      </div>
-                      {selectedCategory === category.id && <div className="w-2 h-2 rounded-full bg-primary"></div>}
+                  <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xl">
+                    {category.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900 dark:text-white truncate">{category.name}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                      {posts.filter((p) => p.category.id === category.id).length} messages
                     </div>
                   </div>
-                </div>
+                  {selectedCategory === category.id && <div className="w-2 h-2 rounded-full bg-green-500"></div>}
+                </motion.div>
               ))}
             </div>
           </ScrollArea>
 
+          {/* User Profile */}
           {isAuthenticated && profile && (
-            <div className="p-3 sm:p-4 border-t border-border">
-              <div className="flex items-center space-x-3 sm:space-x-4 p-3 rounded-full bg-accent/50">
-                <Avatar className="h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0">
+            <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center space-x-3 p-2 rounded-lg bg-gray-100 dark:bg-gray-700">
+                <Avatar className="h-10 w-10">
                   <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} />
-                  <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-xs sm:text-sm">
+                  <AvatarFallback className="bg-green-500 text-white font-semibold">
                     {profile.username?.charAt(0).toUpperCase() || "U"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-foreground text-sm truncate">{profile.username}</div>
+                  <div className="font-medium text-gray-900 dark:text-white text-sm truncate">{profile.username}</div>
                   <UserTierBadge tier={profile.tier} size="sm" />
                 </div>
-                <Button variant="ghost" size="sm" className="rounded-full p-2 min-h-[36px] min-w-[36px]">
+                <Button variant="ghost" size="sm">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           )}
-        </div>
+        </motion.div>
 
-        <div className="flex-1 flex flex-col bg-background min-w-0 h-screen">
-          <div className="sticky top-0 z-20 p-4 bg-background/80 backdrop-blur-md border-b border-border">
+        {/* Main Chat Area - X/Twitter inspired */}
+        <div className="flex-1 flex flex-col bg-white dark:bg-gray-900 min-w-0">
+          {/* Header */}
+          <div className="p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3 min-w-0 flex-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="md:hidden rounded-full p-2 min-h-[44px] min-w-[44px]"
-                  onClick={() => setSidebarOpen(true)}
-                >
+              <div className="flex items-center space-x-3">
+                <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setSidebarOpen(true)}>
                   <Menu className="h-5 w-5" />
                 </Button>
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-lg sm:text-xl flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-lg">
                   {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-lg sm:text-xl font-bold text-foreground truncate">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                     {categories.find((c) => c.id === selectedCategory)?.name || "General"}
                   </h2>
-                  <p className="text-muted-foreground text-sm truncate">{filteredPosts.length} posts</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {activePost ? "Reply to message" : `${filteredPosts.length} messages`}
+                  </p>
                 </div>
               </div>
-              <div className="flex items-center space-x-1 flex-shrink-0">
-                <Button variant="ghost" size="sm" className="rounded-full p-2 min-h-[44px] min-w-[44px]">
-                  <Search className="h-4 w-4 sm:h-5 sm:w-5" />
+              <div className="flex items-center space-x-2">
+                {activePost && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setActivePost(null)}
+                    className="text-blue-500 hover:text-blue-600"
+                  >
+                    Back to feed
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm">
+                  <Search className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="sm" className="rounded-full p-2 min-h-[44px] min-w-[44px]">
-                  <MoreVertical className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Button variant="ghost" size="sm">
+                  <MoreVertical className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           </div>
 
-          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
-            <div className="max-w-2xl mx-auto">
+          {/* Messages Area - BBM/WhatsApp style bubbles */}
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+            <AnimatePresence>
               {filteredPosts.map((post, index) => (
-                <div
+                <motion.div
                   key={post.id}
-                  className="border-b border-border hover:bg-accent/30 transition-colors duration-200 cursor-pointer"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ delay: index * 0.05 }}
+                  className={cn(
+                    "flex space-x-3 group",
+                    activePost === post.id && "bg-blue-50 dark:bg-blue-900/10 -mx-4 px-4 py-2 rounded-lg",
+                  )}
                 >
-                  <div className="p-4 sm:p-6">
-                    <div className="flex space-x-3">
-                      <Avatar className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0">
-                        <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
-                        <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                          {post.user.username.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
+                  <Avatar className="h-10 w-10 flex-shrink-0">
+                    <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
+                    <AvatarFallback className="bg-green-500 text-white font-semibold">
+                      {post.user.username.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2 mb-1 flex-wrap">
-                          <span className="font-bold text-foreground text-base">
-                            {post.user.full_name || post.user.username}
-                          </span>
-                          <UserTierBadge tier={post.user.tier} size="sm" />
-                          <span className="text-muted-foreground text-sm">
-                            · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                          </span>
-                        </div>
-
-                        <p className="text-foreground text-base leading-relaxed mb-3 break-words">{post.content}</p>
-
-                        <div className="flex items-center justify-between max-w-md">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={cn(
-                              "rounded-full px-3 py-2 h-9 transition-colors",
-                              post.has_voted
-                                ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
-                                : "text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950",
-                            )}
-                            onClick={() => voteOnPost(post.id)}
-                          >
-                            <Heart className={cn("h-4 w-4 mr-2", post.has_voted && "fill-current")} />
-                            <span className="text-sm">{post.vote_count}</span>
-                          </Button>
-
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={cn(
-                              "rounded-full px-3 py-2 h-9 transition-colors",
-                              activePost === post.id
-                                ? "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950"
-                                : "text-muted-foreground hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950",
-                            )}
-                            onClick={() => {
-                              if (activePost === post.id) {
-                                setActivePost(null)
-                              } else {
-                                setActivePost(post.id)
-                                loadComments(post.id)
-                              }
-                            }}
-                          >
-                            <MessageCircle className="h-4 w-4 mr-2" />
-                            <span className="text-sm">{post.comment_count}</span>
-                          </Button>
-                        </div>
+                  <div className="flex-1 min-w-0">
+                    {/* Message bubble - WhatsApp style */}
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl rounded-tl-md shadow-sm border border-gray-200 dark:border-gray-700 p-3 max-w-2xl">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className="font-semibold text-gray-900 dark:text-white text-sm">
+                          {post.user.full_name || post.user.username}
+                        </span>
+                        <UserTierBadge tier={post.user.tier} size="sm" />
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                        </span>
                       </div>
-                    </div>
 
-                    {activePost === post.id && (
-                      <div className="mt-4 space-y-3 border-t border-border pt-4">
-                        {comments[post.id]?.map((comment) => (
-                          <div key={comment.id} className="flex space-x-3">
-                            <Avatar className="h-8 w-8 flex-shrink-0">
-                              <AvatarImage src={comment.user.avatar_url || "/placeholder-user.jpg"} />
-                              <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                                {comment.user.username.charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center space-x-2 mb-1">
-                                <span className="font-semibold text-foreground text-sm">{comment.user.username}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                                </span>
-                              </div>
-                              <p className="text-foreground text-sm leading-relaxed break-words">{comment.content}</p>
-                            </div>
-                          </div>
-                        ))}
+                      <p className="text-gray-900 dark:text-white text-sm leading-relaxed break-words mb-3">
+                        {post.content}
+                      </p>
 
-                        {isAuthenticated && (
-                          <div className="flex space-x-3 pt-3">
-                            <Avatar className="h-8 w-8 flex-shrink-0">
-                              <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
-                              <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                                {profile?.username?.charAt(0).toUpperCase() || "U"}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 flex space-x-2">
-                              <Input
-                                placeholder="Tweet your reply"
-                                value={newComment}
-                                onChange={(e) => setNewComment(e.target.value)}
-                                className="flex-1 rounded-full border-border focus:ring-2 focus:ring-primary/20"
-                                onKeyPress={(e) => {
-                                  if (e.key === "Enter" && !e.shiftKey) {
-                                    e.preventDefault()
-                                    sendComment(post.id)
-                                  }
-                                }}
-                              />
-                              <Button
-                                onClick={() => sendComment(post.id)}
-                                disabled={!newComment.trim()}
-                                size="sm"
-                                className="rounded-full px-4"
-                              >
-                                Reply
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-          </div>
+                      {/* Actions - X/Twitter style */}
+                      <div className="flex items-center space-x-4">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-8 px-3 rounded-full transition-colors",
+                            post.has_voted
+                              ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              : "text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20",
+                          )}
+                          onClick={() => voteOnPost(post.id)}
+                        >
+                          <Heart className={cn("h-4 w-4 mr-1", post.has_voted && "fill-current")} />
+                          <span className="text-xs">{post.vote_count}</span>
+                        </Button>
 
-          <div className="border-t border-border bg-background">
-            {isAuthenticated ? (
-              <div className="p-4">
-                <div className="max-w-2xl mx-auto">
-                  <div className="flex space-x-3">
-                    <Avatar className="h-10 w-10 flex-shrink-0">
-                      <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
-                      <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                        {profile?.username?.charAt(0).toUpperCase() || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 space-y-3">
-                      <Input
-                        ref={inputRef}
-                        placeholder="What's happening?"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        className="text-lg border-none bg-transparent focus:ring-0 p-0 h-auto min-h-[48px] resize-none"
-                        onKeyPress={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault()
-                            sendMessage()
-                          }
-                        }}
-                      />
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Button variant="ghost" size="sm" className="rounded-full p-2">
-                            <Paperclip className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="rounded-full p-2">
-                            <Smile className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <Button onClick={sendMessage} disabled={!newMessage.trim()} className="rounded-full px-6">
-                          Post
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-8 px-3 rounded-full transition-colors",
+                            activePost === post.id
+                              ? "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                              : "text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20",
+                          )}
+                          onClick={() => {
+                            if (activePost === post.id) {
+                              setActivePost(null)
+                            } else {
+                              setActivePost(post.id)
+                              loadComments(post.id)
+                            }
+                          }}
+                        >
+                          <MessageCircle className="h-4 w-4 mr-1" />
+                          <span className="text-xs">{post.comment_count}</span>
                         </Button>
                       </div>
                     </div>
+
+                    {/* Comments - Threaded style */}
+                    <AnimatePresence>
+                      {activePost === post.id && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="mt-3 ml-4 space-y-3 border-l-2 border-gray-200 dark:border-gray-700 pl-4"
+                        >
+                          {comments[post.id]?.map((comment) => (
+                            <motion.div
+                              key={comment.id}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              className="flex space-x-2"
+                            >
+                              <Avatar className="h-6 w-6 flex-shrink-0">
+                                <AvatarImage src={comment.user.avatar_url || "/placeholder-user.jpg"} />
+                                <AvatarFallback className="bg-gray-500 text-white text-xs">
+                                  {comment.user.username.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="bg-gray-100 dark:bg-gray-800 rounded-xl rounded-tl-sm p-2 max-w-md">
+                                <div className="flex items-center space-x-2 mb-1">
+                                  <span className="font-medium text-gray-900 dark:text-white text-xs">
+                                    {comment.user.username}
+                                  </span>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                  </span>
+                                </div>
+                                <p className="text-gray-900 dark:text-white text-xs leading-relaxed">
+                                  {comment.content}
+                                </p>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                </div>
-              </div>
-            ) : (
-              <div className="p-4">
-                <div className="max-w-2xl mx-auto text-center">
-                  <div className="bg-card rounded-2xl border border-border p-6">
-                    <p className="text-muted-foreground mb-4">Join the conversation</p>
-                    <Button asChild className="rounded-full px-8">
-                      <a href="/login">Sign In</a>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+            {isAuthenticated ? (
+              <div className="flex items-end space-x-3 max-w-4xl mx-auto">
+                <Avatar className="h-8 w-8 flex-shrink-0">
+                  <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
+                  <AvatarFallback className="bg-green-500 text-white font-semibold text-xs">
+                    {profile?.username?.charAt(0).toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 relative">
+                  <Input
+                    ref={inputRef}
+                    placeholder={activePost ? "Reply to this message..." : "Type a message..."}
+                    value={unifiedInput}
+                    onChange={(e) => setUnifiedInput(e.target.value)}
+                    className="pr-20 rounded-full border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault()
+                        handleUnifiedSubmit()
+                      }
+                    }}
+                  />
+                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full">
+                      <Paperclip className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full">
+                      <Smile className="h-4 w-4" />
                     </Button>
                   </div>
+                </div>
+                <Button
+                  onClick={handleUnifiedSubmit}
+                  disabled={!unifiedInput.trim()}
+                  className="h-10 w-10 p-0 rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="text-center">
+                <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 max-w-md mx-auto">
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">Join the conversation</p>
+                  <Button asChild className="bg-green-500 hover:bg-green-600 rounded-full px-8">
+                    <a href="/login">Sign In</a>
+                  </Button>
                 </div>
               </div>
             )}
           </div>
         </div>
 
+        {/* Overlay for mobile */}
         {sidebarOpen && (
           <div className="fixed inset-0 bg-black/20 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
         )}
