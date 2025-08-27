@@ -1,12 +1,14 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useRef, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Heart, MessageCircle, Smile, Paperclip, MoreVertical, Search, Menu, X, Zap, Send } from "lucide-react"
+import { Heart, MessageCircle, Smile, MoreVertical, Search, Menu, X, Zap, Send, ImageIcon, Mic } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
@@ -75,11 +77,14 @@ export default function CommunityPage() {
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [selectedMedia, setSelectedMedia] = useState<File[]>([])
+  const [mediaPreview, setMediaPreview] = useState<string[]>([])
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     // Add community-specific styling to body when on community page
@@ -98,12 +103,10 @@ export default function CommunityPage() {
     }
   }, [categories, selectedCategory])
 
-  // Scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  // Load categories
   const loadCategories = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -131,7 +134,6 @@ export default function CommunityPage() {
     }
   }, [selectedCategory, supabase])
 
-  // Load posts
   const loadPosts = useCallback(async () => {
     if (!selectedCategory) return
 
@@ -184,7 +186,6 @@ export default function CommunityPage() {
     }
   }, [selectedCategory, supabase])
 
-  // Load comments for a post
   const loadComments = useCallback(
     async (postId: number) => {
       try {
@@ -231,9 +232,31 @@ export default function CommunityPage() {
       return
     }
 
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+    if (urlRegex.test(unifiedInput)) {
+      toast.error("Links are not allowed in posts")
+      return
+    }
+
     try {
+      const mediaUrl = null
+      let mediaType = null
+
+      if (selectedMedia.length > 0) {
+        const file = selectedMedia[0]
+        const fileExt = file.name.split(".").pop()
+        const fileName = `${Math.random()}.${fileExt}`
+
+        if (file.type.startsWith("image/")) {
+          mediaType = "image"
+        } else if (file.type.startsWith("video/")) {
+          mediaType = "video"
+        } else if (file.type.startsWith("audio/")) {
+          mediaType = "audio"
+        }
+      }
+
       if (activePost) {
-        // Comment mode - add comment to active post
         const { data, error } = await supabase
           .from("community_comments")
           .insert({
@@ -270,7 +293,6 @@ export default function CommunityPage() {
 
         toast.success("Comment added!")
       } else {
-        // Post mode - create new post
         if (!selectedCategory) return
 
         const { data, error } = await supabase
@@ -279,6 +301,8 @@ export default function CommunityPage() {
             content: unifiedInput.trim(),
             user_id: profile.id,
             category_id: selectedCategory,
+            media_url: mediaUrl,
+            media_type: mediaType,
             is_published: true,
             is_deleted: false,
           })
@@ -297,6 +321,8 @@ export default function CommunityPage() {
           created_at: data.created_at,
           vote_count: 0,
           comment_count: 0,
+          media_url: data.media_url,
+          media_type: data.media_type,
           user: data.user,
           category: data.category,
           has_voted: false,
@@ -308,13 +334,52 @@ export default function CommunityPage() {
       }
 
       setUnifiedInput("")
+      setSelectedMedia([])
+      setMediaPreview([])
     } catch (error) {
       console.error("Error submitting:", error)
       toast.error("Failed to send")
     }
   }
 
-  // Vote on post
+  const handleMediaSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+    if (files.length === 0) return
+
+    const validFiles = files.filter((file) => {
+      const isValidType =
+        file.type.startsWith("image/") || file.type.startsWith("video/") || file.type.startsWith("audio/")
+      const isValidSize = file.size <= 10 * 1024 * 1024 // 10MB limit
+
+      if (!isValidType) {
+        toast.error(`${file.name} is not a supported media type`)
+        return false
+      }
+      if (!isValidSize) {
+        toast.error(`${file.name} is too large (max 10MB)`)
+        return false
+      }
+      return true
+    })
+
+    if (validFiles.length === 0) return
+
+    setSelectedMedia(validFiles)
+
+    const previews = validFiles.map((file) => URL.createObjectURL(file))
+    setMediaPreview(previews)
+  }
+
+  const removeMedia = (index: number) => {
+    const newMedia = selectedMedia.filter((_, i) => i !== index)
+    const newPreviews = mediaPreview.filter((_, i) => i !== index)
+
+    URL.revokeObjectURL(mediaPreview[index])
+
+    setSelectedMedia(newMedia)
+    setMediaPreview(newPreviews)
+  }
+
   const voteOnPost = async (postId: number) => {
     if (!isAuthenticated || !profile) {
       toast.error("Please sign in to vote")
@@ -353,7 +418,6 @@ export default function CommunityPage() {
     }
   }
 
-  // Filter posts by search
   const filteredPosts = posts.filter(
     (post) =>
       searchQuery === "" ||
@@ -361,7 +425,6 @@ export default function CommunityPage() {
       post.user.username.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  // Effects
   useEffect(() => {
     loadCategories()
   }, [loadCategories])
@@ -376,7 +439,6 @@ export default function CommunityPage() {
     scrollToBottom()
   }, [posts])
 
-  // Real-time subscriptions
   useEffect(() => {
     if (!selectedCategory) return
 
@@ -404,7 +466,6 @@ export default function CommunityPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-        {/* Sidebar - WhatsApp style */}
         <motion.div
           initial={{ x: -300 }}
           animate={{ x: sidebarOpen || window.innerWidth >= 768 ? 0 : -300 }}
@@ -414,7 +475,6 @@ export default function CommunityPage() {
             "fixed md:relative z-50 md:z-auto h-full shadow-lg md:shadow-none",
           )}
         >
-          {/* Header */}
           <div className="p-4 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
@@ -432,7 +492,6 @@ export default function CommunityPage() {
             </div>
           </div>
 
-          {/* Search */}
           <div className="p-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -445,7 +504,6 @@ export default function CommunityPage() {
             </div>
           </div>
 
-          {/* Categories - WhatsApp chat list style */}
           <ScrollArea className="flex-1 px-2">
             <div className="space-y-1">
               {categories.map((category) => (
@@ -462,7 +520,7 @@ export default function CommunityPage() {
                   onClick={() => {
                     setSelectedCategory(category.id)
                     setSidebarOpen(false)
-                    setActivePost(null) // Reset to post mode when switching categories
+                    setActivePost(null)
                   }}
                 >
                   <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xl">
@@ -480,7 +538,6 @@ export default function CommunityPage() {
             </div>
           </ScrollArea>
 
-          {/* User Profile */}
           {isAuthenticated && profile && (
             <div className="p-3 border-t border-gray-200 dark:border-gray-700">
               <div className="flex items-center space-x-3 p-2 rounded-lg bg-gray-100 dark:bg-gray-700">
@@ -502,9 +559,7 @@ export default function CommunityPage() {
           )}
         </motion.div>
 
-        {/* Main Chat Area - X/Twitter inspired */}
         <div className="flex-1 flex flex-col bg-white dark:bg-gray-900 min-w-0">
-          {/* Header */}
           <div className="p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
@@ -544,8 +599,7 @@ export default function CommunityPage() {
             </div>
           </div>
 
-          {/* Messages Area - BBM/WhatsApp style bubbles */}
-          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
             <AnimatePresence>
               {filteredPosts.map((post, index) => (
                 <motion.div
@@ -567,7 +621,6 @@ export default function CommunityPage() {
                   </Avatar>
 
                   <div className="flex-1 min-w-0">
-                    {/* Message bubble - WhatsApp style */}
                     <div className="bg-white dark:bg-gray-800 rounded-2xl rounded-tl-md shadow-sm border border-gray-200 dark:border-gray-700 p-3 max-w-2xl">
                       <div className="flex items-center space-x-2 mb-2">
                         <span className="font-semibold text-gray-900 dark:text-white text-sm">
@@ -583,7 +636,6 @@ export default function CommunityPage() {
                         {post.content}
                       </p>
 
-                      {/* Actions - X/Twitter style */}
                       <div className="flex items-center space-x-4">
                         <Button
                           variant="ghost"
@@ -624,7 +676,6 @@ export default function CommunityPage() {
                       </div>
                     </div>
 
-                    {/* Comments - Threaded style */}
                     <AnimatePresence>
                       {activePost === post.id && (
                         <motion.div
@@ -671,7 +722,35 @@ export default function CommunityPage() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+          <div className="fixed bottom-0 left-0 right-0 md:left-80 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 z-40">
+            {mediaPreview.length > 0 && (
+              <div className="mb-3 flex space-x-2 overflow-x-auto">
+                {mediaPreview.map((preview, index) => (
+                  <div key={index} className="relative flex-shrink-0">
+                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+                      {selectedMedia[index].type.startsWith("image/") ? (
+                        <img src={preview || "/placeholder.svg"} alt="Preview" className="w-full h-full object-cover" />
+                      ) : selectedMedia[index].type.startsWith("video/") ? (
+                        <video src={preview} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Mic className="h-6 w-6 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full"
+                      onClick={() => removeMedia(index)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {isAuthenticated ? (
               <div className="flex items-end space-x-3 max-w-4xl mx-auto">
                 <Avatar className="h-8 w-8 flex-shrink-0">
@@ -686,7 +765,7 @@ export default function CommunityPage() {
                     placeholder={activePost ? "Reply to this message..." : "Type a message..."}
                     value={unifiedInput}
                     onChange={(e) => setUnifiedInput(e.target.value)}
-                    className="pr-20 rounded-full border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="pr-32 rounded-full border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     onKeyPress={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault()
@@ -695,8 +774,13 @@ export default function CommunityPage() {
                     }}
                   />
                   <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full">
-                      <Paperclip className="h-4 w-4" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 rounded-full"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <ImageIcon className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full">
                       <Smile className="h-4 w-4" />
@@ -705,7 +789,7 @@ export default function CommunityPage() {
                 </div>
                 <Button
                   onClick={handleUnifiedSubmit}
-                  disabled={!unifiedInput.trim()}
+                  disabled={!unifiedInput.trim() && selectedMedia.length === 0}
                   className="h-10 w-10 p-0 rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300"
                 >
                   <Send className="h-4 w-4" />
@@ -721,10 +805,18 @@ export default function CommunityPage() {
                 </div>
               </div>
             )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,video/*,audio/*"
+              onChange={handleMediaSelect}
+              className="hidden"
+            />
           </div>
         </div>
 
-        {/* Overlay for mobile */}
         {sidebarOpen && (
           <div className="fixed inset-0 bg-black/20 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
         )}

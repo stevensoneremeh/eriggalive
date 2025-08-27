@@ -67,6 +67,9 @@ export function UnifiedNavigation() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
+  const [isCommunityPage, setIsCommunityPage] = useState(false)
+  const [communityCategories, setCommunityCategories] = useState([])
+  const [selectedCommunityCategory, setSelectedCommunityCategory] = useState(null)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -74,6 +77,28 @@ export function UnifiedNavigation() {
     }
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
+
+  useEffect(() => {
+    const handleCommunityActive = (event) => {
+      setIsCommunityPage(true)
+      setCommunityCategories(event.detail.categories || [])
+      setSelectedCommunityCategory(event.detail.selectedCategory)
+    }
+
+    const handleCommunityInactive = () => {
+      setIsCommunityPage(false)
+      setCommunityCategories([])
+      setSelectedCommunityCategory(null)
+    }
+
+    window.addEventListener("communityPageActive", handleCommunityActive)
+    window.addEventListener("communityPageInactive", handleCommunityInactive)
+
+    return () => {
+      window.removeEventListener("communityPageActive", handleCommunityActive)
+      window.removeEventListener("communityPageInactive", handleCommunityInactive)
+    }
   }, [])
 
   useEffect(() => {
@@ -126,6 +151,26 @@ export function UnifiedNavigation() {
         navigationItems[14], // About
       ]
     }
+  }
+
+  const getMobileNavItems = () => {
+    if (isCommunityPage && communityCategories.length > 0) {
+      const communityNavItems = communityCategories.map((category) => ({
+        name: category.name,
+        href: `/community?category=${category.id}`,
+        icon: Users,
+        isCommunityCategory: true,
+        categoryId: category.id,
+      }))
+
+      return [
+        navigationItems[0], // Home
+        ...communityNavItems,
+        ...(user ? [navigationItems[6], navigationItems[12]] : [navigationItems[14]]), // Dashboard/Wallet or About
+      ]
+    }
+
+    return navigationItems
   }
 
   return (
@@ -310,23 +355,29 @@ export function UnifiedNavigation() {
                   {/* Navigation Items */}
                   <div className="flex-1 overflow-y-auto p-4">
                     <div className="space-y-1">
-                      {navigationItems.map((item) => {
-                        const isActive =
-                          pathname === item.href || (item.href === "/dashboard" && pathname?.startsWith("/dashboard"))
+                      {getMobileNavItems().map((item) => {
+                        const isActive = item.isCommunityCategory
+                          ? selectedCommunityCategory === item.categoryId
+                          : pathname === item.href || (item.href === "/dashboard" && pathname?.startsWith("/dashboard"))
+
                         return (
                           <Button
-                            key={item.name}
+                            key={`${item.name}-${item.categoryId || "main"}`}
                             asChild
                             variant={isActive ? "default" : "ghost"}
                             className={cn(
                               "w-full justify-start h-11 transition-all duration-200",
                               isActive ? "bg-lime-500 text-teal-900 hover:bg-lime-600 shadow-sm" : "hover:bg-accent/50",
+                              item.isCommunityCategory && "ml-4 text-sm",
                             )}
                             onClick={() => setIsOpen(false)}
                           >
                             <Link href={item.href} className="flex items-center space-x-3">
                               <item.icon className="h-5 w-5 flex-shrink-0" />
                               <span className="font-medium">{item.name}</span>
+                              {item.isCommunityCategory && (
+                                <span className="text-xs opacity-60">#{item.name.toLowerCase()}</span>
+                              )}
                             </Link>
                           </Button>
                         )
