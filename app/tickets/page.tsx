@@ -193,7 +193,8 @@ export default function TicketsPage() {
 
       if (paymentType === "coins") {
         // Check if user has enough coins
-        if (!profile?.coins || profile.coins < event.price / 100) {
+        const requiredCoins = event.title?.toLowerCase().includes("intimate") ? 10000 : event.price / 100
+        if (!profile?.coins || profile.coins < requiredCoins) {
           toast.error("Insufficient Erigga Coins")
           setPurchaseLoading(null)
           return
@@ -203,7 +204,7 @@ export default function TicketsPage() {
         const { data, error } = await supabase.rpc("purchase_ticket_with_coins", {
           p_event_id: eventId,
           p_user_id: user?.id,
-          p_coin_amount: event.price / 100,
+          p_coin_amount: requiredCoins,
         })
 
         if (error) throw error
@@ -616,16 +617,23 @@ Status: ${ticket.status.toUpperCase()}
                                         disabled={
                                           purchaseLoading === event.id ||
                                           !profile?.coins ||
-                                          profile.coins < event.price / 100
+                                          profile.coins <
+                                            (event.title?.toLowerCase().includes("intimate")
+                                              ? 10000
+                                              : event.price / 100)
                                         }
                                       >
                                         <CoinsIcon className="w-4 h-4 mr-1" />
                                         Coins
                                       </Button>
                                     </div>
-                                    {profile?.coins && profile.coins < event.price / 100 && (
-                                      <p className="text-xs text-red-400">Insufficient coins</p>
-                                    )}
+                                    {profile?.coins &&
+                                      profile.coins <
+                                        (event.title?.toLowerCase().includes("intimate")
+                                          ? 10000
+                                          : event.price / 100) && (
+                                        <p className="text-xs text-red-400">Insufficient coins</p>
+                                      )}
                                   </div>
                                 )}
                               </div>

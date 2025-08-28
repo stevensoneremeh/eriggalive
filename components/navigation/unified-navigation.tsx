@@ -36,6 +36,8 @@ import {
   Sun,
   Moon,
   Monitor,
+  FileText,
+  Trophy,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useTheme } from "@/contexts/theme-context"
@@ -62,6 +64,8 @@ const navigationItems = [
   { name: "Wallet", href: "/wallet", icon: Wallet },
   { name: "Tickets", href: "/tickets", icon: Ticket },
   { name: "About", href: "/about", icon: Info },
+  { name: "Media", href: "/media", icon: FileText },
+  { name: "Achievements", href: "/achievements", icon: Trophy },
 ]
 
 export function UnifiedNavigation() {
@@ -170,11 +174,38 @@ export function UnifiedNavigation() {
       return [
         navigationItems[0], // Home
         ...communityNavItems,
-        ...(user ? [navigationItems[6], navigationItems[12]] : [navigationItems[14]]), // Dashboard/Wallet or About
+        ...(user ? [navigationItems[15], navigationItems[16]] : [navigationItems[14]]), // Media/Achievements or About
       ]
     }
 
-    return navigationItems
+    if (user) {
+      return [
+        navigationItems[0], // Home
+        navigationItems[1], // Mission
+        navigationItems[2], // Community
+        navigationItems[3], // Radio
+        navigationItems[4], // Events
+        navigationItems[5], // Vault
+        navigationItems[7], // Chat
+        navigationItems[8], // Meet & Greet
+        navigationItems[9], // Merch
+        navigationItems[10], // Chronicles
+        navigationItems[11], // Coins
+        navigationItems[13], // Tickets
+        navigationItems[15], // Media
+        navigationItems[16], // Achievements
+      ]
+    } else {
+      return [
+        navigationItems[0], // Home
+        navigationItems[1], // Mission
+        navigationItems[2], // Community
+        navigationItems[3], // Radio
+        navigationItems[4], // Events
+        navigationItems[5], // Vault
+        navigationItems[14], // About
+      ]
+    }
   }
 
   return (
@@ -410,59 +441,35 @@ export function UnifiedNavigation() {
                   <div className="p-4 border-t">
                     {user ? (
                       <div className="space-y-2">
-                        {FEATURE_UI_FIXES_V1 ? (
-                          <>
-                            <Button asChild variant="outline" className="w-full justify-start bg-transparent">
-                              <Link href="/profile" onClick={() => setIsOpen(false)}>
-                                <Settings className="mr-2 h-4 w-4" />
-                                Settings
-                              </Link>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="w-full justify-start text-red-600 hover:text-red-600 bg-transparent border-red-200 hover:bg-red-50 dark:hover:bg-red-950"
-                              onClick={() => {
-                                handleSignOut()
-                                setIsOpen(false)
-                              }}
-                            >
-                              <LogOut className="mr-2 h-4 w-4" />
-                              Sign Out
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button asChild variant="outline" className="w-full justify-start bg-transparent">
-                              <Link href="/dashboard" onClick={() => setIsOpen(false)}>
-                                <User className="mr-2 h-4 w-4" />
-                                Dashboard
-                              </Link>
-                            </Button>
-                            <Button asChild variant="outline" className="w-full justify-start bg-transparent">
-                              <Link href="/wallet" onClick={() => setIsOpen(false)}>
-                                <Wallet className="mr-2 h-4 w-4" />
-                                Wallet
-                              </Link>
-                            </Button>
-                            <Button asChild variant="outline" className="w-full justify-start bg-transparent">
-                              <Link href="/profile" onClick={() => setIsOpen(false)}>
-                                <Settings className="mr-2 h-4 w-4" />
-                                Settings
-                              </Link>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="w-full justify-start text-red-600 hover:text-red-600 bg-transparent border-red-200 hover:bg-red-50 dark:hover:bg-red-950"
-                              onClick={() => {
-                                handleSignOut()
-                                setIsOpen(false)
-                              }}
-                            >
-                              <LogOut className="mr-2 h-4 w-4" />
-                              Log out
-                            </Button>
-                          </>
-                        )}
+                        <Button asChild variant="outline" className="w-full justify-start bg-transparent">
+                          <Link href="/dashboard" onClick={() => setIsOpen(false)}>
+                            <LayoutDashboard className="mr-2 h-4 w-4" />
+                            Dashboard
+                          </Link>
+                        </Button>
+                        <Button asChild variant="outline" className="w-full justify-start bg-transparent">
+                          <Link href="/wallet" onClick={() => setIsOpen(false)}>
+                            <Wallet className="mr-2 h-4 w-4" />
+                            Wallet
+                          </Link>
+                        </Button>
+                        <Button asChild variant="outline" className="w-full justify-start bg-transparent">
+                          <Link href="/profile" onClick={() => setIsOpen(false)}>
+                            <Settings className="mr-2 h-4 w-4" />
+                            Settings
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-red-600 hover:text-red-600 bg-transparent border-red-200 hover:bg-red-50 dark:hover:bg-red-950"
+                          onClick={() => {
+                            handleSignOut()
+                            setIsOpen(false)
+                          }}
+                        >
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Sign Out
+                        </Button>
                       </div>
                     ) : (
                       <div className="space-y-2">

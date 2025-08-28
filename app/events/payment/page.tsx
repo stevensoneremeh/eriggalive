@@ -47,8 +47,8 @@ export default function EventPaymentPage() {
   const [error, setError] = useState("")
   const supabase = createClient()
 
-  const TICKET_PRICE = FEATURE_UI_FIXES_V1 ? (eventData?.ticket_price_naira || 20000) * 100 : 100000000 // Convert to kobo
-  const TICKET_PRICE_COINS = FEATURE_UI_FIXES_V1 ? eventData?.ticket_price_coins || 10000 : 1000000
+  const TICKET_PRICE = 2000000 // 20,000 naira in kobo
+  const TICKET_PRICE_COINS = 10000
 
   useEffect(() => {
     // Get survey data from localStorage
@@ -57,7 +57,7 @@ export default function EventPaymentPage() {
       setSurveyData(JSON.parse(storedSurveyData))
     }
 
-    if (FEATURE_UI_FIXES_V1 && eventId) {
+    if (eventId) {
       fetchEventData()
     }
 
@@ -79,7 +79,6 @@ export default function EventPaymentPage() {
 
       if (error) {
         console.error("Error fetching event:", error)
-        // Fallback to default values
         setEventData({
           id: eventId,
           title: "ERIGGA Live - Intimate Session",
@@ -193,7 +192,7 @@ export default function EventPaymentPage() {
     console.error("Paystack error:", error)
   }
 
-  if (!surveyData || (FEATURE_UI_FIXES_V1 && !eventData)) {
+  if (!surveyData || !eventData) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
@@ -206,8 +205,8 @@ export default function EventPaymentPage() {
 
   const displayTitle = eventData?.title || "ERIGGA Live - Intimate Session"
   const displayVenue = eventData?.venue || "Uncle Jaffi at The Playground, Warri"
-  const displayPrice = FEATURE_UI_FIXES_V1 ? eventData?.ticket_price_naira || 20000 : 1000000
-  const displayCoins = FEATURE_UI_FIXES_V1 ? eventData?.ticket_price_coins || 10000 : 1000000
+  const displayPrice = 20000
+  const displayCoins = TICKET_PRICE_COINS
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">

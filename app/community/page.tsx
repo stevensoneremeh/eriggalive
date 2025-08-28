@@ -8,7 +8,20 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Heart, MessageCircle, Smile, MoreVertical, Search, Menu, X, Zap, Send, ImageIcon, Mic } from "lucide-react"
+import {
+  Heart,
+  MessageCircle,
+  Smile,
+  MoreVertical,
+  Search,
+  Menu,
+  X,
+  Zap,
+  Send,
+  ImageIcon,
+  Mic,
+  ChevronLeft,
+} from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
@@ -82,6 +95,8 @@ export default function CommunityPage() {
   const [selectedMedia, setSelectedMedia] = useState<File[]>([])
   const [mediaPreview, setMediaPreview] = useState<string[]>([])
   const [isClient, setIsClient] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const [showCategoryNav, setShowCategoryNav] = useState(false)
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -91,6 +106,12 @@ export default function CommunityPage() {
 
   useEffect(() => {
     setIsClient(true)
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+    return () => window.removeEventListener("resize", checkMobile)
   }, [])
 
   useEffect(() => {
@@ -484,15 +505,76 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {isMobile && (
+        <div className="fixed top-16 left-0 right-0 z-40 bg-white/95 dark:bg-gray-950/95 backdrop-blur-md border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center justify-between p-3">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-sm">
+                {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
+              </div>
+              <h2 className="font-semibold text-gray-900 dark:text-white">
+                {categories.find((c) => c.id === selectedCategory)?.name || "General"}
+              </h2>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowCategoryNav(!showCategoryNav)}
+              className="text-green-500 hover:bg-green-50 dark:hover:bg-green-950/30"
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <AnimatePresence>
+            {showCategoryNav && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950"
+              >
+                <ScrollArea className="max-h-48">
+                  <div className="p-2 space-y-1">
+                    {categories.map((category) => (
+                      <Button
+                        key={category.id}
+                        variant={selectedCategory === category.id ? "default" : "ghost"}
+                        size="sm"
+                        className={cn(
+                          "w-full justify-start h-10",
+                          selectedCategory === category.id
+                            ? "bg-green-500 text-white hover:bg-green-600"
+                            : "hover:bg-gray-100 dark:hover:bg-gray-800",
+                        )}
+                        onClick={() => {
+                          setSelectedCategory(category.id)
+                          setShowCategoryNav(false)
+                          setActivePost(null)
+                        }}
+                      >
+                        <span className="mr-2">{category.icon}</span>
+                        {category.name}
+                      </Button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
       <div
         className={cn(
           "flex h-screen overflow-hidden",
           FEATURE_UI_FIXES_V1 ? "bg-white dark:bg-gray-950" : "bg-gray-50 dark:bg-gray-900",
+          isMobile && "pt-20",
         )}
       >
         <motion.div
           initial={{ x: -300 }}
-          animate={{ x: sidebarOpen || (isClient && window.innerWidth >= 768) ? 0 : -300 }}
+          animate={{ x: sidebarOpen || (!isMobile && isClient && window.innerWidth >= 768) ? 0 : -300 }}
           transition={{ type: "spring", damping: 25, stiffness: 200 }}
           className={cn(
             "w-80 flex flex-col",
@@ -500,6 +582,7 @@ export default function CommunityPage() {
             FEATURE_UI_FIXES_V1
               ? "bg-white dark:bg-gray-950 border-r border-gray-100 dark:border-gray-800"
               : "bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700",
+            isMobile && "hidden",
           )}
         >
           <div
@@ -611,54 +694,76 @@ export default function CommunityPage() {
             FEATURE_UI_FIXES_V1 ? "bg-white dark:bg-gray-950" : "bg-white dark:bg-gray-900",
           )}
         >
-          <div
-            className={cn(
-              "p-4 border-b sticky top-0 z-20 backdrop-blur-sm",
-              FEATURE_UI_FIXES_V1
-                ? "bg-white/95 dark:bg-gray-950/95 border-gray-100 dark:border-gray-800"
-                : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700",
-            )}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setSidebarOpen(true)}>
-                  <Menu className="h-5 w-5" />
-                </Button>
-                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-lg">
-                  {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {categories.find((c) => c.id === selectedCategory)?.name || "General"}
-                  </h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {activePost ? "Reply to message" : `${filteredPosts.length} messages`}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                {activePost && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setActivePost(null)}
-                    className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
-                  >
-                    Back to feed
+          {!isMobile && (
+            <div
+              className={cn(
+                "p-4 border-b sticky top-0 z-20 backdrop-blur-sm",
+                FEATURE_UI_FIXES_V1
+                  ? "bg-white/95 dark:bg-gray-950/95 border-gray-100 dark:border-gray-800"
+                  : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700",
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setSidebarOpen(true)}>
+                    <Menu className="h-5 w-5" />
                   </Button>
-                )}
-                <Button variant="ghost" size="sm" className="hover:bg-gray-100 dark:hover:bg-gray-800">
-                  <Search className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm" className="hover:bg-gray-100 dark:hover:bg-gray-800">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
+                  <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-lg">
+                    {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      {categories.find((c) => c.id === selectedCategory)?.name || "General"}
+                    </h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {activePost ? "Reply to message" : `${filteredPosts.length} messages`}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {activePost && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setActivePost(null)}
+                      className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                    >
+                      Back to feed
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" className="hover:bg-gray-100 dark:hover:bg-gray-800">
+                    <Search className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="hover:bg-gray-100 dark:hover:bg-gray-800">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pb-32">
-            <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+          {isMobile && activePost && (
+            <div className="fixed top-16 left-0 right-0 z-30 bg-white/95 dark:bg-gray-950/95 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 p-3">
+              <div className="flex items-center space-x-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActivePost(null)}
+                  className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Back
+                </Button>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Reply to message</span>
+              </div>
+            </div>
+          )}
+
+          <div
+            ref={scrollContainerRef}
+            className={cn("flex-1 overflow-y-auto", isMobile ? "pb-32" : "pb-32", isMobile && activePost && "pt-16")}
+          >
+            <div className={cn("max-w-2xl mx-auto px-4 py-6 space-y-4", isMobile && "px-3 py-4 space-y-3")}>
               <AnimatePresence>
                 {filteredPosts.map((post, index) => (
                   <motion.div
@@ -673,10 +778,11 @@ export default function CommunityPage() {
                         ? "bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 hover:shadow-md hover:border-gray-200 dark:hover:border-gray-700"
                         : "flex space-x-3",
                       activePost === post.id && "ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-950/10",
+                      isMobile && "rounded-xl p-3 shadow-sm",
                     )}
                   >
                     <div className="flex space-x-3">
-                      <Avatar className="h-12 w-12 flex-shrink-0">
+                      <Avatar className={cn("flex-shrink-0", isMobile ? "h-10 w-10" : "h-12 w-12")}>
                         <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
                         <AvatarFallback className="bg-green-500 text-white font-semibold">
                           {post.user.username.charAt(0).toUpperCase()}
@@ -685,49 +791,59 @@ export default function CommunityPage() {
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2 mb-2">
-                          <span className="font-semibold text-gray-900 dark:text-white">
+                          <span className={cn("font-semibold text-gray-900 dark:text-white", isMobile && "text-sm")}>
                             {post.user.full_name || post.user.username}
                           </span>
                           <UserTierBadge tier={post.user.tier} size="sm" />
                           <span className="text-gray-500 dark:text-gray-400">·</span>
-                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                          <span className={cn("text-gray-500 dark:text-gray-400", isMobile ? "text-xs" : "text-sm")}>
                             {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
                           </span>
                         </div>
 
-                        <p className="text-gray-900 dark:text-white leading-relaxed break-words mb-3 text-[15px]">
+                        <p
+                          className={cn(
+                            "text-gray-900 dark:text-white leading-relaxed break-words mb-3",
+                            isMobile ? "text-sm" : "text-[15px]",
+                          )}
+                        >
                           {post.content}
                         </p>
 
-                        <div className="flex items-center space-x-6 mt-3">
+                        <div className={cn("flex items-center mt-3", isMobile ? "space-x-4" : "space-x-6")}>
                           <Button
                             variant="ghost"
                             size="sm"
                             className={cn(
-                              "h-8 px-3 rounded-full transition-all duration-200 group/btn",
+                              "rounded-full transition-all duration-200 group/btn",
                               post.has_voted
                                 ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
                                 : "text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30",
+                              isMobile ? "h-7 px-2" : "h-8 px-3",
                             )}
                             onClick={() => voteOnPost(post.id)}
                           >
                             <Heart
                               className={cn(
-                                "h-4 w-4 mr-1 transition-transform group-hover/btn:scale-110",
+                                "mr-1 transition-transform group-hover/btn:scale-110",
                                 post.has_voted && "fill-current",
+                                isMobile ? "h-3 w-3" : "h-4 w-4",
                               )}
                             />
-                            <span className="text-sm font-medium">{post.vote_count}</span>
+                            <span className={cn("font-medium", isMobile ? "text-xs" : "text-sm")}>
+                              {post.vote_count}
+                            </span>
                           </Button>
 
                           <Button
                             variant="ghost"
                             size="sm"
                             className={cn(
-                              "h-8 px-3 rounded-full transition-all duration-200 group/btn",
+                              "rounded-full transition-all duration-200 group/btn",
                               activePost === post.id
                                 ? "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30"
                                 : "text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30",
+                              isMobile ? "h-7 px-2" : "h-8 px-3",
                             )}
                             onClick={() => {
                               if (activePost === post.id) {
@@ -738,8 +854,15 @@ export default function CommunityPage() {
                               }
                             }}
                           >
-                            <MessageCircle className="h-4 w-4 mr-1 transition-transform group-hover/btn:scale-110" />
-                            <span className="text-sm font-medium">{post.comment_count}</span>
+                            <MessageCircle
+                              className={cn(
+                                "mr-1 transition-transform group-hover/btn:scale-110",
+                                isMobile ? "h-3 w-3" : "h-4 w-4",
+                              )}
+                            />
+                            <span className={cn("font-medium", isMobile ? "text-xs" : "text-sm")}>
+                              {post.comment_count}
+                            </span>
                           </Button>
                         </div>
 
@@ -758,7 +881,7 @@ export default function CommunityPage() {
                                   animate={{ opacity: 1, x: 0 }}
                                   className="flex space-x-3"
                                 >
-                                  <Avatar className="h-8 w-8 flex-shrink-0">
+                                  <Avatar className={cn("flex-shrink-0", isMobile ? "h-6 w-6" : "h-8 w-8")}>
                                     <AvatarImage src={comment.user.avatar_url || "/placeholder-user.jpg"} />
                                     <AvatarFallback className="bg-gray-500 text-white text-xs">
                                       {comment.user.username.charAt(0).toUpperCase()}
@@ -766,14 +889,29 @@ export default function CommunityPage() {
                                   </Avatar>
                                   <div className="flex-1">
                                     <div className="flex items-center space-x-2 mb-1">
-                                      <span className="font-medium text-gray-900 dark:text-white text-sm">
+                                      <span
+                                        className={cn(
+                                          "font-medium text-gray-900 dark:text-white",
+                                          isMobile ? "text-xs" : "text-sm",
+                                        )}
+                                      >
                                         {comment.user.username}
                                       </span>
-                                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                                      <span
+                                        className={cn(
+                                          "text-gray-500 dark:text-gray-400",
+                                          isMobile ? "text-xs" : "text-xs",
+                                        )}
+                                      >
                                         {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
                                       </span>
                                     </div>
-                                    <p className="text-gray-900 dark:text-white text-sm leading-relaxed">
+                                    <p
+                                      className={cn(
+                                        "text-gray-900 dark:text-white leading-relaxed",
+                                        isMobile ? "text-xs" : "text-sm",
+                                      )}
+                                    >
                                       {comment.content}
                                     </p>
                                   </div>
@@ -793,18 +931,24 @@ export default function CommunityPage() {
 
           <div
             className={cn(
-              "fixed bottom-0 left-0 right-0 md:left-80 border-t backdrop-blur-sm z-30",
+              "fixed bottom-0 left-0 right-0 border-t backdrop-blur-sm z-30",
               FEATURE_UI_FIXES_V1
                 ? "bg-white/95 dark:bg-gray-950/95 border-gray-100 dark:border-gray-800"
                 : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700",
+              !isMobile && "md:left-80",
             )}
           >
-            <div className="p-4">
+            <div className={cn("p-4", isMobile && "p-3")}>
               {mediaPreview.length > 0 && (
                 <div className="mb-3 flex space-x-2 overflow-x-auto">
                   {mediaPreview.map((preview, index) => (
                     <div key={index} className="relative flex-shrink-0">
-                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+                      <div
+                        className={cn(
+                          "rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800",
+                          isMobile ? "w-12 h-12" : "w-16 h-16",
+                        )}
+                      >
                         {selectedMedia[index].type.startsWith("image/") ? (
                           <img
                             src={preview || "/placeholder.svg"}
@@ -815,17 +959,20 @@ export default function CommunityPage() {
                           <video src={preview} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <Mic className="h-6 w-6 text-gray-400" />
+                            <Mic className={cn("text-gray-400", isMobile ? "h-4 w-4" : "h-6 w-6")} />
                           </div>
                         )}
                       </div>
                       <Button
                         variant="destructive"
                         size="sm"
-                        className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full"
+                        className={cn(
+                          "absolute -top-2 -right-2 rounded-full",
+                          isMobile ? "h-5 w-5 p-0" : "h-6 w-6 p-0",
+                        )}
                         onClick={() => removeMedia(index)}
                       >
-                        <X className="h-3 w-3" />
+                        <X className={cn(isMobile ? "h-2 w-2" : "h-3 w-3")} />
                       </Button>
                     </div>
                   ))}
@@ -833,8 +980,8 @@ export default function CommunityPage() {
               )}
 
               {isAuthenticated ? (
-                <div className="flex items-end space-x-3 max-w-2xl mx-auto">
-                  <Avatar className="h-10 w-10 flex-shrink-0">
+                <div className={cn("flex items-end max-w-2xl mx-auto", isMobile ? "space-x-2" : "space-x-3")}>
+                  <Avatar className={cn("flex-shrink-0", isMobile ? "h-8 w-8" : "h-10 w-10")}>
                     <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
                     <AvatarFallback className="bg-green-500 text-white font-semibold">
                       {profile?.username?.charAt(0).toUpperCase() || "U"}
@@ -847,11 +994,12 @@ export default function CommunityPage() {
                       value={unifiedInput}
                       onChange={(e) => setUnifiedInput(e.target.value)}
                       className={cn(
-                        "pr-32 rounded-full focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200",
-                        "placeholder:text-gray-500 dark:placeholder:text-gray-400 text-base px-4 py-3",
+                        "rounded-full focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200",
+                        "placeholder:text-gray-500 dark:placeholder:text-gray-400",
                         FEATURE_UI_FIXES_V1
                           ? "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
                           : "border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800",
+                        isMobile ? "pr-24 text-sm px-3 py-2" : "pr-32 text-base px-4 py-3",
                       )}
                       onKeyPress={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
@@ -860,30 +1008,44 @@ export default function CommunityPage() {
                         }
                       }}
                     />
-                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+                    <div
+                      className={cn(
+                        "absolute top-1/2 transform -translate-y-1/2 flex items-center",
+                        isMobile ? "right-1 space-x-0.5" : "right-2 space-x-1",
+                      )}
+                    >
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                        className={cn(
+                          "rounded-full hover:bg-gray-200 dark:hover:bg-gray-700",
+                          isMobile ? "h-6 w-6 p-0" : "h-8 w-8 p-0",
+                        )}
                         onClick={() => fileInputRef.current?.click()}
                       >
-                        <ImageIcon className="h-4 w-4" />
+                        <ImageIcon className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                        className={cn(
+                          "rounded-full hover:bg-gray-200 dark:hover:bg-gray-700",
+                          isMobile ? "h-6 w-6 p-0" : "h-8 w-8 p-0",
+                        )}
                       >
-                        <Smile className="h-4 w-4" />
+                        <Smile className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} />
                       </Button>
                     </div>
                   </div>
                   <Button
                     onClick={handleUnifiedSubmit}
                     disabled={!unifiedInput.trim() && selectedMedia.length === 0}
-                    className="h-10 w-10 p-0 rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 transition-all duration-200 disabled:cursor-not-allowed"
+                    className={cn(
+                      "rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 transition-all duration-200 disabled:cursor-not-allowed",
+                      isMobile ? "h-8 w-8 p-0" : "h-10 w-10 p-0",
+                    )}
                   >
-                    <Send className="h-4 w-4" />
+                    <Send className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} />
                   </Button>
                 </div>
               ) : (
