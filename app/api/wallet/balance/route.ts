@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
+export const dynamic = "force-dynamic"
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = createClient()
@@ -13,14 +15,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
     }
 
-    // Get user wallet data
     const { data: wallet, error: walletError } = await supabase
       .from("user_wallets")
       .select("*")
       .eq("user_id", user.id)
       .single()
 
-    // Get user membership data
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
+      .select("coins")
+      .eq("id", user.id)
+      .single()
+
     const { data: membership, error: membershipError } = await supabase
       .from("user_memberships")
       .select("*, membership_tiers(*)")
@@ -37,8 +43,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      balance: wallet?.coin_balance || 0,
-      walletBalance: 0, // Placeholder for future wallet balance feature
+      balance: wallet?.coin_balance || profile?.coins || 0,
+      walletBalance: wallet?.balance_naira || 0,
       membership: membership
         ? {
             tier: membership.tier_id,

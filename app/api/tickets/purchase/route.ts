@@ -97,13 +97,26 @@ export async function POST(request: NextRequest) {
     }
 
     const requestData = await request.json()
-    const { eventId, ticketType, quantity = 1, paymentMethod, paymentReference } = requestData
+    const { eventId, ticketType, quantity = 1, paymentMethod, paymentReference, surveyData } = requestData
 
     if (!eventId || !ticketType || !paymentMethod) {
       return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 })
     }
 
     const supabase = await createClient()
+
+    const EVENT_PRICING = {
+      "erigga-intimate-session-2025": {
+        ticket_price_naira: 20000,
+        ticket_price_coins: 10000,
+        max_capacity: 200,
+      },
+    }
+
+    const eventConfig = EVENT_PRICING[eventId as keyof typeof EVENT_PRICING]
+    if (!eventConfig) {
+      return NextResponse.json({ success: false, error: "Invalid event" }, { status: 400 })
+    }
 
     // Get event details
     const { data: event, error: eventError } = await supabase.from("events").select("*").eq("id", eventId).single()
@@ -113,46 +126,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Check event capacity
-    if (event.current_attendance + quantity > event.max_capacity) {
+    if (event.current_attendance + quantity > eventConfig.max_capacity) {
       return NextResponse.json({ success: false, error: "Event is sold out" }, { status: 400 })
     }
 
-    // Check membership requirements
-    if (event.requires_membership && event.requires_membership !== "free") {
-      const membershipTiers = ["free", "pro", "enterprise"]
-      const requiredTierIndex = membershipTiers.indexOf(event.requires_membership)
-      const userTierIndex = membershipTiers.indexOf(profile.membership_tier)
-
-      if (userTierIndex < requiredTierIndex) {
-        return NextResponse.json(
-          { success: false, error: `This event requires ${event.requires_membership} membership` },
-          { status: 403 },
-        )
-      }
-    }
-
-    // Calculate price based on ticket type and membership
-    let ticketPrice = 0
-    let coinPrice = 0
-
-    if (ticketType === "early_bird" && event.early_bird_ends && new Date() < new Date(event.early_bird_ends)) {
-      ticketPrice = event.early_bird_price_naira || 0
-      coinPrice = event.early_bird_price_coins || 0
-    } else if (ticketType === "vip") {
-      ticketPrice = event.vip_price_naira || 0
-      coinPrice = event.vip_price_coins || 0
-    } else {
-      ticketPrice = event.ticket_price_naira || 0
-      coinPrice = event.ticket_price_coins || 0
-    }
-
-    // Apply membership discount
-    const discountPercentage =
-      profile.membership_tier === "pro" ? 10 : profile.membership_tier === "enterprise" ? 20 : 0
-    if (discountPercentage > 0) {
-      ticketPrice = Math.floor(ticketPrice * (1 - discountPercentage / 100))
-      coinPrice = Math.floor(coinPrice * (1 - discountPercentage / 100))
-    }
+    const ticketPrice = eventConfig.ticket_price_naira
+    const coinPrice = eventConfig.ticket_price_coins
 
     const totalPrice = ticketPrice * quantity
     const totalCoins = coinPrice * quantity
@@ -180,7 +159,6 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ success: false, error: "Payment verification failed" }, { status: 400 })
         }
 
-        // Verify amount
         const expectedAmountKobo = Math.round(totalPrice * 100)
         if (Math.abs(paystackData.data.amount - expectedAmountKobo) > 100) {
           return NextResponse.json({ success: false, error: "Payment amount mismatch" }, { status: 400 })
@@ -212,7 +190,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create tickets
+    // Create tickets with enhanced QR generation
     const tickets = []
     for (let i = 0; i < quantity; i++) {
       const { ticketNumber, qrCode, qrToken } = generateTicketData(eventId, user.id)
@@ -232,9 +210,9 @@ export async function POST(request: NextRequest) {
           payment_reference: paymentReference,
           status: "valid",
           metadata: {
-            discount_applied: discountPercentage,
-            original_price_naira: event.ticket_price_naira,
-            original_price_coins: event.ticket_price_coins,
+            survey_data: surveyData,
+            original_price_naira: 50000,
+            discounted_price_naira: ticketPrice,
           },
         })
         .select()
@@ -284,10 +262,10 @@ export async function POST(request: NextRequest) {
         id: ticket.id,
         ticket_number: ticket.ticket_number,
         qr_code: ticket.qr_code,
-        event_title: event.title,
-        event_date: event.event_date,
+        event_title: "ERIGGA Live - Intimate Session",
+        event_date: "2025-09-03T20:00:00",
         ticket_type: ticket.ticket_type,
-        venue: event.venue,
+        venue: "Uncle Jaffi at The Playground, Warri",
         status: ticket.status,
       })),
       message: `Successfully purchased ${quantity} ticket(s)`,

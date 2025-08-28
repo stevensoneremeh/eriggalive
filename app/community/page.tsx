@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils"
 import { UserTierBadge } from "@/components/user-tier-badge"
 import { motion, AnimatePresence } from "framer-motion"
 
+const FEATURE_UI_FIXES_V1 = process.env.NEXT_PUBLIC_FEATURE_UI_FIXES_V1 === "true"
+
 interface Category {
   id: number
   name: string
@@ -236,9 +238,10 @@ export default function CommunityPage() {
       return
     }
 
-    const urlRegex = /(https?:\/\/[^\s]+)/g
-    if (urlRegex.test(unifiedInput)) {
-      toast.error("Links are not allowed in posts")
+    if (containsURL(unifiedInput)) {
+      toast.error("Links are not allowed in community posts", {
+        description: "Please share your thoughts without including URLs",
+      })
       return
     }
 
@@ -467,6 +470,16 @@ export default function CommunityPage() {
     }
   }, [selectedCategory, supabase, loadPosts])
 
+  const containsURL = (text: string): boolean => {
+    const urlPatterns = [
+      /https?:\/\/[^\s]+/gi,
+      /www\.[^\s]+/gi,
+      /\b[a-z0-9.-]+\.(com|net|org|xyz|info|io|co|uk|ca|de|fr|jp|au|in|br|ru|cn|gov|edu|mil)\b/gi,
+    ]
+
+    return urlPatterns.some((pattern) => pattern.test(text))
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
@@ -479,15 +492,15 @@ export default function CommunityPage() {
             "fixed md:relative z-50 md:z-auto h-full shadow-lg md:shadow-none",
           )}
         >
-          <div className="p-4 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <div className="p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
                   <Zap className="h-5 w-5 text-white" />
                 </div>
                 <div>
                   <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Community</h1>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Stay connected</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Stay connected</p>
                 </div>
               </div>
               <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setSidebarOpen(false)}>
@@ -498,12 +511,12 @@ export default function CommunityPage() {
 
           <div className="p-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 h-4 w-4" />
               <Input
                 placeholder="Search conversations..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600 rounded-full"
+                className="pl-10 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-full placeholder:text-gray-500 dark:placeholder:text-gray-400 text-sm"
               />
             </div>
           </div>
@@ -513,13 +526,13 @@ export default function CommunityPage() {
               {categories.map((category) => (
                 <motion.div
                   key={category.id}
-                  whileHover={{ backgroundColor: "rgba(0,0,0,0.05)" }}
+                  whileHover={{ backgroundColor: "rgba(59, 130, 246, 0.05)" }}
                   whileTap={{ scale: 0.98 }}
                   className={cn(
-                    "flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-colors",
+                    "flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-all duration-200",
                     selectedCategory === category.id
-                      ? "bg-green-100 dark:bg-green-900/20 border-l-4 border-green-500"
-                      : "hover:bg-gray-100 dark:hover:bg-gray-700",
+                      ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 shadow-sm"
+                      : "hover:bg-gray-50 dark:hover:bg-gray-700/50",
                   )}
                   onClick={() => {
                     setSelectedCategory(category.id)
@@ -527,16 +540,16 @@ export default function CommunityPage() {
                     setActivePost(null)
                   }}
                 >
-                  <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xl">
+                  <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-600 flex items-center justify-center text-xl shadow-sm">
                     {category.icon}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-900 dark:text-white truncate">{category.name}</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                    <div className="font-medium text-gray-900 dark:text-white truncate text-sm">{category.name}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                       {posts.filter((p) => p.category.id === category.id).length} messages
                     </div>
                   </div>
-                  {selectedCategory === category.id && <div className="w-2 h-2 rounded-full bg-green-500"></div>}
+                  {selectedCategory === category.id && <div className="w-2 h-2 rounded-full bg-blue-500"></div>}
                 </motion.div>
               ))}
             </div>
@@ -564,20 +577,20 @@ export default function CommunityPage() {
         </motion.div>
 
         <div className="flex-1 flex flex-col bg-white dark:bg-gray-900 min-w-0">
-          <div className="p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
+          <div className="p-4 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 sticky top-0 z-20 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setSidebarOpen(true)}>
                   <Menu className="h-5 w-5" />
                 </Button>
-                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-lg">
+                <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-lg shadow-sm">
                   {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                     {categories.find((c) => c.id === selectedCategory)?.name || "General"}
                   </h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
                     {activePost ? "Reply to message" : `${filteredPosts.length} messages`}
                   </p>
                 </div>
@@ -588,145 +601,155 @@ export default function CommunityPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setActivePost(null)}
-                    className="text-blue-500 hover:text-blue-600"
+                    className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                   >
                     Back to feed
                   </Button>
                 )}
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" className="hover:bg-gray-100 dark:hover:bg-gray-800">
                   <Search className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" className="hover:bg-gray-100 dark:hover:bg-gray-800">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           </div>
 
-          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
-            <AnimatePresence>
-              {filteredPosts.map((post, index) => (
-                <motion.div
-                  key={post.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ delay: index * 0.05 }}
-                  className={cn(
-                    "flex space-x-3 group",
-                    activePost === post.id && "bg-blue-50 dark:bg-blue-900/10 -mx-4 px-4 py-2 rounded-lg",
-                  )}
-                >
-                  <Avatar className="h-10 w-10 flex-shrink-0">
-                    <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
-                    <AvatarFallback className="bg-green-500 text-white font-semibold">
-                      {post.user.username.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pb-32">
+            <div className="max-w-2xl mx-auto">
+              <AnimatePresence>
+                {filteredPosts.map((post, index) => (
+                  <motion.div
+                    key={post.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ delay: index * 0.05 }}
+                    className={cn(
+                      "border-b border-gray-100 dark:border-gray-800 p-4 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors duration-200 cursor-pointer",
+                      activePost === post.id && "bg-blue-50/50 dark:bg-blue-900/10",
+                    )}
+                  >
+                    <div className="flex space-x-3">
+                      <Avatar className="h-12 w-12 flex-shrink-0 ring-2 ring-gray-100 dark:ring-gray-700">
+                        <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
+                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                          {post.user.username.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl rounded-tl-md shadow-sm border border-gray-200 dark:border-gray-700 p-3 max-w-2xl">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="font-semibold text-gray-900 dark:text-white text-sm">
-                          {post.user.full_name || post.user.username}
-                        </span>
-                        <UserTierBadge tier={post.user.tier} size="sm" />
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                        </span>
-                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className="font-semibold text-gray-900 dark:text-white text-sm hover:underline cursor-pointer">
+                            {post.user.full_name || post.user.username}
+                          </span>
+                          <UserTierBadge tier={post.user.tier} size="sm" />
+                          <span className="text-gray-500 dark:text-gray-400 text-sm">·</span>
+                          <span className="text-gray-500 dark:text-gray-400 text-sm hover:underline cursor-pointer">
+                            {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                          </span>
+                        </div>
 
-                      <p className="text-gray-900 dark:text-white text-sm leading-relaxed break-words mb-3">
-                        {post.content}
-                      </p>
+                        <p className="text-gray-900 dark:text-white text-sm leading-relaxed break-words mb-3">
+                          {post.content}
+                        </p>
 
-                      <div className="flex items-center space-x-4">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className={cn(
-                            "h-8 px-3 rounded-full transition-colors",
-                            post.has_voted
-                              ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                              : "text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20",
+                        <div className="flex items-center space-x-6 mt-3">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "h-8 px-3 rounded-full transition-all duration-200 group",
+                              post.has_voted
+                                ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                : "text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20",
+                            )}
+                            onClick={() => voteOnPost(post.id)}
+                          >
+                            <Heart
+                              className={cn(
+                                "h-4 w-4 mr-1 transition-transform group-hover:scale-110",
+                                post.has_voted && "fill-current",
+                              )}
+                            />
+                            <span className="text-xs font-medium">{post.vote_count}</span>
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "h-8 px-3 rounded-full transition-all duration-200 group",
+                              activePost === post.id
+                                ? "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                : "text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20",
+                            )}
+                            onClick={() => {
+                              if (activePost === post.id) {
+                                setActivePost(null)
+                              } else {
+                                setActivePost(post.id)
+                                loadComments(post.id)
+                              }
+                            }}
+                          >
+                            <MessageCircle className="h-4 w-4 mr-1 transition-transform group-hover:scale-110" />
+                            <span className="text-xs font-medium">{post.comment_count}</span>
+                          </Button>
+                        </div>
+
+                        <AnimatePresence>
+                          {activePost === post.id && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="mt-4 space-y-3 border-l-2 border-gray-200 dark:border-gray-700 pl-4"
+                            >
+                              {comments[post.id]?.map((comment) => (
+                                <motion.div
+                                  key={comment.id}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  className="flex space-x-3"
+                                >
+                                  <Avatar className="h-8 w-8 flex-shrink-0">
+                                    <AvatarImage src={comment.user.avatar_url || "/placeholder-user.jpg"} />
+                                    <AvatarFallback className="bg-gray-500 text-white text-xs">
+                                      {comment.user.username.charAt(0).toUpperCase()}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl rounded-tl-sm p-3 shadow-sm border border-gray-200 dark:border-gray-700">
+                                      <div className="flex items-center space-x-2 mb-1">
+                                        <span className="font-medium text-gray-900 dark:text-white text-xs">
+                                          {comment.user.username}
+                                        </span>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                        </span>
+                                      </div>
+                                      <p className="text-gray-900 dark:text-white text-xs leading-relaxed">
+                                        {comment.content}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </motion.div>
                           )}
-                          onClick={() => voteOnPost(post.id)}
-                        >
-                          <Heart className={cn("h-4 w-4 mr-1", post.has_voted && "fill-current")} />
-                          <span className="text-xs">{post.vote_count}</span>
-                        </Button>
-
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className={cn(
-                            "h-8 px-3 rounded-full transition-colors",
-                            activePost === post.id
-                              ? "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                              : "text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20",
-                          )}
-                          onClick={() => {
-                            if (activePost === post.id) {
-                              setActivePost(null)
-                            } else {
-                              setActivePost(post.id)
-                              loadComments(post.id)
-                            }
-                          }}
-                        >
-                          <MessageCircle className="h-4 w-4 mr-1" />
-                          <span className="text-xs">{post.comment_count}</span>
-                        </Button>
+                        </AnimatePresence>
                       </div>
                     </div>
-
-                    <AnimatePresence>
-                      {activePost === post.id && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="mt-3 ml-4 space-y-3 border-l-2 border-gray-200 dark:border-gray-700 pl-4"
-                        >
-                          {comments[post.id]?.map((comment) => (
-                            <motion.div
-                              key={comment.id}
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              className="flex space-x-2"
-                            >
-                              <Avatar className="h-6 w-6 flex-shrink-0">
-                                <AvatarImage src={comment.user.avatar_url || "/placeholder-user.jpg"} />
-                                <AvatarFallback className="bg-gray-500 text-white text-xs">
-                                  {comment.user.username.charAt(0).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="bg-gray-100 dark:bg-gray-800 rounded-xl rounded-tl-sm p-2 max-w-md">
-                                <div className="flex items-center space-x-2 mb-1">
-                                  <span className="font-medium text-gray-900 dark:text-white text-xs">
-                                    {comment.user.username}
-                                  </span>
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                                  </span>
-                                </div>
-                                <p className="text-gray-900 dark:text-white text-xs leading-relaxed">
-                                  {comment.content}
-                                </p>
-                              </div>
-                            </motion.div>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 md:left-80 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 z-40">
+          <div className="fixed bottom-0 left-0 right-0 md:left-80 border-t border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md p-4 z-30 shadow-lg">
             {mediaPreview.length > 0 && (
               <div className="mb-3 flex space-x-2 overflow-x-auto">
                 {mediaPreview.map((preview, index) => (
@@ -756,20 +779,20 @@ export default function CommunityPage() {
             )}
 
             {isAuthenticated ? (
-              <div className="flex items-end space-x-3 max-w-4xl mx-auto">
-                <Avatar className="h-8 w-8 flex-shrink-0">
+              <div className="flex items-end space-x-3 max-w-2xl mx-auto">
+                <Avatar className="h-10 w-10 flex-shrink-0 ring-2 ring-gray-200 dark:ring-gray-700">
                   <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
-                  <AvatarFallback className="bg-green-500 text-white font-semibold text-xs">
+                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold text-sm">
                     {profile?.username?.charAt(0).toUpperCase() || "U"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 relative">
                   <Input
                     ref={inputRef}
-                    placeholder={activePost ? "Reply to this message..." : "Type a message..."}
+                    placeholder={activePost ? "Reply to this message..." : "What's happening?"}
                     value={unifiedInput}
                     onChange={(e) => setUnifiedInput(e.target.value)}
-                    className="pr-32 rounded-full border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="pr-32 rounded-full border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-gray-500 dark:placeholder:text-gray-400 text-sm py-3 px-4"
                     onKeyPress={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault()
@@ -781,29 +804,33 @@ export default function CommunityPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-8 p-0 rounded-full"
+                      className="h-8 w-8 p-0 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20"
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      <ImageIcon className="h-4 w-4" />
+                      <ImageIcon className="h-4 w-4 text-blue-500" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full">
-                      <Smile className="h-4 w-4" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    >
+                      <Smile className="h-4 w-4 text-blue-500" />
                     </Button>
                   </div>
                 </div>
                 <Button
                   onClick={handleUnifiedSubmit}
                   disabled={!unifiedInput.trim() && selectedMedia.length === 0}
-                  className="h-10 w-10 p-0 rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300"
+                  className="h-10 w-10 p-0 rounded-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 shadow-sm transition-all duration-200 hover:scale-105"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
             ) : (
               <div className="text-center">
-                <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 max-w-md mx-auto">
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 max-w-md mx-auto shadow-sm">
                   <p className="text-gray-600 dark:text-gray-400 mb-4">Join the conversation</p>
-                  <Button asChild className="bg-green-500 hover:bg-green-600 rounded-full px-8">
+                  <Button asChild className="bg-blue-500 hover:bg-blue-600 rounded-full px-8 shadow-sm">
                     <a href="/login">Sign In</a>
                   </Button>
                 </div>

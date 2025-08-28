@@ -38,6 +38,7 @@ import {
   Monitor,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
+import { useWallet } from "@/contexts/wallet-context"
 import { useTheme } from "@/contexts/theme-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
 import { Badge } from "@/components/ui/badge"
@@ -63,6 +64,7 @@ const navigationItems = [
 
 export function UnifiedNavigation() {
   const { user, profile, signOut } = useAuth()
+  const { balance } = useWallet()
   const { theme, setTheme, resolvedTheme } = useTheme()
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
@@ -163,14 +165,20 @@ export function UnifiedNavigation() {
         categoryId: category.id,
       }))
 
-      return [
-        navigationItems[0], // Home
-        ...communityNavItems,
-        ...(user ? [navigationItems[6], navigationItems[12]] : [navigationItems[14]]), // Dashboard/Wallet or About
-      ]
+      const baseItems = [navigationItems[0]] // Home only
+      const authItems = user ? [] : [navigationItems[14]] // About for non-authenticated users
+
+      return [...baseItems, ...communityNavItems, ...authItems]
     }
 
-    return navigationItems
+    const filteredItems = navigationItems.filter((item) => {
+      if (typeof window !== "undefined" && window.innerWidth < 768) {
+        return item.name !== "Dashboard" && item.name !== "Wallet"
+      }
+      return true
+    })
+
+    return filteredItems
   }
 
   return (
@@ -218,11 +226,11 @@ export function UnifiedNavigation() {
           <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4 flex-shrink-0">
             {user ? (
               <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3">
-                {profile?.coins !== undefined && (
+                {balance !== undefined && (
                   <div className="hidden sm:flex items-center space-x-1 bg-yellow-100 dark:bg-yellow-900/20 px-2 md:px-3 py-1 rounded-full">
                     <Coins className="h-3 w-3 md:h-4 md:w-4 text-yellow-600" />
                     <span className="text-xs md:text-sm font-medium text-yellow-700 dark:text-yellow-400">
-                      {profile.coins.toLocaleString()}
+                      {balance.toLocaleString()}
                     </span>
                   </div>
                 )}
@@ -339,11 +347,11 @@ export function UnifiedNavigation() {
                               {profile.tier.replace("_", " ").toUpperCase()}
                             </Badge>
                           )}
-                          {profile?.coins !== undefined && (
+                          {balance !== undefined && (
                             <div className="flex items-center space-x-1 text-xs bg-yellow-100 dark:bg-yellow-900/20 px-2 py-0.5 rounded-full">
                               <Coins className="h-3 w-3 text-yellow-600" />
                               <span className="font-medium text-yellow-700 dark:text-yellow-400">
-                                {profile.coins.toLocaleString()}
+                                {balance.toLocaleString()}
                               </span>
                             </div>
                           )}
@@ -368,7 +376,8 @@ export function UnifiedNavigation() {
                             className={cn(
                               "w-full justify-start h-11 transition-all duration-200",
                               isActive ? "bg-lime-500 text-teal-900 hover:bg-lime-600 shadow-sm" : "hover:bg-accent/50",
-                              item.isCommunityCategory && "ml-4 text-sm",
+                              item.isCommunityCategory &&
+                                "ml-4 text-sm border-l-2 border-blue-200 dark:border-blue-800",
                             )}
                             onClick={() => setIsOpen(false)}
                           >
@@ -376,7 +385,9 @@ export function UnifiedNavigation() {
                               <item.icon className="h-5 w-5 flex-shrink-0" />
                               <span className="font-medium">{item.name}</span>
                               {item.isCommunityCategory && (
-                                <span className="text-xs opacity-60">#{item.name.toLowerCase()}</span>
+                                <span className="text-xs opacity-60 bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded-full">
+                                  #{item.name.toLowerCase()}
+                                </span>
                               )}
                             </Link>
                           </Button>
@@ -389,18 +400,6 @@ export function UnifiedNavigation() {
                   <div className="p-4 border-t">
                     {user ? (
                       <div className="space-y-2">
-                        <Button asChild variant="outline" className="w-full justify-start bg-transparent">
-                          <Link href="/dashboard" onClick={() => setIsOpen(false)}>
-                            <User className="mr-2 h-4 w-4" />
-                            Dashboard
-                          </Link>
-                        </Button>
-                        <Button asChild variant="outline" className="w-full justify-start bg-transparent">
-                          <Link href="/wallet" onClick={() => setIsOpen(false)}>
-                            <Wallet className="mr-2 h-4 w-4" />
-                            Wallet
-                          </Link>
-                        </Button>
                         <Button asChild variant="outline" className="w-full justify-start bg-transparent">
                           <Link href="/profile" onClick={() => setIsOpen(false)}>
                             <Settings className="mr-2 h-4 w-4" />
@@ -416,7 +415,7 @@ export function UnifiedNavigation() {
                           }}
                         >
                           <LogOut className="mr-2 h-4 w-4" />
-                          Log out
+                          Sign Out
                         </Button>
                       </div>
                     ) : (

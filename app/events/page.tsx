@@ -25,6 +25,7 @@ export default function EventsPage() {
     max_capacity: 200,
     current_attendance: 45,
     ticket_price_naira: 20000,
+    original_price_naira: 50000,
     ticket_price_coins: 10000,
     image_url: "/events/erigga-intimate-session.png",
     status: "upcoming",
@@ -193,12 +194,16 @@ export default function EventsPage() {
                     <h3 className="text-2xl font-bold text-white mb-4">Ticket Price</h3>
                     <div className="text-center">
                       <div className="space-y-2">
-                        <div className="text-lg text-gray-400 line-through">₦50,000</div>
+                        <div className="text-lg text-gray-400 line-through">
+                          {formatCurrency(event.original_price_naira)}
+                        </div>
                         <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400">
-                          ₦20,000
+                          {formatCurrency(event.ticket_price_naira)}
                         </div>
                       </div>
-                      <div className="text-lg text-yellow-400 font-semibold mt-2">OR 10,000 Erigga Coins</div>
+                      <div className="text-lg text-yellow-400 font-semibold mt-2">
+                        OR {event.ticket_price_coins.toLocaleString()} Erigga Coins
+                      </div>
                     </div>
                   </div>
 
