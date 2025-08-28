@@ -11,7 +11,6 @@ import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { PaystackIntegration } from "@/components/paystack/paystack-integration"
 import { createClient } from "@/lib/supabase/client"
-import { z } from "zod"
 
 const FEATURE_UI_FIXES_V1 = process.env.NEXT_PUBLIC_FEATURE_UI_FIXES_V1 === "true"
 
@@ -34,15 +33,10 @@ interface EventData {
   current_attendance: number
 }
 
-const checkoutParamsSchema = z.object({
-  event: z.string().uuid(),
-})
-
 export default function EventPaymentPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { event } = checkoutParamsSchema.parse(Object.fromEntries(searchParams.entries()))
-  const eventId = event
+  const eventId = searchParams.get("event")
   const { user, profile } = useAuth()
 
   const [surveyData, setSurveyData] = useState<SurveyData | null>(null)
@@ -85,7 +79,6 @@ export default function EventPaymentPage() {
 
       if (error) {
         console.error("Error fetching event:", error)
-        setError("Failed to load event details.")
         // Fallback to default values
         setEventData({
           id: eventId,
@@ -102,7 +95,6 @@ export default function EventPaymentPage() {
       }
     } catch (error) {
       console.error("Error fetching event data:", error)
-      setError("Failed to load event details.")
     }
   }
 

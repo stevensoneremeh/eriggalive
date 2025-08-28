@@ -1,8 +1,66 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
+import type { Database } from "@/types/database"
 
-export function createClient() {
-  const cookieStore = cookies()
+export async function createClient() {
+  const cookieStore = await cookies()
+
+  // Validate environment variables
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("[SERVER] Missing Supabase environment variables")
+    throw new Error("Missing Supabase environment variables")
+  }
+
+  return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll()
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+        } catch (error: any) {
+          console.warn("[SERVER] Cookie setting failed in server component:", error.message)
+        }
+      },
+    },
+  })
+}
+
+export async function createAdminClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error("[SERVER] Missing Supabase admin environment variables")
+    throw new Error("Missing Supabase admin environment variables")
+  }
+
+  return createServerClient<Database>(supabaseUrl, supabaseServiceKey, {
+    cookies: {
+      getAll() {
+        return []
+      },
+      setAll() {
+        // Admin client doesn't need cookies
+      },
+    },
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
+}
+
+// Alternative function for cases where cookies() might not be available
+export function createClientComponentClient() {
+  // This should only be used in client components
+  if (typeof window === "undefined") {
+    throw new Error("createClientComponentClient should only be used in client components")
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -11,41 +69,31 @@ export function createClient() {
     throw new Error("Missing Supabase environment variables")
   }
 
-  return createServerClient(supabaseUrl, supabaseAnonKey, {
+  return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
-        return cookieStore.getAll()
+        return document.cookie.split(";").map((cookie) => {
+          const [name, value] = cookie.trim().split("=")
+          return { name, value: decodeURIComponent(value || "") }
+        })
       },
       setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-        } catch {
-          // The `setAll` method was called from a Server Component.
-          // This can be ignored if you have middleware refreshing
-          // user sessions.
-        }
+        cookiesToSet.forEach(({ name, value, options }) => {
+          let cookieString = `${name}=${encodeURIComponent(value)}`
+          if (options?.maxAge) cookieString += `; max-age=${options.maxAge}`
+          if (options?.path) cookieString += `; path=${options.path}`
+          if (options?.domain) cookieString += `; domain=${options.domain}`
+          if (options?.secure) cookieString += "; secure"
+          if (options?.httpOnly) cookieString += "; httponly"
+          if (options?.sameSite) cookieString += `; samesite=${options.sameSite}`
+          document.cookie = cookieString
+        })
       },
     },
   })
 }
 
-export function createServerSupabaseClient() {
-  return createClient()
-}
+export const createServerSupabaseClient = createClient
+export const createAdminSupabaseClient = createAdminClient
 
-export function createAdminSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase admin environment variables")
-  }
-
-  const { createClient } = require("@supabase/supabase-js")
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
-}
+export { createClient as createServerClient }

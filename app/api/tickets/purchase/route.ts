@@ -1,21 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { generateSecureToken } from "@/lib/security/validation"
-import { z } from "zod"
 
 const FEATURE_UI_FIXES_V1 = process.env.NEXT_PUBLIC_FEATURE_UI_FIXES_V1 === "true"
-
-const purchaseRequestSchema = z.object({
-  eventId: z.string().uuid("Invalid event ID"),
-  quantity: z.number().min(1, "Quantity must be at least 1").max(10, "Maximum 10 tickets per purchase"),
-  paymentMethod: z.enum(["paystack", "coins", "free"], {
-    required_error: "Payment method is required",
-  }),
-  paymentReference: z.string().optional(),
-  amount: z.number().optional(),
-  ticketType: z.string().optional(),
-  surveyData: z.any().optional(),
-})
 
 // Check if we're in preview/development mode
 const isPreviewMode = () => {
@@ -29,7 +16,7 @@ const isPreviewMode = () => {
 
 async function verifyUser(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const {
       data: { user },
       error: authError,
@@ -39,7 +26,11 @@ async function verifyUser(request: NextRequest) {
       return { error: "Authentication required", user: null, profile: null }
     }
 
-    const { data: profile, error: profileError } = await supabase.from("users").select("*").eq("id", user.id).single()
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single()
 
     if (profileError || !profile) {
       return { error: "User profile not found", user: null, profile: null }
@@ -94,78 +85,31 @@ async function verifyWithPaystack(reference: string, paystackSecretKey: string) 
     headers: {
       Authorization: `Bearer ${paystackSecretKey}`,
       "Content-Type": "application/json",
-      "Cache-Control": "no-cache",
     },
   })
 
   if (!response.ok) {
-    console.error(`Paystack API error: ${response.status} - ${response.statusText}`)
-    throw new Error(`Paystack API error: ${response.status} - ${response.statusText}`)
+    throw new Error(`Paystack API error: ${response.status}`)
   }
 
   return await response.json()
 }
 
 export async function POST(request: NextRequest) {
-  if (FEATURE_UI_FIXES_V1 === false) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Feature not enabled",
-        code: "FEATURE_DISABLED",
-      },
-      { status: 405 },
-    )
-  }
-
   try {
     const { user, profile, error: authError } = await verifyUser(request)
     if (authError || !user || !profile) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: authError || "Unauthorized",
-          code: "AUTH_ERROR",
-        },
-        { status: 401 },
-      )
+      return NextResponse.json({ success: false, error: authError || "Unauthorized" }, { status: 401 })
     }
 
-    // Parse and validate request body
-    let requestData
-    try {
-      requestData = await request.json()
-    } catch (error) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid JSON in request body",
-          code: "INVALID_JSON",
-        },
-        { status: 400 },
-      )
+    const requestData = await request.json()
+    const { eventId, ticketType, quantity = 1, paymentMethod, paymentReference, amount, surveyData } = requestData
+
+    if (!eventId || !paymentMethod) {
+      return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 })
     }
 
-    // Validate request data
-    const validationResult = purchaseRequestSchema.safeParse(requestData)
-
-    if (!validationResult.success) {
-      const formattedError = validationResult.error.format()
-      console.error("Purchase validation error:", formattedError)
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid request data",
-          details: formattedError,
-          code: "VALIDATION_ERROR",
-        },
-        { status: 400 },
-      )
-    }
-
-    const { eventId, quantity, paymentMethod, paymentReference, amount, ticketType, surveyData } = validationResult.data
-
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { data: event, error: eventError } = await supabase.from("events").select("*").eq("id", eventId).single()
 
@@ -217,7 +161,7 @@ export async function POST(request: NextRequest) {
     const totalPrice = ticketPrice * quantity
     const totalCoins = coinPrice * quantity
 
-    if (paymentMethod === "paystack" && amount) {
+    if (FEATURE_UI_FIXES_V1 && paymentMethod === "paystack" && amount) {
       const expectedAmountKobo = totalPrice * 100
       const submittedAmountKobo = amount
 
@@ -267,15 +211,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: "Payment verification failed" }, { status: 500 })
       }
     } else if (paymentMethod === "coins") {
-      if (profile.coins < totalCoins) {
+      if (profile.coins_balance < totalCoins) {
         return NextResponse.json({ success: false, error: "Insufficient coins balance" }, { status: 400 })
       }
 
       // Deduct coins
       const { error: coinsError } = await supabase
-        .from("users")
+        .from("profiles")
         .update({
-          coins: profile.coins - totalCoins,
+          coins_balance: profile.coins_balance - totalCoins,
           updated_at: new Date().toISOString(),
         })
         .eq("id", user.id)
@@ -377,4 +321,8 @@ export async function POST(request: NextRequest) {
     console.error("Ticket purchase error:", error)
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }
+}
+
+export async function GET() {
+  return NextResponse.json({ success: false, error: "Method not allowed" }, { status: 405 })
 }

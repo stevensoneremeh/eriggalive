@@ -38,9 +38,6 @@ import { useToast } from "@/components/ui/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { motion, AnimatePresence } from "framer-motion"
 import { MissionsDashboard } from "@/components/missions/missions-dashboard"
-import { TicketQRDisplay } from "@/components/tickets/ticket-qr-display"
-
-const FEATURE_UI_FIXES_V1 = process.env.NEXT_PUBLIC_FEATURE_UI_FIXES_V1 === "true"
 
 interface UserStats {
   totalPosts: number
@@ -52,20 +49,6 @@ interface UserStats {
   followersCount: number
   followingCount: number
   reputationScore: number
-}
-
-interface UserTicket {
-  id: string
-  ticket_number: string
-  qr_code: string
-  qr_token: string
-  status: string
-  created_at: string
-  events: {
-    title: string
-    event_date: string
-    venue: string
-  }
 }
 
 export default function DashboardPage() {
@@ -85,14 +68,13 @@ export default function DashboardPage() {
   })
   const [recentActivity, setRecentActivity] = useState<any[]>([])
   const [loadingStats, setLoadingStats] = useState(true)
-  const [userTickets, setUserTickets] = useState<UserTicket[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
   useEffect(() => {
     if (user && profile) {
       // Load stats and activity in parallel for better performance
-      Promise.all([loadUserStats(), loadRecentActivity(), loadUserTickets()])
+      Promise.all([loadUserStats(), loadRecentActivity()])
     }
   }, [user, profile])
 
@@ -102,7 +84,6 @@ export default function DashboardPage() {
     try {
       setLoadingStats(true)
 
-      // Use Promise.allSettled to handle potential missing tables gracefully
       const [
         postsResult,
         commentsResult,
@@ -112,7 +93,7 @@ export default function DashboardPage() {
         vaultViewsResult,
         followersResult,
         followingResult,
-      ] = await Promise.allSettled([
+      ] = await Promise.all([
         supabase
           .from("community_posts")
           .select("*", { count: "exact", head: true })
@@ -132,14 +113,14 @@ export default function DashboardPage() {
       ])
 
       setUserStats({
-        totalPosts: postsResult.status === "fulfilled" ? postsResult.value.count || 0 : 0,
-        totalComments: commentsResult.status === "fulfilled" ? commentsResult.value.count || 0 : 0,
-        totalVotes: votesResult.status === "fulfilled" ? votesResult.value.count || 0 : 0,
-        totalTickets: ticketsResult.status === "fulfilled" ? ticketsResult.value.count || 0 : 0,
-        totalPurchases: purchasesResult.status === "fulfilled" ? purchasesResult.value.count || 0 : 0,
-        vaultViews: vaultViewsResult.status === "fulfilled" ? vaultViewsResult.value.count || 0 : 0,
-        followersCount: followersResult.status === "fulfilled" ? followersResult.value.count || 0 : 0,
-        followingCount: followingResult.status === "fulfilled" ? followingResult.value.count || 0 : 0,
+        totalPosts: postsResult.count || 0,
+        totalComments: commentsResult.count || 0,
+        totalVotes: votesResult.count || 0,
+        totalTickets: ticketsResult.count || 0,
+        totalPurchases: purchasesResult.count || 0,
+        vaultViews: vaultViewsResult.count || 0,
+        followersCount: followersResult.count || 0,
+        followingCount: followingResult.count || 0,
         reputationScore: profile.reputation_score || 0,
       })
     } catch (error) {
@@ -164,55 +145,68 @@ export default function DashboardPage() {
     if (!profile) return
 
     try {
-      const activities = []
-
-      // Try to load recent posts
-      try {
-        const { data: recentPosts } = await supabase
+      const [recentPostsResult, recentCommentsResult, recentTicketsResult] = await Promise.all([
+        supabase
           .from("community_posts")
           .select("id, content, created_at")
           .eq("user_id", profile.id)
           .eq("is_deleted", false)
           .order("created_at", { ascending: false })
-          .limit(3)
-
-        if (recentPosts) {
-          recentPosts.forEach((post) => {
-            activities.push({
-              type: "post",
-              content: `Created post: ${post.content.substring(0, 50)}...`,
-              timestamp: post.created_at,
-              icon: MessageCircle,
-              color: "text-blue-500",
-            })
-          })
-        }
-      } catch (error) {
-        console.log("Community posts table not available")
-      }
-
-      // Try to load recent tickets
-      try {
-        const { data: recentTickets } = await supabase
+          .limit(3),
+        supabase
+          .from("community_comments")
+          .select("id, content, created_at")
+          .eq("user_id", profile.id)
+          .eq("is_deleted", false)
+          .order("created_at", { ascending: false })
+          .limit(3),
+        supabase
           .from("tickets")
           .select("id, ticket_number, created_at, events(title)")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
-          .limit(2)
+          .limit(2),
+      ])
 
-        if (recentTickets) {
-          recentTickets.forEach((ticket) => {
-            activities.push({
-              type: "ticket",
-              content: `Got ticket for ${ticket.events?.title || "Event"}`,
-              timestamp: ticket.created_at,
-              icon: Ticket,
-              color: "text-purple-500",
-            })
+      const activities = []
+
+      // Add posts to activity
+      if (recentPostsResult.data) {
+        recentPostsResult.data.forEach((post) => {
+          activities.push({
+            type: "post",
+            content: `Created post: ${post.content.substring(0, 50)}...`,
+            timestamp: post.created_at,
+            icon: MessageCircle,
+            color: "text-blue-500",
           })
-        }
-      } catch (error) {
-        console.log("Tickets table not available")
+        })
+      }
+
+      // Add comments to activity
+      if (recentCommentsResult.data) {
+        recentCommentsResult.data.forEach((comment) => {
+          activities.push({
+            type: "comment",
+            content: `Commented: ${comment.content.substring(0, 50)}...`,
+            timestamp: comment.created_at,
+            icon: MessageCircle,
+            color: "text-green-500",
+          })
+        })
+      }
+
+      // Add tickets to activity
+      if (recentTicketsResult.data) {
+        recentTicketsResult.data.forEach((ticket) => {
+          activities.push({
+            type: "ticket",
+            content: `Got ticket for ${ticket.events?.title || "Event"}`,
+            timestamp: ticket.created_at,
+            icon: Ticket,
+            color: "text-purple-500",
+          })
+        })
       }
 
       // Sort by timestamp and take latest 5
@@ -221,29 +215,6 @@ export default function DashboardPage() {
     } catch (error) {
       console.error("Error loading recent activity:", error)
       setRecentActivity([])
-    }
-  }
-
-  const loadUserTickets = async () => {
-    if (!user) return
-
-    try {
-      const { data: tickets, error: ticketsError } = await supabase
-        .from("tickets")
-        .select("*, events(title, event_date, venue)")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(5)
-
-      if (ticketsError) {
-        console.log("Tickets table not available:", ticketsError)
-        setUserTickets([])
-      } else {
-        setUserTickets(tickets || [])
-      }
-    } catch (error) {
-      console.log("Error loading user tickets:", error)
-      setUserTickets([])
     }
   }
 
@@ -581,61 +552,6 @@ export default function DashboardPage() {
                     </CardContent>
                   </Card>
                 </motion.div>
-
-                {/* Display User Tickets with QR Codes */}
-                {FEATURE_UI_FIXES_V1 && (
-                  <motion.div variants={itemVariants} initial="hidden" animate="visible">
-                    <Card className="bg-white/5 backdrop-blur-xl border-white/10 hover:bg-white/10 transition-all duration-300">
-                      <CardHeader>
-                        <CardTitle className="flex items-center text-white">
-                          <Ticket className="w-5 h-5 mr-2 text-blue-400" />
-                          My Tickets
-                        </CardTitle>
-                        <CardDescription className="text-gray-300">
-                          Your purchased event tickets with QR codes
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        {userTickets.length > 0 ? (
-                          userTickets.map((ticket) => (
-                            <div key={ticket.id} className="border border-white/10 rounded-lg p-4 bg-white/5">
-                              <div className="flex justify-between items-start mb-4">
-                                <div>
-                                  <h4 className="text-white font-semibold">{ticket.events?.title || "Event"}</h4>
-                                  <p className="text-gray-300 text-sm">Ticket #{ticket.ticket_number}</p>
-                                  <p className="text-gray-400 text-xs">
-                                    {new Date(ticket.created_at).toLocaleDateString()}
-                                  </p>
-                                </div>
-                                <Badge
-                                  variant={
-                                    ticket.status === "unused"
-                                      ? "default"
-                                      : ticket.status === "used"
-                                        ? "secondary"
-                                        : "destructive"
-                                  }
-                                  className="capitalize"
-                                >
-                                  {ticket.status}
-                                </Badge>
-                              </div>
-                              <TicketQRDisplay ticket={ticket} showDetails={false} />
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-center py-8">
-                            <Ticket className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                            <p className="text-gray-400">No tickets purchased yet.</p>
-                            <Button asChild className="mt-4">
-                              <Link href="/events">Browse Events</Link>
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                )}
 
                 {/* Tier Progress */}
                 <motion.div variants={itemVariants} initial="hidden" animate="visible">

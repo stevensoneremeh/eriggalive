@@ -30,7 +30,6 @@ import {
   LogOut,
   User,
   MoreHorizontal,
-  Wallet,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useTheme } from "@/contexts/theme-context"
@@ -39,9 +38,6 @@ import { CoinBalance } from "@/components/coin-balance"
 import { UserTierBadge } from "@/components/user-tier-badge"
 import { cn } from "@/lib/utils"
 import { useMediaQuery } from "@/hooks/use-media-query"
-import { MobileSidebarContent } from "@/components/mobile-sidebar-content" // Import MobileSidebarContent
-
-const FEATURE_UI_FIXES_V1 = process.env.NEXT_PUBLIC_FEATURE_UI_FIXES_V1 === "true"
 
 interface SidebarItem {
   name: string
@@ -440,18 +436,14 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
 
         {/* Footer Actions */}
         <div className={cn("p-4 border-t", isCollapsed && "px-2")}>
-          {isMobile && FEATURE_UI_FIXES_V1 ? (
+          {!isCollapsed ? (
             <div className="space-y-2">
               <Button variant="outline" size="sm" className="w-full justify-start bg-transparent" asChild>
                 <Link href="/profile">
+                  {" "}
+                  {/* Assuming /profile exists or will be created */}
                   <User className="h-4 w-4 mr-2" />
                   Profile
-                </Link>
-              </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start bg-transparent" asChild>
-                <Link href="/wallet">
-                  <Wallet className="h-4 w-4 mr-2" />
-                  Wallet
                 </Link>
               </Button>
               <Button
@@ -465,34 +457,35 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
               </Button>
             </div>
           ) : (
-            <div className="space-y-2">
-              <Button variant="outline" size="sm" className="w-full justify-start bg-transparent" asChild>
-                <Link href="/dashboard">
-                  <User className="h-4 w-4 mr-2" />
-                  Dashboard
-                </Link>
-              </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start bg-transparent" asChild>
-                <Link href="/wallet">
-                  <Wallet className="h-4 w-4 mr-2" />
-                  Wallet
-                </Link>
-              </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start bg-transparent" asChild>
-                <Link href="/profile">
-                  <User className="h-4 w-4 mr-2" />
-                  Profile
-                </Link>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={signOut}
-                className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
-              </Button>
+            <div className="flex flex-col space-y-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full justify-center" asChild>
+                      <Link href="/profile">
+                        <User className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Profile</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={signOut}
+                      className="w-full justify-center text-red-500 hover:text-red-600"
+                    >
+                      <LogOut className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Sign Out</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           )}
         </div>
@@ -559,7 +552,7 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-80 p-0">
-              <MobileSidebarContent />
+              <SidebarContent isMobile />
             </SheetContent>
           </Sheet>
 

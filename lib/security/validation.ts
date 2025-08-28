@@ -5,13 +5,12 @@ import crypto from "crypto"
 export const ticketPurchaseSchema = z.object({
   eventId: z.string().uuid("Invalid event ID"),
   quantity: z.number().min(1, "Quantity must be at least 1").max(10, "Maximum 10 tickets per purchase"),
-  paymentMethod: z.enum(["paystack", "coins", "free"], {
+  paymentMethod: z.enum(["paystack", "coins"], {
     required_error: "Payment method is required",
   }),
-  paymentReference: z.string().optional(),
-  amount: z.number().optional(),
-  ticketType: z.string().optional(),
-  surveyData: z.any().optional(),
+  totalAmount: z.number().positive("Total amount must be positive"),
+  userEmail: z.string().email("Invalid email address"),
+  userName: z.string().min(2, "Name must be at least 2 characters"),
 })
 
 // Membership purchase validation schema

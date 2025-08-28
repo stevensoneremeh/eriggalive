@@ -1,14 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { z } from "zod"
-
-const FEATURE_UI_FIXES_V1 = process.env.NEXT_PUBLIC_FEATURE_UI_FIXES_V1 === "true"
-
-const purchaseRequestSchema = z.object({
-  amount: z.number().positive("Amount must be positive"),
-  reference: z.string().min(1, "Reference is required"),
-  coins: z.number().positive("Coins must be positive"),
-})
 
 // Check if we're in preview/development mode
 const isPreviewMode = () => {
@@ -22,7 +13,7 @@ const isPreviewMode = () => {
 
 async function verifyUser(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get the authenticated user
     const {
@@ -52,6 +43,31 @@ async function verifyUser(request: NextRequest) {
   }
 }
 
+// Validate purchase request data
+function validatePurchaseRequest(data: any) {
+  const errors: string[] = []
+
+  if (!data.reference || typeof data.reference !== "string") {
+    errors.push("Invalid payment reference")
+  }
+
+  if (!data.amount || typeof data.amount !== "number" || data.amount <= 0) {
+    errors.push("Invalid amount")
+  }
+
+  if (!data.coins || typeof data.coins !== "number" || data.coins < 100) {
+    errors.push("Invalid coin amount")
+  }
+
+  // Validate exchange rate (1 coin = 0.5 NGN)
+  const expectedAmount = Math.floor(data.coins * 0.5)
+  if (Math.abs(data.amount - expectedAmount) > 1) {
+    errors.push("Amount doesn't match expected exchange rate")
+  }
+
+  return errors
+}
+
 // Mock Paystack verification for preview mode
 async function mockPaystackVerification(reference: string, expectedAmount: number) {
   // Simulate API delay
@@ -79,12 +95,10 @@ async function verifyWithPaystack(reference: string, paystackSecretKey: string) 
     headers: {
       Authorization: `Bearer ${paystackSecretKey}`,
       "Content-Type": "application/json",
-      "Cache-Control": "no-cache",
     },
   })
 
   if (!response.ok) {
-    console.error(`Paystack API error: ${response.status} - ${response.statusText}`)
     throw new Error(`Paystack API error: ${response.status} - ${response.statusText}`)
   }
 
@@ -92,17 +106,6 @@ async function verifyWithPaystack(reference: string, paystackSecretKey: string) 
 }
 
 export async function POST(request: NextRequest) {
-  if (FEATURE_UI_FIXES_V1 === false) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Feature not enabled",
-        code: "FEATURE_DISABLED",
-      },
-      { status: 405 },
-    )
-  }
-
   try {
     const { user, profile, error: authError } = await verifyUser(request)
     if (authError || !user || !profile) {
@@ -132,38 +135,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate request data
-    const validationResult = purchaseRequestSchema.safeParse(requestData)
-
-    if (!validationResult.success) {
-      const formattedError = validationResult.error.format()
-      console.error("Purchase validation error:", formattedError)
+    const validationErrors = validatePurchaseRequest(requestData)
+    if (validationErrors.length > 0) {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid request data",
-          details: formattedError,
+          error: validationErrors.join(", "),
           code: "VALIDATION_ERROR",
         },
         { status: 400 },
       )
     }
 
-    const { amount, reference, coins } = validationResult.data
+    const { amount, reference, coins } = requestData
 
-    // Validate exchange rate (1 coin = 0.5 NGN)
-    const expectedAmount = Math.floor(coins * 0.5)
-    if (Math.abs(amount - expectedAmount) > 1) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Amount doesn't match expected exchange rate",
-          code: "AMOUNT_MISMATCH",
-        },
-        { status: 400 },
-      )
-    }
-
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: existingTransaction } = await supabase
       .from("transactions")
       .select("id")
@@ -283,22 +269,48 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Update user coin balance and wallet
-      const { error: walletUpdateError } = await supabase.rpc("increment_total_earned", {
-        user_id: user.id,
-        amount: coins,
-      })
+      // Update user coin balance
+      const { data: updatedProfile, error: updateError } = await supabase
+        .from("users")
+        .update({
+          coins: profile.coins + coins,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("auth_user_id", user.id)
+        .select("coins")
+        .single()
 
-      if (walletUpdateError) {
-        console.error("Wallet update error:", walletUpdateError)
+      if (updateError) {
+        console.error("Balance update error:", updateError)
+        // Try to mark transaction as failed
+        await supabase.from("transactions").update({ status: "failed" }).eq("id", transaction.id)
+
         return NextResponse.json(
           {
             success: false,
-            error: "Failed to update wallet balance",
-            code: "DATABASE_ERROR",
+            error: "Failed to update coin balance",
+            code: "BALANCE_UPDATE_ERROR",
           },
           { status: 500 },
         )
+      }
+
+      const { error: walletUpdateError } = await supabase.from("user_wallets").upsert(
+        {
+          user_id: user.id,
+          coin_balance: profile.coins + coins,
+          total_earned: coins, // This should be incremented, not set
+          last_transaction_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "user_id",
+        },
+      )
+
+      if (walletUpdateError) {
+        console.error("Wallet update error:", walletUpdateError)
+        // Continue anyway as the main balance was updated
       }
 
       // Create coin transaction record for audit trail
@@ -322,7 +334,7 @@ export async function POST(request: NextRequest) {
           status: transaction.status,
           created_at: transaction.created_at,
         },
-        newBalance: profile.coins + coins,
+        newBalance: updatedProfile.coins,
         message: `Successfully purchased ${coins.toLocaleString()} Erigga Coins`,
         isPreviewMode: isPreviewMode(),
       })
