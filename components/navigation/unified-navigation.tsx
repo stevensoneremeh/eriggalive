@@ -71,7 +71,7 @@ const navigationItems = [
 export function UnifiedNavigation() {
   const { user, profile, signOut } = useAuth()
   const { theme, setTheme, resolvedTheme } = useTheme()
-  const { formattedBalance, isRealtime } = useUserBalance() // Use formatted balance from hook
+  const { formattedBalance, isRealtime } = useUserBalance()
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
@@ -192,8 +192,8 @@ export function UnifiedNavigation() {
         navigationItems[10], // Chronicles
         navigationItems[11], // Coins
         navigationItems[13], // Tickets
-        navigationItems[15], // Media
-        navigationItems[16], // Achievements
+        navigationItems[15], // Media (moved from bottom section)
+        navigationItems[16], // Achievements (moved from bottom section)
       ]
     } else {
       return [
@@ -258,15 +258,15 @@ export function UnifiedNavigation() {
                     className={cn(
                       "hidden sm:flex items-center space-x-1 px-2 md:px-3 py-1 rounded-full transition-all duration-200",
                       "bg-yellow-100 dark:bg-yellow-900/20",
-                      isRealtime && FEATURE_UI_FIXES_V1 && "ring-1 ring-yellow-300 dark:ring-yellow-700", // Visual indicator for real-time updates
+                      isRealtime && FEATURE_UI_FIXES_V1 && "ring-1 ring-yellow-300 dark:ring-yellow-700",
                     )}
                   >
                     <Coins className="h-3 w-3 md:h-4 md:w-4 text-yellow-600" />
                     <span className="text-xs md:text-sm font-medium text-yellow-700 dark:text-yellow-400">
-                      {formattedBalance} {/* Use formatted balance */}
+                      {formattedBalance}
                     </span>
                     {isRealtime && FEATURE_UI_FIXES_V1 && (
-                      <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" /> // Real-time indicator dot
+                      <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
                     )}
                   </div>
                 )}
@@ -387,15 +387,15 @@ export function UnifiedNavigation() {
                             <div
                               className={cn(
                                 "flex items-center space-x-1 text-xs bg-yellow-100 dark:bg-yellow-900/20 px-2 py-0.5 rounded-full transition-all duration-200",
-                                isRealtime && FEATURE_UI_FIXES_V1 && "ring-1 ring-yellow-300 dark:ring-yellow-700", // Visual indicator for real-time updates
+                                isRealtime && FEATURE_UI_FIXES_V1 && "ring-1 ring-yellow-300 dark:ring-yellow-700",
                               )}
                             >
                               <Coins className="h-3 w-3 text-yellow-600" />
                               <span className="font-medium text-yellow-700 dark:text-yellow-400">
-                                {formattedBalance} {/* Use formatted balance */}
+                                {formattedBalance}
                               </span>
                               {isRealtime && FEATURE_UI_FIXES_V1 && (
-                                <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" /> // Real-time indicator dot
+                                <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
                               )}
                             </div>
                           )}

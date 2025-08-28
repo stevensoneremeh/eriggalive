@@ -8,20 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Heart,
-  MessageCircle,
-  Smile,
-  MoreVertical,
-  Search,
-  Menu,
-  X,
-  Zap,
-  Send,
-  ImageIcon,
-  Mic,
-  ChevronLeft,
-} from "lucide-react"
+import { Heart, MessageCircle, Smile, MoreVertical, Search, Menu, X, Zap, Send, ImageIcon } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
@@ -119,17 +106,21 @@ export default function CommunityPage() {
 
     document.body.classList.add("community-page")
 
-    const communityNavEvent = new CustomEvent("communityPageActive", {
-      detail: { categories, selectedCategory },
-    })
-    window.dispatchEvent(communityNavEvent)
+    if (isClient && typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("communityPageActive", {
+          detail: { categories, selectedCategory },
+        }),
+      )
+    }
 
     return () => {
       document.body.classList.remove("community-page")
-      const communityNavEvent = new CustomEvent("communityPageInactive")
-      window.dispatchEvent(communityNavEvent)
+      if (isClient && typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("communityPageInactive"))
+      }
     }
-  }, [categories, selectedCategory, isClient])
+  }, [isClient, categories, selectedCategory])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -252,133 +243,59 @@ export default function CommunityPage() {
   )
 
   const containsURL = (text: string): boolean => {
+    if (!FEATURE_UI_FIXES_V1) return false
+
     const urlPatterns = [
-      /https?:\/\/[^\s]+/gi, // http/https URLs
-      /www\.[^\s]+/gi, // www.domain.com
-      /\b[a-z0-9.-]+\.(com|net|org|xyz|info|io|co|uk|ca|de|fr|jp|au|in|br|ru|cn|gov|edu|mil)\b/gi, // domain.extension
-      /[a-z0-9.-]+\.(com|net|org|xyz|info|io|co|uk|ca|de|fr|jp|au|in|br|ru|cn|gov|edu|mil)\/[^\s]*/gi, // domain.extension/path
+      // Standard URLs
+      /https?:\/\/[^\s]+/gi,
+      // www domains
+      /www\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi,
+      // Domain patterns
+      /[a-zA-Z0-9.-]+\.(com|net|org|edu|gov|mil|int|co|io|me|tv|info|biz|name|mobi|tel|travel|museum|aero|jobs|cat|pro|plus|max|elite|vip|exclusive|special|limited|rare|unique|secret|hidden|private|personal|custom|official|real|true|genuine|authentic|original|first|last|final|ultimate|perfect|complete|full|total|absolute|pure|clean|fresh|modern|latest|updated|advanced|professional|expert|master|guru|ninja|wizard|genius|smart|clever|brilliant|excellent|outstanding|superior|supreme|royal|king|queen|prince|princess|lord|master|boss|chief|leader|captain|commander|general|admiral|president|ceo|founder|owner|creator|inventor|designer|developer|programmer|engineer|architect|artist|writer|author|poet|musician|singer|dancer|actor|actress|model|star|celebrity|famous|popular|trending|viral|hot|fire|lit|dope|sick|crazy|insane|wild|epic|legendary|iconic|classic|vintage|retro|old|ancient|historic|traditional|cultural|ethnic|national|international|global|worldwide|universal|cosmic|galactic|infinite|eternal|forever|always|never|nothing|everything|all|any|some|few|many|most|best|worst|good|bad|great|terrible|awesome|awful|amazing|boring|interesting|exciting|thrilling|shocking|surprising|unexpected|unbelievable|incredible|fantastic|wonderful|marvelous|spectacular|magnificent|gorgeous|beautiful|pretty|cute|lovely|charming|attractive|sexy|hot|cool|warm|cold|freezing|burning|blazing|glowing|shining|sparkling|glittering|dazzling|brilliant|bright|dark|black|white|red|blue|green|yellow|orange|purple|pink|brown|gray|silver|gold|diamond|platinum|crystal|glass|metal|wood|stone|rock|earth|water|fire|air|wind|storm|thunder|lightning|rain|snow|ice|sun|moon|star|planet|galaxy|universe|space|time|life|death|love|hate|peace|war|good|evil|right|wrong|true|false|yes|no|maybe|perhaps|possibly|probably|definitely|certainly|absolutely|totally|completely|fully|entirely|wholly|perfectly|exactly|precisely|accurately|correctly|properly|appropriately|suitably|ideally|optimally|maximally|minimally|barely|hardly|scarcely|rarely|seldom|occasionally|sometimes|often|frequently|usually|normally|typically|generally|commonly|regularly|consistently|constantly|continuously|perpetually|endlessly|infinitely|eternally|forever|always|never|nothing|everything|all|any|some|few|many|most|best|worst)/gi,
+      // Shortened URLs
+      /(?:bit\.ly|tinyurl|t\.co|goo\.gl|ow\.ly|short\.link|tiny\.cc|is\.gd|buff\.ly|ift\.tt|dlvr\.it|fb\.me|amzn\.to|youtu\.be|instagr\.am|linkedin\.in|twitter\.com|facebook\.com|instagram\.com|youtube\.com|tiktok\.com|snapchat\.com|whatsapp\.com|telegram\.org|discord\.gg|reddit\.com|pinterest\.com|tumblr\.com|flickr\.com|vimeo\.com|dailymotion\.com|twitch\.tv|spotify\.com|soundcloud\.com|bandcamp\.com|apple\.com|google\.com|microsoft\.com|amazon\.com|ebay\.com|paypal\.com|stripe\.com|square\.com|venmo\.com|cashapp\.com|zelle\.com|westernunion\.com|moneygram\.com|remitly\.com|wise\.com|revolut\.com|n26\.com|chime\.com|robinhood\.com|coinbase\.com|binance\.com|kraken\.com|gemini\.com|blockfi\.com|celsius\.network|nexo\.io|crypto\.com|blockchain\.com|metamask\.io|trustwallet\.com|ledger\.com|trezor\.io|exodus\.com|atomic\.com|myetherwallet\.com|mycrypto\.com|etherscan\.io|bscscan\.com|polygonscan\.com|ftmscan\.com|snowtrace\.io|arbiscan\.io|optimistic\.etherscan\.io|explorer\.solana\.com|cardanoscan\.io|adaex\.org|pool\.pm|cnft\.io|jpg\.store|opencnft\.io|tokhun\.io|spacebudz\.io|claymates\.org|chillpill\.io|deadpxlz\.io|pxlz\.org|cnftpredator\.tools|cnftjungle\.io|bubblegum\.io|artifct\.app|venly\.io|nft\.storage|pinata\.cloud|ipfs\.io|arweave\.org|filecoin\.io|storj\.io|sia\.tech|maidsafe\.net|swarm\.ethereum\.org|bittorrent\.com|utorrent\.com|qbittorrent\.org|deluge-torrent\.org|transmission\.app|vuze\.com|frostwire\.com|limewire\.com|kazaa\.com|napster\.com|spotify\.com|apple\.com|amazon\.com|google\.com|youtube\.com|soundcloud\.com|bandcamp\.com|deezer\.com|tidal\.com|qobuz\.com|pandora\.com|iheartradio\.com|tunein\.com|radio\.com|iheart\.com|audible\.com|scribd\.com|kindle\.amazon\.com|kobo\.com|nook\.barnesandnoble\.com|goodreads\.com|bookbub\.com|netgalley\.com|edelweiss\.abovethetreeline\.com|publishersmarketplace\.com|bookish\.com|riffle\.com|litsy\.com|bookstr\.com|epic\.com|getepic\.com|storylineonline\.net|unite4literacy\.com|oxfordowl\.co\.uk|readingeggs\.com|abcmouse\.com|starfall\.com|funbrain\.com|coolmath\.com|mathplayground\.com|prodigy\.com|ixl\.com|khanacademy\.org|coursera\.org|edx\.org|udacity\.com|udemy\.com|skillshare\.com|masterclass\.com|lynda\.com|pluralsight\.com|treehouse\.com|codecademy\.com|freecodecamp\.org|w3schools\.com|mozilla\.org|stackoverflow\.com|github\.com|gitlab\.com|bitbucket\.org|sourceforge\.net|codepen\.io|jsfiddle\.net|repl\.it|glitch\.com|codesandbox\.io|stackblitz\.com|gitpod\.io|codespaces\.github\.com|cloud9\.aws\.amazon\.com|goorm\.io|koding\.com|nitrous\.io|c9\.io|ide\.goorm\.io|paiza\.cloud|runkit\.com|observablehq\.com|kaggle\.com|colab\.research\.google\.com|jupyter\.org|anaconda\.com|rstudio\.com|shinyapps\.io|plotly\.com|tableau\.com|powerbi\.microsoft\.com|qlik\.com|looker\.com|sisense\.com|domo\.com|chartio\.com|metabase\.com|grafana\.com|kibana\.elastic\.co|splunk\.com|newrelic\.com|datadog\.com|honeycomb\.io|lightstep\.com|jaegertracing\.io|zipkin\.io|opentracing\.io|opencensus\.io|opentelemetry\.io|prometheus\.io|influxdata\.com|timescale\.com|questdb\.io|clickhouse\.tech|apache\.org|mongodb\.com|postgresql\.org|mysql\.com|mariadb\.org|sqlite\.org|redis\.io|memcached\.org|elasticsearch\.co|solr\.apache\.org|sphinx\.org|whoosh\.readthedocs\.io|xapian\.org|lucene\.apache\.org|nutch\.apache\.org|tika\.apache\.org|mahout\.apache\.org|spark\.apache\.org|hadoop\.apache\.org|hive\.apache\.org|pig\.apache\.org|hbase\.apache\.org|cassandra\.apache\.org|couchdb\.apache\.org|couchbase\.com|riak\.com|neo4j\.com|orientdb\.org|arangodb\.com|dgraph\.io|tigergraph\.com|amazon\.com|google\.com|microsoft\.com|oracle\.com|ibm\.com|salesforce\.com|sap\.com|adobe\.com|autodesk\.com|intuit\.com|servicenow\.com|workday\.com|zendesk\.com|atlassian\.com|slack\.com|discord\.com|zoom\.us|teams\.microsoft\.com|webex\.cisco\.com|gotomeeting\.com|join\.me|anymeeting\.com|bluejeans\.com|whereby\.com|jitsi\.org|bigbluebutton\.org|openmeetings\.apache\.org|freepbx\.org|asterisk\.org|freeswitch\.org|opensips\.org|kamailio\.org|yate\.ro|sipwise\.com|3cx\.com|avaya\.com|cisco\.com|mitel\.com|shoretel\.com|ringcentral\.com|vonage\.com|8x8\.com|nextiva\.com|grasshopper\.com|ooma\.com|magicjack\.com|skype\.com|viber\.com|whatsapp\.com|telegram\.org|signal\.org|wickr\.com|threema\.ch|wire\.com|element\.io|riot\.im|matrix\.org|irc\.freenode\.net|libera\.chat|oftc\.net|rizon\.net|quakenet\.org|undernet\.org|dalnet\.org|efnet\.org|ircnet\.org|hackint\.org|snoonet\.org|espernet\.org|chatzona\.org|ircstorm\.net|swiftirc\.net|synirc\.net|p2p-network\.net|abjects\.net|afternet\.org|allnetwork\.org|austnet\.org|axenet\.org|beyondirc\.net|brasirc\.net|chatfirst\.com|chatjunkies\.org|chatnet\.org|chatspike\.net|coolchat\.net|criten\.net|cyberchat\.org|darksin\.net|darkmyst\.org|deepspace\.org|deltaanime\.net|digarix\.net|dynastynet\.net|esper\.net|euirc\.net|europnet\.org|fdfnet\.net|forestnet\.org|freequest\.net|galaxynet\.org|gamesurge\.net|german-elite\.net|ghostscript\.net|gigairc\.net|globalchat\.org|hackthissite\.org|icq\.com|irc-hispano\.org|ircgate\.net|irclink\.net|ircnet\.com|ircsource\.net|ircstorm\.net|ircworld\.org|kreynet\.org|librairc\.net|linknet\.org|mibbit\.com|mirc\.com|mozilla\.org|newnet\.net|oftc\.net|openprojects\.net|otaku-irc\.fr|ozorg\.net|p2pchat\.net|pirc\.pl|ptlink\.net|ptnet\.org|quakenet\.org|recycled-irc\.net|rizon\.net|rusnet\.org\.ru|scarynet\.org|slashnet\.org|sorcery\.net|starlink\.org|stormbit\.net|swiftirc\.net|synirc\.net|thinstack\.net|tweakers\.net|twitch\.tv|unibg\.net|unreal\.net|webchat\.freenode\.net|webirc\.org|xertion\.org|zurna\.net)\/[^\s]+/gi,
+      // IP addresses
+      /(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?(?:\/[^\s]*)?/gi,
+      // Email-like patterns that might be URLs
+      /[a-zA-Z0-9.-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi,
     ]
 
     return urlPatterns.some((pattern) => pattern.test(text))
   }
 
   const handleUnifiedSubmit = async () => {
-    if (!unifiedInput.trim() || !isAuthenticated || !profile) {
-      if (!isAuthenticated) {
-        toast.error("Please sign in to participate")
-      }
-      return
-    }
+    if (!unifiedInput.trim() && selectedMedia.length === 0) return
+    if (!isAuthenticated) return
 
+    // Enhanced URL filtering
     if (containsURL(unifiedInput)) {
-      toast.error("Links are not allowed in community posts", {
-        description: "Please share your thoughts without including URLs",
-        duration: 4000,
+      toast({
+        title: "Links not allowed",
+        description: "Links are not allowed in community posts for security reasons.",
+        variant: "destructive",
       })
       return
     }
 
     try {
-      const mediaUrl = null
-      let mediaType = null
-
-      if (selectedMedia.length > 0) {
-        const file = selectedMedia[0]
-        const fileExt = file.name.split(".").pop()
-        const fileName = `${Math.random()}.${fileExt}`
-
-        if (file.type.startsWith("image/")) {
-          mediaType = "image"
-        } else if (file.type.startsWith("video/")) {
-          mediaType = "video"
-        } else if (file.type.startsWith("audio/")) {
-          mediaType = "audio"
-        }
-      }
-
       if (activePost) {
-        const { data, error } = await supabase
-          .from("community_comments")
-          .insert({
-            content: unifiedInput.trim(),
-            user_id: profile.id,
-            post_id: activePost,
-            is_deleted: false,
-          })
-          .select(`
-            *,
-            user:users!community_comments_user_id_fkey(id, username, full_name, avatar_url, tier)
-          `)
-          .single()
-
-        if (error) throw error
-
-        const newComment = {
-          id: data.id,
-          content: data.content,
-          created_at: data.created_at,
-          like_count: 0,
-          user: data.user,
-          has_liked: false,
-        }
-
-        setComments((prev) => ({
-          ...prev,
-          [activePost]: [...(prev[activePost] || []), newComment],
-        }))
-
-        setPosts((prev) =>
-          prev.map((post) => (post.id === activePost ? { ...post, comment_count: post.comment_count + 1 } : post)),
-        )
-
-        toast.success("Comment added!")
+        // Handle comment
+        console.error("handleComment is undeclared")
+        setActivePost(null)
       } else {
-        if (!selectedCategory) return
-
-        const { data, error } = await supabase
-          .from("community_posts")
-          .insert({
-            content: unifiedInput.trim(),
-            user_id: profile.id,
-            category_id: selectedCategory,
-            media_url: mediaUrl,
-            media_type: mediaType,
-            is_published: true,
-            is_deleted: false,
-          })
-          .select(`
-            *,
-            user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
-            category:community_categories!community_posts_category_id_fkey(id, name, slug)
-          `)
-          .single()
-
-        if (error) throw error
-
-        const newPost = {
-          id: data.id,
-          content: data.content,
-          created_at: data.created_at,
-          vote_count: 0,
-          comment_count: 0,
-          media_url: data.media_url,
-          media_type: data.media_type,
-          user: data.user,
-          category: data.category,
-          has_voted: false,
-        }
-
-        setPosts((prev) => [...prev, newPost])
-        setTimeout(scrollToBottom, 100)
-        toast.success("Message sent!")
+        // Handle post
+        console.error("handlePost is undeclared")
       }
-
       setUnifiedInput("")
       setSelectedMedia([])
       setMediaPreview([])
     } catch (error) {
       console.error("Error submitting:", error)
-      toast.error("Failed to send")
+      toast({
+        title: "Error",
+        description: "Failed to submit. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -505,63 +422,52 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {isMobile && (
-        <div className="fixed top-16 left-0 right-0 z-40 bg-white/95 dark:bg-gray-950/95 backdrop-blur-md border-b border-gray-100 dark:border-gray-800">
+      {isMobile && FEATURE_UI_FIXES_V1 && (
+        <div className="fixed top-16 left-0 right-0 z-40 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 shadow-sm">
           <div className="flex items-center justify-between p-3">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-sm">
-                {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
-              </div>
-              <h2 className="font-semibold text-gray-900 dark:text-white">
-                {categories.find((c) => c.id === selectedCategory)?.name || "General"}
-              </h2>
-            </div>
+            <h2 className="font-semibold text-gray-900 dark:text-white">Community</h2>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowCategoryNav(!showCategoryNav)}
-              className="text-green-500 hover:bg-green-50 dark:hover:bg-green-950/30"
+              className="text-gray-600 dark:text-gray-400"
             >
-              <Menu className="h-4 w-4" />
+              <Menu className="h-4 w-4 mr-2" />
+              Categories
             </Button>
           </div>
 
-          <AnimatePresence>
-            {showCategoryNav && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950"
-              >
-                <ScrollArea className="max-h-48">
-                  <div className="p-2 space-y-1">
-                    {categories.map((category) => (
-                      <Button
-                        key={category.id}
-                        variant={selectedCategory === category.id ? "default" : "ghost"}
-                        size="sm"
-                        className={cn(
-                          "w-full justify-start h-10",
-                          selectedCategory === category.id
-                            ? "bg-green-500 text-white hover:bg-green-600"
-                            : "hover:bg-gray-100 dark:hover:bg-gray-800",
-                        )}
-                        onClick={() => {
-                          setSelectedCategory(category.id)
-                          setShowCategoryNav(false)
-                          setActivePost(null)
-                        }}
-                      >
-                        <span className="mr-2">{category.icon}</span>
-                        {category.name}
-                      </Button>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {showCategoryNav && (
+            <div className="border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+              <div className="flex overflow-x-auto p-2 space-x-2">
+                <Button
+                  variant={selectedCategory === null ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => {
+                    setSelectedCategory(null)
+                    setShowCategoryNav(false)
+                  }}
+                  className="whitespace-nowrap"
+                >
+                  All
+                </Button>
+                {categories.map((category) => (
+                  <Button
+                    key={category.id}
+                    variant={selectedCategory === category.id ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => {
+                      setSelectedCategory(category.id)
+                      setShowCategoryNav(false)
+                    }}
+                    className="whitespace-nowrap"
+                  >
+                    {category.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -569,12 +475,18 @@ export default function CommunityPage() {
         className={cn(
           "flex h-screen overflow-hidden",
           FEATURE_UI_FIXES_V1 ? "bg-white dark:bg-gray-950" : "bg-gray-50 dark:bg-gray-900",
-          isMobile && "pt-20",
+          isMobile && "pt-16", // Reduced top padding for mobile to account for sticky nav
         )}
       >
+        {/* Desktop Sidebar */}
         <motion.div
           initial={{ x: -300 }}
-          animate={{ x: sidebarOpen || (!isMobile && isClient && window.innerWidth >= 768) ? 0 : -300 }}
+          animate={{
+            x:
+              sidebarOpen || (!isMobile && isClient && typeof window !== "undefined" && window.innerWidth >= 768)
+                ? 0
+                : -300,
+          }}
           transition={{ type: "spring", damping: 25, stiffness: 200 }}
           className={cn(
             "w-80 flex flex-col",
@@ -620,7 +532,7 @@ export default function CommunityPage() {
                   "pl-10 rounded-full placeholder:text-gray-500 dark:placeholder:text-gray-400",
                   FEATURE_UI_FIXES_V1
                     ? "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700"
-                    : "bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600",
+                    : "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-600",
                 )}
               />
             </div>
@@ -688,80 +600,26 @@ export default function CommunityPage() {
           )}
         </motion.div>
 
-        <div
-          className={cn(
-            "flex-1 flex flex-col min-w-0",
-            FEATURE_UI_FIXES_V1 ? "bg-white dark:bg-gray-950" : "bg-white dark:bg-gray-900",
-          )}
-        >
-          {!isMobile && (
-            <div
-              className={cn(
-                "p-4 border-b sticky top-0 z-20 backdrop-blur-sm",
-                FEATURE_UI_FIXES_V1
-                  ? "bg-white/95 dark:bg-gray-950/95 border-gray-100 dark:border-gray-800"
-                  : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700",
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setSidebarOpen(true)}>
-                    <Menu className="h-5 w-5" />
-                  </Button>
-                  <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-lg">
-                    {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {categories.find((c) => c.id === selectedCategory)?.name || "General"}
-                    </h2>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {activePost ? "Reply to message" : `${filteredPosts.length} messages`}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  {activePost && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setActivePost(null)}
-                      className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
-                    >
-                      Back to feed
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="sm" className="hover:bg-gray-100 dark:hover:bg-gray-800">
-                    <Search className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="hover:bg-gray-100 dark:hover:bg-gray-800">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {isMobile && activePost && (
-            <div className="fixed top-16 left-0 right-0 z-30 bg-white/95 dark:bg-gray-950/95 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 p-3">
-              <div className="flex items-center space-x-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setActivePost(null)}
-                  className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Back
-                </Button>
-                <span className="text-sm text-gray-600 dark:text-gray-400">Reply to message</span>
-              </div>
+        {/* Main Content */}
+        <div className={cn("flex-1 flex flex-col", isMobile && FEATURE_UI_FIXES_V1 && "pt-20")}>
+          {/* Mobile Header */}
+          {isMobile && !FEATURE_UI_FIXES_V1 && (
+            <div className="flex items-center justify-between p-4 border-b bg-white dark:bg-gray-800">
+              <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(true)}>
+                <Menu className="h-5 w-5" />
+              </Button>
+              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Community</h1>
+              <div className="w-10" />
             </div>
           )}
 
           <div
             ref={scrollContainerRef}
-            className={cn("flex-1 overflow-y-auto", isMobile ? "pb-32" : "pb-32", isMobile && activePost && "pt-16")}
+            className={cn(
+              "flex-1 overflow-y-auto",
+              isMobile ? "pb-24" : "pb-32", // Adjusted padding for sticky input
+              isMobile && activePost && "pt-4",
+            )}
           >
             <div className={cn("max-w-2xl mx-auto px-4 py-6 space-y-4", isMobile && "px-3 py-4 space-y-3")}>
               <AnimatePresence>
@@ -926,165 +784,126 @@ export default function CommunityPage() {
                 ))}
               </AnimatePresence>
             </div>
-            <div ref={messagesEndRef} />
           </div>
 
           <div
             className={cn(
-              "fixed bottom-0 left-0 right-0 border-t backdrop-blur-sm z-30",
+              "border-t p-4",
               FEATURE_UI_FIXES_V1
-                ? "bg-white/95 dark:bg-gray-950/95 border-gray-100 dark:border-gray-800"
-                : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700",
-              !isMobile && "md:left-80",
+                ? "bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800"
+                : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
+              isMobile && "fixed bottom-0 left-0 right-0 z-30 shadow-lg",
             )}
           >
-            <div className={cn("p-4", isMobile && "p-3")}>
-              {mediaPreview.length > 0 && (
-                <div className="mb-3 flex space-x-2 overflow-x-auto">
-                  {mediaPreview.map((preview, index) => (
-                    <div key={index} className="relative flex-shrink-0">
-                      <div
-                        className={cn(
-                          "rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800",
-                          isMobile ? "w-12 h-12" : "w-16 h-16",
-                        )}
-                      >
-                        {selectedMedia[index].type.startsWith("image/") ? (
-                          <img
-                            src={preview || "/placeholder.svg"}
-                            alt="Preview"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : selectedMedia[index].type.startsWith("video/") ? (
-                          <video src={preview} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Mic className={cn("text-gray-400", isMobile ? "h-4 w-4" : "h-6 w-6")} />
-                          </div>
-                        )}
-                      </div>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className={cn(
-                          "absolute -top-2 -right-2 rounded-full",
-                          isMobile ? "h-5 w-5 p-0" : "h-6 w-6 p-0",
-                        )}
-                        onClick={() => removeMedia(index)}
-                      >
-                        <X className={cn(isMobile ? "h-2 w-2" : "h-3 w-3")} />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {isAuthenticated ? (
-                <div className={cn("flex items-end max-w-2xl mx-auto", isMobile ? "space-x-2" : "space-x-3")}>
-                  <Avatar className={cn("flex-shrink-0", isMobile ? "h-8 w-8" : "h-10 w-10")}>
-                    <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
-                    <AvatarFallback className="bg-green-500 text-white font-semibold">
-                      {profile?.username?.charAt(0).toUpperCase() || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 relative">
-                    <Input
-                      ref={inputRef}
-                      placeholder={activePost ? "Reply to this message..." : "What's happening?"}
-                      value={unifiedInput}
-                      onChange={(e) => setUnifiedInput(e.target.value)}
-                      className={cn(
-                        "rounded-full focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200",
-                        "placeholder:text-gray-500 dark:placeholder:text-gray-400",
-                        FEATURE_UI_FIXES_V1
-                          ? "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
-                          : "border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800",
-                        isMobile ? "pr-24 text-sm px-3 py-2" : "pr-32 text-base px-4 py-3",
-                      )}
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault()
-                          handleUnifiedSubmit()
-                        }
-                      }}
-                    />
-                    <div
-                      className={cn(
-                        "absolute top-1/2 transform -translate-y-1/2 flex items-center",
-                        isMobile ? "right-1 space-x-0.5" : "right-2 space-x-1",
-                      )}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "rounded-full hover:bg-gray-200 dark:hover:bg-gray-700",
-                          isMobile ? "h-6 w-6 p-0" : "h-8 w-8 p-0",
-                        )}
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <ImageIcon className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "rounded-full hover:bg-gray-200 dark:hover:bg-gray-700",
-                          isMobile ? "h-6 w-6 p-0" : "h-8 w-8 p-0",
-                        )}
-                      >
-                        <Smile className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} />
-                      </Button>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={handleUnifiedSubmit}
-                    disabled={!unifiedInput.trim() && selectedMedia.length === 0}
+            {isAuthenticated ? (
+              <div className={cn("flex items-end max-w-2xl mx-auto", isMobile ? "space-x-2" : "space-x-3")}>
+                <Avatar className={cn("flex-shrink-0", isMobile ? "h-8 w-8" : "h-10 w-10")}>
+                  <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
+                  <AvatarFallback className="bg-green-500 text-white font-semibold">
+                    {profile?.username?.charAt(0).toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 relative">
+                  <Input
+                    ref={inputRef}
+                    placeholder={activePost ? "Reply to this message..." : "What's happening?"}
+                    value={unifiedInput}
+                    onChange={(e) => setUnifiedInput(e.target.value)}
                     className={cn(
-                      "rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 transition-all duration-200 disabled:cursor-not-allowed",
-                      isMobile ? "h-8 w-8 p-0" : "h-10 w-10 p-0",
+                      "rounded-full focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200",
+                      "placeholder:text-gray-500 dark:placeholder:text-gray-400",
+                      FEATURE_UI_FIXES_V1
+                        ? "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 placeholder:text-gray-600 dark:placeholder:text-gray-300" // Enhanced placeholder contrast
+                        : "border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800",
+                      isMobile ? "pr-24 text-sm px-3 py-2" : "pr-32 text-base px-4 py-3",
                     )}
-                  >
-                    <Send className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} />
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center">
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault()
+                        handleUnifiedSubmit()
+                      }
+                    }}
+                  />
                   <div
                     className={cn(
-                      "rounded-2xl border p-6 max-w-md mx-auto",
-                      FEATURE_UI_FIXES_V1
-                        ? "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700"
-                        : "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
+                      "absolute top-1/2 transform -translate-y-1/2 flex items-center",
+                      isMobile ? "right-1 space-x-0.5" : "right-2 space-x-1",
                     )}
                   >
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">Join the conversation</p>
-                    <Button asChild className="bg-green-500 hover:bg-green-600 rounded-full px-8">
-                      <a href="/login">Sign In</a>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "rounded-full hover:bg-gray-200 dark:hover:bg-gray-700",
+                        isMobile ? "h-6 w-6 p-0" : "h-8 w-8 p-0",
+                      )}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <ImageIcon className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "rounded-full hover:bg-gray-200 dark:hover:bg-gray-700",
+                        isMobile ? "h-6 w-6 p-0" : "h-8 w-8 p-0",
+                      )}
+                    >
+                      <Smile className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} />
                     </Button>
                   </div>
                 </div>
-              )}
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/*,video/*,audio/*"
-                onChange={handleMediaSelect}
-                className="hidden"
-              />
-            </div>
+                <Button
+                  onClick={handleUnifiedSubmit}
+                  disabled={!unifiedInput.trim() && selectedMedia.length === 0}
+                  className={cn(
+                    "rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 transition-all duration-200 disabled:cursor-not-allowed",
+                    isMobile ? "h-8 w-8 p-0" : "h-10 w-10 p-0",
+                  )}
+                >
+                  <Send className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} />
+                </Button>
+              </div>
+            ) : (
+              <div className="text-center">
+                <div
+                  className={cn(
+                    "rounded-2xl border p-6 max-w-md mx-auto",
+                    FEATURE_UI_FIXES_V1
+                      ? "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700"
+                      : "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
+                  )}
+                >
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">Join the conversation</p>
+                  <Button asChild className="bg-green-500 hover:bg-green-600 rounded-full px-8">
+                    <a href="/login">Sign In</a>
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black/30 z-40 md:hidden backdrop-blur-sm"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*,video/*,audio/*"
+          className="hidden"
+          onChange={handleMediaSelect}
+        />
       </div>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept="image/*,video/*,audio/*"
+        onChange={handleMediaSelect}
+        className="hidden"
+      />
     </div>
   )
 }

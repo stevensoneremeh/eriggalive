@@ -205,7 +205,7 @@ export default function EventPaymentPage() {
 
   const displayTitle = eventData?.title || "ERIGGA Live - Intimate Session"
   const displayVenue = eventData?.venue || "Uncle Jaffi at The Playground, Warri"
-  const displayPrice = 20000
+  const displayPrice = eventData?.ticket_price_naira || 20000
   const displayCoins = TICKET_PRICE_COINS
 
   return (
@@ -259,10 +259,13 @@ export default function EventPaymentPage() {
               <p className="text-gray-400">{displayVenue}</p>
             </CardHeader>
             <CardContent className="text-center">
-              <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500 mb-2">
-                ₦{displayPrice.toLocaleString()}
+              <div className="space-y-2">
+                <div className="text-lg text-gray-400 line-through">₦50,000</div>
+                <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500">
+                  ₦{displayPrice.toLocaleString()}
+                </div>
               </div>
-              <p className="text-gray-400">Premium Access Ticket</p>
+              <p className="text-gray-400 mt-2">Premium Access Ticket</p>
             </CardContent>
           </Card>
         </motion.div>
