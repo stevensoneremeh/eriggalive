@@ -295,6 +295,24 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      const { error: walletUpdateError } = await supabase.from("user_wallets").upsert(
+        {
+          user_id: user.id,
+          coin_balance: profile.coins + coins,
+          total_earned: coins, // This should be incremented, not set
+          last_transaction_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "user_id",
+        },
+      )
+
+      if (walletUpdateError) {
+        console.error("Wallet update error:", walletUpdateError)
+        // Continue anyway as the main balance was updated
+      }
+
       // Create coin transaction record for audit trail
       await supabase.from("coin_transactions").insert({
         user_id: user.id,

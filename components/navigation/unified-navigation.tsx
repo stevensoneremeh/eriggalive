@@ -38,11 +38,13 @@ import {
   Monitor,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { useWallet } from "@/contexts/wallet-context"
 import { useTheme } from "@/contexts/theme-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import { useUserBalance } from "@/hooks/useUserBalance"
+
+const FEATURE_UI_FIXES_V1 = process.env.NEXT_PUBLIC_FEATURE_UI_FIXES_V1 === "true"
 
 const navigationItems = [
   { name: "Home", href: "/", icon: Home },
@@ -64,8 +66,8 @@ const navigationItems = [
 
 export function UnifiedNavigation() {
   const { user, profile, signOut } = useAuth()
-  const { balance } = useWallet()
   const { theme, setTheme, resolvedTheme } = useTheme()
+  const { formattedBalance, isRealtime } = useUserBalance() // Use formatted balance from hook
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
@@ -165,20 +167,14 @@ export function UnifiedNavigation() {
         categoryId: category.id,
       }))
 
-      const baseItems = [navigationItems[0]] // Home only
-      const authItems = user ? [] : [navigationItems[14]] // About for non-authenticated users
-
-      return [...baseItems, ...communityNavItems, ...authItems]
+      return [
+        navigationItems[0], // Home
+        ...communityNavItems,
+        ...(user ? [navigationItems[6], navigationItems[12]] : [navigationItems[14]]), // Dashboard/Wallet or About
+      ]
     }
 
-    const filteredItems = navigationItems.filter((item) => {
-      if (typeof window !== "undefined" && window.innerWidth < 768) {
-        return item.name !== "Dashboard" && item.name !== "Wallet"
-      }
-      return true
-    })
-
-    return filteredItems
+    return navigationItems
   }
 
   return (
@@ -226,12 +222,21 @@ export function UnifiedNavigation() {
           <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4 flex-shrink-0">
             {user ? (
               <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3">
-                {balance !== undefined && (
-                  <div className="hidden sm:flex items-center space-x-1 bg-yellow-100 dark:bg-yellow-900/20 px-2 md:px-3 py-1 rounded-full">
+                {profile?.coins !== undefined && (
+                  <div
+                    className={cn(
+                      "hidden sm:flex items-center space-x-1 px-2 md:px-3 py-1 rounded-full transition-all duration-200",
+                      "bg-yellow-100 dark:bg-yellow-900/20",
+                      isRealtime && FEATURE_UI_FIXES_V1 && "ring-1 ring-yellow-300 dark:ring-yellow-700", // Visual indicator for real-time updates
+                    )}
+                  >
                     <Coins className="h-3 w-3 md:h-4 md:w-4 text-yellow-600" />
                     <span className="text-xs md:text-sm font-medium text-yellow-700 dark:text-yellow-400">
-                      {balance.toLocaleString()}
+                      {formattedBalance} {/* Use formatted balance */}
                     </span>
+                    {isRealtime && FEATURE_UI_FIXES_V1 && (
+                      <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" /> // Real-time indicator dot
+                    )}
                   </div>
                 )}
 
@@ -347,12 +352,20 @@ export function UnifiedNavigation() {
                               {profile.tier.replace("_", " ").toUpperCase()}
                             </Badge>
                           )}
-                          {balance !== undefined && (
-                            <div className="flex items-center space-x-1 text-xs bg-yellow-100 dark:bg-yellow-900/20 px-2 py-0.5 rounded-full">
+                          {profile?.coins !== undefined && (
+                            <div
+                              className={cn(
+                                "flex items-center space-x-1 text-xs bg-yellow-100 dark:bg-yellow-900/20 px-2 py-0.5 rounded-full transition-all duration-200",
+                                isRealtime && FEATURE_UI_FIXES_V1 && "ring-1 ring-yellow-300 dark:ring-yellow-700", // Visual indicator for real-time updates
+                              )}
+                            >
                               <Coins className="h-3 w-3 text-yellow-600" />
                               <span className="font-medium text-yellow-700 dark:text-yellow-400">
-                                {balance.toLocaleString()}
+                                {formattedBalance} {/* Use formatted balance */}
                               </span>
+                              {isRealtime && FEATURE_UI_FIXES_V1 && (
+                                <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" /> // Real-time indicator dot
+                              )}
                             </div>
                           )}
                         </div>
@@ -376,8 +389,7 @@ export function UnifiedNavigation() {
                             className={cn(
                               "w-full justify-start h-11 transition-all duration-200",
                               isActive ? "bg-lime-500 text-teal-900 hover:bg-lime-600 shadow-sm" : "hover:bg-accent/50",
-                              item.isCommunityCategory &&
-                                "ml-4 text-sm border-l-2 border-blue-200 dark:border-blue-800",
+                              item.isCommunityCategory && "ml-4 text-sm",
                             )}
                             onClick={() => setIsOpen(false)}
                           >
@@ -385,9 +397,7 @@ export function UnifiedNavigation() {
                               <item.icon className="h-5 w-5 flex-shrink-0" />
                               <span className="font-medium">{item.name}</span>
                               {item.isCommunityCategory && (
-                                <span className="text-xs opacity-60 bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded-full">
-                                  #{item.name.toLowerCase()}
-                                </span>
+                                <span className="text-xs opacity-60">#{item.name.toLowerCase()}</span>
                               )}
                             </Link>
                           </Button>
@@ -400,23 +410,59 @@ export function UnifiedNavigation() {
                   <div className="p-4 border-t">
                     {user ? (
                       <div className="space-y-2">
-                        <Button asChild variant="outline" className="w-full justify-start bg-transparent">
-                          <Link href="/profile" onClick={() => setIsOpen(false)}>
-                            <Settings className="mr-2 h-4 w-4" />
-                            Settings
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-red-600 hover:text-red-600 bg-transparent border-red-200 hover:bg-red-50 dark:hover:bg-red-950"
-                          onClick={() => {
-                            handleSignOut()
-                            setIsOpen(false)
-                          }}
-                        >
-                          <LogOut className="mr-2 h-4 w-4" />
-                          Sign Out
-                        </Button>
+                        {FEATURE_UI_FIXES_V1 ? (
+                          <>
+                            <Button asChild variant="outline" className="w-full justify-start bg-transparent">
+                              <Link href="/profile" onClick={() => setIsOpen(false)}>
+                                <Settings className="mr-2 h-4 w-4" />
+                                Settings
+                              </Link>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start text-red-600 hover:text-red-600 bg-transparent border-red-200 hover:bg-red-50 dark:hover:bg-red-950"
+                              onClick={() => {
+                                handleSignOut()
+                                setIsOpen(false)
+                              }}
+                            >
+                              <LogOut className="mr-2 h-4 w-4" />
+                              Sign Out
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button asChild variant="outline" className="w-full justify-start bg-transparent">
+                              <Link href="/dashboard" onClick={() => setIsOpen(false)}>
+                                <User className="mr-2 h-4 w-4" />
+                                Dashboard
+                              </Link>
+                            </Button>
+                            <Button asChild variant="outline" className="w-full justify-start bg-transparent">
+                              <Link href="/wallet" onClick={() => setIsOpen(false)}>
+                                <Wallet className="mr-2 h-4 w-4" />
+                                Wallet
+                              </Link>
+                            </Button>
+                            <Button asChild variant="outline" className="w-full justify-start bg-transparent">
+                              <Link href="/profile" onClick={() => setIsOpen(false)}>
+                                <Settings className="mr-2 h-4 w-4" />
+                                Settings
+                              </Link>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start text-red-600 hover:text-red-600 bg-transparent border-red-200 hover:bg-red-50 dark:hover:bg-red-950"
+                              onClick={() => {
+                                handleSignOut()
+                                setIsOpen(false)
+                              }}
+                            >
+                              <LogOut className="mr-2 h-4 w-4" />
+                              Log out
+                            </Button>
+                          </>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-2">

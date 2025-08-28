@@ -12,6 +12,7 @@ import {
   SkipForward,
   SkipBack,
   Radio,
+  Users,
   MessageCircle,
   Heart,
   Flame,
@@ -622,260 +623,304 @@ export default function RadioPage() {
                   </motion.div>
                 </div>
 
-                {/* Track Info */}
-                <div className="text-center mb-8">
-                  <h2 className={cn("text-2xl font-bold mb-2", theme === "dark" ? "text-white" : "text-gray-900")}>
-                    {currentTrack?.title || "Select a mood to start"}
-                  </h2>
-                  <p className={cn("text-lg", theme === "dark" ? "text-white/70" : "text-gray-600")}>
-                    {currentTrack?.artist || "Erigga Radio"}
-                  </p>
-                  <Badge className={cn("mt-2", selectedMoodData.color)}>
-                    {selectedMoodData.name} {selectedMoodData.emoji}
-                  </Badge>
-                </div>
+                {/* Beat Visualizer */}
+                {isPlaying && (
+                  <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-2">
+                    {[...Array(7)].map((_, i) => (
+                      <motion.div
+                        key={i}
+                        className={cn(
+                          "w-2 rounded-full",
+                          selectedMoodData.color.replace("from-", "bg-").replace("to-", ""),
+                        )}
+                        animate={
+                          prefersReducedMotion
+                            ? {}
+                            : {
+                                height: [8, 32, 8],
+                                opacity: [0.5, 1, 0.5],
+                              }
+                        }
+                        transition={{
+                          duration: 0.8,
+                          repeat: Number.POSITIVE_INFINITY,
+                          delay: i * 0.1,
+                          ease: "easeInOut",
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
 
-                {/* Controls */}
-                <div className="flex items-center justify-center space-x-6 mb-6">
-                  <Button
-                    variant="ghost"
-                    size="lg"
-                    className={cn(
-                      theme === "dark" ? "text-white hover:text-white/80" : "text-gray-700 hover:text-gray-900",
-                    )}
-                  >
-                    <SkipBack className="w-6 h-6" />
-                  </Button>
+              {/* Track Info */}
+              <div className="text-center mb-8">
+                <h2 className={cn("text-2xl font-bold mb-2", theme === "dark" ? "text-white" : "text-gray-900")}>
+                  {currentTrack?.title || "Select a mood to start"}
+                </h2>
+                <p className={cn("text-lg", theme === "dark" ? "text-white/70" : "text-gray-600")}>
+                  {currentTrack?.artist || "Erigga Radio"}
+                </p>
+                <Badge className={cn("mt-2", selectedMoodData.color)}>
+                  {selectedMoodData.name} {selectedMoodData.emoji}
+                </Badge>
+              </div>
 
-                  <Button
-                    size="lg"
-                    className={cn(
-                      "rounded-full w-16 h-16",
-                      theme === "dark"
-                        ? "bg-white text-black hover:bg-white/90"
-                        : "bg-gray-900 text-white hover:bg-gray-800",
-                    )}
-                    onClick={togglePlayPause}
-                  >
-                    {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
-                  </Button>
+              {/* Controls */}
+              <div className="flex items-center justify-center space-x-6 mb-6">
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className={cn(
+                    theme === "dark" ? "text-white hover:text-white/80" : "text-gray-700 hover:text-gray-900",
+                  )}
+                >
+                  <SkipBack className="w-6 h-6" />
+                </Button>
 
-                  <Button
-                    variant="ghost"
-                    size="lg"
-                    className={cn(
-                      theme === "dark" ? "text-white hover:text-white/80" : "text-gray-700 hover:text-gray-900",
-                    )}
-                  >
-                    <SkipForward className="w-6 h-6" />
-                  </Button>
-                </div>
+                <Button
+                  size="lg"
+                  className={cn(
+                    "rounded-full w-16 h-16",
+                    theme === "dark"
+                      ? "bg-white text-black hover:bg-white/90"
+                      : "bg-gray-900 text-white hover:bg-gray-800",
+                  )}
+                  onClick={togglePlayPause}
+                >
+                  {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
+                </Button>
 
-                {/* Volume Control */}
-                <div className="flex items-center space-x-4">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsMuted(!isMuted)}
-                    className={cn(theme === "dark" ? "text-white" : "text-gray-700")}
-                  >
-                    {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                  </Button>
-                  <Slider
-                    value={[volume]}
-                    max={100}
-                    step={1}
-                    onValueChange={(value) => setVolume(value[0])}
-                    className="flex-1"
-                  />
-                  <span className={cn("text-sm w-12", theme === "dark" ? "text-white/70" : "text-gray-600")}>
-                    {volume}%
-                  </span>
-                </div>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className={cn(
+                    theme === "dark" ? "text-white hover:text-white/80" : "text-gray-700 hover:text-gray-900",
+                  )}
+                >
+                  <SkipForward className="w-6 h-6" />
+                </Button>
+              </div>
+
+              {/* Volume Control */}
+              <div className="flex items-center space-x-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsMuted(!isMuted)}
+                  className={cn(theme === "dark" ? "text-white" : "text-gray-700")}
+                >
+                  {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                </Button>
+                <Slider
+                  value={[volume]}
+                  max={100}
+                  step={1}
+                  onValueChange={(value) => setVolume(value[0])}
+                  className="flex-1"
+                />
+                <span className={cn("text-sm w-12", theme === "dark" ? "text-white/70" : "text-gray-600")}>
+                  {volume}%
+                </span>
               </div>
             </motion.div>
           </div>
 
-          {/* Enhanced Community Shout-outs Section */}
-          <div className="lg:col-span-1">
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Live Broadcast Card */}
             <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8 }}>
               <Card
                 className={cn(
-                  "relative overflow-hidden",
-                  theme === "dark"
-                    ? "glass-card border-2 border-purple-500/30 shadow-2xl shadow-purple-500/10"
-                    : "bg-white/95 backdrop-blur-md border-2 border-purple-200/50 shadow-xl shadow-purple-100/20",
+                  theme === "dark" ? "glass-card" : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg",
                 )}
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-purple-500/20 opacity-50 animate-pulse" />
-
-                <CardHeader className="relative z-10 pb-4">
+                <CardHeader>
                   <CardTitle
-                    className={cn(
-                      "flex items-center gap-3 text-xl font-bold",
-                      theme === "dark" ? "text-white" : "text-gray-900",
-                    )}
+                    className={cn("flex items-center gap-2", theme === "dark" ? "text-white" : "text-gray-900")}
                   >
-                    <div className="relative">
-                      <MessageCircle className="w-6 h-6" />
-                      {shoutouts.length > 0 && (
-                        <motion.div
-                          className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"
-                          animate={{ scale: [1, 1.2, 1] }}
-                          transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
-                        />
-                      )}
-                    </div>
-                    Fan Shout-outs
-                    {shoutouts.length > 0 && (
-                      <motion.div
-                        className="ml-auto bg-purple-500 text-white text-xs px-2 py-1 rounded-full font-bold"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", stiffness: 500 }}
-                      >
-                        {shoutouts.length}
-                      </motion.div>
-                    )}
+                    <Radio className="w-5 h-5" />
+                    Live Broadcast
                   </CardTitle>
-                  <p className={cn("text-sm", theme === "dark" ? "text-white/70" : "text-gray-600")}>
-                    Share your vibes with the community! 🎵
-                  </p>
                 </CardHeader>
-
-                <CardContent className="relative z-10 space-y-6">
-                  <div className="space-y-3">
-                    <div className="flex gap-2">
-                      <Input
-                        value={newShoutout}
-                        onChange={(e) => setNewShoutout(e.target.value)}
-                        placeholder="What's on your mind? Share your vibe..."
-                        className={cn(
-                          "flex-1 h-12 text-base",
-                          theme === "dark"
-                            ? "bg-white/10 border-white/30 text-white placeholder:text-white/60 focus:border-purple-400"
-                            : "bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-purple-400",
-                        )}
-                        onKeyPress={(e) => e.key === "Enter" && submitShoutout()}
-                        maxLength={200}
-                      />
-                      <Button
-                        onClick={submitShoutout}
-                        size="lg"
-                        className={cn(
-                          "px-6 h-12 font-semibold transition-all duration-200",
-                          theme === "dark"
-                            ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg shadow-purple-500/25"
-                            : "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg shadow-purple-500/25",
-                        )}
-                        disabled={!newShoutout.trim()}
-                      >
-                        <Send className="w-4 h-4 mr-2" />
-                        Send
-                      </Button>
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                      <div className={cn("text-xs", theme === "dark" ? "text-white/50" : "text-gray-500")}>
-                        💬 Your message will appear on the radio character!
-                      </div>
-                      <div
-                        className={cn(
-                          "text-xs font-medium",
-                          newShoutout.length > 180
-                            ? "text-red-500"
-                            : newShoutout.length > 150
-                              ? "text-yellow-500"
-                              : theme === "dark"
-                                ? "text-white/50"
-                                : "text-gray-500",
-                        )}
-                      >
-                        {newShoutout.length}/200
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-xl p-6 border border-purple-200/20">
-                    <div className="flex justify-center">
-                      <AnimatedRadioCharacter
-                        isPlaying={isPlaying}
-                        isLive={isLive}
-                        shoutouts={shoutouts}
-                        className="w-full"
-                      />
-                    </div>
-                    <div className="text-center mt-4">
-                      <p className={cn("text-sm font-medium", theme === "dark" ? "text-white/80" : "text-gray-700")}>
-                        {shoutouts.length > 0
-                          ? "Your messages are live on air! 📻"
-                          : "Be the first to send a shout-out! 🎤"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className={cn("font-semibold", theme === "dark" ? "text-white" : "text-gray-900")}>
-                        Recent Messages
-                      </h4>
-                      {shoutouts.length > 0 && (
+                <CardContent>
+                  {isLive ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
                         <motion.div
-                          className="text-xs text-purple-500 font-medium"
-                          animate={{ opacity: [0.5, 1, 0.5] }}
-                          transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
-                        >
-                          ● LIVE
-                        </motion.div>
-                      )}
+                          className="w-3 h-3 bg-red-500 rounded-full"
+                          animate={{ opacity: [1, 0.3, 1] }}
+                          transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY }}
+                        />
+                        <span className="text-white font-bold">LIVE NOW</span>
+                      </div>
+                      <p className={cn("text-white/90", theme === "dark" ? "text-white/90" : "text-gray-800")}>
+                        {liveTitle}
+                      </p>
+                      <div className="flex items-center gap-2 text-sm text-white/70">
+                        <Users className="w-4 h-4" />
+                        <span>{listenerCount} listeners</span>
+                      </div>
                     </div>
+                  ) : (
+                    <p className={cn("text-white/70", theme === "dark" ? "text-white/70" : "text-gray-600")}>
+                      No live broadcasts scheduled
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
 
-                    <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
-                      {shoutouts.length === 0 ? (
-                        <div
-                          className={cn(
-                            "text-center py-8 rounded-lg border-2 border-dashed",
-                            theme === "dark"
-                              ? "text-white/50 border-white/20 bg-white/5"
-                              : "text-gray-500 border-gray-300 bg-gray-50/50",
-                          )}
-                        >
-                          <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                          <p className="text-sm font-medium mb-1">No shout-outs yet!</p>
-                          <p className="text-xs">Be the first to share your vibe 🎵</p>
-                        </div>
-                      ) : (
-                        shoutouts.map((shoutout, index) => (
-                          <motion.div
-                            key={index}
-                            className={cn(
-                              "p-3 rounded-lg border-l-4 border-purple-400 relative overflow-hidden",
-                              theme === "dark"
-                                ? "text-white/90 bg-white/10 backdrop-blur-sm"
-                                : "text-gray-800 bg-white/80 backdrop-blur-sm shadow-sm",
-                            )}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: index * 0.1 }}
-                          >
-                            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-transparent opacity-50" />
-                            <div className="relative z-10">
-                              <div className="flex items-start gap-2">
-                                <div className="text-purple-500 text-sm">💬</div>
-                                <p className="text-sm leading-relaxed flex-1">{shoutout}</p>
-                              </div>
-                              <div className={cn("text-xs mt-1", theme === "dark" ? "text-white/40" : "text-gray-500")}>
-                                Just now
-                              </div>
-                            </div>
-                          </motion.div>
-                        ))
+            {/* Community Shout-outs */}
+            <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.0 }}>
+              <Card
+                className={cn(
+                  theme === "dark" ? "glass-card" : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg",
+                )}
+              >
+                <CardHeader>
+                  <CardTitle
+                    className={cn("flex items-center gap-2", theme === "dark" ? "text-white" : "text-gray-900")}
+                  >
+                    <MessageCircle className="w-5 h-5" />
+                    Fan Shout-outs
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex gap-2">
+                    <Input
+                      value={newShoutout}
+                      onChange={(e) => setNewShoutout(e.target.value)}
+                      placeholder="Send a shout-out..."
+                      className={cn(
+                        "flex-1",
+                        theme === "dark"
+                          ? "bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                          : "bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-500",
                       )}
-                    </div>
+                      onKeyPress={(e) => e.key === "Enter" && submitShoutout()}
+                      maxLength={200}
+                    />
+                    <Button
+                      onClick={submitShoutout}
+                      size="sm"
+                      className={cn(
+                        theme === "dark"
+                          ? "bg-white text-black hover:bg-white/90"
+                          : "bg-gray-900 text-white hover:bg-gray-800",
+                      )}
+                      disabled={!newShoutout.trim()}
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* Character count indicator */}
+                  <div className={cn("text-xs text-right", theme === "dark" ? "text-white/50" : "text-gray-500")}>
+                    {newShoutout.length}/200
+                  </div>
+
+                  {/* Animated Radio Character */}
+                  <div className="flex justify-center py-4">
+                    <AnimatedRadioCharacter
+                      isPlaying={isPlaying}
+                      isLive={isLive}
+                      shoutouts={shoutouts}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {shoutouts.length === 0 ? (
+                      <p
+                        className={cn("text-sm text-center py-4", theme === "dark" ? "text-white/50" : "text-gray-500")}
+                      >
+                        No shout-outs yet. Be the first to send one!
+                      </p>
+                    ) : (
+                      shoutouts.map((shoutout, index) => (
+                        <motion.div
+                          key={index}
+                          className={cn(
+                            "text-sm p-2 rounded-lg",
+                            theme === "dark" ? "text-white/80 bg-white/5" : "text-gray-700 bg-gray-100/50",
+                          )}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                        >
+                          {shoutout}
+                        </motion.div>
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>
             </motion.div>
+
+            {/* Pinned Tracks */}
+            {pinnedTracks.length > 0 && (
+              <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.2 }}>
+                <Card
+                  className={cn(
+                    theme === "dark"
+                      ? "glass-card"
+                      : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg",
+                  )}
+                >
+                  <CardHeader>
+                    <CardTitle
+                      className={cn("flex items-center gap-2", theme === "dark" ? "text-white" : "text-gray-900")}
+                    >
+                      <Pin className="w-5 h-5" />
+                      Pinned Tracks
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {pinnedTracks.map((track) => (
+                        <div
+                          key={track.id}
+                          className={cn(
+                            "flex items-center gap-3 p-2 rounded-lg",
+                            theme === "dark" ? "bg-white/5" : "bg-gray-100/50",
+                          )}
+                        >
+                          <img
+                            src={track.artwork_url || "/placeholder.svg"}
+                            alt={track.title}
+                            className="w-8 h-8 rounded object-cover"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className={cn(
+                                "text-sm font-medium truncate",
+                                theme === "dark" ? "text-white" : "text-gray-900",
+                              )}
+                            >
+                              {track.title}
+                            </p>
+                            <p className={cn("text-xs truncate", theme === "dark" ? "text-white/70" : "text-gray-600")}>
+                              {track.artist}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => togglePinTrack(track)}
+                            className={cn(
+                              theme === "dark" ? "text-white/70 hover:text-white" : "text-gray-700 hover:text-gray-900",
+                            )}
+                          >
+                            <PinOff className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
           </div>
         </div>
 

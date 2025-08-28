@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import crypto from "crypto"
+import { generateSecureToken } from "@/lib/security/validation"
+
+const FEATURE_UI_FIXES_V1 = process.env.NEXT_PUBLIC_FEATURE_UI_FIXES_V1 === "true"
 
 // Check if we're in preview/development mode
 const isPreviewMode = () => {
@@ -41,19 +43,23 @@ async function verifyUser(request: NextRequest) {
   }
 }
 
-// Generate unique ticket number and QR code
 function generateTicketData(eventId: string, userId: string) {
   const timestamp = Date.now()
   const random = Math.random().toString(36).substr(2, 9)
 
   const ticketNumber = `TKT-${timestamp}-${random}`.toUpperCase()
-  const qrCode = `ERIGGA-${eventId.substr(0, 8)}-${userId.substr(0, 8)}-${timestamp}`
-  const qrToken = crypto
-    .createHmac("sha256", process.env.NEXTAUTH_SECRET || "erigga-live-secret")
-    .update(`${eventId}${userId}${timestamp}`)
-    .digest("hex")
 
-  return { ticketNumber, qrCode, qrToken }
+  if (FEATURE_UI_FIXES_V1) {
+    // Use secure token generation
+    const qrToken = generateSecureToken(userId, eventId, ticketNumber)
+    const qrCode = `${process.env.NEXT_PUBLIC_BASE_URL || "https://eriggalive.com"}/api/tickets/validate?token=${qrToken}`
+    return { ticketNumber, qrCode, qrToken }
+  } else {
+    // Legacy format
+    const qrCode = `ERIGGA-${eventId.substr(0, 8)}-${userId.substr(0, 8)}-${timestamp}`
+    const qrToken = qrCode
+    return { ticketNumber, qrCode, qrToken }
+  }
 }
 
 // Mock Paystack verification for preview mode
@@ -97,28 +103,14 @@ export async function POST(request: NextRequest) {
     }
 
     const requestData = await request.json()
-    const { eventId, ticketType, quantity = 1, paymentMethod, paymentReference, surveyData } = requestData
+    const { eventId, ticketType, quantity = 1, paymentMethod, paymentReference, amount, surveyData } = requestData
 
-    if (!eventId || !ticketType || !paymentMethod) {
+    if (!eventId || !paymentMethod) {
       return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 })
     }
 
     const supabase = await createClient()
 
-    const EVENT_PRICING = {
-      "erigga-intimate-session-2025": {
-        ticket_price_naira: 20000,
-        ticket_price_coins: 10000,
-        max_capacity: 200,
-      },
-    }
-
-    const eventConfig = EVENT_PRICING[eventId as keyof typeof EVENT_PRICING]
-    if (!eventConfig) {
-      return NextResponse.json({ success: false, error: "Invalid event" }, { status: 400 })
-    }
-
-    // Get event details
     const { data: event, error: eventError } = await supabase.from("events").select("*").eq("id", eventId).single()
 
     if (eventError || !event) {
@@ -126,15 +118,65 @@ export async function POST(request: NextRequest) {
     }
 
     // Check event capacity
-    if (event.current_attendance + quantity > eventConfig.max_capacity) {
+    if (event.current_attendance + quantity > event.max_capacity) {
       return NextResponse.json({ success: false, error: "Event is sold out" }, { status: 400 })
     }
 
-    const ticketPrice = eventConfig.ticket_price_naira
-    const coinPrice = eventConfig.ticket_price_coins
+    // Check membership requirements
+    if (event.requires_membership && event.requires_membership !== "free") {
+      const membershipTiers = ["free", "pro", "enterprise"]
+      const requiredTierIndex = membershipTiers.indexOf(event.requires_membership)
+      const userTierIndex = membershipTiers.indexOf(profile.membership_tier)
+
+      if (userTierIndex < requiredTierIndex) {
+        return NextResponse.json(
+          { success: false, error: `This event requires ${event.requires_membership} membership` },
+          { status: 403 },
+        )
+      }
+    }
+
+    let ticketPrice = 0
+    let coinPrice = 0
+
+    if (ticketType === "early_bird" && event.early_bird_ends && new Date() < new Date(event.early_bird_ends)) {
+      ticketPrice = event.early_bird_price_naira || 0
+      coinPrice = event.early_bird_price_coins || 0
+    } else if (ticketType === "vip") {
+      ticketPrice = event.vip_price_naira || 0
+      coinPrice = event.vip_price_coins || 0
+    } else {
+      ticketPrice = event.ticket_price_naira || (FEATURE_UI_FIXES_V1 ? 20000 : 1000000)
+      coinPrice = event.ticket_price_coins || (FEATURE_UI_FIXES_V1 ? 10000 : 1000000)
+    }
+
+    // Apply membership discount
+    const discountPercentage =
+      profile.membership_tier === "pro" ? 10 : profile.membership_tier === "enterprise" ? 20 : 0
+    if (discountPercentage > 0) {
+      ticketPrice = Math.floor(ticketPrice * (1 - discountPercentage / 100))
+      coinPrice = Math.floor(coinPrice * (1 - discountPercentage / 100))
+    }
 
     const totalPrice = ticketPrice * quantity
     const totalCoins = coinPrice * quantity
+
+    if (FEATURE_UI_FIXES_V1 && paymentMethod === "paystack" && amount) {
+      const expectedAmountKobo = totalPrice * 100
+      const submittedAmountKobo = amount
+
+      if (Math.abs(submittedAmountKobo - expectedAmountKobo) > 100) {
+        // Allow 1 NGN tolerance
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Price mismatch. Please refresh and try again.",
+            details: { expected: expectedAmountKobo, submitted: submittedAmountKobo },
+          },
+          { status: 400 },
+        )
+      }
+    }
 
     // Process payment based on method
     if (paymentMethod === "paystack") {
@@ -159,6 +201,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ success: false, error: "Payment verification failed" }, { status: 400 })
         }
 
+        // Verify amount
         const expectedAmountKobo = Math.round(totalPrice * 100)
         if (Math.abs(paystackData.data.amount - expectedAmountKobo) > 100) {
           return NextResponse.json({ success: false, error: "Payment amount mismatch" }, { status: 400 })
@@ -190,7 +233,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create tickets with enhanced QR generation
+    // Create tickets
     const tickets = []
     for (let i = 0; i < quantity; i++) {
       const { ticketNumber, qrCode, qrToken } = generateTicketData(eventId, user.id)
@@ -200,7 +243,7 @@ export async function POST(request: NextRequest) {
         .insert({
           event_id: eventId,
           user_id: user.id,
-          ticket_type: ticketType,
+          ticket_type: ticketType || "general",
           ticket_number: ticketNumber,
           qr_code: qrCode,
           qr_token: qrToken,
@@ -208,11 +251,12 @@ export async function POST(request: NextRequest) {
           price_paid_coins: paymentMethod === "coins" ? coinPrice : null,
           payment_method: paymentMethod,
           payment_reference: paymentReference,
-          status: "valid",
+          status: FEATURE_UI_FIXES_V1 ? "unused" : "valid", // Use 'unused' status for new tickets
+          survey_data: surveyData,
           metadata: {
-            survey_data: surveyData,
-            original_price_naira: 50000,
-            discounted_price_naira: ticketPrice,
+            discount_applied: discountPercentage,
+            original_price_naira: event.ticket_price_naira,
+            original_price_coins: event.ticket_price_coins,
           },
         })
         .select()
@@ -235,7 +279,6 @@ export async function POST(request: NextRequest) {
       })
       .eq("id", eventId)
 
-    // Create transaction record
     await supabase.from("transactions").insert({
       user_id: user.id,
       type: "purchase",
@@ -245,14 +288,15 @@ export async function POST(request: NextRequest) {
       payment_method: paymentMethod,
       paystack_reference: paymentReference,
       status: "completed",
-      description: `Purchased ${quantity} ${ticketType} ticket(s) for ${event.title}`,
+      description: `Purchased ${quantity} ${ticketType || "general"} ticket(s) for ${event.title}`,
       reference_id: eventId,
       reference_type: "event",
       metadata: {
         ticket_ids: tickets.map((t) => t.id),
         event_title: event.title,
-        ticket_type: ticketType,
+        ticket_type: ticketType || "general",
         quantity: quantity,
+        reason: "purchase",
       },
     })
 
@@ -262,10 +306,11 @@ export async function POST(request: NextRequest) {
         id: ticket.id,
         ticket_number: ticket.ticket_number,
         qr_code: ticket.qr_code,
-        event_title: "ERIGGA Live - Intimate Session",
-        event_date: "2025-09-03T20:00:00",
+        qr_token: ticket.qr_token,
+        event_title: event.title,
+        event_date: event.event_date,
         ticket_type: ticket.ticket_type,
-        venue: "Uncle Jaffi at The Playground, Warri",
+        venue: event.venue,
         status: ticket.status,
       })),
       message: `Successfully purchased ${quantity} ticket(s)`,

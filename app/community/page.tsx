@@ -230,6 +230,17 @@ export default function CommunityPage() {
     [supabase],
   )
 
+  const containsURL = (text: string): boolean => {
+    const urlPatterns = [
+      /https?:\/\/[^\s]+/gi, // http/https URLs
+      /www\.[^\s]+/gi, // www.domain.com
+      /\b[a-z0-9.-]+\.(com|net|org|xyz|info|io|co|uk|ca|de|fr|jp|au|in|br|ru|cn|gov|edu|mil)\b/gi, // domain.extension
+      /[a-z0-9.-]+\.(com|net|org|xyz|info|io|co|uk|ca|de|fr|jp|au|in|br|ru|cn|gov|edu|mil)\/[^\s]*/gi, // domain.extension/path
+    ]
+
+    return urlPatterns.some((pattern) => pattern.test(text))
+  }
+
   const handleUnifiedSubmit = async () => {
     if (!unifiedInput.trim() || !isAuthenticated || !profile) {
       if (!isAuthenticated) {
@@ -241,6 +252,7 @@ export default function CommunityPage() {
     if (containsURL(unifiedInput)) {
       toast.error("Links are not allowed in community posts", {
         description: "Please share your thoughts without including URLs",
+        duration: 4000,
       })
       return
     }
@@ -470,32 +482,37 @@ export default function CommunityPage() {
     }
   }, [selectedCategory, supabase, loadPosts])
 
-  const containsURL = (text: string): boolean => {
-    const urlPatterns = [
-      /https?:\/\/[^\s]+/gi,
-      /www\.[^\s]+/gi,
-      /\b[a-z0-9.-]+\.(com|net|org|xyz|info|io|co|uk|ca|de|fr|jp|au|in|br|ru|cn|gov|edu|mil)\b/gi,
-    ]
-
-    return urlPatterns.some((pattern) => pattern.test(text))
-  }
-
   return (
     <div className="min-h-screen bg-background">
-      <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+      <div
+        className={cn(
+          "flex h-screen overflow-hidden",
+          FEATURE_UI_FIXES_V1 ? "bg-white dark:bg-gray-950" : "bg-gray-50 dark:bg-gray-900",
+        )}
+      >
         <motion.div
           initial={{ x: -300 }}
           animate={{ x: sidebarOpen || (isClient && window.innerWidth >= 768) ? 0 : -300 }}
           transition={{ type: "spring", damping: 25, stiffness: 200 }}
           className={cn(
-            "w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col",
-            "fixed md:relative z-50 md:z-auto h-full shadow-lg md:shadow-none",
+            "w-80 flex flex-col",
+            "fixed md:relative z-50 md:z-auto h-full shadow-xl md:shadow-none",
+            FEATURE_UI_FIXES_V1
+              ? "bg-white dark:bg-gray-950 border-r border-gray-100 dark:border-gray-800"
+              : "bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700",
           )}
         >
-          <div className="p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
+          <div
+            className={cn(
+              "p-4 border-b",
+              FEATURE_UI_FIXES_V1
+                ? "bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800"
+                : "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
+            )}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
                   <Zap className="h-5 w-5 text-white" />
                 </div>
                 <div>
@@ -511,12 +528,17 @@ export default function CommunityPage() {
 
           <div className="p-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
               <Input
                 placeholder="Search conversations..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-full placeholder:text-gray-500 dark:placeholder:text-gray-400 text-sm"
+                className={cn(
+                  "pl-10 rounded-full placeholder:text-gray-500 dark:placeholder:text-gray-400",
+                  FEATURE_UI_FIXES_V1
+                    ? "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700"
+                    : "bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600",
+                )}
               />
             </div>
           </div>
@@ -526,13 +548,15 @@ export default function CommunityPage() {
               {categories.map((category) => (
                 <motion.div
                   key={category.id}
-                  whileHover={{ backgroundColor: "rgba(59, 130, 246, 0.05)" }}
+                  whileHover={{ backgroundColor: FEATURE_UI_FIXES_V1 ? "rgba(0,0,0,0.03)" : "rgba(0,0,0,0.05)" }}
                   whileTap={{ scale: 0.98 }}
                   className={cn(
                     "flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-all duration-200",
                     selectedCategory === category.id
-                      ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 shadow-sm"
-                      : "hover:bg-gray-50 dark:hover:bg-gray-700/50",
+                      ? FEATURE_UI_FIXES_V1
+                        ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800"
+                        : "bg-green-100 dark:bg-green-900/20 border-l-4 border-green-500"
+                      : "hover:bg-gray-50 dark:hover:bg-gray-800/50",
                   )}
                   onClick={() => {
                     setSelectedCategory(category.id)
@@ -540,16 +564,21 @@ export default function CommunityPage() {
                     setActivePost(null)
                   }}
                 >
-                  <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-600 flex items-center justify-center text-xl shadow-sm">
+                  <div
+                    className={cn(
+                      "w-12 h-12 rounded-full flex items-center justify-center text-xl",
+                      FEATURE_UI_FIXES_V1 ? "bg-gray-100 dark:bg-gray-800" : "bg-gray-200 dark:bg-gray-600",
+                    )}
+                  >
                     {category.icon}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-900 dark:text-white truncate text-sm">{category.name}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    <div className="font-medium text-gray-900 dark:text-white truncate">{category.name}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
                       {posts.filter((p) => p.category.id === category.id).length} messages
                     </div>
                   </div>
-                  {selectedCategory === category.id && <div className="w-2 h-2 rounded-full bg-blue-500"></div>}
+                  {selectedCategory === category.id && <div className="w-2 h-2 rounded-full bg-green-500"></div>}
                 </motion.div>
               ))}
             </div>
@@ -576,14 +605,26 @@ export default function CommunityPage() {
           )}
         </motion.div>
 
-        <div className="flex-1 flex flex-col bg-white dark:bg-gray-900 min-w-0">
-          <div className="p-4 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 sticky top-0 z-20 shadow-sm">
+        <div
+          className={cn(
+            "flex-1 flex flex-col min-w-0",
+            FEATURE_UI_FIXES_V1 ? "bg-white dark:bg-gray-950" : "bg-white dark:bg-gray-900",
+          )}
+        >
+          <div
+            className={cn(
+              "p-4 border-b sticky top-0 z-20 backdrop-blur-sm",
+              FEATURE_UI_FIXES_V1
+                ? "bg-white/95 dark:bg-gray-950/95 border-gray-100 dark:border-gray-800"
+                : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700",
+            )}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setSidebarOpen(true)}>
                   <Menu className="h-5 w-5" />
                 </Button>
-                <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-lg shadow-sm">
+                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-lg">
                   {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
                 </div>
                 <div>
@@ -601,7 +642,7 @@ export default function CommunityPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setActivePost(null)}
-                    className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
                   >
                     Back to feed
                   </Button>
@@ -617,7 +658,7 @@ export default function CommunityPage() {
           </div>
 
           <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pb-32">
-            <div className="max-w-2xl mx-auto">
+            <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
               <AnimatePresence>
                 {filteredPosts.map((post, index) => (
                   <motion.div
@@ -627,31 +668,34 @@ export default function CommunityPage() {
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ delay: index * 0.05 }}
                     className={cn(
-                      "border-b border-gray-100 dark:border-gray-800 p-4 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors duration-200 cursor-pointer",
-                      activePost === post.id && "bg-blue-50/50 dark:bg-blue-900/10",
+                      "group transition-all duration-200",
+                      FEATURE_UI_FIXES_V1
+                        ? "bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 hover:shadow-md hover:border-gray-200 dark:hover:border-gray-700"
+                        : "flex space-x-3",
+                      activePost === post.id && "ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-950/10",
                     )}
                   >
                     <div className="flex space-x-3">
-                      <Avatar className="h-12 w-12 flex-shrink-0 ring-2 ring-gray-100 dark:ring-gray-700">
+                      <Avatar className="h-12 w-12 flex-shrink-0">
                         <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
-                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                        <AvatarFallback className="bg-green-500 text-white font-semibold">
                           {post.user.username.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
 
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <span className="font-semibold text-gray-900 dark:text-white text-sm hover:underline cursor-pointer">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className="font-semibold text-gray-900 dark:text-white">
                             {post.user.full_name || post.user.username}
                           </span>
                           <UserTierBadge tier={post.user.tier} size="sm" />
-                          <span className="text-gray-500 dark:text-gray-400 text-sm">·</span>
-                          <span className="text-gray-500 dark:text-gray-400 text-sm hover:underline cursor-pointer">
+                          <span className="text-gray-500 dark:text-gray-400">·</span>
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
                             {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
                           </span>
                         </div>
 
-                        <p className="text-gray-900 dark:text-white text-sm leading-relaxed break-words mb-3">
+                        <p className="text-gray-900 dark:text-white leading-relaxed break-words mb-3 text-[15px]">
                           {post.content}
                         </p>
 
@@ -660,30 +704,30 @@ export default function CommunityPage() {
                             variant="ghost"
                             size="sm"
                             className={cn(
-                              "h-8 px-3 rounded-full transition-all duration-200 group",
+                              "h-8 px-3 rounded-full transition-all duration-200 group/btn",
                               post.has_voted
-                                ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                : "text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20",
+                                ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                                : "text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30",
                             )}
                             onClick={() => voteOnPost(post.id)}
                           >
                             <Heart
                               className={cn(
-                                "h-4 w-4 mr-1 transition-transform group-hover:scale-110",
+                                "h-4 w-4 mr-1 transition-transform group-hover/btn:scale-110",
                                 post.has_voted && "fill-current",
                               )}
                             />
-                            <span className="text-xs font-medium">{post.vote_count}</span>
+                            <span className="text-sm font-medium">{post.vote_count}</span>
                           </Button>
 
                           <Button
                             variant="ghost"
                             size="sm"
                             className={cn(
-                              "h-8 px-3 rounded-full transition-all duration-200 group",
+                              "h-8 px-3 rounded-full transition-all duration-200 group/btn",
                               activePost === post.id
-                                ? "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                                : "text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20",
+                                ? "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                                : "text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30",
                             )}
                             onClick={() => {
                               if (activePost === post.id) {
@@ -694,8 +738,8 @@ export default function CommunityPage() {
                               }
                             }}
                           >
-                            <MessageCircle className="h-4 w-4 mr-1 transition-transform group-hover:scale-110" />
-                            <span className="text-xs font-medium">{post.comment_count}</span>
+                            <MessageCircle className="h-4 w-4 mr-1 transition-transform group-hover/btn:scale-110" />
+                            <span className="text-sm font-medium">{post.comment_count}</span>
                           </Button>
                         </div>
 
@@ -705,7 +749,7 @@ export default function CommunityPage() {
                               initial={{ opacity: 0, height: 0 }}
                               animate={{ opacity: 1, height: "auto" }}
                               exit={{ opacity: 0, height: 0 }}
-                              className="mt-4 space-y-3 border-l-2 border-gray-200 dark:border-gray-700 pl-4"
+                              className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-3"
                             >
                               {comments[post.id]?.map((comment) => (
                                 <motion.div
@@ -720,20 +764,18 @@ export default function CommunityPage() {
                                       {comment.user.username.charAt(0).toUpperCase()}
                                     </AvatarFallback>
                                   </Avatar>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl rounded-tl-sm p-3 shadow-sm border border-gray-200 dark:border-gray-700">
-                                      <div className="flex items-center space-x-2 mb-1">
-                                        <span className="font-medium text-gray-900 dark:text-white text-xs">
-                                          {comment.user.username}
-                                        </span>
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                                          {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                                        </span>
-                                      </div>
-                                      <p className="text-gray-900 dark:text-white text-xs leading-relaxed">
-                                        {comment.content}
-                                      </p>
+                                  <div className="flex-1">
+                                    <div className="flex items-center space-x-2 mb-1">
+                                      <span className="font-medium text-gray-900 dark:text-white text-sm">
+                                        {comment.user.username}
+                                      </span>
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                      </span>
                                     </div>
+                                    <p className="text-gray-900 dark:text-white text-sm leading-relaxed">
+                                      {comment.content}
+                                    </p>
                                   </div>
                                 </motion.div>
                               ))}
@@ -749,107 +791,136 @@ export default function CommunityPage() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 md:left-80 border-t border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md p-4 z-30 shadow-lg">
-            {mediaPreview.length > 0 && (
-              <div className="mb-3 flex space-x-2 overflow-x-auto">
-                {mediaPreview.map((preview, index) => (
-                  <div key={index} className="relative flex-shrink-0">
-                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
-                      {selectedMedia[index].type.startsWith("image/") ? (
-                        <img src={preview || "/placeholder.svg"} alt="Preview" className="w-full h-full object-cover" />
-                      ) : selectedMedia[index].type.startsWith("video/") ? (
-                        <video src={preview} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Mic className="h-6 w-6 text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full"
-                      onClick={() => removeMedia(index)}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+          <div
+            className={cn(
+              "fixed bottom-0 left-0 right-0 md:left-80 border-t backdrop-blur-sm z-30",
+              FEATURE_UI_FIXES_V1
+                ? "bg-white/95 dark:bg-gray-950/95 border-gray-100 dark:border-gray-800"
+                : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700",
             )}
-
-            {isAuthenticated ? (
-              <div className="flex items-end space-x-3 max-w-2xl mx-auto">
-                <Avatar className="h-10 w-10 flex-shrink-0 ring-2 ring-gray-200 dark:ring-gray-700">
-                  <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
-                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold text-sm">
-                    {profile?.username?.charAt(0).toUpperCase() || "U"}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 relative">
-                  <Input
-                    ref={inputRef}
-                    placeholder={activePost ? "Reply to this message..." : "What's happening?"}
-                    value={unifiedInput}
-                    onChange={(e) => setUnifiedInput(e.target.value)}
-                    className="pr-32 rounded-full border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-gray-500 dark:placeholder:text-gray-400 text-sm py-3 px-4"
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault()
-                        handleUnifiedSubmit()
-                      }
-                    }}
-                  />
-                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <ImageIcon className="h-4 w-4 text-blue-500" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                    >
-                      <Smile className="h-4 w-4 text-blue-500" />
-                    </Button>
-                  </div>
+          >
+            <div className="p-4">
+              {mediaPreview.length > 0 && (
+                <div className="mb-3 flex space-x-2 overflow-x-auto">
+                  {mediaPreview.map((preview, index) => (
+                    <div key={index} className="relative flex-shrink-0">
+                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+                        {selectedMedia[index].type.startsWith("image/") ? (
+                          <img
+                            src={preview || "/placeholder.svg"}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : selectedMedia[index].type.startsWith("video/") ? (
+                          <video src={preview} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Mic className="h-6 w-6 text-gray-400" />
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full"
+                        onClick={() => removeMedia(index)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
-                <Button
-                  onClick={handleUnifiedSubmit}
-                  disabled={!unifiedInput.trim() && selectedMedia.length === 0}
-                  className="h-10 w-10 p-0 rounded-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 shadow-sm transition-all duration-200 hover:scale-105"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <div className="text-center">
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 max-w-md mx-auto shadow-sm">
-                  <p className="text-gray-600 dark:text-gray-400 mb-4">Join the conversation</p>
-                  <Button asChild className="bg-blue-500 hover:bg-blue-600 rounded-full px-8 shadow-sm">
-                    <a href="/login">Sign In</a>
+              )}
+
+              {isAuthenticated ? (
+                <div className="flex items-end space-x-3 max-w-2xl mx-auto">
+                  <Avatar className="h-10 w-10 flex-shrink-0">
+                    <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
+                    <AvatarFallback className="bg-green-500 text-white font-semibold">
+                      {profile?.username?.charAt(0).toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 relative">
+                    <Input
+                      ref={inputRef}
+                      placeholder={activePost ? "Reply to this message..." : "What's happening?"}
+                      value={unifiedInput}
+                      onChange={(e) => setUnifiedInput(e.target.value)}
+                      className={cn(
+                        "pr-32 rounded-full focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200",
+                        "placeholder:text-gray-500 dark:placeholder:text-gray-400 text-base px-4 py-3",
+                        FEATURE_UI_FIXES_V1
+                          ? "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
+                          : "border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800",
+                      )}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault()
+                          handleUnifiedSubmit()
+                        }
+                      }}
+                    />
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <ImageIcon className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                      >
+                        <Smile className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={handleUnifiedSubmit}
+                    disabled={!unifiedInput.trim() && selectedMedia.length === 0}
+                    className="h-10 w-10 p-0 rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 transition-all duration-200 disabled:cursor-not-allowed"
+                  >
+                    <Send className="h-4 w-4" />
                   </Button>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="text-center">
+                  <div
+                    className={cn(
+                      "rounded-2xl border p-6 max-w-md mx-auto",
+                      FEATURE_UI_FIXES_V1
+                        ? "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700"
+                        : "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
+                    )}
+                  >
+                    <p className="text-gray-600 dark:text-gray-400 mb-4">Join the conversation</p>
+                    <Button asChild className="bg-green-500 hover:bg-green-600 rounded-full px-8">
+                      <a href="/login">Sign In</a>
+                    </Button>
+                  </div>
+                </div>
+              )}
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*,video/*,audio/*"
-              onChange={handleMediaSelect}
-              className="hidden"
-            />
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,video/*,audio/*"
+                onChange={handleMediaSelect}
+                className="hidden"
+              />
+            </div>
           </div>
         </div>
 
         {sidebarOpen && (
-          <div className="fixed inset-0 bg-black/20 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
+          <div
+            className="fixed inset-0 bg-black/30 z-40 md:hidden backdrop-blur-sm"
+            onClick={() => setSidebarOpen(false)}
+          />
         )}
       </div>
     </div>
