@@ -19,16 +19,10 @@ import {
   Crown,
   Zap,
   TrendingUp,
-  Camera,
-  Edit,
   Phone,
   Ticket,
-  ShoppingBag,
-  Eye,
   Heart,
   Activity,
-  BarChart3,
-  Sparkles,
   Play,
   Target,
 } from "lucide-react"
@@ -36,8 +30,9 @@ import Link from "next/link"
 import { useState, useRef, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { createClient } from "@/lib/supabase/client"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { MissionsDashboard } from "@/components/missions/missions-dashboard"
+import { TicketQRDisplay } from "@/components/tickets/ticket-qr-display"
 
 interface UserStats {
   totalPosts: number
@@ -68,13 +63,14 @@ export default function DashboardPage() {
   })
   const [recentActivity, setRecentActivity] = useState<any[]>([])
   const [loadingStats, setLoadingStats] = useState(true)
+  const [userTickets, setUserTickets] = useState([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
   useEffect(() => {
     if (user && profile) {
       // Load stats and activity in parallel for better performance
-      Promise.all([loadUserStats(), loadRecentActivity()])
+      Promise.all([loadUserStats(), loadRecentActivity(), loadUserTickets()])
     }
   }, [user, profile])
 
@@ -215,6 +211,26 @@ export default function DashboardPage() {
     } catch (error) {
       console.error("Error loading recent activity:", error)
       setRecentActivity([])
+    }
+  }
+
+  const loadUserTickets = async () => {
+    if (!user) return
+
+    try {
+      const { data: tickets, error: ticketsError } = await supabase
+        .from("tickets")
+        .select("*, events(title, event_date, venue)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+
+      if (ticketsError) {
+        console.error("Error loading user tickets:", ticketsError)
+      } else {
+        setUserTickets(tickets)
+      }
+    } catch (error) {
+      console.error("Error loading user tickets:", error)
     }
   }
 
@@ -666,6 +682,28 @@ export default function DashboardPage() {
                     </CardContent>
                   </Card>
                 </motion.div>
+
+                {/* Display User Tickets */}
+                <motion.div variants={itemVariants} initial="hidden" animate="visible">
+                  <Card className="bg-white/5 backdrop-blur-xl border-white/10 hover:bg-white/10 transition-all duration-300">
+                    <CardHeader>
+                      <CardTitle className="flex items-center text-white">
+                        <Ticket className="w-5 h-5 mr-2 text-blue-400" />
+                        My Tickets
+                      </CardTitle>
+                      <CardDescription className="text-gray-300">Your purchased event tickets</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {userTickets.length > 0 ? (
+                        userTickets.map((ticket) => (
+                          <TicketQRDisplay key={ticket.id} ticket={ticket} showDetails={false} />
+                        ))
+                      ) : (
+                        <p className="text-gray-400 text-center py-4">No tickets purchased yet.</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
               </div>
 
               {/* Sidebar */}
@@ -697,188 +735,4 @@ export default function DashboardPage() {
                             <Button
                               size="icon"
                               variant="outline"
-                              className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 border-0 text-white hover:opacity-90"
-                              onClick={() => fileInputRef.current?.click()}
-                              disabled={isUploadingAvatar}
-                            >
-                              {isUploadingAvatar ? (
-                                <motion.div
-                                  animate={{ rotate: 360 }}
-                                  transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-                                  className="w-3 h-3 border border-white border-t-transparent rounded-full"
-                                />
-                              ) : (
-                                <Camera className="h-3 w-3" />
-                              )}
-                            </Button>
-                          </motion.div>
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleAvatarUpload}
-                          />
-                        </div>
-                        <div>
-                          <p className="font-medium text-lg text-white">
-                            {profile?.full_name || profile?.username || "User"}
-                          </p>
-                          <p className="text-sm text-gray-300">@{profile?.username || "username"}</p>
-                          <p className="text-xs text-gray-400">{user?.email}</p>
-                        </div>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between text-gray-300">
-                          <span>Member since:</span>
-                          <span>{new Date(profile?.created_at || Date.now()).toLocaleDateString()}</span>
-                        </div>
-                        <div className="flex justify-between text-gray-300">
-                          <span>Last active:</span>
-                          <span className="text-green-400">Just now</span>
-                        </div>
-                        <div className="flex justify-between text-gray-300">
-                          <span>Verified:</span>
-                          <span>{profile?.is_verified ? "✅" : "❌"}</span>
-                        </div>
-                      </div>
-                      <Button
-                        asChild
-                        variant="outline"
-                        className="w-full bg-gradient-to-r from-purple-500 to-blue-500 border-0 text-white hover:opacity-90"
-                      >
-                        <Link href="/settings">
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit Profile
-                        </Link>
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                {/* Platform Stats */}
-                <motion.div variants={itemVariants} initial="hidden" animate="visible">
-                  <Card className="bg-white/5 backdrop-blur-xl border-white/10 hover:bg-white/10 transition-all duration-300">
-                    <CardHeader>
-                      <CardTitle className="flex items-center text-white">
-                        <BarChart3 className="w-5 h-5 mr-2 text-blue-400" />
-                        Platform Stats
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {[
-                          { icon: Ticket, label: "Tickets", value: userStats.totalTickets, color: "text-blue-400" },
-                          {
-                            icon: ShoppingBag,
-                            label: "Purchases",
-                            value: userStats.totalPurchases,
-                            color: "text-green-400",
-                          },
-                          { icon: Eye, label: "Vault Views", value: userStats.vaultViews, color: "text-purple-400" },
-                          {
-                            icon: Users,
-                            label: "Following",
-                            value: userStats.followingCount,
-                            color: "text-orange-400",
-                          },
-                        ].map((stat, index) => (
-                          <motion.div
-                            key={stat.label}
-                            className="flex justify-between items-center"
-                            whileHover={{ x: 5 }}
-                          >
-                            <div className="flex items-center gap-2">
-                              <stat.icon className={`w-4 h-4 ${stat.color}`} />
-                              <span className="text-sm text-gray-300">{stat.label}</span>
-                            </div>
-                            <span className="font-medium text-white">{stat.value}</span>
-                          </motion.div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                {/* Recent Activity */}
-                <motion.div variants={itemVariants} initial="hidden" animate="visible">
-                  <Card className="bg-white/5 backdrop-blur-xl border-white/10 hover:bg-white/10 transition-all duration-300">
-                    <CardHeader>
-                      <CardTitle className="text-white">Recent Activity</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3 text-sm">
-                        <AnimatePresence>
-                          {recentActivity.length > 0 ? (
-                            recentActivity.map((activity, index) => {
-                              const Icon = activity.icon
-                              return (
-                                <motion.div
-                                  key={index}
-                                  initial={{ opacity: 0, x: -10 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  transition={{ delay: index * 0.1 }}
-                                  className="flex items-start space-x-2"
-                                >
-                                  <Icon className={`w-4 h-4 mt-0.5 ${activity.color}`} />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm truncate text-gray-300">{activity.content}</p>
-                                    <p className="text-xs text-gray-500">
-                                      {new Date(activity.timestamp).toLocaleDateString()}
-                                    </p>
-                                  </div>
-                                </motion.div>
-                              )
-                            })
-                          ) : (
-                            <motion.p
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              className="text-gray-400 text-center py-4"
-                            >
-                              No recent activity
-                            </motion.p>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                {/* Achievements */}
-                <motion.div variants={itemVariants} initial="hidden" animate="visible">
-                  <Card className="bg-white/5 backdrop-blur-xl border-white/10 hover:bg-white/10 transition-all duration-300">
-                    <CardHeader>
-                      <CardTitle className="flex items-center text-white">
-                        <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
-                        Achievements
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          { icon: Trophy, label: "First Login", color: "from-yellow-400 to-orange-500" },
-                          { icon: Users, label: "Community Member", color: "from-blue-400 to-purple-500" },
-                          { icon: Star, label: "Active User", color: "from-green-400 to-emerald-500" },
-                        ].map((achievement, index) => (
-                          <motion.div
-                            key={achievement.label}
-                            whileHover={{ scale: 1.05 }}
-                            className={`text-center p-3 bg-gradient-to-r ${achievement.color} rounded-xl shadow-lg`}
-                          >
-                            <achievement.icon className="w-6 h-6 text-white mx-auto mb-1" />
-                            <span className="text-xs text-white font-medium">{achievement.label}</span>
-                          </motion.div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-    </AuthGuard>
-  )
-}
+                              className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-gradient-to-r from-purple-500 to-blue\

@@ -112,12 +112,12 @@ export function useUserBalance() {
 
 export function useRealtimeBalance() {
   const { profile } = useAuth()
-  const { balance, refresh, isRealtime } = useUserBalance()
+  const { balance, refresh, isRealtime, formattedBalance } = useUserBalance()
 
   return {
     balance,
     refresh,
     isRealtime,
-    formattedBalance: balance.toLocaleString(),
+    formattedBalance,
   }
 }
