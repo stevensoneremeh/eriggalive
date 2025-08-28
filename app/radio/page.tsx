@@ -111,8 +111,6 @@ const moodCategories: MoodCategory[] = [
 const ERIGGA_AUDIO_URL =
   "https://yor5bfsajnljnrjg.public.blob.vercel-storage.com/Erigga-Ft-Great-Adamz-Around-9-%28TrendyBeatz.com%29.mp3"
 
-const FEATURE_UI_FIXES_V1 = process.env.NEXT_PUBLIC_FEATURE_UI_FIXES_V1 === "true"
-
 export default function RadioPage() {
   const { isAuthenticated, user } = useAuth()
   const { theme } = useTheme()
@@ -137,7 +135,6 @@ export default function RadioPage() {
   const [dailyQuote, setDailyQuote] = useState("")
   const [shoutouts, setShoutouts] = useState<string[]>([])
   const [newShoutout, setNewShoutout] = useState("")
-  const [shoutoutTimestamps, setShoutoutTimestamps] = useState<{ [key: string]: number }>({})
   const [nextShow, setNextShow] = useState<NextShow | null>(null)
 
   // Visual state
@@ -207,22 +204,12 @@ export default function RadioPage() {
       // Load recent shoutouts
       const { data: recentShoutouts } = await supabase
         .from("community_shoutouts")
-        .select("message, created_at")
+        .select("message")
         .order("created_at", { ascending: false })
         .limit(10)
 
       if (recentShoutouts) {
-        const messages = recentShoutouts.map((s) => s.message)
-        const timestamps = recentShoutouts.reduce(
-          (acc, s) => {
-            acc[s.message] = new Date(s.created_at).getTime()
-            return acc
-          },
-          {} as { [key: string]: number },
-        )
-
-        setShoutouts(messages)
-        setShoutoutTimestamps(timestamps)
+        setShoutouts(recentShoutouts.map((s) => s.message))
       }
 
       // Load pinned tracks for user
@@ -283,11 +270,7 @@ export default function RadioPage() {
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "community_shoutouts" }, (payload) => {
         if (payload.new) {
-          const message = payload.new.message
-          const timestamp = new Date(payload.new.created_at).getTime()
-
-          setShoutouts((prev) => [message, ...prev.slice(0, 9)]) // Keep only 10 most recent
-          setShoutoutTimestamps((prev) => ({ ...prev, [message]: timestamp }))
+          setShoutouts((prev) => [payload.new.message, ...prev.slice(0, 9)]) // Keep only 10 most recent
         }
       })
       .subscribe()
@@ -344,11 +327,9 @@ export default function RadioPage() {
 
     try {
       const shoutoutText = `${user.user_metadata?.full_name || user.email}: ${newShoutout.trim()}`
-      const timestamp = Date.now()
 
       // Add to local state immediately for better UX
       setShoutouts((prev) => [shoutoutText, ...prev.slice(0, 9)]) // Keep only 10 most recent
-      setShoutoutTimestamps((prev) => ({ ...prev, [shoutoutText]: timestamp }))
       setNewShoutout("")
 
       // Save to database
@@ -362,28 +343,11 @@ export default function RadioPage() {
         console.error("Error saving shoutout:", error)
         // Remove from local state if database save failed
         setShoutouts((prev) => prev.slice(1))
-        setShoutoutTimestamps((prev) => {
-          const newTimestamps = { ...prev }
-          delete newTimestamps[shoutoutText]
-          return newTimestamps
-        })
       }
     } catch (error) {
       console.error("Error submitting shoutout:", error)
       setShoutouts((prev) => prev.slice(1))
     }
-  }
-
-  const getVisibleShoutouts = () => {
-    if (!FEATURE_UI_FIXES_V1) return shoutouts
-
-    const now = Date.now()
-    const fiveMinutes = 5 * 60 * 1000 // 5 minutes in milliseconds
-
-    return shoutouts.filter((shoutout) => {
-      const timestamp = shoutoutTimestamps[shoutout]
-      return timestamp && now - timestamp <= fiveMinutes
-    })
   }
 
   const formatTime = (seconds: number) => {
@@ -830,13 +794,9 @@ export default function RadioPage() {
                       placeholder="Send a shout-out..."
                       className={cn(
                         "flex-1",
-                        FEATURE_UI_FIXES_V1
-                          ? theme === "dark"
-                            ? "bg-gray-800/80 border-gray-600/50 text-white placeholder:text-gray-300 focus:border-white/50 focus:ring-2 focus:ring-white/20"
-                            : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-600 focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
-                          : theme === "dark"
-                            ? "bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                            : "bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-500",
+                        theme === "dark"
+                          ? "bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                          : "bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-500",
                       )}
                       onKeyPress={(e) => e.key === "Enter" && submitShoutout()}
                       maxLength={200}
@@ -845,13 +805,9 @@ export default function RadioPage() {
                       onClick={submitShoutout}
                       size="sm"
                       className={cn(
-                        FEATURE_UI_FIXES_V1
-                          ? theme === "dark"
-                            ? "bg-white text-black hover:bg-gray-100 shadow-lg"
-                            : "bg-gray-900 text-white hover:bg-gray-800 shadow-lg"
-                          : theme === "dark"
-                            ? "bg-white text-black hover:bg-white/90"
-                            : "bg-gray-900 text-white hover:bg-gray-800",
+                        theme === "dark"
+                          ? "bg-white text-black hover:bg-white/90"
+                          : "bg-gray-900 text-white hover:bg-gray-800",
                       )}
                       disabled={!newShoutout.trim()}
                     >
@@ -860,18 +816,7 @@ export default function RadioPage() {
                   </div>
 
                   {/* Character count indicator */}
-                  <div
-                    className={cn(
-                      "text-xs text-right",
-                      FEATURE_UI_FIXES_V1
-                        ? theme === "dark"
-                          ? "text-gray-300"
-                          : "text-gray-600"
-                        : theme === "dark"
-                          ? "text-white/50"
-                          : "text-gray-500",
-                    )}
-                  >
+                  <div className={cn("text-xs text-right", theme === "dark" ? "text-white/50" : "text-gray-500")}>
                     {newShoutout.length}/200
                   </div>
 
@@ -880,56 +825,31 @@ export default function RadioPage() {
                     <AnimatedRadioCharacter
                       isPlaying={isPlaying}
                       isLive={isLive}
-                      shoutouts={FEATURE_UI_FIXES_V1 ? getVisibleShoutouts() : shoutouts}
+                      shoutouts={shoutouts}
                       className="w-full"
                     />
                   </div>
 
                   <div className="space-y-2 max-h-32 overflow-y-auto">
-                    {(FEATURE_UI_FIXES_V1 ? getVisibleShoutouts() : shoutouts).length === 0 ? (
+                    {shoutouts.length === 0 ? (
                       <p
-                        className={cn(
-                          "text-sm text-center py-4",
-                          FEATURE_UI_FIXES_V1
-                            ? theme === "dark"
-                              ? "text-gray-300"
-                              : "text-gray-600"
-                            : theme === "dark"
-                              ? "text-white/50"
-                              : "text-gray-500",
-                        )}
+                        className={cn("text-sm text-center py-4", theme === "dark" ? "text-white/50" : "text-gray-500")}
                       >
                         No shout-outs yet. Be the first to send one!
                       </p>
                     ) : (
-                      (FEATURE_UI_FIXES_V1 ? getVisibleShoutouts() : shoutouts).map((shoutout, index) => (
+                      shoutouts.map((shoutout, index) => (
                         <motion.div
                           key={index}
                           className={cn(
-                            "text-sm p-3 rounded-lg border",
-                            FEATURE_UI_FIXES_V1
-                              ? theme === "dark"
-                                ? "text-white bg-gray-800/60 border-gray-600/30 shadow-sm"
-                                : "text-gray-800 bg-gray-50 border-gray-200 shadow-sm"
-                              : theme === "dark"
-                                ? "text-white/80 bg-white/5"
-                                : "text-gray-700 bg-gray-100/50",
+                            "text-sm p-2 rounded-lg",
+                            theme === "dark" ? "text-white/80 bg-white/5" : "text-gray-700 bg-gray-100/50",
                           )}
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: index * 0.1 }}
                         >
                           {shoutout}
-                          {FEATURE_UI_FIXES_V1 && shoutoutTimestamps[shoutout] && (
-                            <div
-                              className={cn(
-                                "text-xs mt-1 opacity-60",
-                                theme === "dark" ? "text-gray-400" : "text-gray-500",
-                              )}
-                            >
-                              {new Date(shoutoutTimestamps[shoutout]).toLocaleTimeString()}
-                            </div>
-                          )}
                         </motion.div>
                       ))
                     )}

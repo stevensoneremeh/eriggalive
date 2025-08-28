@@ -1,37 +1,150 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useRef, useCallback } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Heart, MessageCircle, Search, ImageIcon, Mic } from "lucide-react"
+import { Heart, MessageCircle, Smile, MoreVertical, Search, Menu, X, Zap, Send, ImageIcon, Mic } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
+import { cn } from "@/lib/utils"
 import { UserTierBadge } from "@/components/user-tier-badge"
+import { motion, AnimatePresence } from "framer-motion"
 
 const FEATURE_UI_FIXES_V1 = process.env.NEXT_PUBLIC_FEATURE_UI_FIXES_V1 === "true"
 
-const CommunityPage = () => {
-  const { supabase, isAuthenticated, profile } = useAuth()
-  const [unifiedInput, setUnifiedInput] = useState("")
-  const [selectedMedia, setSelectedMedia] = useState([])
-  const [mediaPreview, setMediaPreview] = useState([])
-  const [activePost, setActivePost] = useState(null)
-  const [selectedCategory, setSelectedCategory] = useState(null)
-  const [posts, setPosts] = useState([])
-  const [comments, setComments] = useState({})
-  const scrollAreaRef = useRef(null)
+interface Category {
+  id: number
+  name: string
+  slug: string
+  icon: string
+  color: string
+  is_active: boolean
+}
 
-  const scrollToBottom = useCallback(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
-    }
+interface Post {
+  id: number
+  content: string
+  created_at: string
+  vote_count: number
+  comment_count: number
+  media_url?: string
+  media_type?: string
+  user: {
+    id: string
+    username: string
+    full_name: string
+    avatar_url?: string
+    tier: string
+  }
+  category: {
+    id: number
+    name: string
+    slug: string
+  }
+  has_voted: boolean
+}
+
+interface Comment {
+  id: number
+  content: string
+  created_at: string
+  like_count: number
+  user: {
+    id: string
+    username: string
+    full_name: string
+    avatar_url?: string
+    tier: string
+  }
+  has_liked: boolean
+}
+
+export default function CommunityPage() {
+  const { isAuthenticated, profile } = useAuth()
+  const supabase = createClient()
+
+  // State
+  const [categories, setCategories] = useState<Category[]>([])
+  const [posts, setPosts] = useState<Post[]>([])
+  const [comments, setComments] = useState<{ [postId: number]: Comment[] }>({})
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
+  const [unifiedInput, setUnifiedInput] = useState("")
+  const [activePost, setActivePost] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedMedia, setSelectedMedia] = useState<File[]>([])
+  const [mediaPreview, setMediaPreview] = useState<string[]>([])
+  const [isClient, setIsClient] = useState(false)
+
+  // Refs
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setIsClient(true)
   }, [])
 
   useEffect(() => {
-    const fetchPosts = async () => {
+    if (!isClient) return
+
+    document.body.classList.add("community-page")
+
+    const communityNavEvent = new CustomEvent("communityPageActive", {
+      detail: { categories, selectedCategory },
+    })
+    window.dispatchEvent(communityNavEvent)
+
+    return () => {
+      document.body.classList.remove("community-page")
+      const communityNavEvent = new CustomEvent("communityPageInactive")
+      window.dispatchEvent(communityNavEvent)
+    }
+  }, [categories, selectedCategory, isClient])
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  const loadCategories = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("community_categories")
+        .select("*")
+        .eq("is_active", true)
+        .order("display_order", { ascending: true })
+
+      if (error) throw error
+
+      setCategories(data || [])
+      if (data && data.length > 0 && !selectedCategory) {
+        setSelectedCategory(data[0].id)
+      }
+    } catch (error) {
+      console.error("Error loading categories:", error)
+      const fallbackCategories = [
+        { id: 1, name: "General", slug: "general", icon: "💬", color: "#25D366", is_active: true },
+        { id: 2, name: "Music", slug: "music", icon: "🎵", color: "#128C7E", is_active: true },
+        { id: 3, name: "Events", slug: "events", icon: "📅", color: "#075E54", is_active: true },
+      ]
+      setCategories(fallbackCategories)
+      setSelectedCategory(1)
+    }
+  }, [selectedCategory, supabase])
+
+  const loadPosts = useCallback(async () => {
+    if (!selectedCategory) return
+
+    try {
+      setLoading(true)
       const { data, error } = await supabase
         .from("community_posts")
         .select(`
@@ -39,111 +152,93 @@ const CommunityPage = () => {
           user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
           category:community_categories!community_posts_category_id_fkey(id, name, slug)
         `)
-        .order("created_at", { ascending: false })
+        .eq("category_id", selectedCategory)
+        .eq("is_published", true)
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: true })
+        .limit(50)
 
-      if (error) {
-        console.error("Error fetching posts:", error)
-        toast.error("Failed to load posts")
-      } else {
-        setPosts(data)
-      }
+      if (error) throw error
+
+      const transformedPosts = (data || []).map((post) => ({
+        id: post.id,
+        content: post.content,
+        created_at: post.created_at,
+        vote_count: post.vote_count || 0,
+        comment_count: post.comment_count || 0,
+        media_url: post.media_url,
+        media_type: post.media_type,
+        user: post.user || {
+          id: "unknown",
+          username: "Unknown User",
+          full_name: "Unknown User",
+          avatar_url: null,
+          tier: "FREE",
+        },
+        category: post.category || {
+          id: selectedCategory,
+          name: "General",
+          slug: "general",
+        },
+        has_voted: false,
+      }))
+
+      setPosts(transformedPosts)
+      setTimeout(scrollToBottom, 100)
+    } catch (error) {
+      console.error("Error loading posts:", error)
+    } finally {
+      setLoading(false)
     }
+  }, [selectedCategory, supabase])
 
-    fetchPosts()
-  }, [supabase])
+  const loadComments = useCallback(
+    async (postId: number) => {
+      try {
+        const { data, error } = await supabase
+          .from("community_comments")
+          .select(`
+          *,
+          user:users!community_comments_user_id_fkey(id, username, full_name, avatar_url, tier)
+        `)
+          .eq("post_id", postId)
+          .eq("is_deleted", false)
+          .order("created_at", { ascending: true })
+
+        if (error) throw error
+
+        const transformedComments = (data || []).map((comment) => ({
+          id: comment.id,
+          content: comment.content,
+          created_at: comment.created_at,
+          like_count: comment.like_count || 0,
+          user: comment.user || {
+            id: "unknown",
+            username: "Unknown User",
+            full_name: "Unknown User",
+            avatar_url: null,
+            tier: "FREE",
+          },
+          has_liked: false,
+        }))
+
+        setComments((prev) => ({ ...prev, [postId]: transformedComments }))
+      } catch (error) {
+        console.error("Error loading comments:", error)
+      }
+    },
+    [supabase],
+  )
 
   const containsURL = (text: string): boolean => {
-    if (!FEATURE_UI_FIXES_V1) {
-      // Original basic URL detection
-      const urlPatterns = [
-        /https?:\/\/[^\s]+/gi, // http/https URLs
-        /www\.[^\s]+/gi, // www.domain.com
-        /\b[a-z0-9.-]+\.(com|net|org|xyz|info|io|co|uk|ca|de|fr|jp|au|in|br|ru|cn|gov|edu|mil)\b/gi, // domain.extension
-        /[a-z0-9.-]+\.(com|net|org|xyz|info|io|co|uk|ca|de|fr|jp|au|in|br|ru|cn|gov|edu|mil)\/[^\s]*/gi, // domain.extension/path
-      ]
-      return urlPatterns.some((pattern) => pattern.test(text))
-    }
-
-    // Enhanced URL detection patterns - simplified to avoid regex complexity issues
-    const enhancedUrlPatterns = [
-      // Standard HTTP/HTTPS URLs
-      /https?:\/\/[^\s]+/gi,
-
-      // www.domain patterns
-      /www\.[a-z0-9.-]+\.[a-z]{2,}/gi,
-
-      // Domain.extension patterns with common TLDs
-      /\b[a-z0-9.-]+\.(com|net|org|edu|gov|mil|co|uk|ca|au|de|fr|jp|cn|in|br|ru|info|biz|io|xyz|me|tv|cc|ly|gl|to|be|it|us|nl|se|no|dk|fi|pl|cz|hu|ro|bg|hr|si|sk|ee|lv|lt|ie|pt|gr|cy|mt|lu|at|ch|li|is|ad|mc|sm|va|gi|im|je|gg)\b/gi,
-
-      // Popular URL shorteners (simplified list)
-      /\b(bit\.ly|tinyurl\.com|t\.co|goo\.gl|ow\.ly|short\.link|tiny\.cc|is\.gd|youtu\.be|amzn\.to|fb\.me|lnkd\.in|wp\.me|buff\.ly|ift\.tt|dlvr\.it|po\.st|shar\.es|su\.pr|j\.mp|snipurl\.com|tr\.im|tl\.gd|cli\.gs|go\.usa\.gov|1\.usa\.gov|tweez\.me|budurl\.com|ff\.im|url\.ie|short\.ie|prettylinkpro\.com|scrnch\.me|filoops\.info|virl\.com|2tu\.us|lnk\.gd|qr\.ae|cutt\.us|b23\.ru|short\.gy|rb\.gy|short\.link|tiny\.one|t2mio\.com|lstu\.fr|kutt\.it|polr\.me|short\.cm|git\.io|aka\.ms|s\.id|chilp\.it|clicky\.me|budurl\.com|shorl\.com|xr\.com|u\.nu|metamark\.net|makeashorterlink\.com|tinyarrows\.com|6url\.com|shorturl\.com|icanhaz\.com|easyurl\.net|doiop\.com|littleurl\.net|lnk\.ms|sn\.im|tiny\.pl|zi\.ma|korta\.nu|shrten\.com|x\.co|2big\.at|dwarfurl\.com|easyuri\.com|ezurl\.cc|fa\.b|fon\.gs|freak\.to|fuseurl\.com|fuzzy\.to|g00\.me|hit\.my|id\.tl|iscool\.net|just\.as|kissa\.be|kl\.am|klck\.me|korta\.nu|krunchd\.com|l9k\.net|liltext\.com|linkbee\.com|linkto\.run|liurl\.cn|ln-s\.net|lnk\.gd|lnk\.ms|lnkd\.in|lnkurl\.com|lru\.jp|lt\.tl|lurl\.no|lynk\.my|m1p\.fr|makeagif\.com|mcaf\.ee|mdl29\.net|merky\.de|migre\.me|miniurl\.com|minurl\.fr|mke\.me|moby\.to|moourl\.com|mrte\.ch|myloc\.me|myurl\.in|n\.pr|nbc\.co|nblo\.gs|nn\.nf|not\.my|notlong\.com|nsfw\.in|nutshellurl\.com|nxy\.in|nyti\.ms|o-x\.fr|oc1\.us|om\.ly|omf\.gd|omoikane\.net|onforb\.es|orz\.se|ow\.ly|p\.pw|para\.pt|parky\.tv|past\.is|pdh\.co|ph\.dog|pich\.in|pin\.st|ping\.fm|piurl\.com|pli\.gs|pnt\.me|politi\.co|post\.ly|pp\.gg|profile\.to|ptiturl\.com|qlnk\.net|qte\.me|qu\.tc|qy\.fi|r\.im|rb6\.me|read\.bi|readability\.com|reallytinyurl\.com|redir\.ec|redirects\.ca|redirx\.com|retwt\.me|ri\.ms|rickroll\.it|riz\.gd|rt\.nu|ru\.ly|rubyurl\.com|rurl\.org|rww\.tw|s4c\.in|s7y\.us|safe\.mn|sameurl\.com|sdut\.us|shar\.es|shink\.de|shorl\.com|short\.ie|shortlinks\.co\.uk|shorturl\.com|shout\.to|show\.my|shrinkify\.com|shrinkr\.com|shrt\.fr|shrunkin\.com|simurl\.com|slate\.me|smallr\.com|smsh\.me|smurl\.name|sn\.im|snipr\.com|snipurl\.com|snurl\.com|sp2\.ro|spedr\.com|srnk\.net|srs\.li|starturl\.com|su\.pr|surl\.co\.uk|surl\.hu|t\.cn|t\.co|t\.lh\.com|ta\.gd|tbd\.ly|tcrn\.ch|tgr\.me|tgr\.ph|tighturl\.com|tiniuri\.com|tiny\.cc|tiny\.ly|tiny\.pl|tinylink\.in|tinyuri\.ca|tinyurl\.com|tl\.gd|tmi\.me|tnij\.org|tnw\.to|tny\.com|to\.ly|togoto\.us|totc\.us|toysr\.us|tpm\.ly|tr\.im|tra\.kz|trunc\.it|twhub\.com|twirl\.at|twitclicks\.com|twitterpan\.com|twitterurl\.net|twitterurl\.org|twiturl\.de|twurl\.cc|twurl\.nl|u\.mavrev\.com|u\.nu|u76\.org|ub0\.cc|ulu\.lu|updating\.me|ur1\.ca|url\.az|url\.co\.uk|url\.ie|url4\.eu|urlborg\.com|urlbrief\.com|urlcover\.com|urlcut\.com|urlenco\.de|urli\.nl|urls\.im|urlx\.ie|urlzen\.com|usat\.ly|use\.my|vb\.ly|vgn\.am|virl\.com|vl\.am|vm\.lc|w55c\.net|wapo\.st|wapurl\.co\.uk|wipi\.es|wp\.me|x\.vu|xr\.com|xrl\.in|xrl\.us|xurl\.es|xzb\.cc|yatuc\.com|ye\.pe|yep\.it|yfrog\.com|yhoo\.it|yiyd\.com|youtu\.be|yuarel\.com|z0p\.de|zi\.ma|zi\.mu|zipmyurl\.com|zud\.me|zurl\.ws|zws\.im|zyva\.org)\/[^\s]*/gi,
-
-      // IP addresses (IPv4)
-      /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?::[0-9]+)?\b/gi,
-
-      // Domain patterns without protocol
-      /\b[a-z0-9.-]+\.[a-z]{2,}\/[^\s]*/gi,
-
-      // Email addresses (often used to bypass filters)
-      /\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/gi,
-
-      // Common obfuscation patterns
-      /h..p[s]?:\/\/[^\s]+/gi,
-      /w{3}\.[^\s]+/gi,
-
-      // URL-like patterns with spaces or special characters (bypass attempts)
-      /\b[a-z0-9.-]+\s*\.\s*[a-z]{2,}/gi,
-      /\b[a-z0-9.-]+\[dot\][a-z]{2,}/gi,
+    const urlPatterns = [
+      /https?:\/\/[^\s]+/gi, // http/https URLs
+      /www\.[^\s]+/gi, // www.domain.com
+      /\b[a-z0-9.-]+\.(com|net|org|xyz|info|io|co|uk|ca|de|fr|jp|au|in|br|ru|cn|gov|edu|mil)\b/gi, // domain.extension
+      /[a-z0-9.-]+\.(com|net|org|xyz|info|io|co|uk|ca|de|fr|jp|au|in|br|ru|cn|gov|edu|mil)\/[^\s]*/gi, // domain.extension/path
     ]
 
-    return enhancedUrlPatterns.some((pattern) => pattern.test(text))
-  }
-
-  // Enhanced content validation with security measures
-  const validateContent = (text: string): { isValid: boolean; reason?: string } => {
-    if (!FEATURE_UI_FIXES_V1) {
-      return { isValid: true }
-    }
-
-    // Check for URLs
-    if (containsURL(text)) {
-      return { isValid: false, reason: "Links and URLs are not allowed in community posts" }
-    }
-
-    // Check for suspicious patterns
-    const suspiciousPatterns = [
-      // Potential spam indicators
-      /\b(click here|visit now|limited time|act now|urgent|free money|make money|work from home|get rich|lose weight|miracle cure)\b/gi,
-
-      // Potential phishing indicators
-      /\b(verify account|suspended account|click to verify|update payment|confirm identity|security alert)\b/gi,
-
-      // Excessive repetition (spam indicator)
-      /(.)\1{10,}/gi, // Same character repeated 10+ times
-      /(\b\w+\b)(\s+\1){5,}/gi, // Same word repeated 5+ times
-
-      // Excessive caps (spam indicator)
-      /[A-Z]{20,}/g, // 20+ consecutive caps
-    ]
-
-    for (const pattern of suspiciousPatterns) {
-      if (pattern.test(text)) {
-        return { isValid: false, reason: "Content appears to be spam or suspicious" }
-      }
-    }
-
-    // Check content length
-    if (text.length > 2000) {
-      return { isValid: false, reason: "Content is too long (max 2000 characters)" }
-    }
-
-    // Check for excessive special characters (potential spam)
-    const specialCharCount = (text.match(/[!@#$%^&*()_+={}[\]|\\:";'<>?,./]/g) || []).length
-    if (specialCharCount > text.length * 0.3) {
-      return { isValid: false, reason: "Content contains too many special characters" }
-    }
-
-    return { isValid: true }
+    return urlPatterns.some((pattern) => pattern.test(text))
   }
 
   const handleUnifiedSubmit = async () => {
@@ -154,20 +249,7 @@ const CommunityPage = () => {
       return
     }
 
-    // Enhanced content validation with detailed error messages
-    const validation = validateContent(unifiedInput)
-    if (!validation.isValid) {
-      toast.error(validation.reason || "Content validation failed", {
-        description: FEATURE_UI_FIXES_V1
-          ? "Please share your thoughts without including URLs, excessive caps, or spam-like content"
-          : "Please share your thoughts without including URLs",
-        duration: 4000,
-      })
-      return
-    }
-
-    // Legacy URL check for backward compatibility
-    if (!FEATURE_UI_FIXES_V1 && containsURL(unifiedInput)) {
+    if (containsURL(unifiedInput)) {
       toast.error("Links are not allowed in community posts", {
         description: "Please share your thoughts without including URLs",
         duration: 4000,
@@ -279,94 +361,568 @@ const CommunityPage = () => {
     }
   }
 
-  return (
-    <div className="flex flex-col h-screen">
-      {/* Header */}
-      <div className="bg-background p-4 border-b">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Community</h1>
-          {/* Search bar */}
-          <div className="relative">
-            <Input type="text" placeholder="Search..." className="pl-10" />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          </div>
-        </div>
-      </div>
+  const handleMediaSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+    if (files.length === 0) return
 
-      {/* Main content */}
-      <ScrollArea ref={scrollAreaRef} className="flex-1">
-        {/* Posts */}
-        {posts.map((post) => (
-          <div key={post.id} className="p-4 border-b">
-            <div className="flex items-center space-x-4">
-              <Avatar>
-                <AvatarImage src={post.user.avatar_url || "/placeholder.svg"} alt={post.user.username} />
-                <AvatarFallback>{post.user.username.charAt(0).toUpperCase()}</AvatarFallback>
-              </Avatar>
-              <div>
-                <div className="flex items-center space-x-2">
-                  <span className="font-semibold">{post.user.username}</span>
-                  <UserTierBadge tier={post.user.tier} />
+    const validFiles = files.filter((file) => {
+      const isValidType =
+        file.type.startsWith("image/") || file.type.startsWith("video/") || file.type.startsWith("audio/")
+      const isValidSize = file.size <= 10 * 1024 * 1024
+
+      if (!isValidType) {
+        toast.error(`${file.name} is not a supported media type`)
+        return false
+      }
+      if (!isValidSize) {
+        toast.error(`${file.name} is too large (max 10MB)`)
+        return false
+      }
+      return true
+    })
+
+    if (validFiles.length === 0) return
+
+    setSelectedMedia(validFiles)
+
+    const previews = validFiles.map((file) => URL.createObjectURL(file))
+    setMediaPreview(previews)
+  }
+
+  const removeMedia = (index: number) => {
+    const newMedia = selectedMedia.filter((_, i) => i !== index)
+    const newPreviews = mediaPreview.filter((_, i) => i !== index)
+
+    URL.revokeObjectURL(mediaPreview[index])
+
+    setSelectedMedia(newMedia)
+    setMediaPreview(newPreviews)
+  }
+
+  const voteOnPost = async (postId: number) => {
+    if (!isAuthenticated || !profile) {
+      toast.error("Please sign in to vote")
+      return
+    }
+
+    try {
+      const post = posts.find((p) => p.id === postId)
+      if (!post) return
+
+      if (post.has_voted) {
+        await supabase.from("community_post_votes").delete().eq("post_id", postId).eq("user_id", profile.id)
+      } else {
+        await supabase.from("community_post_votes").insert({
+          post_id: postId,
+          user_id: profile.id,
+        })
+      }
+
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? {
+                ...p,
+                has_voted: !p.has_voted,
+                vote_count: p.has_voted ? p.vote_count - 1 : p.vote_count + 1,
+              }
+            : p,
+        ),
+      )
+
+      toast.success(post.has_voted ? "Vote removed" : "Vote added!")
+    } catch (error) {
+      console.error("Error voting:", error)
+      toast.error("Failed to vote")
+    }
+  }
+
+  const filteredPosts = posts.filter(
+    (post) =>
+      searchQuery === "" ||
+      post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.user.username.toLowerCase().includes(searchQuery.toLowerCase()),
+  )
+
+  useEffect(() => {
+    loadCategories()
+  }, [loadCategories])
+
+  useEffect(() => {
+    if (selectedCategory) {
+      loadPosts()
+    }
+  }, [selectedCategory, loadPosts])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [posts])
+
+  useEffect(() => {
+    if (!selectedCategory) return
+
+    const postsSubscription = supabase
+      .channel(`posts-${selectedCategory}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "community_posts",
+          filter: `category_id=eq.${selectedCategory}`,
+        },
+        (payload) => {
+          loadPosts()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(postsSubscription)
+    }
+  }, [selectedCategory, supabase, loadPosts])
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div
+        className={cn(
+          "flex h-screen overflow-hidden",
+          FEATURE_UI_FIXES_V1 ? "bg-white dark:bg-gray-950" : "bg-gray-50 dark:bg-gray-900",
+        )}
+      >
+        <motion.div
+          initial={{ x: -300 }}
+          animate={{ x: sidebarOpen || (isClient && window.innerWidth >= 768) ? 0 : -300 }}
+          transition={{ type: "spring", damping: 25, stiffness: 200 }}
+          className={cn(
+            "w-80 flex flex-col",
+            "fixed md:relative z-50 md:z-auto h-full shadow-xl md:shadow-none",
+            FEATURE_UI_FIXES_V1
+              ? "bg-white dark:bg-gray-950 border-r border-gray-100 dark:border-gray-800"
+              : "bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700",
+          )}
+        >
+          <div
+            className={cn(
+              "p-4 border-b",
+              FEATURE_UI_FIXES_V1
+                ? "bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800"
+                : "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+                  <Zap className="h-5 w-5 text-white" />
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                </p>
+                <div>
+                  <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Community</h1>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Stay connected</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setSidebarOpen(false)}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="p-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
+              <Input
+                placeholder="Search conversations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={cn(
+                  "pl-10 rounded-full placeholder:text-gray-500 dark:placeholder:text-gray-400",
+                  FEATURE_UI_FIXES_V1
+                    ? "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700"
+                    : "bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600",
+                )}
+              />
+            </div>
+          </div>
+
+          <ScrollArea className="flex-1 px-2">
+            <div className="space-y-1">
+              {categories.map((category) => (
+                <motion.div
+                  key={category.id}
+                  whileHover={{ backgroundColor: FEATURE_UI_FIXES_V1 ? "rgba(0,0,0,0.03)" : "rgba(0,0,0,0.05)" }}
+                  whileTap={{ scale: 0.98 }}
+                  className={cn(
+                    "flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-all duration-200",
+                    selectedCategory === category.id
+                      ? FEATURE_UI_FIXES_V1
+                        ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800"
+                        : "bg-green-100 dark:bg-green-900/20 border-l-4 border-green-500"
+                      : "hover:bg-gray-50 dark:hover:bg-gray-800/50",
+                  )}
+                  onClick={() => {
+                    setSelectedCategory(category.id)
+                    setSidebarOpen(false)
+                    setActivePost(null)
+                  }}
+                >
+                  <div
+                    className={cn(
+                      "w-12 h-12 rounded-full flex items-center justify-center text-xl",
+                      FEATURE_UI_FIXES_V1 ? "bg-gray-100 dark:bg-gray-800" : "bg-gray-200 dark:bg-gray-600",
+                    )}
+                  >
+                    {category.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900 dark:text-white truncate">{category.name}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                      {posts.filter((p) => p.category.id === category.id).length} messages
+                    </div>
+                  </div>
+                  {selectedCategory === category.id && <div className="w-2 h-2 rounded-full bg-green-500"></div>}
+                </motion.div>
+              ))}
+            </div>
+          </ScrollArea>
+
+          {isAuthenticated && profile && (
+            <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center space-x-3 p-2 rounded-lg bg-gray-100 dark:bg-gray-700">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} />
+                  <AvatarFallback className="bg-green-500 text-white font-semibold">
+                    {profile.username?.charAt(0).toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-gray-900 dark:text-white text-sm truncate">{profile.username}</div>
+                  <UserTierBadge tier={profile.tier} size="sm" />
+                </div>
+                <Button variant="ghost" size="sm">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
               </div>
             </div>
-            <div className="mt-4">
-              <p>{post.content}</p>
-              {post.media_url && (
-                <div className="mt-4">
-                  {post.media_type === "image" && (
-                    <img src={post.media_url || "/placeholder.svg"} alt="Post media" className="max-w-full h-auto" />
-                  )}
-                  {post.media_type === "video" && (
-                    <video controls className="max-w-full h-auto">
-                      <source src={post.media_url} type="video/mp4" />
-                      Your browser does not support the video tag.
-                    </video>
-                  )}
-                  {post.media_type === "audio" && (
-                    <audio controls className="max-w-full">
-                      <source src={post.media_url} type="audio/mpeg" />
-                      Your browser does not support the audio element.
-                    </audio>
-                  )}
+          )}
+        </motion.div>
+
+        <div
+          className={cn(
+            "flex-1 flex flex-col min-w-0",
+            FEATURE_UI_FIXES_V1 ? "bg-white dark:bg-gray-950" : "bg-white dark:bg-gray-900",
+          )}
+        >
+          <div
+            className={cn(
+              "p-4 border-b sticky top-0 z-20 backdrop-blur-sm",
+              FEATURE_UI_FIXES_V1
+                ? "bg-white/95 dark:bg-gray-950/95 border-gray-100 dark:border-gray-800"
+                : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700",
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setSidebarOpen(true)}>
+                  <Menu className="h-5 w-5" />
+                </Button>
+                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-lg">
+                  {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {categories.find((c) => c.id === selectedCategory)?.name || "General"}
+                  </h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {activePost ? "Reply to message" : `${filteredPosts.length} messages`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                {activePost && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setActivePost(null)}
+                    className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                  >
+                    Back to feed
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" className="hover:bg-gray-100 dark:hover:bg-gray-800">
+                  <Search className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="sm" className="hover:bg-gray-100 dark:hover:bg-gray-800">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pb-32">
+            <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+              <AnimatePresence>
+                {filteredPosts.map((post, index) => (
+                  <motion.div
+                    key={post.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ delay: index * 0.05 }}
+                    className={cn(
+                      "group transition-all duration-200",
+                      FEATURE_UI_FIXES_V1
+                        ? "bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 hover:shadow-md hover:border-gray-200 dark:hover:border-gray-700"
+                        : "flex space-x-3",
+                      activePost === post.id && "ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-950/10",
+                    )}
+                  >
+                    <div className="flex space-x-3">
+                      <Avatar className="h-12 w-12 flex-shrink-0">
+                        <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
+                        <AvatarFallback className="bg-green-500 text-white font-semibold">
+                          {post.user.username.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className="font-semibold text-gray-900 dark:text-white">
+                            {post.user.full_name || post.user.username}
+                          </span>
+                          <UserTierBadge tier={post.user.tier} size="sm" />
+                          <span className="text-gray-500 dark:text-gray-400">·</span>
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                            {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                          </span>
+                        </div>
+
+                        <p className="text-gray-900 dark:text-white leading-relaxed break-words mb-3 text-[15px]">
+                          {post.content}
+                        </p>
+
+                        <div className="flex items-center space-x-6 mt-3">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "h-8 px-3 rounded-full transition-all duration-200 group/btn",
+                              post.has_voted
+                                ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                                : "text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30",
+                            )}
+                            onClick={() => voteOnPost(post.id)}
+                          >
+                            <Heart
+                              className={cn(
+                                "h-4 w-4 mr-1 transition-transform group-hover/btn:scale-110",
+                                post.has_voted && "fill-current",
+                              )}
+                            />
+                            <span className="text-sm font-medium">{post.vote_count}</span>
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "h-8 px-3 rounded-full transition-all duration-200 group/btn",
+                              activePost === post.id
+                                ? "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                                : "text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30",
+                            )}
+                            onClick={() => {
+                              if (activePost === post.id) {
+                                setActivePost(null)
+                              } else {
+                                setActivePost(post.id)
+                                loadComments(post.id)
+                              }
+                            }}
+                          >
+                            <MessageCircle className="h-4 w-4 mr-1 transition-transform group-hover/btn:scale-110" />
+                            <span className="text-sm font-medium">{post.comment_count}</span>
+                          </Button>
+                        </div>
+
+                        <AnimatePresence>
+                          {activePost === post.id && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-3"
+                            >
+                              {comments[post.id]?.map((comment) => (
+                                <motion.div
+                                  key={comment.id}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  className="flex space-x-3"
+                                >
+                                  <Avatar className="h-8 w-8 flex-shrink-0">
+                                    <AvatarImage src={comment.user.avatar_url || "/placeholder-user.jpg"} />
+                                    <AvatarFallback className="bg-gray-500 text-white text-xs">
+                                      {comment.user.username.charAt(0).toUpperCase()}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1">
+                                    <div className="flex items-center space-x-2 mb-1">
+                                      <span className="font-medium text-gray-900 dark:text-white text-sm">
+                                        {comment.user.username}
+                                      </span>
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                      </span>
+                                    </div>
+                                    <p className="text-gray-900 dark:text-white text-sm leading-relaxed">
+                                      {comment.content}
+                                    </p>
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div
+            className={cn(
+              "fixed bottom-0 left-0 right-0 md:left-80 border-t backdrop-blur-sm z-30",
+              FEATURE_UI_FIXES_V1
+                ? "bg-white/95 dark:bg-gray-950/95 border-gray-100 dark:border-gray-800"
+                : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700",
+            )}
+          >
+            <div className="p-4">
+              {mediaPreview.length > 0 && (
+                <div className="mb-3 flex space-x-2 overflow-x-auto">
+                  {mediaPreview.map((preview, index) => (
+                    <div key={index} className="relative flex-shrink-0">
+                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+                        {selectedMedia[index].type.startsWith("image/") ? (
+                          <img
+                            src={preview || "/placeholder.svg"}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : selectedMedia[index].type.startsWith("video/") ? (
+                          <video src={preview} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Mic className="h-6 w-6 text-gray-400" />
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full"
+                        onClick={() => removeMedia(index)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               )}
-            </div>
-            <div className="mt-4 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Heart className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">{post.vote_count}</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">{post.comment_count}</span>
-              </div>
+
+              {isAuthenticated ? (
+                <div className="flex items-end space-x-3 max-w-2xl mx-auto">
+                  <Avatar className="h-10 w-10 flex-shrink-0">
+                    <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
+                    <AvatarFallback className="bg-green-500 text-white font-semibold">
+                      {profile?.username?.charAt(0).toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 relative">
+                    <Input
+                      ref={inputRef}
+                      placeholder={activePost ? "Reply to this message..." : "What's happening?"}
+                      value={unifiedInput}
+                      onChange={(e) => setUnifiedInput(e.target.value)}
+                      className={cn(
+                        "pr-32 rounded-full focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200",
+                        "placeholder:text-gray-500 dark:placeholder:text-gray-400 text-base px-4 py-3",
+                        FEATURE_UI_FIXES_V1
+                          ? "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
+                          : "border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800",
+                      )}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault()
+                          handleUnifiedSubmit()
+                        }
+                      }}
+                    />
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <ImageIcon className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                      >
+                        <Smile className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={handleUnifiedSubmit}
+                    disabled={!unifiedInput.trim() && selectedMedia.length === 0}
+                    className="h-10 w-10 p-0 rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 transition-all duration-200 disabled:cursor-not-allowed"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <div
+                    className={cn(
+                      "rounded-2xl border p-6 max-w-md mx-auto",
+                      FEATURE_UI_FIXES_V1
+                        ? "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700"
+                        : "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
+                    )}
+                  >
+                    <p className="text-gray-600 dark:text-gray-400 mb-4">Join the conversation</p>
+                    <Button asChild className="bg-green-500 hover:bg-green-600 rounded-full px-8">
+                      <a href="/login">Sign In</a>
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,video/*,audio/*"
+                onChange={handleMediaSelect}
+                className="hidden"
+              />
             </div>
           </div>
-        ))}
-      </ScrollArea>
-
-      {/* Footer */}
-      <div className="bg-background p-4 border-t">
-        <Input
-          type="text"
-          placeholder="Write a message..."
-          value={unifiedInput}
-          onChange={(e) => setUnifiedInput(e.target.value)}
-          className="w-full mb-4"
-        />
-        {/* Media upload */}
-        <div className="flex items-center space-x-2">
-          <ImageIcon className="h-5 w-5 text-muted-foreground" />
-          <Mic className="h-5 w-5 text-muted-foreground" />
-          <Button onClick={handleUnifiedSubmit}>Send</Button>
         </div>
+
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/30 z-40 md:hidden backdrop-blur-sm"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
       </div>
     </div>
   )
 }
-
-export default CommunityPage
