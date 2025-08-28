@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server"
 import { updateSession } from "@/lib/supabase/middleware"
+import { NextResponse } from "next/server"
 
 export async function middleware(request: NextRequest) {
   try {
@@ -7,7 +8,6 @@ export async function middleware(request: NextRequest) {
     return response
   } catch (error: any) {
     console.error("[SERVER] Middleware execution failed:", error.message)
-    const { NextResponse } = await import("next/server")
     return NextResponse.next({
       request,
     })

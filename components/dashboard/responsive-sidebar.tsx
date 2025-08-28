@@ -37,6 +37,7 @@ import { DynamicLogo } from "@/components/dynamic-logo"
 import { CoinBalance } from "@/components/coin-balance"
 import { UserTierBadge } from "@/components/user-tier-badge"
 import { cn } from "@/lib/utils"
+import { useMediaQuery } from "@/hooks/use-media-query"
 
 interface SidebarItem {
   name: string
@@ -137,6 +138,7 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
   const pathname = usePathname()
   const { user, profile, signOut } = useAuth()
   const { theme, setTheme, resolvedTheme } = useTheme()
+  const isMobile = useMediaQuery("(max-width: 768px)")
 
   // Screen size detection with debouncing
   const updateScreenSize = useCallback(() => {
