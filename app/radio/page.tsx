@@ -1,1047 +1,427 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Slider } from "@/components/ui/slider"
+import { Badge } from "@/components/ui/badge"
 import {
   Play,
   Pause,
-  Volume2,
-  VolumeX,
   SkipForward,
   SkipBack,
-  Radio,
-  Users,
-  MessageCircle,
+  Volume2,
+  VolumeX,
   Heart,
-  Flame,
-  Brain,
-  Zap,
-  Shuffle,
-  Pin,
-  PinOff,
-  Clock,
-  Send,
+  MessageCircle,
+  Share2,
+  Radio,
+  Music,
+  Headphones,
+  Users,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Slider } from "@/components/ui/slider"
-import { cn } from "@/lib/utils"
-import { useAuth } from "@/contexts/auth-context"
-import { createClient } from "@/lib/supabase/client"
 import { AnimatedRadioCharacter } from "@/components/radio/animated-radio-character"
-import { useTheme } from "next-themes"
+import { EnhancedShoutOut } from "@/components/radio/enhanced-shout-out"
+import { useAuth } from "@/contexts/auth-context"
+
+const FEATURE_UI_FIXES_V1 = process.env.NEXT_PUBLIC_FEATURE_UI_FIXES_V1 === "true"
 
 interface Track {
   id: string
   title: string
   artist: string
-  artwork_url: string
-  duration_ms: number
-  mood_category: string
-  is_pinned?: boolean
+  duration: number
+  url: string
 }
 
-interface MoodCategory {
+interface ShoutOut {
   id: string
-  name: string
-  emoji: string
-  color: string
-  gradient: string
-  description: string
-  icon: React.ReactNode
+  message: string
+  username: string
+  timestamp: Date
+  type: "dedication" | "shoutout" | "request"
 }
 
-interface NextShow {
-  title: string
-  time: string
-}
-
-const moodCategories: MoodCategory[] = [
+const mockTracks: Track[] = [
   {
-    id: "turn-up",
-    name: "Turn Up",
-    emoji: "🔥",
-    color: "from-red-500 to-orange-500",
-    gradient: "bg-gradient-to-br from-red-500/20 to-orange-500/20",
-    description: "Hype / Party Vibes",
-    icon: <Flame className="w-8 h-8" />,
+    id: "1",
+    title: "Paper Boi",
+    artist: "Erigga",
+    duration: 240,
+    url: "/audio/paper-boi.mp3",
   },
   {
-    id: "reflective",
-    name: "Reflective",
-    emoji: "🧠",
-    color: "from-purple-500 to-blue-500",
-    gradient: "bg-gradient-to-br from-purple-500/20 to-blue-500/20",
-    description: "Street Wisdom",
-    icon: <Brain className="w-8 h-8" />,
+    id: "2",
+    title: "The Erigma",
+    artist: "Erigga",
+    duration: 180,
+    url: "/audio/the-erigma.mp3",
   },
   {
-    id: "love-emotions",
-    name: "Love & Emotions",
-    emoji: "❤️",
-    color: "from-pink-500 to-rose-500",
-    gradient: "bg-gradient-to-br from-pink-500/20 to-rose-500/20",
-    description: "Heart & Soul",
-    icon: <Heart className="w-8 h-8" />,
-  },
-  {
-    id: "motivation",
-    name: "Motivation",
-    emoji: "💪",
-    color: "from-green-500 to-emerald-500",
-    gradient: "bg-gradient-to-br from-green-500/20 to-emerald-500/20",
-    description: "Hustle & Grind",
-    icon: <Zap className="w-8 h-8" />,
-  },
-  {
-    id: "freestyle",
-    name: "Freestyle",
-    emoji: "🎭",
-    color: "from-yellow-500 to-amber-500",
-    gradient: "bg-gradient-to-br from-yellow-500/20 to-amber-500/20",
-    description: "Mixed Vibes",
-    icon: <Shuffle className="w-8 h-8" />,
+    id: "3",
+    title: "Motivation",
+    artist: "Erigga ft. Victor AD",
+    duration: 200,
+    url: "/audio/motivation.mp3",
   },
 ]
 
-const ERIGGA_AUDIO_URL =
-  "https://yor5bfsajnljnrjg.public.blob.vercel-storage.com/Erigga-Ft-Great-Adamz-Around-9-%28TrendyBeatz.com%29.mp3"
+const mockShoutOuts: ShoutOut[] = [
+  {
+    id: "1",
+    message: "Big up Erigga! This track is fire! 🔥 Much love from Warri!",
+    username: "warri_boy",
+    timestamp: new Date(),
+    type: "shoutout",
+  },
+  {
+    id: "2",
+    message: "Can you play 'Paper Boi' next? That's my jam! Dedication to all the hustlers out there.",
+    username: "hustler_queen",
+    timestamp: new Date(),
+    type: "dedication",
+  },
+  {
+    id: "3",
+    message: "Request: Please play some old school Erigga tracks. The classics never get old!",
+    username: "old_school_fan",
+    timestamp: new Date(),
+    type: "request",
+  },
+]
 
 export default function RadioPage() {
-  const { isAuthenticated, user } = useAuth()
-  const { theme } = useTheme()
-  const supabase = createClient()
+  const { user } = useAuth()
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTrack, setCurrentTrack] = useState(0)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [volume, setVolume] = useState([75])
+  const [isMuted, setIsMuted] = useState(false)
+  const [currentShoutOut, setCurrentShoutOut] = useState<ShoutOut | null>(null)
+  const [listeners, setListeners] = useState(1247)
   const audioRef = useRef<HTMLAudioElement>(null)
 
-  // Player state
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [volume, setVolume] = useState(70)
-  const [isMuted, setIsMuted] = useState(false)
-  const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(0)
-
-  // Radio state
-  const [selectedMood, setSelectedMood] = useState<string>("turn-up")
-  const [currentTrack, setCurrentTrack] = useState<Track | null>(null)
-  const [playlist, setPlaylist] = useState<Track[]>([])
-  const [pinnedTracks, setPinnedTracks] = useState<Track[]>([])
-  const [isLive, setIsLive] = useState(false)
-  const [liveTitle, setLiveTitle] = useState("")
-  const [listenerCount, setListenerCount] = useState(247)
-  const [dailyQuote, setDailyQuote] = useState("")
-  const [shoutouts, setShoutouts] = useState<string[]>([])
-  const [newShoutout, setNewShoutout] = useState("")
-  const [nextShow, setNextShow] = useState<NextShow | null>(null)
-
-  // Visual state
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
-  const [backgroundTheme, setBackgroundTheme] = useState("turn-up")
-
+  // Simulate live listener count
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)")
-    setPrefersReducedMotion(mediaQuery.matches)
-    const handleChange = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches)
-    mediaQuery.addEventListener("change", handleChange)
-    return () => mediaQuery.removeEventListener("change", handleChange)
+    const interval = setInterval(() => {
+      setListeners((prev) => prev + Math.floor(Math.random() * 10) - 5)
+    }, 5000)
+    return () => clearInterval(interval)
   }, [])
 
+  // Simulate shout-outs cycling
   useEffect(() => {
-    loadRadioData()
-    setupRealtimeSubscription()
+    const interval = setInterval(
+      () => {
+        const randomShoutOut = mockShoutOuts[Math.floor(Math.random() * mockShoutOuts.length)]
+        setCurrentShoutOut({
+          ...randomShoutOut,
+          timestamp: new Date(),
+        })
+      },
+      FEATURE_UI_FIXES_V1 ? 12000 : 8000,
+    ) // Longer intervals with feature flag
+
+    return () => clearInterval(interval)
   }, [])
 
+  // Audio time update
   useEffect(() => {
-    if (selectedMood) {
-      loadMoodPlaylist(selectedMood)
-      setBackgroundTheme(selectedMood)
+    const audio = audioRef.current
+    if (!audio) return
+
+    const updateTime = () => setCurrentTime(audio.currentTime)
+    audio.addEventListener("timeupdate", updateTime)
+    return () => audio.removeEventListener("timeupdate", updateTime)
+  }, [])
+
+  const togglePlay = () => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    if (isPlaying) {
+      audio.pause()
+    } else {
+      audio.play()
     }
-  }, [selectedMood])
-
-  const loadRadioData = async () => {
-    try {
-      // Load daily quote
-      const { data: quote } = await supabase
-        .from("daily_quotes")
-        .select("*")
-        .gte("created_at", new Date().toISOString().split("T")[0])
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single()
-
-      if (quote) {
-        setDailyQuote(quote.text)
-      }
-
-      // Load live broadcast status
-      const { data: broadcast } = await supabase.from("live_broadcasts").select("*").eq("status", "live").single()
-
-      if (broadcast) {
-        setIsLive(true)
-        setLiveTitle(broadcast.title)
-      }
-
-      // Load next scheduled show
-      const { data: nextBroadcast } = await supabase
-        .from("live_broadcasts")
-        .select("*")
-        .eq("status", "scheduled")
-        .gte("scheduled_time", new Date().toISOString())
-        .order("scheduled_time", { ascending: true })
-        .limit(1)
-        .single()
-
-      if (nextBroadcast) {
-        setNextShow({
-          title: nextBroadcast.title,
-          time: new Date(nextBroadcast.scheduled_time).toLocaleTimeString(),
-        })
-      }
-
-      // Load recent shoutouts
-      const { data: recentShoutouts } = await supabase
-        .from("community_shoutouts")
-        .select("message")
-        .order("created_at", { ascending: false })
-        .limit(10)
-
-      if (recentShoutouts) {
-        setShoutouts(recentShoutouts.map((s) => s.message))
-      }
-
-      // Load pinned tracks for user
-      if (user) {
-        const { data: pinned } = await supabase
-          .from("user_pinned_tracks")
-          .select(`
-            tracks (*)
-          `)
-          .eq("user_id", user.id)
-
-        if (pinned) {
-          setPinnedTracks(pinned.map((p) => p.tracks).filter(Boolean))
-        }
-      }
-    } catch (error) {
-      console.error("Error loading radio data:", error)
-    }
+    setIsPlaying(!isPlaying)
   }
 
-  const loadMoodPlaylist = async (mood: string) => {
-    try {
-      // Create a mock track for the selected mood using the provided audio
-      const mockTrack: Track = {
-        id: `${mood}-track`,
-        title: "Around 9",
-        artist: "Erigga Ft. Great Adamz",
-        artwork_url: "/erigga-album-cover.png",
-        duration_ms: 180000, // 3 minutes placeholder
-        mood_category: mood,
-        is_pinned: false,
-      }
-
-      setPlaylist([mockTrack])
-      setCurrentTrack(mockTrack)
-
-      // Update audio source
-      if (audioRef.current) {
-        audioRef.current.src = ERIGGA_AUDIO_URL
-        audioRef.current.load()
-      }
-    } catch (error) {
-      console.error("Error loading playlist:", error)
-    }
+  const nextTrack = () => {
+    setCurrentTrack((prev) => (prev + 1) % mockTracks.length)
+    setCurrentTime(0)
   }
 
-  const setupRealtimeSubscription = () => {
-    const channel = supabase
-      .channel("radio-updates")
-      .on("postgres_changes", { event: "*", schema: "public", table: "live_broadcasts" }, (payload) => {
-        if (payload.new?.status === "live") {
-          setIsLive(true)
-          setLiveTitle(payload.new.title)
-        } else if (payload.old?.status === "live") {
-          setIsLive(false)
-          setLiveTitle("")
-        }
-      })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "community_shoutouts" }, (payload) => {
-        if (payload.new) {
-          setShoutouts((prev) => [payload.new.message, ...prev.slice(0, 9)]) // Keep only 10 most recent
-        }
-      })
-      .subscribe()
-
-    return () => supabase.removeChannel(channel)
+  const prevTrack = () => {
+    setCurrentTrack((prev) => (prev - 1 + mockTracks.length) % mockTracks.length)
+    setCurrentTime(0)
   }
 
-  const togglePlayPause = async () => {
-    if (!audioRef.current) return
+  const toggleMute = () => {
+    const audio = audioRef.current
+    if (!audio) return
 
-    try {
-      if (isPlaying) {
-        audioRef.current.pause()
-      } else {
-        await audioRef.current.play()
-      }
-    } catch (error) {
-      console.error("Playback error:", error)
-    }
+    audio.muted = !isMuted
+    setIsMuted(!isMuted)
   }
 
-  const handleMoodSelect = (moodId: string) => {
-    setSelectedMood(moodId)
+  const handleVolumeChange = (value: number[]) => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    const newVolume = value[0]
+    audio.volume = newVolume / 100
+    setVolume(value)
   }
 
-  const togglePinTrack = async (track: Track) => {
-    if (!user) return
-
-    const isPinned = pinnedTracks.some((t) => t.id === track.id)
-
-    try {
-      if (isPinned) {
-        await supabase.from("user_pinned_tracks").delete().eq("user_id", user.id).eq("track_id", track.id)
-        setPinnedTracks((prev) => prev.filter((t) => t.id !== track.id))
-      } else {
-        await supabase.from("user_pinned_tracks").insert({
-          user_id: user.id,
-          track_id: track.id,
-        })
-        setPinnedTracks((prev) => [...prev, track])
-      }
-    } catch (error) {
-      console.error("Error toggling pin:", error)
-    }
+  const formatTime = (time: number) => {
+    const minutes = Math.floor(time / 60)
+    const seconds = Math.floor(time % 60)
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`
   }
 
-  const submitShoutout = async () => {
-    if (!newShoutout.trim() || !user) return
-
-    if (newShoutout.length > 200) {
-      alert("Shoutout must be 200 characters or less")
-      return
-    }
-
-    try {
-      const shoutoutText = `${user.user_metadata?.full_name || user.email}: ${newShoutout.trim()}`
-
-      // Add to local state immediately for better UX
-      setShoutouts((prev) => [shoutoutText, ...prev.slice(0, 9)]) // Keep only 10 most recent
-      setNewShoutout("")
-
-      // Save to database
-      const { error } = await supabase.from("fan_shoutouts").insert({
-        user_id: user.id,
-        message: newShoutout.trim(),
-        created_at: new Date().toISOString(),
-      })
-
-      if (error) {
-        console.error("Error saving shoutout:", error)
-        // Remove from local state if database save failed
-        setShoutouts((prev) => prev.slice(1))
-      }
-    } catch (error) {
-      console.error("Error submitting shoutout:", error)
-      setShoutouts((prev) => prev.slice(1))
-    }
-  }
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${mins}:${secs.toString().padStart(2, "0")}`
-  }
-
-  const selectedMoodData = moodCategories.find((m) => m.id === selectedMood) || moodCategories[0]
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-accent/10">
-        <Card className="glass-card p-8 text-center max-w-md">
-          <CardContent>
-            <Radio className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-            <h2 className="text-2xl font-bold mb-4">Sign In Required</h2>
-            <p className="text-muted-foreground mb-6">
-              Please sign in to access Erigga Radio and enjoy mood-based playlists.
-            </p>
-            <Button asChild className="w-full">
-              <a href="/login?redirect=/radio">Sign In</a>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
+  const track = mockTracks[currentTrack]
 
   return (
-    <div
-      className={cn(
-        "min-h-screen transition-all duration-1000",
-        theme === "dark"
-          ? selectedMoodData.gradient
-          : `bg-gradient-to-br from-gray-50 to-gray-100 dark:${selectedMoodData.gradient}`,
-      )}
-    >
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 opacity-5 dark:opacity-5">
-          {/* Lagos Skyline Silhouettes */}
-          <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/20 to-transparent" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+      {/* Enhanced Shout-Out Display */}
+      <EnhancedShoutOut currentShoutOut={currentShoutOut} className={FEATURE_UI_FIXES_V1 ? "md:top-24" : undefined} />
 
-          {/* Floating Graffiti Elements */}
-          {[...Array(8)].map((_, i) => (
-            <motion.div
-              key={i}
-              className={cn(
-                "absolute rounded-lg",
-                theme === "dark" ? selectedMoodData.color.replace("from-", "bg-") : "bg-gray-300/30",
-              )}
-              style={{
-                width: `${20 + i * 10}px`,
-                height: `${20 + i * 10}px`,
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-              }}
-              animate={
-                prefersReducedMotion
-                  ? {}
-                  : {
-                      x: [0, 50, -50, 0],
-                      y: [0, -30, 30, 0],
-                      rotate: [0, 180, 360],
-                      opacity: [0.1, 0.3, 0.1],
-                    }
-              }
-              transition={{
-                duration: 15 + i * 3,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "easeInOut",
-              }}
-            />
-          ))}
-        </div>
+      {/* Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <motion.div
+          className="absolute top-20 left-10 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl"
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.3, 0.6, 0.3],
+          }}
+          transition={{
+            duration: 8,
+            repeat: Number.POSITIVE_INFINITY,
+            ease: "easeInOut",
+          }}
+        />
+        <motion.div
+          className="absolute bottom-20 right-10 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"
+          animate={{
+            scale: [1.2, 1, 1.2],
+            opacity: [0.2, 0.5, 0.2],
+          }}
+          transition={{
+            duration: 10,
+            repeat: Number.POSITIVE_INFINITY,
+            ease: "easeInOut",
+          }}
+        />
       </div>
 
-      <div className="relative z-10 container mx-auto px-4 py-8">
-        {/* Hero Section */}
-        <motion.div
-          className="text-center mb-12"
-          initial={{ opacity: 0, y: -50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-        >
-          <motion.h1
-            className={cn(
-              "text-6xl md:text-8xl font-black mb-4 bg-gradient-to-r bg-clip-text text-transparent",
-              theme === "dark" ? "from-white via-gray-200 to-white" : "from-gray-900 via-gray-700 to-gray-900",
-            )}
-            style={{
-              textShadow: theme === "dark" ? "2px 2px 4px rgba(0,0,0,0.5)" : "2px 2px 4px rgba(255,255,255,0.5)",
-              fontFamily: "Impact, Arial Black, sans-serif",
-              letterSpacing: "0.1em",
-            }}
-            animate={
-              prefersReducedMotion
-                ? {}
-                : {
-                    textShadow:
-                      theme === "dark"
-                        ? [
-                            "2px 2px 4px rgba(0,0,0,0.5)",
-                            "4px 4px 8px rgba(255,0,0,0.3)",
-                            "2px 2px 4px rgba(0,0,0,0.5)",
-                          ]
-                        : [
-                            "2px 2px 4px rgba(255,255,255,0.5)",
-                            "4px 4px 8px rgba(255,0,0,0.2)",
-                            "2px 2px 4px rgba(255,255,255,0.5)",
-                          ],
-                  }
-            }
-            transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY }}
-          >
-            ERIGGA RADIO
-          </motion.h1>
-          <motion.p
-            className={cn("text-2xl md:text-3xl font-bold mb-2", theme === "dark" ? "text-white/90" : "text-gray-800")}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-          >
-            Vibes for Every Mood
-          </motion.p>
-
-          {/* Live Indicator */}
-          <AnimatePresence>
-            {isLive && (
-              <motion.div
-                className="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-full font-bold"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0 }}
-              >
-                <motion.div
-                  className="w-3 h-3 bg-white rounded-full"
-                  animate={{ opacity: [1, 0.3, 1] }}
-                  transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY }}
-                />
-                LIVE: {liveTitle}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-
-        {/* Daily Quote */}
-        {dailyQuote && (
-          <motion.div
-            className={cn(
-              "glass-card rounded-2xl p-6 mb-8 text-center",
-              theme === "dark"
-                ? "bg-white/10 backdrop-blur-md border-white/20"
-                : "bg-white/80 backdrop-blur-md border-gray-200/50 shadow-lg",
-            )}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3 }}
-          >
-            <p className={cn("text-lg italic", theme === "dark" ? "text-white/90" : "text-gray-800")}>"{dailyQuote}"</p>
-            <p className={cn("text-sm mt-2", theme === "dark" ? "text-white/70" : "text-gray-600")}>- Erigga</p>
+      <div className="relative z-10 p-4 sm:p-6 lg:p-8">
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
+            <div className="flex items-center justify-center mb-4">
+              <Radio className="w-8 h-8 text-red-500 mr-3" />
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 bg-clip-text text-transparent">
+                Erigga Live Radio
+              </h1>
+            </div>
+            <p className="text-gray-300 text-lg">24/7 Non-stop Erigga hits and exclusive content</p>
+            <div className="flex items-center justify-center mt-4 space-x-4">
+              <Badge variant="secondary" className="bg-red-500/20 text-red-300 border-red-500/30">
+                <div className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse" />
+                LIVE
+              </Badge>
+              <Badge variant="outline" className="text-gray-300 border-gray-600">
+                <Users className="w-4 h-4 mr-1" />
+                {listeners.toLocaleString()} listeners
+              </Badge>
+            </div>
           </motion.div>
-        )}
 
-        {/* Mood Selector Grid */}
-        <motion.div
-          className="mb-12"
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <h2 className={cn("text-3xl font-bold mb-6 text-center", theme === "dark" ? "text-white" : "text-gray-900")}>
-            Choose Your Vibe
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {moodCategories.map((mood, index) => (
-              <motion.div
-                key={mood.id}
-                className={cn(
-                  "rounded-2xl p-6 cursor-pointer transition-all duration-300",
-                  "hover:scale-105 hover:shadow-2xl",
-                  selectedMood === mood.id ? "ring-4 scale-105" : "",
-                  theme === "dark"
-                    ? "glass-card ring-white/50"
-                    : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg ring-gray-400/50",
-                )}
-                onClick={() => handleMoodSelect(mood.id)}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 * index }}
-                whileHover={prefersReducedMotion ? {} : { y: -5 }}
-                whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
-              >
-                <div
-                  className={cn(
-                    "w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center",
-                    mood.color.replace("from-", "bg-").replace("to-", ""),
-                  )}
-                >
-                  {mood.icon}
-                </div>
-                <h3
-                  className={cn(
-                    "text-lg font-bold text-center mb-2",
-                    theme === "dark" ? "text-white" : "text-gray-900",
-                  )}
-                >
-                  {mood.name}
-                </h3>
-                <p className={cn("text-sm text-center", theme === "dark" ? "text-white/70" : "text-gray-600")}>
-                  {mood.description}
-                </p>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Player */}
-          <div className="lg:col-span-2">
-            <motion.div
-              className={cn(
-                "rounded-2xl p-8",
-                theme === "dark" ? "glass-card" : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-xl",
-              )}
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              {/* Cassette/Vinyl Player Interface */}
-              <div className="relative mb-8">
-                <div className="aspect-square max-w-md mx-auto">
-                  {/* Vinyl Record */}
-                  <motion.div
-                    className="relative w-full h-full rounded-full bg-gradient-to-br from-gray-900 to-black shadow-2xl overflow-hidden"
-                    animate={isPlaying && !prefersReducedMotion ? { rotate: 360 } : {}}
-                    transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-                  >
-                    {/* Record Grooves */}
-                    {[...Array(8)].map((_, i) => (
-                      <div
-                        key={i}
-                        className="absolute border border-gray-700 rounded-full"
-                        style={{
-                          width: `${90 - i * 10}%`,
-                          height: `${90 - i * 10}%`,
-                          top: `${5 + i * 5}%`,
-                          left: `${5 + i * 5}%`,
-                        }}
-                      />
-                    ))}
-
-                    {/* Center Label */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-32 h-32 rounded-full bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center">
-                        <img
-                          src={currentTrack?.artwork_url || "/placeholder.svg?height=80&width=80&query=erigga logo"}
-                          alt="Album Art"
-                          className="w-20 h-20 rounded-full object-cover"
-                        />
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  {/* Tonearm */}
-                  <motion.div
-                    className="absolute -top-4 right-8 w-2 h-32 bg-gradient-to-b from-gray-400 to-gray-600 rounded-full origin-bottom"
-                    animate={isPlaying ? { rotate: -25 } : { rotate: 25 }}
-                    transition={{ duration: 0.5 }}
-                  >
-                    <div className="absolute bottom-0 w-4 h-4 bg-gray-500 rounded-full -left-1" />
-                  </motion.div>
-                </div>
-
-                {/* Beat Visualizer */}
-                {isPlaying && (
-                  <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-2">
-                    {[...Array(7)].map((_, i) => (
-                      <motion.div
-                        key={i}
-                        className={cn(
-                          "w-2 rounded-full",
-                          selectedMoodData.color.replace("from-", "bg-").replace("to-", ""),
-                        )}
-                        animate={
-                          prefersReducedMotion
-                            ? {}
-                            : {
-                                height: [8, 32, 8],
-                                opacity: [0.5, 1, 0.5],
-                              }
-                        }
-                        transition={{
-                          duration: 0.8,
-                          repeat: Number.POSITIVE_INFINITY,
-                          delay: i * 0.1,
-                          ease: "easeInOut",
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Track Info */}
-              <div className="text-center mb-8">
-                <h2 className={cn("text-2xl font-bold mb-2", theme === "dark" ? "text-white" : "text-gray-900")}>
-                  {currentTrack?.title || "Select a mood to start"}
-                </h2>
-                <p className={cn("text-lg", theme === "dark" ? "text-white/70" : "text-gray-600")}>
-                  {currentTrack?.artist || "Erigga Radio"}
-                </p>
-                <Badge className={cn("mt-2", selectedMoodData.color)}>
-                  {selectedMoodData.name} {selectedMoodData.emoji}
-                </Badge>
-              </div>
-
-              {/* Controls */}
-              <div className="flex items-center justify-center space-x-6 mb-6">
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  className={cn(
-                    theme === "dark" ? "text-white hover:text-white/80" : "text-gray-700 hover:text-gray-900",
-                  )}
-                >
-                  <SkipBack className="w-6 h-6" />
-                </Button>
-
-                <Button
-                  size="lg"
-                  className={cn(
-                    "rounded-full w-16 h-16",
-                    theme === "dark"
-                      ? "bg-white text-black hover:bg-white/90"
-                      : "bg-gray-900 text-white hover:bg-gray-800",
-                  )}
-                  onClick={togglePlayPause}
-                >
-                  {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  className={cn(
-                    theme === "dark" ? "text-white hover:text-white/80" : "text-gray-700 hover:text-gray-900",
-                  )}
-                >
-                  <SkipForward className="w-6 h-6" />
-                </Button>
-              </div>
-
-              {/* Volume Control */}
-              <div className="flex items-center space-x-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsMuted(!isMuted)}
-                  className={cn(theme === "dark" ? "text-white" : "text-gray-700")}
-                >
-                  {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                </Button>
-                <Slider
-                  value={[volume]}
-                  max={100}
-                  step={1}
-                  onValueChange={(value) => setVolume(value[0])}
-                  className="flex-1"
-                />
-                <span className={cn("text-sm w-12", theme === "dark" ? "text-white/70" : "text-gray-600")}>
-                  {volume}%
-                </span>
-              </div>
-            </motion.div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Live Broadcast Card */}
-            <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8 }}>
-              <Card
-                className={cn(
-                  theme === "dark" ? "glass-card" : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg",
-                )}
-              >
-                <CardHeader>
-                  <CardTitle
-                    className={cn("flex items-center gap-2", theme === "dark" ? "text-white" : "text-gray-900")}
-                  >
-                    <Radio className="w-5 h-5" />
-                    Live Broadcast
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLive ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <motion.div
-                          className="w-3 h-3 bg-red-500 rounded-full"
-                          animate={{ opacity: [1, 0.3, 1] }}
-                          transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY }}
-                        />
-                        <span className="text-white font-bold">LIVE NOW</span>
-                      </div>
-                      <p className={cn("text-white/90", theme === "dark" ? "text-white/90" : "text-gray-800")}>
-                        {liveTitle}
-                      </p>
-                      <div className="flex items-center gap-2 text-sm text-white/70">
-                        <Users className="w-4 h-4" />
-                        <span>{listenerCount} listeners</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className={cn("text-white/70", theme === "dark" ? "text-white/70" : "text-gray-600")}>
-                      No live broadcasts scheduled
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Community Shout-outs */}
-            <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.0 }}>
-              <Card
-                className={cn(
-                  theme === "dark" ? "glass-card" : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg",
-                )}
-              >
-                <CardHeader>
-                  <CardTitle
-                    className={cn("flex items-center gap-2", theme === "dark" ? "text-white" : "text-gray-900")}
-                  >
-                    <MessageCircle className="w-5 h-5" />
-                    Fan Shout-outs
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex gap-2">
-                    <Input
-                      value={newShoutout}
-                      onChange={(e) => setNewShoutout(e.target.value)}
-                      placeholder="Send a shout-out..."
-                      className={cn(
-                        "flex-1",
-                        theme === "dark"
-                          ? "bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                          : "bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-500",
-                      )}
-                      onKeyPress={(e) => e.key === "Enter" && submitShoutout()}
-                      maxLength={200}
-                    />
-                    <Button
-                      onClick={submitShoutout}
-                      size="sm"
-                      className={cn(
-                        theme === "dark"
-                          ? "bg-white text-black hover:bg-white/90"
-                          : "bg-gray-900 text-white hover:bg-gray-800",
-                      )}
-                      disabled={!newShoutout.trim()}
-                    >
-                      <Send className="w-4 h-4" />
-                    </Button>
-                  </div>
-
-                  {/* Character count indicator */}
-                  <div className={cn("text-xs text-right", theme === "dark" ? "text-white/50" : "text-gray-500")}>
-                    {newShoutout.length}/200
-                  </div>
-
-                  {/* Animated Radio Character */}
-                  <div className="flex justify-center py-4">
-                    <AnimatedRadioCharacter
-                      isPlaying={isPlaying}
-                      isLive={isLive}
-                      shoutouts={shoutouts}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div className="space-y-2 max-h-32 overflow-y-auto">
-                    {shoutouts.length === 0 ? (
-                      <p
-                        className={cn("text-sm text-center py-4", theme === "dark" ? "text-white/50" : "text-gray-500")}
-                      >
-                        No shout-outs yet. Be the first to send one!
-                      </p>
-                    ) : (
-                      shoutouts.map((shoutout, index) => (
-                        <motion.div
-                          key={index}
-                          className={cn(
-                            "text-sm p-2 rounded-lg",
-                            theme === "dark" ? "text-white/80 bg-white/5" : "text-gray-700 bg-gray-100/50",
-                          )}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.1 }}
-                        >
-                          {shoutout}
-                        </motion.div>
-                      ))
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Pinned Tracks */}
-            {pinnedTracks.length > 0 && (
-              <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.2 }}>
-                <Card
-                  className={cn(
-                    theme === "dark"
-                      ? "glass-card"
-                      : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg",
-                  )}
-                >
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main Player */}
+            <div className="lg:col-span-2">
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+                <Card className="bg-white/5 backdrop-blur-xl border-white/10 hover:bg-white/10 transition-all duration-300">
                   <CardHeader>
-                    <CardTitle
-                      className={cn("flex items-center gap-2", theme === "dark" ? "text-white" : "text-gray-900")}
-                    >
-                      <Pin className="w-5 h-5" />
-                      Pinned Tracks
+                    <CardTitle className="flex items-center text-white">
+                      <Music className="w-5 h-5 mr-2 text-purple-400" />
+                      Now Playing
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {pinnedTracks.map((track) => (
-                        <div
-                          key={track.id}
-                          className={cn(
-                            "flex items-center gap-3 p-2 rounded-lg",
-                            theme === "dark" ? "bg-white/5" : "bg-gray-100/50",
-                          )}
-                        >
-                          <img
-                            src={track.artwork_url || "/placeholder.svg"}
-                            alt={track.title}
-                            className="w-8 h-8 rounded object-cover"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className={cn(
-                                "text-sm font-medium truncate",
-                                theme === "dark" ? "text-white" : "text-gray-900",
-                              )}
-                            >
-                              {track.title}
-                            </p>
-                            <p className={cn("text-xs truncate", theme === "dark" ? "text-white/70" : "text-gray-600")}>
-                              {track.artist}
-                            </p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => togglePinTrack(track)}
-                            className={cn(
-                              theme === "dark" ? "text-white/70 hover:text-white" : "text-gray-700 hover:text-gray-900",
-                            )}
-                          >
-                            <PinOff className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
+                  <CardContent className="space-y-6">
+                    {/* Track Info */}
+                    <div className="text-center">
+                      <h3 className="text-2xl font-bold text-white mb-2">{track.title}</h3>
+                      <p className="text-gray-300 text-lg">{track.artist}</p>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="space-y-2">
+                      <Slider
+                        value={[currentTime]}
+                        max={track.duration}
+                        step={1}
+                        className="w-full"
+                        onValueChange={(value) => {
+                          const audio = audioRef.current
+                          if (audio) {
+                            audio.currentTime = value[0]
+                            setCurrentTime(value[0])
+                          }
+                        }}
+                      />
+                      <div className="flex justify-between text-sm text-gray-400">
+                        <span>{formatTime(currentTime)}</span>
+                        <span>{formatTime(track.duration)}</span>
+                      </div>
+                    </div>
+
+                    {/* Controls */}
+                    <div className="flex items-center justify-center space-x-4">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={prevTrack}
+                        className="bg-white/10 border-white/20 hover:bg-white/20"
+                      >
+                        <SkipBack className="w-5 h-5" />
+                      </Button>
+
+                      <Button
+                        size="icon"
+                        onClick={togglePlay}
+                        className="w-16 h-16 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600"
+                      >
+                        {isPlaying ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8" />}
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={nextTrack}
+                        className="bg-white/10 border-white/20 hover:bg-white/20"
+                      >
+                        <SkipForward className="w-5 h-5" />
+                      </Button>
+                    </div>
+
+                    {/* Volume Control */}
+                    <div className="flex items-center space-x-4">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={toggleMute}
+                        className="text-gray-300 hover:text-white"
+                      >
+                        {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                      </Button>
+                      <Slider value={volume} max={100} step={1} className="flex-1" onValueChange={handleVolumeChange} />
+                      <span className="text-sm text-gray-400 w-12">{volume[0]}%</span>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex justify-center space-x-4">
+                      <Button variant="outline" className="bg-white/10 border-white/20 hover:bg-white/20">
+                        <Heart className="w-4 h-4 mr-2" />
+                        Like
+                      </Button>
+                      <Button variant="outline" className="bg-white/10 border-white/20 hover:bg-white/20">
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        Shout-out
+                      </Button>
+                      <Button variant="outline" className="bg-white/10 border-white/20 hover:bg-white/20">
+                        <Share2 className="w-4 h-4 mr-2" />
+                        Share
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
               </motion.div>
-            )}
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Animated Character */}
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}>
+                <Card className="bg-white/5 backdrop-blur-xl border-white/10">
+                  <CardContent className="p-6 text-center">
+                    <AnimatedRadioCharacter isPlaying={isPlaying} />
+                    <p className="text-gray-300 mt-4">Your DJ is spinning the hottest tracks!</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* Up Next */}
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6 }}>
+                <Card className="bg-white/5 backdrop-blur-xl border-white/10">
+                  <CardHeader>
+                    <CardTitle className="text-white">Up Next</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {mockTracks.slice(1).map((track, index) => (
+                      <div key={track.id} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-white/5">
+                        <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded flex items-center justify-center text-white text-sm font-bold">
+                          {index + 2}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white font-medium truncate">{track.title}</p>
+                          <p className="text-gray-400 text-sm truncate">{track.artist}</p>
+                        </div>
+                        <span className="text-gray-400 text-sm">{formatTime(track.duration)}</span>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* Live Stats */}
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8 }}>
+                <Card className="bg-white/5 backdrop-blur-xl border-white/10">
+                  <CardHeader>
+                    <CardTitle className="flex items-center text-white">
+                      <Headphones className="w-5 h-5 mr-2 text-green-400" />
+                      Live Stats
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-300">Current Listeners</span>
+                      <span className="text-white font-bold">{listeners.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-300">Peak Today</span>
+                      <span className="text-white font-bold">2,847</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-300">Total Plays</span>
+                      <span className="text-white font-bold">45.2K</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-300">Uptime</span>
+                      <span className="text-green-400 font-bold">99.9%</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </div>
           </div>
         </div>
-
-        {/* Current Playlist */}
-        {playlist.length > 0 && (
-          <motion.div
-            className="mt-12"
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.4 }}
-          >
-            <Card
-              className={cn(
-                theme === "dark" ? "glass-card" : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg",
-              )}
-            >
-              <CardHeader>
-                <CardTitle className={cn("text-white", theme === "dark" ? "text-white" : "text-gray-900")}>
-                  {selectedMoodData.name} Playlist {selectedMoodData.emoji}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {playlist.slice(0, 6).map((track, index) => (
-                    <motion.div
-                      key={track.id}
-                      className={cn(
-                        "flex items-center gap-3 p-3 rounded-lg hover:cursor-pointer",
-                        theme === "dark" ? "bg-white/5" : "bg-gray-100/50",
-                      )}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 * index }}
-                      onClick={() => setCurrentTrack(track)}
-                    >
-                      <img
-                        src={track.artwork_url || "/placeholder.svg"}
-                        alt={track.title}
-                        className="w-12 h-12 rounded-lg object-cover"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className={cn("font-medium truncate", theme === "dark" ? "text-white" : "text-gray-900")}>
-                          {track.title}
-                        </p>
-                        <p className={cn("text-sm truncate", theme === "dark" ? "text-white/70" : "text-gray-600")}>
-                          {track.artist}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          togglePinTrack(track)
-                        }}
-                        className={cn(
-                          theme === "dark" ? "text-white/70 hover:text-white" : "text-gray-700 hover:text-gray-900",
-                        )}
-                      >
-                        {pinnedTracks.some((t) => t.id === track.id) ? (
-                          <PinOff className="w-4 h-4" />
-                        ) : (
-                          <Pin className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </motion.div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {/* Next Scheduled Show */}
-        {nextShow && (
-          <motion.div
-            className="mt-12"
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.6 }}
-          >
-            <Card
-              className={cn(
-                theme === "dark" ? "glass-card" : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg",
-              )}
-            >
-              <CardHeader>
-                <CardTitle className={cn("text-white", theme === "dark" ? "text-white" : "text-gray-900")}>
-                  Next Scheduled Show
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-5 h-5" />
-                    <span className={cn("text-sm", theme === "dark" ? "text-white/70" : "text-gray-600")}>
-                      {nextShow.time}
-                    </span>
-                  </div>
-                  <p className={cn("text-sm", theme === "dark" ? "text-white/70" : "text-gray-600")}>
-                    {nextShow.title}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
       </div>
 
-      {/* Audio Element */}
+      {/* Hidden Audio Element */}
       <audio
         ref={audioRef}
-        onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime || 0)}
-        onDurationChange={() => setDuration(audioRef.current?.duration || 0)}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        onError={(e) => console.error("[v0] Audio playback error:", e)}
-        onLoadedMetadata={() => console.log("[v0] Audio loaded successfully")}
-      >
-        <source src={ERIGGA_AUDIO_URL} type="audio/mpeg" />
-      </audio>
+        src={track.url}
+        onEnded={nextTrack}
+        onLoadedMetadata={() => {
+          const audio = audioRef.current
+          if (audio) {
+            setCurrentTime(0)
+          }
+        }}
+      />
     </div>
   )
 }
