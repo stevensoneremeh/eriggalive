@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Heart, MessageCircle, Smile, MoreVertical, Search, Menu, X, Zap, Send, ImageIcon } from "lucide-react"
+import { Heart, MessageCircle, Smile, MoreVertical, Search, Menu, X, Zap, Send, ImageIcon, Mic } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils"
 import { UserTierBadge } from "@/components/user-tier-badge"
 import { motion, AnimatePresence } from "framer-motion"
 
-const FEATURE_UI_FIXES_V1 = process.env.NEXT_PUBLIC_FEATURE_UI_FIXES_V1 === "true"
+const ENHANCED_COMMUNITY_UI = true
 
 interface Category {
   id: number
@@ -58,7 +58,6 @@ interface Comment {
   user: {
     id: string
     username: string
-    full_name: string
     avatar_url?: string
     tier: string
   }
@@ -82,8 +81,6 @@ export default function CommunityPage() {
   const [selectedMedia, setSelectedMedia] = useState<File[]>([])
   const [mediaPreview, setMediaPreview] = useState<string[]>([])
   const [isClient, setIsClient] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
-  const [showCategoryNav, setShowCategoryNav] = useState(false)
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -93,12 +90,6 @@ export default function CommunityPage() {
 
   useEffect(() => {
     setIsClient(true)
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768)
-    }
-    checkMobile()
-    window.addEventListener("resize", checkMobile)
-    return () => window.removeEventListener("resize", checkMobile)
   }, [])
 
   useEffect(() => {
@@ -106,21 +97,22 @@ export default function CommunityPage() {
 
     document.body.classList.add("community-page")
 
-    if (isClient && typeof window !== "undefined") {
-      window.dispatchEvent(
-        new CustomEvent("communityPageActive", {
-          detail: { categories, selectedCategory },
-        }),
-      )
-    }
+    const communityNavEvent = new CustomEvent("communityPageActive", {
+      detail: {
+        categories,
+        selectedCategory,
+        isMobile: window.innerWidth < 768,
+        enhancedUI: ENHANCED_COMMUNITY_UI,
+      },
+    })
+    window.dispatchEvent(communityNavEvent)
 
     return () => {
       document.body.classList.remove("community-page")
-      if (isClient && typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("communityPageInactive"))
-      }
+      const communityNavEvent = new CustomEvent("communityPageInactive")
+      window.dispatchEvent(communityNavEvent)
     }
-  }, [isClient, categories, selectedCategory])
+  }, [categories, selectedCategory, isClient])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -242,60 +234,129 @@ export default function CommunityPage() {
     [supabase],
   )
 
-  const containsURL = (text: string): boolean => {
-    if (!FEATURE_UI_FIXES_V1) return false
-
-    const urlPatterns = [
-      // Standard URLs
-      /https?:\/\/[^\s]+/gi,
-      // www domains
-      /www\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi,
-      // Domain patterns
-      /[a-zA-Z0-9.-]+\.(com|net|org|edu|gov|mil|int|co|io|me|tv|info|biz|name|mobi|tel|travel|museum|aero|jobs|cat|pro|plus|max|elite|vip|exclusive|special|limited|rare|unique|secret|hidden|private|personal|custom|official|real|true|genuine|authentic|original|first|last|final|ultimate|perfect|complete|full|total|absolute|pure|clean|fresh|modern|latest|updated|advanced|professional|expert|master|guru|ninja|wizard|genius|smart|clever|brilliant|excellent|outstanding|superior|supreme|royal|king|queen|prince|princess|lord|master|boss|chief|leader|captain|commander|general|admiral|president|ceo|founder|owner|creator|inventor|designer|developer|programmer|engineer|architect|artist|writer|author|poet|musician|singer|dancer|actor|actress|model|star|celebrity|famous|popular|trending|viral|hot|fire|lit|dope|sick|crazy|insane|wild|epic|legendary|iconic|classic|vintage|retro|old|ancient|historic|traditional|cultural|ethnic|national|international|global|worldwide|universal|cosmic|galactic|infinite|eternal|forever|always|never|nothing|everything|all|any|some|few|many|most|best|worst|good|bad|great|terrible|awesome|awful|amazing|boring|interesting|exciting|thrilling|shocking|surprising|unexpected|unbelievable|incredible|fantastic|wonderful|marvelous|spectacular|magnificent|gorgeous|beautiful|pretty|cute|lovely|charming|attractive|sexy|hot|cool|warm|cold|freezing|burning|blazing|glowing|shining|sparkling|glittering|dazzling|brilliant|bright|dark|black|white|red|blue|green|yellow|orange|purple|pink|brown|gray|silver|gold|diamond|platinum|crystal|glass|metal|wood|stone|rock|earth|water|fire|air|wind|storm|thunder|lightning|rain|snow|ice|sun|moon|star|planet|galaxy|universe|space|time|life|death|love|hate|peace|war|good|evil|right|wrong|true|false|yes|no|maybe|perhaps|possibly|probably|definitely|certainly|absolutely|totally|completely|fully|entirely|wholly|perfectly|exactly|precisely|accurately|correctly|properly|appropriately|suitably|ideally|optimally|maximally|minimally|barely|hardly|scarcely|rarely|seldom|occasionally|sometimes|often|frequently|usually|normally|typically|generally|commonly|regularly|consistently|constantly|continuously|perpetually|endlessly|infinitely|eternally|forever|always|never|nothing|everything|all|any|some|few|many|most|best|worst)/gi,
-      // Shortened URLs
-      /(?:bit\.ly|tinyurl|t\.co|goo\.gl|ow\.ly|short\.link|tiny\.cc|is\.gd|buff\.ly|ift\.tt|dlvr\.it|fb\.me|amzn\.to|youtu\.be|instagr\.am|linkedin\.in|twitter\.com|facebook\.com|instagram\.com|youtube\.com|tiktok\.com|snapchat\.com|whatsapp\.com|telegram\.org|discord\.gg|reddit\.com|pinterest\.com|tumblr\.com|flickr\.com|vimeo\.com|dailymotion\.com|twitch\.tv|spotify\.com|soundcloud\.com|bandcamp\.com|apple\.com|google\.com|microsoft\.com|amazon\.com|ebay\.com|paypal\.com|stripe\.com|square\.com|venmo\.com|cashapp\.com|zelle\.com|westernunion\.com|moneygram\.com|remitly\.com|wise\.com|revolut\.com|n26\.com|chime\.com|robinhood\.com|coinbase\.com|binance\.com|kraken\.com|gemini\.com|blockfi\.com|celsius\.network|nexo\.io|crypto\.com|blockchain\.com|metamask\.io|trustwallet\.com|ledger\.com|trezor\.io|exodus\.com|atomic\.com|myetherwallet\.com|mycrypto\.com|etherscan\.io|bscscan\.com|polygonscan\.com|ftmscan\.com|snowtrace\.io|arbiscan\.io|optimistic\.etherscan\.io|explorer\.solana\.com|cardanoscan\.io|adaex\.org|pool\.pm|cnft\.io|jpg\.store|opencnft\.io|tokhun\.io|spacebudz\.io|claymates\.org|chillpill\.io|deadpxlz\.io|pxlz\.org|cnftpredator\.tools|cnftjungle\.io|bubblegum\.io|artifct\.app|venly\.io|nft\.storage|pinata\.cloud|ipfs\.io|arweave\.org|filecoin\.io|storj\.io|sia\.tech|maidsafe\.net|swarm\.ethereum\.org|bittorrent\.com|utorrent\.com|qbittorrent\.org|deluge-torrent\.org|transmission\.app|vuze\.com|frostwire\.com|limewire\.com|kazaa\.com|napster\.com|spotify\.com|apple\.com|amazon\.com|google\.com|youtube\.com|soundcloud\.com|bandcamp\.com|deezer\.com|tidal\.com|qobuz\.com|pandora\.com|iheartradio\.com|tunein\.com|radio\.com|iheart\.com|audible\.com|scribd\.com|kindle\.amazon\.com|kobo\.com|nook\.barnesandnoble\.com|goodreads\.com|bookbub\.com|netgalley\.com|edelweiss\.abovethetreeline\.com|publishersmarketplace\.com|bookish\.com|riffle\.com|litsy\.com|bookstr\.com|epic\.com|getepic\.com|storylineonline\.net|unite4literacy\.com|oxfordowl\.co\.uk|readingeggs\.com|abcmouse\.com|starfall\.com|funbrain\.com|coolmath\.com|mathplayground\.com|prodigy\.com|ixl\.com|khanacademy\.org|coursera\.org|edx\.org|udacity\.com|udemy\.com|skillshare\.com|masterclass\.com|lynda\.com|pluralsight\.com|treehouse\.com|codecademy\.com|freecodecamp\.org|w3schools\.com|mozilla\.org|stackoverflow\.com|github\.com|gitlab\.com|bitbucket\.org|sourceforge\.net|codepen\.io|jsfiddle\.net|repl\.it|glitch\.com|codesandbox\.io|stackblitz\.com|gitpod\.io|codespaces\.github\.com|cloud9\.aws\.amazon\.com|goorm\.io|koding\.com|nitrous\.io|c9\.io|ide\.goorm\.io|paiza\.cloud|runkit\.com|observablehq\.com|kaggle\.com|colab\.research\.google\.com|jupyter\.org|anaconda\.com|rstudio\.com|shinyapps\.io|plotly\.com|tableau\.com|powerbi\.microsoft\.com|qlik\.com|looker\.com|sisense\.com|domo\.com|chartio\.com|metabase\.com|grafana\.com|kibana\.elastic\.co|splunk\.com|newrelic\.com|datadog\.com|honeycomb\.io|lightstep\.com|jaegertracing\.io|zipkin\.io|opentracing\.io|opencensus\.io|opentelemetry\.io|prometheus\.io|influxdata\.com|timescale\.com|questdb\.io|clickhouse\.tech|apache\.org|mongodb\.com|postgresql\.org|mysql\.com|mariadb\.org|sqlite\.org|redis\.io|memcached\.org|elasticsearch\.co|solr\.apache\.org|sphinx\.org|whoosh\.readthedocs\.io|xapian\.org|lucene\.apache\.org|nutch\.apache\.org|tika\.apache\.org|mahout\.apache\.org|spark\.apache\.org|hadoop\.apache\.org|hive\.apache\.org|pig\.apache\.org|hbase\.apache\.org|cassandra\.apache\.org|couchdb\.apache\.org|couchbase\.com|riak\.com|neo4j\.com|orientdb\.org|arangodb\.com|dgraph\.io|tigergraph\.com|amazon\.com|google\.com|microsoft\.com|oracle\.com|ibm\.com|salesforce\.com|sap\.com|adobe\.com|autodesk\.com|intuit\.com|servicenow\.com|workday\.com|zendesk\.com|atlassian\.com|slack\.com|discord\.com|zoom\.us|teams\.microsoft\.com|webex\.cisco\.com|gotomeeting\.com|join\.me|anymeeting\.com|bluejeans\.com|whereby\.com|jitsi\.org|bigbluebutton\.org|openmeetings\.apache\.org|freepbx\.org|asterisk\.org|freeswitch\.org|opensips\.org|kamailio\.org|yate\.ro|sipwise\.com|3cx\.com|avaya\.com|cisco\.com|mitel\.com|shoretel\.com|ringcentral\.com|vonage\.com|8x8\.com|nextiva\.com|grasshopper\.com|ooma\.com|magicjack\.com|skype\.com|viber\.com|whatsapp\.com|telegram\.org|signal\.org|wickr\.com|threema\.ch|wire\.com|element\.io|riot\.im|matrix\.org|irc\.freenode\.net|libera\.chat|oftc\.net|rizon\.net|quakenet\.org|undernet\.org|dalnet\.org|efnet\.org|ircnet\.org|hackint\.org|snoonet\.org|espernet\.org|chatzona\.org|ircstorm\.net|swiftirc\.net|synirc\.net|p2p-network\.net|abjects\.net|afternet\.org|allnetwork\.org|austnet\.org|axenet\.org|beyondirc\.net|brasirc\.net|chatfirst\.com|chatjunkies\.org|chatnet\.org|chatspike\.net|coolchat\.net|criten\.net|cyberchat\.org|darksin\.net|darkmyst\.org|deepspace\.org|deltaanime\.net|digarix\.net|dynastynet\.net|esper\.net|euirc\.net|europnet\.org|fdfnet\.net|forestnet\.org|freequest\.net|galaxynet\.org|gamesurge\.net|german-elite\.net|ghostscript\.net|gigairc\.net|globalchat\.org|hackthissite\.org|icq\.com|irc-hispano\.org|ircgate\.net|irclink\.net|ircnet\.com|ircsource\.net|ircstorm\.net|ircworld\.org|kreynet\.org|librairc\.net|linknet\.org|mibbit\.com|mirc\.com|mozilla\.org|newnet\.net|oftc\.net|openprojects\.net|otaku-irc\.fr|ozorg\.net|p2pchat\.net|pirc\.pl|ptlink\.net|ptnet\.org|quakenet\.org|recycled-irc\.net|rizon\.net|rusnet\.org\.ru|scarynet\.org|slashnet\.org|sorcery\.net|starlink\.org|stormbit\.net|swiftirc\.net|synirc\.net|thinstack\.net|tweakers\.net|twitch\.tv|unibg\.net|unreal\.net|webchat\.freenode\.net|webirc\.org|xertion\.org|zurna\.net)\/[^\s]+/gi,
-      // IP addresses
-      /(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?(?:\/[^\s]*)?/gi,
-      // Email-like patterns that might be URLs
-      /[a-zA-Z0-9.-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi,
-    ]
-
-    return urlPatterns.some((pattern) => pattern.test(text))
-  }
-
   const handleUnifiedSubmit = async () => {
-    if (!unifiedInput.trim() && selectedMedia.length === 0) return
-    if (!isAuthenticated) return
+    if (!unifiedInput.trim() || !isAuthenticated || !profile) {
+      if (!isAuthenticated) {
+        toast.error("Please sign in to participate")
+      }
+      return
+    }
 
-    // Enhanced URL filtering
-    if (containsURL(unifiedInput)) {
-      toast({
-        title: "Links not allowed",
-        description: "Links are not allowed in community posts for security reasons.",
-        variant: "destructive",
-      })
+    const urlRegex =
+      /(https?:\/\/[^\s]+|www\.[^\s]+|[^\s]+\.(com|org|net|edu|gov|io|co|uk|de|fr|jp|cn|in|br|au|ca|mx|es|it|ru|kr|nl|se|no|dk|fi|pl|tr|za|ng|ke|gh|tz|ug|rw|et|ma|eg|dz|ly|tn|sd|ao|mz|zw|bw|na|sz|ls|mw|zm|cd|cf|cm|ga|gq|st|td|ne|ml|bf|ci|sn|gm|gw|sl|lr|gh|tg|bj|ng|ne|td|cm|cf|cd|cg|ga|gq|st|ao|na|bw|sz|ls|mw|zm|zw|mz|mg|mu|sc|km|dj|so|er|et|ke|ug|tz|rw|bi|mw|zm|zw|bw|na|sz|ls))/gi
+
+    if (urlRegex.test(unifiedInput)) {
+      toast.error("Links and URLs are not allowed in posts. Please share your thoughts without external links.")
+      return
+    }
+
+    const trimmedContent = unifiedInput.trim()
+    if (trimmedContent.length > 2000) {
+      toast.error("Message is too long. Please keep it under 2000 characters.")
       return
     }
 
     try {
-      if (activePost) {
-        // Handle comment
-        console.error("handleComment is undeclared")
-        setActivePost(null)
-      } else {
-        // Handle post
-        console.error("handlePost is undeclared")
+      const mediaUrl = null
+      let mediaType = null
+
+      if (selectedMedia.length > 0) {
+        const file = selectedMedia[0]
+        const fileExt = file.name.split(".").pop()
+        const fileName = `${Math.random()}.${fileExt}`
+
+        if (file.type.startsWith("image/")) {
+          mediaType = "image"
+        } else if (file.type.startsWith("video/")) {
+          mediaType = "video"
+        } else if (file.type.startsWith("audio/")) {
+          mediaType = "audio"
+        }
       }
+
+      if (activePost) {
+        const { data, error } = await supabase
+          .from("community_comments")
+          .insert({
+            content: trimmedContent,
+            user_id: profile.id,
+            post_id: activePost,
+            is_deleted: false,
+          })
+          .select(`
+            *,
+            user:users!community_comments_user_id_fkey(id, username, full_name, avatar_url, tier)
+          `)
+          .single()
+
+        if (error) throw error
+
+        const newComment = {
+          id: data.id,
+          content: data.content,
+          created_at: data.created_at,
+          like_count: 0,
+          user: data.user,
+          has_liked: false,
+        }
+
+        setComments((prev) => ({
+          ...prev,
+          [activePost]: [...(prev[activePost] || []), newComment],
+        }))
+
+        setPosts((prev) =>
+          prev.map((post) => (post.id === activePost ? { ...post, comment_count: post.comment_count + 1 } : post)),
+        )
+
+        toast.success("Reply sent!")
+      } else {
+        if (!selectedCategory) return
+
+        const { data, error } = await supabase
+          .from("community_posts")
+          .insert({
+            content: trimmedContent,
+            user_id: profile.id,
+            category_id: selectedCategory,
+            media_url: mediaUrl,
+            media_type: mediaType,
+            is_published: true,
+            is_deleted: false,
+          })
+          .select(`
+            *,
+            user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
+            category:community_categories!community_posts_category_id_fkey(id, name, slug)
+          `)
+          .single()
+
+        if (error) throw error
+
+        const newPost = {
+          id: data.id,
+          content: data.content,
+          created_at: data.created_at,
+          vote_count: 0,
+          comment_count: 0,
+          media_url: data.media_url,
+          media_type: data.media_type,
+          user: data.user,
+          category: data.category,
+          has_voted: false,
+        }
+
+        setPosts((prev) => [...prev, newPost])
+        setTimeout(scrollToBottom, 100)
+        toast.success("Message posted!")
+      }
+
       setUnifiedInput("")
       setSelectedMedia([])
       setMediaPreview([])
     } catch (error) {
       console.error("Error submitting:", error)
-      toast({
-        title: "Error",
-        description: "Failed to submit. Please try again.",
-        variant: "destructive",
-      })
+      toast.error("Failed to send message. Please try again.")
     }
   }
 
@@ -422,118 +483,46 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {isMobile && FEATURE_UI_FIXES_V1 && (
-        <div className="fixed top-16 left-0 right-0 z-40 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 shadow-sm">
-          <div className="flex items-center justify-between p-3">
-            <h2 className="font-semibold text-gray-900 dark:text-white">Community</h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowCategoryNav(!showCategoryNav)}
-              className="text-gray-600 dark:text-gray-400"
-            >
-              <Menu className="h-4 w-4 mr-2" />
-              Categories
-            </Button>
-          </div>
-
-          {showCategoryNav && (
-            <div className="border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-              <div className="flex overflow-x-auto p-2 space-x-2">
-                <Button
-                  variant={selectedCategory === null ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => {
-                    setSelectedCategory(null)
-                    setShowCategoryNav(false)
-                  }}
-                  className="whitespace-nowrap"
-                >
-                  All
-                </Button>
-                {categories.map((category) => (
-                  <Button
-                    key={category.id}
-                    variant={selectedCategory === category.id ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => {
-                      setSelectedCategory(category.id)
-                      setShowCategoryNav(false)
-                    }}
-                    className="whitespace-nowrap"
-                  >
-                    {category.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div
-        className={cn(
-          "flex h-screen overflow-hidden",
-          FEATURE_UI_FIXES_V1 ? "bg-white dark:bg-gray-950" : "bg-gray-50 dark:bg-gray-900",
-          isMobile && "pt-16", // Reduced top padding for mobile to account for sticky nav
-        )}
-      >
-        {/* Desktop Sidebar */}
+      <div className="flex h-screen overflow-hidden bg-white dark:bg-gray-950">
         <motion.div
           initial={{ x: -300 }}
-          animate={{
-            x:
-              sidebarOpen || (!isMobile && isClient && typeof window !== "undefined" && window.innerWidth >= 768)
-                ? 0
-                : -300,
-          }}
+          animate={{ x: sidebarOpen || (isClient && window.innerWidth >= 768) ? 0 : -300 }}
           transition={{ type: "spring", damping: 25, stiffness: 200 }}
           className={cn(
-            "w-80 flex flex-col",
+            "w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col",
             "fixed md:relative z-50 md:z-auto h-full shadow-xl md:shadow-none",
-            FEATURE_UI_FIXES_V1
-              ? "bg-white dark:bg-gray-950 border-r border-gray-100 dark:border-gray-800"
-              : "bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700",
-            isMobile && "hidden",
           )}
         >
-          <div
-            className={cn(
-              "p-4 border-b",
-              FEATURE_UI_FIXES_V1
-                ? "bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800"
-                : "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
-            )}
-          >
+          <div className="p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center shadow-sm">
                   <Zap className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Community</h1>
+                  <h1 className="text-lg font-bold text-gray-900 dark:text-white">Community</h1>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Stay connected</p>
                 </div>
               </div>
-              <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setSidebarOpen(false)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="md:hidden hover:bg-gray-100 dark:hover:bg-gray-800"
+                onClick={() => setSidebarOpen(false)}
+              >
                 <X className="h-5 w-5" />
               </Button>
             </div>
           </div>
 
-          <div className="p-3">
+          <div className="p-4">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 h-4 w-4" />
               <Input
                 placeholder="Search conversations..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={cn(
-                  "pl-10 rounded-full placeholder:text-gray-500 dark:placeholder:text-gray-400",
-                  FEATURE_UI_FIXES_V1
-                    ? "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700"
-                    : "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-600",
-                )}
+                className="pl-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-full focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -543,15 +532,13 @@ export default function CommunityPage() {
               {categories.map((category) => (
                 <motion.div
                   key={category.id}
-                  whileHover={{ backgroundColor: FEATURE_UI_FIXES_V1 ? "rgba(0,0,0,0.03)" : "rgba(0,0,0,0.05)" }}
+                  whileHover={{ backgroundColor: "rgba(34, 197, 94, 0.05)" }}
                   whileTap={{ scale: 0.98 }}
                   className={cn(
                     "flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-all duration-200",
                     selectedCategory === category.id
-                      ? FEATURE_UI_FIXES_V1
-                        ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800"
-                        : "bg-green-100 dark:bg-green-900/20 border-l-4 border-green-500"
-                      : "hover:bg-gray-50 dark:hover:bg-gray-800/50",
+                      ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 shadow-sm"
+                      : "hover:bg-gray-50 dark:hover:bg-gray-800",
                   )}
                   onClick={() => {
                     setSelectedCategory(category.id)
@@ -559,40 +546,37 @@ export default function CommunityPage() {
                     setActivePost(null)
                   }}
                 >
-                  <div
-                    className={cn(
-                      "w-12 h-12 rounded-full flex items-center justify-center text-xl",
-                      FEATURE_UI_FIXES_V1 ? "bg-gray-100 dark:bg-gray-800" : "bg-gray-200 dark:bg-gray-600",
-                    )}
-                  >
+                  <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl shadow-sm">
                     {category.icon}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-900 dark:text-white truncate">{category.name}</div>
+                    <div className="font-semibold text-gray-900 dark:text-white truncate">{category.name}</div>
                     <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
                       {posts.filter((p) => p.category.id === category.id).length} messages
                     </div>
                   </div>
-                  {selectedCategory === category.id && <div className="w-2 h-2 rounded-full bg-green-500"></div>}
+                  {selectedCategory === category.id && (
+                    <div className="w-2 h-2 rounded-full bg-green-500 shadow-sm"></div>
+                  )}
                 </motion.div>
               ))}
             </div>
           </ScrollArea>
 
           {isAuthenticated && profile && (
-            <div className="p-3 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center space-x-3 p-2 rounded-lg bg-gray-100 dark:bg-gray-700">
-                <Avatar className="h-10 w-10">
+            <div className="p-3 border-t border-gray-200 dark:border-gray-800">
+              <div className="flex items-center space-x-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
+                <Avatar className="h-10 w-10 ring-2 ring-green-500/20">
                   <AvatarImage src={profile.avatar_url || "/placeholder-user.jpg"} />
                   <AvatarFallback className="bg-green-500 text-white font-semibold">
                     {profile.username?.charAt(0).toUpperCase() || "U"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900 dark:text-white text-sm truncate">{profile.username}</div>
+                  <div className="font-semibold text-gray-900 dark:text-white text-sm truncate">{profile.username}</div>
                   <UserTierBadge tier={profile.tier} size="sm" />
                 </div>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" className="hover:bg-gray-200 dark:hover:bg-gray-700">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </div>
@@ -600,204 +584,211 @@ export default function CommunityPage() {
           )}
         </motion.div>
 
-        {/* Main Content */}
-        <div className={cn("flex-1 flex flex-col", isMobile && FEATURE_UI_FIXES_V1 && "pt-20")}>
-          {/* Mobile Header */}
-          {isMobile && !FEATURE_UI_FIXES_V1 && (
-            <div className="flex items-center justify-between p-4 border-b bg-white dark:bg-gray-800">
-              <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(true)}>
-                <Menu className="h-5 w-5" />
-              </Button>
-              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Community</h1>
-              <div className="w-10" />
-            </div>
-          )}
-
-          <div
-            ref={scrollContainerRef}
-            className={cn(
-              "flex-1 overflow-y-auto",
-              isMobile ? "pb-24" : "pb-32", // Adjusted padding for sticky input
-              isMobile && activePost && "pt-4",
-            )}
-          >
-            <div className={cn("max-w-2xl mx-auto px-4 py-6 space-y-4", isMobile && "px-3 py-4 space-y-3")}>
-              <AnimatePresence>
-                {filteredPosts.map((post, index) => (
-                  <motion.div
-                    key={post.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ delay: index * 0.05 }}
-                    className={cn(
-                      "group transition-all duration-200",
-                      FEATURE_UI_FIXES_V1
-                        ? "bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 hover:shadow-md hover:border-gray-200 dark:hover:border-gray-700"
-                        : "flex space-x-3",
-                      activePost === post.id && "ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-950/10",
-                      isMobile && "rounded-xl p-3 shadow-sm",
-                    )}
+        <div className="flex-1 flex flex-col bg-white dark:bg-gray-950 min-w-0">
+          <div className="p-4 bg-white/95 dark:bg-gray-950/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="md:hidden hover:bg-gray-100 dark:hover:bg-gray-800"
+                  onClick={() => setSidebarOpen(true)}
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-lg shadow-sm">
+                  {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    {categories.find((c) => c.id === selectedCategory)?.name || "General"}
+                  </h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {activePost ? "Reply to message" : `${filteredPosts.length} messages`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                {activePost && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setActivePost(null)}
+                    className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
                   >
-                    <div className="flex space-x-3">
-                      <Avatar className={cn("flex-shrink-0", isMobile ? "h-10 w-10" : "h-12 w-12")}>
-                        <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
-                        <AvatarFallback className="bg-green-500 text-white font-semibold">
-                          {post.user.username.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <span className={cn("font-semibold text-gray-900 dark:text-white", isMobile && "text-sm")}>
-                            {post.user.full_name || post.user.username}
-                          </span>
-                          <UserTierBadge tier={post.user.tier} size="sm" />
-                          <span className="text-gray-500 dark:text-gray-400">·</span>
-                          <span className={cn("text-gray-500 dark:text-gray-400", isMobile ? "text-xs" : "text-sm")}>
-                            {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                          </span>
-                        </div>
-
-                        <p
-                          className={cn(
-                            "text-gray-900 dark:text-white leading-relaxed break-words mb-3",
-                            isMobile ? "text-sm" : "text-[15px]",
-                          )}
-                        >
-                          {post.content}
-                        </p>
-
-                        <div className={cn("flex items-center mt-3", isMobile ? "space-x-4" : "space-x-6")}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={cn(
-                              "rounded-full transition-all duration-200 group/btn",
-                              post.has_voted
-                                ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
-                                : "text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30",
-                              isMobile ? "h-7 px-2" : "h-8 px-3",
-                            )}
-                            onClick={() => voteOnPost(post.id)}
-                          >
-                            <Heart
-                              className={cn(
-                                "mr-1 transition-transform group-hover/btn:scale-110",
-                                post.has_voted && "fill-current",
-                                isMobile ? "h-3 w-3" : "h-4 w-4",
-                              )}
-                            />
-                            <span className={cn("font-medium", isMobile ? "text-xs" : "text-sm")}>
-                              {post.vote_count}
-                            </span>
-                          </Button>
-
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={cn(
-                              "rounded-full transition-all duration-200 group/btn",
-                              activePost === post.id
-                                ? "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30"
-                                : "text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30",
-                              isMobile ? "h-7 px-2" : "h-8 px-3",
-                            )}
-                            onClick={() => {
-                              if (activePost === post.id) {
-                                setActivePost(null)
-                              } else {
-                                setActivePost(post.id)
-                                loadComments(post.id)
-                              }
-                            }}
-                          >
-                            <MessageCircle
-                              className={cn(
-                                "mr-1 transition-transform group-hover/btn:scale-110",
-                                isMobile ? "h-3 w-3" : "h-4 w-4",
-                              )}
-                            />
-                            <span className={cn("font-medium", isMobile ? "text-xs" : "text-sm")}>
-                              {post.comment_count}
-                            </span>
-                          </Button>
-                        </div>
-
-                        <AnimatePresence>
-                          {activePost === post.id && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-3"
-                            >
-                              {comments[post.id]?.map((comment) => (
-                                <motion.div
-                                  key={comment.id}
-                                  initial={{ opacity: 0, x: -20 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  className="flex space-x-3"
-                                >
-                                  <Avatar className={cn("flex-shrink-0", isMobile ? "h-6 w-6" : "h-8 w-8")}>
-                                    <AvatarImage src={comment.user.avatar_url || "/placeholder-user.jpg"} />
-                                    <AvatarFallback className="bg-gray-500 text-white text-xs">
-                                      {comment.user.username.charAt(0).toUpperCase()}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div className="flex-1">
-                                    <div className="flex items-center space-x-2 mb-1">
-                                      <span
-                                        className={cn(
-                                          "font-medium text-gray-900 dark:text-white",
-                                          isMobile ? "text-xs" : "text-sm",
-                                        )}
-                                      >
-                                        {comment.user.username}
-                                      </span>
-                                      <span
-                                        className={cn(
-                                          "text-gray-500 dark:text-gray-400",
-                                          isMobile ? "text-xs" : "text-xs",
-                                        )}
-                                      >
-                                        {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                                      </span>
-                                    </div>
-                                    <p
-                                      className={cn(
-                                        "text-gray-900 dark:text-white leading-relaxed",
-                                        isMobile ? "text-xs" : "text-sm",
-                                      )}
-                                    >
-                                      {comment.content}
-                                    </p>
-                                  </div>
-                                </motion.div>
-                              ))}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+                    Back to feed
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" className="hover:bg-gray-100 dark:hover:bg-gray-800">
+                  <Search className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="sm" className="hover:bg-gray-100 dark:hover:bg-gray-800">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
 
-          <div
-            className={cn(
-              "border-t p-4",
-              FEATURE_UI_FIXES_V1
-                ? "bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800"
-                : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
-              isMobile && "fixed bottom-0 left-0 right-0 z-30 shadow-lg",
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pb-32">
+            <AnimatePresence>
+              {filteredPosts.map((post, index) => (
+                <motion.div
+                  key={post.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ delay: index * 0.05 }}
+                  className={cn(
+                    "border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors duration-200 p-4",
+                    activePost === post.id &&
+                      "bg-green-50/50 dark:bg-green-900/10 border-green-200 dark:border-green-800",
+                  )}
+                >
+                  <div className="flex space-x-3">
+                    <Avatar className="h-12 w-12 flex-shrink-0 ring-2 ring-gray-200 dark:ring-gray-700">
+                      <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
+                      <AvatarFallback className="bg-green-500 text-white font-semibold">
+                        {post.user.username.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className="font-bold text-gray-900 dark:text-white">
+                          {post.user.full_name || post.user.username}
+                        </span>
+                        <UserTierBadge tier={post.user.tier} size="sm" />
+                        <span className="text-gray-500 dark:text-gray-400">@{post.user.username}</span>
+                        <span className="text-gray-500 dark:text-gray-400">·</span>
+                        <span className="text-gray-500 dark:text-gray-400">
+                          {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                        </span>
+                      </div>
+
+                      <p className="text-gray-900 dark:text-white leading-relaxed break-words mb-3 text-[15px]">
+                        {post.content}
+                      </p>
+
+                      <div className="flex items-center space-x-6 max-w-md">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-8 px-3 rounded-full transition-all duration-200 group",
+                            post.has_voted
+                              ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              : "text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20",
+                          )}
+                          onClick={() => voteOnPost(post.id)}
+                        >
+                          <Heart
+                            className={cn("h-4 w-4 mr-1 transition-all", post.has_voted && "fill-current scale-110")}
+                          />
+                          <span className="text-sm font-medium">{post.vote_count}</span>
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-8 px-3 rounded-full transition-all duration-200 group",
+                            activePost === post.id
+                              ? "text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20"
+                              : "text-gray-500 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20",
+                          )}
+                          onClick={() => {
+                            if (activePost === post.id) {
+                              setActivePost(null)
+                            } else {
+                              setActivePost(post.id)
+                              loadComments(post.id)
+                            }
+                          }}
+                        >
+                          <MessageCircle className="h-4 w-4 mr-1 transition-all group-hover:scale-110" />
+                          <span className="text-sm font-medium">{post.comment_count}</span>
+                        </Button>
+                      </div>
+
+                      <AnimatePresence>
+                        {activePost === post.id && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="mt-4 space-y-3 border-l-2 border-green-200 dark:border-green-800 pl-4"
+                          >
+                            {comments[post.id]?.map((comment) => (
+                              <motion.div
+                                key={comment.id}
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="flex space-x-3"
+                              >
+                                <Avatar className="h-8 w-8 flex-shrink-0">
+                                  <AvatarImage src={comment.user.avatar_url || "/placeholder-user.jpg"} />
+                                  <AvatarFallback className="bg-gray-500 text-white text-xs">
+                                    {comment.user.username.charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-2 mb-1">
+                                    <span className="font-semibold text-gray-900 dark:text-white text-sm">
+                                      {comment.user.username}
+                                    </span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                      {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                    </span>
+                                  </div>
+                                  <p className="text-gray-900 dark:text-white text-sm leading-relaxed">
+                                    {comment.content}
+                                  </p>
+                                </div>
+                              </motion.div>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="fixed bottom-0 left-0 right-0 md:left-80 border-t border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-950/95 backdrop-blur-sm p-4 z-40">
+            {mediaPreview.length > 0 && (
+              <div className="mb-3 flex space-x-2 overflow-x-auto">
+                {mediaPreview.map((preview, index) => (
+                  <div key={index} className="relative flex-shrink-0">
+                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                      {selectedMedia[index].type.startsWith("image/") ? (
+                        <img src={preview || "/placeholder.svg"} alt="Preview" className="w-full h-full object-cover" />
+                      ) : selectedMedia[index].type.startsWith("video/") ? (
+                        <video src={preview} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Mic className="h-6 w-6 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full shadow-sm"
+                      onClick={() => removeMedia(index)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             )}
-          >
+
             {isAuthenticated ? (
-              <div className={cn("flex items-end max-w-2xl mx-auto", isMobile ? "space-x-2" : "space-x-3")}>
-                <Avatar className={cn("flex-shrink-0", isMobile ? "h-8 w-8" : "h-10 w-10")}>
+              <div className="flex items-end space-x-3 max-w-4xl mx-auto">
+                <Avatar className="h-10 w-10 flex-shrink-0 ring-2 ring-green-500/20">
                   <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
                   <AvatarFallback className="bg-green-500 text-white font-semibold">
                     {profile?.username?.charAt(0).toUpperCase() || "U"}
@@ -806,17 +797,10 @@ export default function CommunityPage() {
                 <div className="flex-1 relative">
                   <Input
                     ref={inputRef}
-                    placeholder={activePost ? "Reply to this message..." : "What's happening?"}
+                    placeholder={activePost ? "Tweet your reply..." : "What's happening?"}
                     value={unifiedInput}
                     onChange={(e) => setUnifiedInput(e.target.value)}
-                    className={cn(
-                      "rounded-full focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200",
-                      "placeholder:text-gray-500 dark:placeholder:text-gray-400",
-                      FEATURE_UI_FIXES_V1
-                        ? "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 placeholder:text-gray-600 dark:placeholder:text-gray-300" // Enhanced placeholder contrast
-                        : "border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800",
-                      isMobile ? "pr-24 text-sm px-3 py-2" : "pr-32 text-base px-4 py-3",
-                    )}
+                    className="pr-32 rounded-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:ring-2 focus:ring-green-500 focus:border-transparent text-[16px] min-h-[44px]"
                     onKeyPress={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault()
@@ -824,86 +808,58 @@ export default function CommunityPage() {
                       }
                     }}
                   />
-                  <div
-                    className={cn(
-                      "absolute top-1/2 transform -translate-y-1/2 flex items-center",
-                      isMobile ? "right-1 space-x-0.5" : "right-2 space-x-1",
-                    )}
-                  >
+                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
                     <Button
                       variant="ghost"
                       size="sm"
-                      className={cn(
-                        "rounded-full hover:bg-gray-200 dark:hover:bg-gray-700",
-                        isMobile ? "h-6 w-6 p-0" : "h-8 w-8 p-0",
-                      )}
+                      className="h-8 w-8 p-0 rounded-full hover:bg-green-50 dark:hover:bg-green-900/20"
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      <ImageIcon className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} />
+                      <ImageIcon className="h-4 w-4 text-green-500" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className={cn(
-                        "rounded-full hover:bg-gray-200 dark:hover:bg-gray-700",
-                        isMobile ? "h-6 w-6 p-0" : "h-8 w-8 p-0",
-                      )}
+                      className="h-8 w-8 p-0 rounded-full hover:bg-green-50 dark:hover:bg-green-900/20"
                     >
-                      <Smile className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} />
+                      <Smile className="h-4 w-4 text-green-500" />
                     </Button>
                   </div>
                 </div>
                 <Button
                   onClick={handleUnifiedSubmit}
                   disabled={!unifiedInput.trim() && selectedMedia.length === 0}
-                  className={cn(
-                    "rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 transition-all duration-200 disabled:cursor-not-allowed",
-                    isMobile ? "h-8 w-8 p-0" : "h-10 w-10 p-0",
-                  )}
+                  className="h-10 w-10 p-0 rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 shadow-sm transition-all duration-200 hover:scale-105"
                 >
-                  <Send className={cn(isMobile ? "h-3 w-3" : "h-4 w-4")} />
+                  <Send className="h-4 w-4" />
                 </Button>
               </div>
             ) : (
               <div className="text-center">
-                <div
-                  className={cn(
-                    "rounded-2xl border p-6 max-w-md mx-auto",
-                    FEATURE_UI_FIXES_V1
-                      ? "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700"
-                      : "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
-                  )}
-                >
-                  <p className="text-gray-600 dark:text-gray-400 mb-4">Join the conversation</p>
-                  <Button asChild className="bg-green-500 hover:bg-green-600 rounded-full px-8">
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 max-w-md mx-auto shadow-sm">
+                  <p className="text-gray-700 dark:text-gray-300 mb-4 font-medium">Join the conversation</p>
+                  <Button asChild className="bg-green-500 hover:bg-green-600 rounded-full px-8 shadow-sm">
                     <a href="/login">Sign In</a>
                   </Button>
                 </div>
               </div>
             )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,video/*,audio/*"
+              onChange={handleMediaSelect}
+              className="hidden"
+            />
           </div>
         </div>
 
-        {/* Hidden file input */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept="image/*,video/*,audio/*"
-          className="hidden"
-          onChange={handleMediaSelect}
-        />
+        {sidebarOpen && (
+          <div className="fixed inset-0 bg-black/20 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
+        )}
       </div>
-
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        accept="image/*,video/*,audio/*"
-        onChange={handleMediaSelect}
-        className="hidden"
-      />
     </div>
   )
 }

@@ -12,25 +12,12 @@ import { useAuth } from "@/contexts/auth-context"
 import { PaystackIntegration } from "@/components/paystack/paystack-integration"
 import { createClient } from "@/lib/supabase/client"
 
-const FEATURE_UI_FIXES_V1 = process.env.NEXT_PUBLIC_FEATURE_UI_FIXES_V1 === "true"
-
 interface SurveyData {
   location: string
   favoriteSong: string
   hopedSong: string
   hearAbout: string
   specialRequests: string
-}
-
-interface EventData {
-  id: string
-  title: string
-  event_date: string
-  venue: string
-  ticket_price_naira: number
-  ticket_price_coins: number
-  max_capacity: number
-  current_attendance: number
 }
 
 export default function EventPaymentPage() {
@@ -40,15 +27,14 @@ export default function EventPaymentPage() {
   const { user, profile } = useAuth()
 
   const [surveyData, setSurveyData] = useState<SurveyData | null>(null)
-  const [eventData, setEventData] = useState<EventData | null>(null)
   const [selectedPayment, setSelectedPayment] = useState<"paystack" | "coins" | null>(null)
   const [loading, setLoading] = useState(false)
   const [coinBalance, setCoinBalance] = useState(0)
   const [error, setError] = useState("")
   const supabase = createClient()
 
-  const TICKET_PRICE = 2000000 // 20,000 naira in kobo
-  const TICKET_PRICE_COINS = 10000
+  const TICKET_PRICE = 100000000 // ₦1,000,000 in kobo
+  const TICKET_PRICE_COINS = 1000000 // 1,000,000 Erigga Coins
 
   useEffect(() => {
     // Get survey data from localStorage
@@ -57,45 +43,9 @@ export default function EventPaymentPage() {
       setSurveyData(JSON.parse(storedSurveyData))
     }
 
-    if (eventId) {
-      fetchEventData()
-    }
-
     // Fetch user's coin balance
     fetchCoinBalance()
-  }, [eventId])
-
-  const fetchEventData = async () => {
-    if (!eventId) return
-
-    try {
-      const { data, error } = await supabase
-        .from("events")
-        .select(
-          "id, title, event_date, venue, ticket_price_naira, ticket_price_coins, max_capacity, current_attendance",
-        )
-        .eq("id", eventId)
-        .single()
-
-      if (error) {
-        console.error("Error fetching event:", error)
-        setEventData({
-          id: eventId,
-          title: "ERIGGA Live - Intimate Session",
-          event_date: "2025-09-03T20:00:00",
-          venue: "Uncle Jaffi at The Playground, Warri",
-          ticket_price_naira: 20000,
-          ticket_price_coins: 10000,
-          max_capacity: 200,
-          current_attendance: 45,
-        })
-      } else {
-        setEventData(data)
-      }
-    } catch (error) {
-      console.error("Error fetching event data:", error)
-    }
-  }
+  }, [])
 
   const fetchCoinBalance = async () => {
     if (!user) return
@@ -111,7 +61,7 @@ export default function EventPaymentPage() {
   }
 
   const handleCoinPayment = async () => {
-    if (!user || !surveyData || !eventData) return
+    if (!user || !surveyData) return
 
     setLoading(true)
     setError("")
@@ -123,7 +73,7 @@ export default function EventPaymentPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          eventId: eventData.id,
+          eventId: "erigga-september-2025",
           userId: user.id,
           coinAmount: TICKET_PRICE_COINS,
           surveyData,
@@ -149,7 +99,7 @@ export default function EventPaymentPage() {
   }
 
   const handlePaystackSuccess = async (reference: string) => {
-    if (!user || !surveyData || !eventData) return
+    if (!user || !surveyData) return
 
     setLoading(true)
     setError("")
@@ -161,7 +111,7 @@ export default function EventPaymentPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          eventId: eventData.id,
+          eventId: "erigga-september-2025",
           userId: user.id,
           paystackReference: reference,
           amount: TICKET_PRICE,
@@ -192,7 +142,7 @@ export default function EventPaymentPage() {
     console.error("Paystack error:", error)
   }
 
-  if (!surveyData || !eventData) {
+  if (!surveyData) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
@@ -202,11 +152,6 @@ export default function EventPaymentPage() {
       </div>
     )
   }
-
-  const displayTitle = eventData?.title || "ERIGGA Live - Intimate Session"
-  const displayVenue = eventData?.venue || "Uncle Jaffi at The Playground, Warri"
-  const displayPrice = eventData?.ticket_price_naira || 20000
-  const displayCoins = TICKET_PRICE_COINS
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
@@ -254,18 +199,15 @@ export default function EventPaymentPage() {
         >
           <Card className="bg-gradient-to-br from-gray-900 to-black border-2 border-red-500/30">
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-bold text-white">{displayTitle}</CardTitle>
+              <CardTitle className="text-2xl font-bold text-white">ERIGGA Live - Intimate Session</CardTitle>
               <p className="text-gray-300">Wednesday, 3rd September 2025</p>
-              <p className="text-gray-400">{displayVenue}</p>
+              <p className="text-gray-400">Uncle Jaffi at The Playground, Warri</p>
             </CardHeader>
             <CardContent className="text-center">
-              <div className="space-y-2">
-                <div className="text-lg text-gray-400 line-through">₦50,000</div>
-                <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500">
-                  ₦{displayPrice.toLocaleString()}
-                </div>
+              <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500 mb-2">
+                ₦1,000,000
               </div>
-              <p className="text-gray-400 mt-2">Premium Access Ticket</p>
+              <p className="text-gray-400">Premium Access Ticket</p>
             </CardContent>
           </Card>
         </motion.div>
@@ -316,8 +258,8 @@ export default function EventPaymentPage() {
                     amount={TICKET_PRICE}
                     email={profile.email}
                     metadata={{
-                      event_id: eventData?.id || eventId,
-                      event_title: displayTitle,
+                      event_id: "erigga-september-2025",
+                      event_title: "ERIGGA Live - Intimate Session",
                       user_id: user?.id,
                       survey_data: surveyData,
                     }}
@@ -336,7 +278,7 @@ export default function EventPaymentPage() {
                       ) : (
                         <>
                           <CreditCard className="h-5 w-5 mr-2" />
-                          Pay ₦{displayPrice.toLocaleString()} with Card
+                          Pay ₦1,000,000 with Card
                         </>
                       )}
                     </Button>
@@ -390,7 +332,7 @@ export default function EventPaymentPage() {
                     ) : (
                       <>
                         <Coins className="h-5 w-5 mr-2" />
-                        Pay {displayCoins.toLocaleString()} Erigga Coins
+                        Pay {TICKET_PRICE_COINS.toLocaleString()} Erigga Coins
                       </>
                     )}
                   </Button>

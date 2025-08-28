@@ -36,17 +36,12 @@ import {
   Sun,
   Moon,
   Monitor,
-  FileText,
-  Trophy,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useTheme } from "@/contexts/theme-context"
 import { DynamicLogo } from "@/components/dynamic-logo"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { useUserBalance } from "@/hooks/useUserBalance"
-
-const FEATURE_UI_FIXES_V1 = process.env.NEXT_PUBLIC_FEATURE_UI_FIXES_V1 === "true"
 
 const navigationItems = [
   { name: "Home", href: "/", icon: Home },
@@ -64,14 +59,11 @@ const navigationItems = [
   { name: "Wallet", href: "/wallet", icon: Wallet },
   { name: "Tickets", href: "/tickets", icon: Ticket },
   { name: "About", href: "/about", icon: Info },
-  { name: "Media", href: "/media", icon: FileText },
-  { name: "Achievements", href: "/achievements", icon: Trophy },
 ]
 
 export function UnifiedNavigation() {
   const { user, profile, signOut } = useAuth()
   const { theme, setTheme, resolvedTheme } = useTheme()
-  const { formattedBalance, isRealtime } = useUserBalance()
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
@@ -174,38 +166,11 @@ export function UnifiedNavigation() {
       return [
         navigationItems[0], // Home
         ...communityNavItems,
-        ...(user ? [navigationItems[15], navigationItems[16]] : [navigationItems[14]]), // Media/Achievements or About
+        ...(user ? [navigationItems[6], navigationItems[12]] : [navigationItems[14]]), // Dashboard/Wallet or About
       ]
     }
 
-    if (user) {
-      return [
-        navigationItems[0], // Home
-        navigationItems[1], // Mission
-        navigationItems[2], // Community
-        navigationItems[3], // Radio
-        navigationItems[4], // Events
-        navigationItems[5], // Vault
-        navigationItems[7], // Chat
-        navigationItems[8], // Meet & Greet
-        navigationItems[9], // Merch
-        navigationItems[10], // Chronicles
-        navigationItems[11], // Coins
-        navigationItems[13], // Tickets
-        navigationItems[15], // Media (moved from bottom section)
-        navigationItems[16], // Achievements (moved from bottom section)
-      ]
-    } else {
-      return [
-        navigationItems[0], // Home
-        navigationItems[1], // Mission
-        navigationItems[2], // Community
-        navigationItems[3], // Radio
-        navigationItems[4], // Events
-        navigationItems[5], // Vault
-        navigationItems[14], // About
-      ]
-    }
+    return navigationItems
   }
 
   return (
@@ -254,20 +219,11 @@ export function UnifiedNavigation() {
             {user ? (
               <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3">
                 {profile?.coins !== undefined && (
-                  <div
-                    className={cn(
-                      "hidden sm:flex items-center space-x-1 px-2 md:px-3 py-1 rounded-full transition-all duration-200",
-                      "bg-yellow-100 dark:bg-yellow-900/20",
-                      isRealtime && FEATURE_UI_FIXES_V1 && "ring-1 ring-yellow-300 dark:ring-yellow-700",
-                    )}
-                  >
+                  <div className="hidden sm:flex items-center space-x-1 bg-yellow-100 dark:bg-yellow-900/20 px-2 md:px-3 py-1 rounded-full">
                     <Coins className="h-3 w-3 md:h-4 md:w-4 text-yellow-600" />
                     <span className="text-xs md:text-sm font-medium text-yellow-700 dark:text-yellow-400">
-                      {formattedBalance}
+                      {profile.coins.toLocaleString()}
                     </span>
-                    {isRealtime && FEATURE_UI_FIXES_V1 && (
-                      <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
-                    )}
                   </div>
                 )}
 
@@ -384,19 +340,11 @@ export function UnifiedNavigation() {
                             </Badge>
                           )}
                           {profile?.coins !== undefined && (
-                            <div
-                              className={cn(
-                                "flex items-center space-x-1 text-xs bg-yellow-100 dark:bg-yellow-900/20 px-2 py-0.5 rounded-full transition-all duration-200",
-                                isRealtime && FEATURE_UI_FIXES_V1 && "ring-1 ring-yellow-300 dark:ring-yellow-700",
-                              )}
-                            >
+                            <div className="flex items-center space-x-1 text-xs bg-yellow-100 dark:bg-yellow-900/20 px-2 py-0.5 rounded-full">
                               <Coins className="h-3 w-3 text-yellow-600" />
                               <span className="font-medium text-yellow-700 dark:text-yellow-400">
-                                {formattedBalance}
+                                {profile.coins.toLocaleString()}
                               </span>
-                              {isRealtime && FEATURE_UI_FIXES_V1 && (
-                                <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
-                              )}
                             </div>
                           )}
                         </div>
@@ -443,7 +391,7 @@ export function UnifiedNavigation() {
                       <div className="space-y-2">
                         <Button asChild variant="outline" className="w-full justify-start bg-transparent">
                           <Link href="/dashboard" onClick={() => setIsOpen(false)}>
-                            <LayoutDashboard className="mr-2 h-4 w-4" />
+                            <User className="mr-2 h-4 w-4" />
                             Dashboard
                           </Link>
                         </Button>
@@ -468,7 +416,7 @@ export function UnifiedNavigation() {
                           }}
                         >
                           <LogOut className="mr-2 h-4 w-4" />
-                          Sign Out
+                          Log out
                         </Button>
                       </div>
                     ) : (
