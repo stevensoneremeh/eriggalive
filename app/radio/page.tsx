@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 import {
   Play,
   Pause,
@@ -20,10 +21,13 @@ import {
   Music,
   Headphones,
   Users,
+  Pin,
+  PinOff,
 } from "lucide-react"
 import { AnimatedRadioCharacter } from "@/components/radio/animated-radio-character"
 import { EnhancedShoutOut } from "@/components/radio/enhanced-shout-out"
 import { useAuth } from "@/contexts/auth-context"
+import { supabase } from "@/lib/supabase"
 
 const FEATURE_UI_FIXES_V1 = process.env.NEXT_PUBLIC_FEATURE_UI_FIXES_V1 === "true"
 
@@ -33,6 +37,7 @@ interface Track {
   artist: string
   duration: number
   url: string
+  artwork_url?: string
 }
 
 interface ShoutOut {
@@ -50,6 +55,7 @@ const mockTracks: Track[] = [
     artist: "Erigga",
     duration: 240,
     url: "/audio/paper-boi.mp3",
+    artwork_url: "/images/paper-boi.jpg",
   },
   {
     id: "2",
@@ -57,6 +63,7 @@ const mockTracks: Track[] = [
     artist: "Erigga",
     duration: 180,
     url: "/audio/the-erigma.mp3",
+    artwork_url: "/images/the-erigma.jpg",
   },
   {
     id: "3",
@@ -64,6 +71,7 @@ const mockTracks: Track[] = [
     artist: "Erigga ft. Victor AD",
     duration: 200,
     url: "/audio/motivation.mp3",
+    artwork_url: "/images/motivation.jpg",
   },
 ]
 
@@ -100,7 +108,17 @@ export default function RadioPage() {
   const [isMuted, setIsMuted] = useState(false)
   const [currentShoutOut, setCurrentShoutOut] = useState<ShoutOut | null>(null)
   const [listeners, setListeners] = useState(1247)
+  const [dailyQuote, setDailyQuote] = useState("")
+  const [isLive, setIsLive] = useState(false)
+  const [liveTitle, setLiveTitle] = useState("")
+  const [nextShow, setNextShow] = useState<{ title: string; time: string } | null>(null)
+  const [shoutouts, setShoutouts] = useState<string[]>([])
+  const [pinnedTracks, setPinnedTracks] = useState<Track[]>([])
+  const [playlist, setPlaylist] = useState<Track[]>([])
+  const [selectedMoodData, setSelectedMoodData] = useState<{ name: string; emoji: string }>({ name: "", emoji: "" })
   const audioRef = useRef<HTMLAudioElement>(null)
+  const [theme, setTheme] = useState("dark")
+  const [newShoutout, setNewShoutout] = useState("") // Declare setNewShoutout variable
 
   // Simulate live listener count
   useEffect(() => {
@@ -181,7 +199,127 @@ export default function RadioPage() {
     return `${minutes}:${seconds.toString().padStart(2, "0")}`
   }
 
+  const loadRadioData = async () => {
+    try {
+      // Load daily quote with null guard
+      const { data: quote } = await supabase
+        .from("daily_quotes")
+        .select("*")
+        .gte("created_at", new Date().toISOString().split("T")[0])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single()
+
+      if (quote?.text) {
+        setDailyQuote(quote.text)
+      }
+
+      // Load live broadcast status with null guard
+      const { data: broadcast } = await supabase.from("live_broadcasts").select("*").eq("status", "live").single()
+
+      if (broadcast?.title) {
+        setIsLive(true)
+        setLiveTitle(broadcast.title)
+      }
+
+      // Load next scheduled show with null guard
+      const { data: nextBroadcast } = await supabase
+        .from("live_broadcasts")
+        .select("*")
+        .eq("status", "scheduled")
+        .gte("scheduled_time", new Date().toISOString())
+        .order("scheduled_time", { ascending: true })
+        .limit(1)
+        .single()
+
+      if (nextBroadcast?.title && nextBroadcast?.scheduled_time) {
+        setNextShow({
+          title: nextBroadcast.title,
+          time: new Date(nextBroadcast.scheduled_time).toLocaleTimeString(),
+        })
+      }
+
+      // Load recent shoutouts with null guards
+      const { data: recentShoutouts } = await supabase
+        .from("community_shoutouts")
+        .select("message")
+        .order("created_at", { ascending: false })
+        .limit(10)
+
+      if (recentShoutouts && Array.isArray(recentShoutouts)) {
+        setShoutouts(recentShoutouts.map((s) => s?.message).filter(Boolean))
+      }
+
+      // Load pinned tracks for user with null guards
+      if (user?.id) {
+        const { data: pinned } = await supabase
+          .from("user_pinned_tracks")
+          .select(`
+            tracks (*)
+          `)
+          .eq("user_id", user.id)
+
+        if (pinned && Array.isArray(pinned)) {
+          setPinnedTracks(pinned.map((p) => p?.tracks).filter(Boolean))
+        }
+      }
+    } catch (error) {
+      console.error("Error loading radio data:", error)
+    }
+  }
+
+  const submitShoutout = async () => {
+    if (!newShoutout?.trim() || !user?.id) return
+
+    if (newShoutout.length > 200) {
+      alert("Shoutout must be 200 characters or less")
+      return
+    }
+
+    try {
+      const userName = user.user_metadata?.full_name || user.email || "Anonymous"
+      const shoutoutText = `${userName}: ${newShoutout.trim()}`
+
+      // Add to local state immediately for better UX
+      setShoutouts((prev) => {
+        const currentShoutouts = Array.isArray(prev) ? prev : []
+        return [shoutoutText, ...currentShoutouts.slice(0, 9)]
+      })
+      setNewShoutout("")
+
+      // Save to database
+      const { error } = await supabase.from("fan_shoutouts").insert({
+        user_id: user.id,
+        message: newShoutout.trim(),
+        created_at: new Date().toISOString(),
+      })
+
+      if (error) {
+        console.error("Error saving shoutout:", error)
+        // Remove from local state if database save failed
+        setShoutouts((prev) => {
+          const currentShoutouts = Array.isArray(prev) ? prev : []
+          return currentShoutouts.slice(1)
+        })
+      }
+    } catch (error) {
+      console.error("Error submitting shoutout:", error)
+      setShoutouts((prev) => {
+        const currentShoutouts = Array.isArray(prev) ? prev : []
+        return currentShoutouts.slice(1)
+      })
+    }
+  }
+
+  const togglePinTrack = (track: Track) => {
+    // Placeholder for togglePinTrack logic
+  }
+
   const track = mockTracks[currentTrack]
+
+  useEffect(() => {
+    loadRadioData()
+  }, [user])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
@@ -327,7 +465,11 @@ export default function RadioPage() {
                         <Heart className="w-4 h-4 mr-2" />
                         Like
                       </Button>
-                      <Button variant="outline" className="bg-white/10 border-white/20 hover:bg-white/20">
+                      <Button
+                        variant="outline"
+                        className="bg-white/10 border-white/20 hover:bg-white/20"
+                        onClick={submitShoutout}
+                      >
                         <MessageCircle className="w-4 h-4 mr-2" />
                         Shout-out
                       </Button>
@@ -405,6 +547,205 @@ export default function RadioPage() {
                   </CardContent>
                 </Card>
               </motion.div>
+
+              {/* Shoutouts */}
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.0 }}>
+                <Card className="bg-white/5 backdrop-blur-xl border-white/10">
+                  <CardHeader>
+                    <CardTitle className="text-white">Shoutouts</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {!Array.isArray(shoutouts) || shoutouts.length === 0 ? (
+                        <p
+                          className={cn(
+                            "text-sm text-center py-4",
+                            theme === "dark" ? "text-white/50" : "text-gray/500",
+                          )}
+                        >
+                          No shout-outs yet. Be the first to send one!
+                        </p>
+                      ) : (
+                        shoutouts.map((shoutout, index) => (
+                          <motion.div
+                            key={index}
+                            className={cn(
+                              "text-sm p-2 rounded-lg",
+                              theme === "dark" ? "text-white/80 bg-white/5" : "text-gray-700 bg-gray-100/50",
+                            )}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                          >
+                            {shoutout || ""}
+                          </motion.div>
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* Pinned Tracks */}
+              {Array.isArray(pinnedTracks) && pinnedTracks.length > 0 && (
+                <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.2 }}>
+                  <Card
+                    className={cn(
+                      theme === "dark"
+                        ? "glass-card"
+                        : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg",
+                    )}
+                  >
+                    <CardHeader>
+                      <CardTitle
+                        className={cn("flex items-center gap-2", theme === "dark" ? "text-white" : "text-gray-900")}
+                      >
+                        <Pin className="w-5 h-5" />
+                        Pinned Tracks
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {pinnedTracks.map(
+                          (track) =>
+                            track && (
+                              <div
+                                key={track.id}
+                                className={cn(
+                                  "flex items-center gap-3 p-2 rounded-lg",
+                                  theme === "dark" ? "bg-white/5" : "bg-gray-100/50",
+                                )}
+                              >
+                                <img
+                                  src={track.artwork_url || "/placeholder.svg"}
+                                  alt={track.title || "Track"}
+                                  className="w-8 h-8 rounded object-cover"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p
+                                    className={cn(
+                                      "text-sm font-medium truncate",
+                                      theme === "dark" ? "text-white" : "text-gray-900",
+                                    )}
+                                  >
+                                    {track.title || "Unknown Track"}
+                                  </p>
+                                  <p
+                                    className={cn(
+                                      "text-xs truncate",
+                                      theme === "dark" ? "text-white/70" : "text-gray-600",
+                                    )}
+                                  >
+                                    {track.artist || "Unknown Artist"}
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => togglePinTrack(track)}
+                                  className={cn(
+                                    theme === "dark"
+                                      ? "text-white/70 hover:text-white"
+                                      : "text-gray-700 hover:text-gray-900",
+                                  )}
+                                >
+                                  <PinOff className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ),
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* Playlist */}
+              {Array.isArray(playlist) && playlist.length > 0 && (
+                <motion.div
+                  className="mt-12"
+                  initial={{ opacity: 0, y: 50 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1.4 }}
+                >
+                  <Card
+                    className={cn(
+                      theme === "dark"
+                        ? "glass-card"
+                        : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg",
+                    )}
+                  >
+                    <CardHeader>
+                      <CardTitle className={cn("text-white", theme === "dark" ? "text-white" : "text-gray-900")}>
+                        {selectedMoodData.name} Playlist {selectedMoodData.emoji}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {playlist.slice(0, 6).map(
+                          (track, index) =>
+                            track && (
+                              <motion.div
+                                key={track.id}
+                                className={cn(
+                                  "flex items-center gap-3 p-3 rounded-lg hover:cursor-pointer",
+                                  theme === "dark" ? "bg-white/5" : "bg-gray-100/50",
+                                )}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.1 * index }}
+                                onClick={() => setCurrentTrack(track)}
+                              >
+                                <img
+                                  src={track.artwork_url || "/placeholder.svg"}
+                                  alt={track.title || "Track"}
+                                  className="w-12 h-12 rounded-lg object-cover"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p
+                                    className={cn(
+                                      "font-medium truncate",
+                                      theme === "dark" ? "text-white" : "text-gray-900",
+                                    )}
+                                  >
+                                    {track.title || "Unknown Track"}
+                                  </p>
+                                  <p
+                                    className={cn(
+                                      "text-sm truncate",
+                                      theme === "dark" ? "text-white/70" : "text-gray-600",
+                                    )}
+                                  >
+                                    {track.artist || "Unknown Artist"}
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    togglePinTrack(track)
+                                  }}
+                                  className={cn(
+                                    theme === "dark"
+                                      ? "text-white/70 hover:text-white"
+                                      : "text-gray-700 hover:text-gray-900",
+                                  )}
+                                >
+                                  {Array.isArray(pinnedTracks) && pinnedTracks.some((t) => t?.id === track.id) ? (
+                                    <PinOff className="w-4 h-4" />
+                                  ) : (
+                                    <Pin className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              </motion.div>
+                            ),
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
             </div>
           </div>
         </div>
