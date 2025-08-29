@@ -33,8 +33,9 @@ export default function EventPaymentPage() {
   const [error, setError] = useState("")
   const supabase = createClient()
 
-  const TICKET_PRICE = 100000000 // ₦1,000,000 in kobo
-  const TICKET_PRICE_COINS = 1000000 // 1,000,000 Erigga Coins
+  const TICKET_PRICE = 2000000 // ₦20,000 in kobo
+  const TICKET_PRICE_COINS = 10000 // 10,000 Erigga Coins
+  const ORIGINAL_PRICE = 5000000 // ₦50,000 in kobo for display
 
   useEffect(() => {
     // Get survey data from localStorage
@@ -204,10 +205,13 @@ export default function EventPaymentPage() {
               <p className="text-gray-400">Uncle Jaffi at The Playground, Warri</p>
             </CardHeader>
             <CardContent className="text-center">
-              <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500 mb-2">
-                ₦1,000,000
+              <div className="space-y-2">
+                <div className="text-lg text-gray-400 line-through">₦50,000</div>
+                <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500">
+                  ₦20,000
+                </div>
               </div>
-              <p className="text-gray-400">Premium Access Ticket</p>
+              <p className="text-gray-400 mt-2">Premium Access Ticket</p>
             </CardContent>
           </Card>
         </motion.div>
@@ -278,7 +282,7 @@ export default function EventPaymentPage() {
                       ) : (
                         <>
                           <CreditCard className="h-5 w-5 mr-2" />
-                          Pay ₦1,000,000 with Card
+                          Pay ₦20,000 with Card
                         </>
                       )}
                     </Button>

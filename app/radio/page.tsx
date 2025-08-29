@@ -23,6 +23,7 @@ import {
   PinOff,
   Clock,
   Send,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -135,6 +136,8 @@ export default function RadioPage() {
   const [dailyQuote, setDailyQuote] = useState("")
   const [shoutouts, setShoutouts] = useState<string[]>([])
   const [newShoutout, setNewShoutout] = useState("")
+  const [featuredShoutout, setFeaturedShoutout] = useState<string | null>(null)
+  const [shoutoutQueue, setShoutoutQueue] = useState<string[]>([])
   const [nextShow, setNextShow] = useState<NextShow | null>(null)
 
   // Visual state
@@ -160,6 +163,31 @@ export default function RadioPage() {
       setBackgroundTheme(selectedMood)
     }
   }, [selectedMood])
+
+  useEffect(() => {
+    if (shoutoutQueue.length === 0) return
+
+    const timer = setInterval(() => {
+      setShoutoutQueue((prev) => {
+        if (prev.length === 0) return prev
+        const [next, ...rest] = prev
+        setFeaturedShoutout(next)
+        return rest
+      })
+    }, 8000) // Show each shoutout for 8 seconds
+
+    return () => clearInterval(timer)
+  }, [shoutoutQueue])
+
+  useEffect(() => {
+    if (!featuredShoutout) return
+
+    const hideTimer = setTimeout(() => {
+      setFeaturedShoutout(null)
+    }, 8000)
+
+    return () => clearTimeout(hideTimer)
+  }, [featuredShoutout])
 
   const loadRadioData = async () => {
     try {
@@ -209,7 +237,11 @@ export default function RadioPage() {
         .limit(10)
 
       if (recentShoutouts) {
-        setShoutouts(recentShoutouts.map((s) => s.message))
+        const formattedShoutouts = recentShoutouts.map((s) => s.message)
+        setShoutouts(formattedShoutouts)
+        if (formattedShoutouts.length > 0) {
+          setFeaturedShoutout(formattedShoutouts[0])
+        }
       }
 
       // Load pinned tracks for user
@@ -270,7 +302,9 @@ export default function RadioPage() {
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "community_shoutouts" }, (payload) => {
         if (payload.new) {
-          setShoutouts((prev) => [payload.new.message, ...prev.slice(0, 9)]) // Keep only 10 most recent
+          const newMessage = payload.new.message
+          setShoutouts((prev) => [newMessage, ...prev.slice(0, 9)]) // Keep only 10 most recent
+          setShoutoutQueue((prev) => [...prev, newMessage])
         }
       })
       .subscribe()
@@ -330,6 +364,7 @@ export default function RadioPage() {
 
       // Add to local state immediately for better UX
       setShoutouts((prev) => [shoutoutText, ...prev.slice(0, 9)]) // Keep only 10 most recent
+      setShoutoutQueue((prev) => [...prev, shoutoutText])
       setNewShoutout("")
 
       // Save to database
@@ -343,10 +378,12 @@ export default function RadioPage() {
         console.error("Error saving shoutout:", error)
         // Remove from local state if database save failed
         setShoutouts((prev) => prev.slice(1))
+        setShoutoutQueue((prev) => prev.slice(0, -1))
       }
     } catch (error) {
       console.error("Error submitting shoutout:", error)
       setShoutouts((prev) => prev.slice(1))
+      setShoutoutQueue((prev) => prev.slice(0, -1))
     }
   }
 
@@ -728,6 +765,39 @@ export default function RadioPage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Featured Shout-out Banner */}
+            {featuredShoutout && (
+              <motion.div
+                initial={{ opacity: 0, y: -50, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -50, scale: 0.9 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-2xl w-full mx-4"
+              >
+                <Card className="bg-gradient-to-r from-red-500/95 to-orange-500/95 backdrop-blur-md border-2 border-yellow-400/50 shadow-2xl">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0">
+                        <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-bold text-sm uppercase tracking-wide mb-1">🎤 Live Shout-out</p>
+                        <p className="text-white text-lg font-medium leading-tight break-words">{featuredShoutout}</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setFeaturedShoutout(null)}
+                        className="text-white hover:bg-white/20 flex-shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+
             {/* Live Broadcast Card */}
             <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8 }}>
               <Card
@@ -784,6 +854,10 @@ export default function RadioPage() {
                   >
                     <MessageCircle className="w-5 h-5" />
                     Fan Shout-outs
+                    <div className="flex items-center gap-1 ml-auto">
+                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs text-red-500 font-medium">LIVE</span>
+                    </div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -791,12 +865,12 @@ export default function RadioPage() {
                     <Input
                       value={newShoutout}
                       onChange={(e) => setNewShoutout(e.target.value)}
-                      placeholder="Send a shout-out..."
+                      placeholder="Send a shout-out to go live on air..."
                       className={cn(
-                        "flex-1",
+                        "flex-1 transition-all duration-200",
                         theme === "dark"
-                          ? "bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                          : "bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-500",
+                          ? "bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:bg-white/15 focus:border-red-400/50"
+                          : "bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-500 focus:bg-white focus:border-red-400/50",
                       )}
                       onKeyPress={(e) => e.key === "Enter" && submitShoutout()}
                       maxLength={200}
@@ -805,9 +879,10 @@ export default function RadioPage() {
                       onClick={submitShoutout}
                       size="sm"
                       className={cn(
+                        "transition-all duration-200 min-w-[44px]",
                         theme === "dark"
-                          ? "bg-white text-black hover:bg-white/90"
-                          : "bg-gray-900 text-white hover:bg-gray-800",
+                          ? "bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-600/25"
+                          : "bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-600/25",
                       )}
                       disabled={!newShoutout.trim()}
                     >
@@ -818,6 +893,9 @@ export default function RadioPage() {
                   {/* Character count indicator */}
                   <div className={cn("text-xs text-right", theme === "dark" ? "text-white/50" : "text-gray-500")}>
                     {newShoutout.length}/200
+                    {newShoutout.length === 0 && (
+                      <span className="ml-2 text-red-400">• Your message will appear live on air!</span>
+                    )}
                   </div>
 
                   {/* Animated Radio Character */}
@@ -830,30 +908,70 @@ export default function RadioPage() {
                     />
                   </div>
 
-                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                  <div className="space-y-3 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-red-500/20">
                     {shoutouts.length === 0 ? (
-                      <p
-                        className={cn("text-sm text-center py-4", theme === "dark" ? "text-white/50" : "text-gray-500")}
-                      >
-                        No shout-outs yet. Be the first to send one!
-                      </p>
+                      <div className="text-center py-8">
+                        <MessageCircle
+                          className={cn(
+                            "w-12 h-12 mx-auto mb-3 opacity-30",
+                            theme === "dark" ? "text-white" : "text-gray-400",
+                          )}
+                        />
+                        <p className={cn("text-sm", theme === "dark" ? "text-white/50" : "text-gray-500")}>
+                          No shout-outs yet. Be the first to send one!
+                        </p>
+                        <p className={cn("text-xs mt-1", theme === "dark" ? "text-white/30" : "text-gray-400")}>
+                          Your message will be featured live on the radio
+                        </p>
+                      </div>
                     ) : (
                       shoutouts.map((shoutout, index) => (
                         <motion.div
                           key={index}
                           className={cn(
-                            "text-sm p-2 rounded-lg",
-                            theme === "dark" ? "text-white/80 bg-white/5" : "text-gray-700 bg-gray-100/50",
+                            "text-sm p-3 rounded-xl border transition-all duration-200 hover:scale-[1.02]",
+                            index === 0
+                              ? theme === "dark"
+                                ? "text-white bg-red-500/20 border-red-400/30 shadow-lg shadow-red-500/10"
+                                : "text-gray-900 bg-red-50 border-red-200 shadow-lg shadow-red-500/10"
+                              : theme === "dark"
+                                ? "text-white/80 bg-white/5 border-white/10 hover:bg-white/10"
+                                : "text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100",
                           )}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.1 }}
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          transition={{ delay: index * 0.1, duration: 0.3 }}
                         >
-                          {shoutout}
+                          <div className="flex items-start gap-2">
+                            {index === 0 && (
+                              <div className="flex-shrink-0 mt-0.5">
+                                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              {index === 0 && (
+                                <div className="text-xs font-medium text-red-500 mb-1 uppercase tracking-wide">
+                                  Now Playing
+                                </div>
+                              )}
+                              <p className="break-words leading-relaxed">{shoutout}</p>
+                            </div>
+                          </div>
                         </motion.div>
                       ))
                     )}
                   </div>
+
+                  {shoutoutQueue.length > 0 && (
+                    <div
+                      className={cn(
+                        "text-xs text-center py-2 border-t",
+                        theme === "dark" ? "text-white/40 border-white/10" : "text-gray-400 border-gray-200",
+                      )}
+                    >
+                      {shoutoutQueue.length} shout-out{shoutoutQueue.length !== 1 ? "s" : ""} in queue
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>

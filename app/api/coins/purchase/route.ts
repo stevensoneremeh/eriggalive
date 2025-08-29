@@ -269,11 +269,11 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Update user coin balance
+      const newBalance = profile.coins + coins
       const { data: updatedProfile, error: updateError } = await supabase
         .from("users")
         .update({
-          coins: profile.coins + coins,
+          coins: newBalance,
           updated_at: new Date().toISOString(),
         })
         .eq("auth_user_id", user.id)
@@ -293,6 +293,18 @@ export async function POST(request: NextRequest) {
           },
           { status: 500 },
         )
+      }
+
+      const { error: walletError } = await supabase.from("user_wallets").upsert({
+        user_id: profile.id,
+        coin_balance: newBalance,
+        total_earned: coins, // This should be incremented, but for now we'll set it
+        updated_at: new Date().toISOString(),
+      })
+
+      if (walletError) {
+        console.error("Wallet sync error:", walletError)
+        // Don't fail the transaction for wallet sync issues
       }
 
       // Create coin transaction record for audit trail

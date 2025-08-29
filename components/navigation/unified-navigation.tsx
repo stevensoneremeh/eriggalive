@@ -166,7 +166,7 @@ export function UnifiedNavigation() {
       return [
         navigationItems[0], // Home
         ...communityNavItems,
-        ...(user ? [navigationItems[6], navigationItems[12]] : [navigationItems[14]]), // Dashboard/Wallet or About
+        ...(user ? [] : [navigationItems[14]]), // Only About for non-authenticated users
       ]
     }
 
@@ -390,18 +390,6 @@ export function UnifiedNavigation() {
                     {user ? (
                       <div className="space-y-2">
                         <Button asChild variant="outline" className="w-full justify-start bg-transparent">
-                          <Link href="/dashboard" onClick={() => setIsOpen(false)}>
-                            <User className="mr-2 h-4 w-4" />
-                            Dashboard
-                          </Link>
-                        </Button>
-                        <Button asChild variant="outline" className="w-full justify-start bg-transparent">
-                          <Link href="/wallet" onClick={() => setIsOpen(false)}>
-                            <Wallet className="mr-2 h-4 w-4" />
-                            Wallet
-                          </Link>
-                        </Button>
-                        <Button asChild variant="outline" className="w-full justify-start bg-transparent">
                           <Link href="/profile" onClick={() => setIsOpen(false)}>
                             <Settings className="mr-2 h-4 w-4" />
                             Settings
@@ -416,7 +404,7 @@ export function UnifiedNavigation() {
                           }}
                         >
                           <LogOut className="mr-2 h-4 w-4" />
-                          Log out
+                          Sign Out
                         </Button>
                       </div>
                     ) : (
