@@ -245,7 +245,7 @@ export default function CommunityPage() {
     }
 
     const urlRegex =
-      /(https?:\/\/[^\s]+|www\.[^\s]+|[^\s]+\.(com|org|net|edu|gov|io|co|uk|de|fr|jp|cn|in|br|au|ca|mx|es|it|ru|kr|nl|se|no|dk|fi|pl|tr|za|ng|ke|gh|tz|ug|rw|et|ma|eg|dz|ly|tn|sd|ao|mz|zw|bw|na|sz|ls|mw|zm|cd|cf|cm|ga|gq|st|td|ne|ml|bf|ci|sn|gm|gw|sl|lr|gh|tg|bj|ng|ne|td|cm|cf|cd|cg|ga|gq|st|ao|na|bw|sz|ls|mw|zm|zw|mz|mg|mu|sc|km|dj|so|er|et|ke|ug|tz|rw|bi|mw|zm|zw|bw|na|sz|ls))/gi
+      /(https?:\/\/[^\s]+|www\.[^\s]+|[^\s]+\.(com|org|net|edu|gov|io|co|uk|de|fr|jp|cn|in|br|au|ca|mx|es|it|ru|kr|nl|se|no|dk|fi|pl|tr|za|ng|ke|gh|tz|ug|rw|et|ma|eg|dz|ly|tn|sd|ao|mz|zw|bw|na|sz|ls|mw|zm|cd|cf|cm|ga|gq|st|td|ne|ml|bf|ci|sn|gm|gw|sl|lr|gh|tg|bj|ng|ne|td|cm|cf|cd|cg|ga|gq|st|ao|na|bw|sz|ls))/gi
 
     if (urlRegex.test(unifiedInput)) {
       toast.error("Links and URLs are not allowed in posts. Please share your thoughts without external links.")
@@ -586,42 +586,42 @@ export default function CommunityPage() {
           )}
         </motion.div>
 
-        <div className="flex-1 flex flex-col bg-white dark:bg-gray-950 min-w-0">
+        <div className="flex-1 flex flex-col bg-white dark:bg-gray-950 min-w-0 w-full md:ml-0">
           <motion.div
             initial={{ y: 0 }}
             animate={{ y: headerVisible ? 0 : -100 }}
             transition={{ type: "spring", damping: 20, stiffness: 300 }}
-            className="p-3 md:p-4 bg-white/98 dark:bg-gray-950/98 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 sticky top-0 z-20 shadow-sm"
+            className="p-2 sm:p-3 md:p-4 bg-white/98 dark:bg-gray-950/98 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 sticky top-0 z-20 shadow-sm"
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2 md:space-x-3">
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center space-x-2 md:space-x-3 flex-1 min-w-0">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="md:hidden hover:bg-gray-100 dark:hover:bg-gray-800 h-9 w-9 p-0"
+                  className="md:hidden hover:bg-gray-100 dark:hover:bg-gray-800 h-8 w-8 p-0 flex-shrink-0"
                   onClick={() => setSidebarOpen(true)}
                 >
-                  <Menu className="h-5 w-5" />
+                  <Menu className="h-4 w-4" />
                 </Button>
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-sm md:text-lg">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-sm md:text-lg flex-shrink-0">
                   {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
                 </div>
-                <div>
-                  <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 dark:text-white truncate">
                     {categories.find((c) => c.id === selectedCategory)?.name || "General"}
                   </h2>
-                  <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 truncate">
                     {activePost ? "Reply to message" : `${filteredPosts.length} messages`}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center space-x-1 md:space-x-2">
+              <div className="flex items-center space-x-1 flex-shrink-0">
                 {activePost && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setActivePost(null)}
-                    className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 text-xs md:text-sm px-2 md:px-3"
+                    className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 text-xs md:text-sm px-2 md:px-3 hidden sm:flex"
                   >
                     Back to feed
                   </Button>
@@ -629,16 +629,16 @@ export default function CommunityPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="hover:bg-gray-100 dark:hover:bg-gray-800 h-8 w-8 md:h-9 md:w-9 p-0"
+                  className="hover:bg-gray-100 dark:hover:bg-gray-800 h-7 w-7 md:h-9 md:w-9 p-0"
                 >
-                  <Search className="h-4 w-4" />
+                  <Search className="h-3 w-3 md:h-4 md:w-4" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="hover:bg-gray-100 dark:hover:bg-gray-800 h-8 w-8 md:h-9 md:w-9 p-0"
+                  className="hover:bg-gray-100 dark:hover:bg-gray-800 h-7 w-7 md:h-9 md:w-9 p-0"
                 >
-                  <MoreVertical className="h-4 w-4" />
+                  <MoreVertical className="h-3 w-3 md:h-4 md:w-4" />
                 </Button>
               </div>
             </div>
@@ -650,7 +650,7 @@ export default function CommunityPage() {
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0, opacity: 0 }}
-                className="fixed top-4 right-4 z-30"
+                className="fixed top-4 left-4 z-30"
               >
                 <Button
                   onClick={() => {
@@ -658,17 +658,17 @@ export default function CommunityPage() {
                     setShowFloatingButton(false)
                     setTimeout(() => setShowFloatingButton(true), 3000)
                   }}
-                  className="h-12 w-12 rounded-full bg-green-500 hover:bg-green-600 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-110"
+                  className="h-10 w-10 rounded-full bg-green-500 hover:bg-green-600 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-110"
                 >
                   <motion.div animate={{ rotate: headerVisible ? 45 : 0 }} transition={{ duration: 0.2 }}>
-                    <span className="text-white text-xl font-light">+</span>
+                    <span className="text-white text-lg font-light">+</span>
                   </motion.div>
                 </Button>
               </motion.div>
             )}
           </AnimatePresence>
 
-          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pb-24 md:pb-32">
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pb-20 sm:pb-24 md:pb-32">
             <AnimatePresence>
               {filteredPosts.map((post, index) => (
                 <motion.div
@@ -678,44 +678,42 @@ export default function CommunityPage() {
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ delay: index * 0.05 }}
                   className={cn(
-                    "border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors duration-200 p-3 md:p-4",
+                    "border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors duration-200 p-2 sm:p-3 md:p-4",
                     activePost === post.id &&
                       "bg-green-50/50 dark:bg-green-900/10 border-green-200 dark:border-green-800",
                   )}
                 >
                   <div className="flex space-x-2 md:space-x-3">
-                    <Avatar className="h-10 w-10 md:h-12 md:w-12 flex-shrink-0 ring-2 ring-gray-200 dark:ring-gray-700">
+                    <Avatar className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 flex-shrink-0 ring-2 ring-gray-200 dark:ring-gray-700">
                       <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
-                      <AvatarFallback className="bg-green-500 text-white font-semibold text-sm">
+                      <AvatarFallback className="bg-green-500 text-white font-semibold text-xs sm:text-sm">
                         {post.user.username.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
 
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-1 md:space-x-2 mb-1 md:mb-2">
-                        <span className="font-bold text-gray-900 dark:text-white text-sm md:text-base truncate">
+                      <div className="flex items-center space-x-1 md:space-x-2 mb-1 md:mb-2 flex-wrap">
+                        <span className="font-bold text-gray-900 dark:text-white text-xs sm:text-sm md:text-base truncate">
                           {post.user.full_name || post.user.username}
                         </span>
                         <UserTierBadge tier={post.user.tier} size="sm" />
-                        <span className="text-gray-500 dark:text-gray-400 text-xs md:text-sm truncate">
-                          @{post.user.username}
-                        </span>
+                        <span className="text-gray-500 dark:text-gray-400 text-xs truncate">@{post.user.username}</span>
                         <span className="text-gray-500 dark:text-gray-400 text-xs">·</span>
                         <span className="text-gray-500 dark:text-gray-400 text-xs">
                           {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
                         </span>
                       </div>
 
-                      <p className="text-gray-900 dark:text-white leading-relaxed break-words mb-2 md:mb-3 text-sm md:text-[15px]">
+                      <p className="text-gray-900 dark:text-white leading-relaxed break-words mb-2 md:mb-3 text-xs sm:text-sm md:text-[15px]">
                         {post.content}
                       </p>
 
-                      <div className="flex items-center space-x-4 md:space-x-6 max-w-md">
+                      <div className="flex items-center space-x-3 sm:space-x-4 md:space-x-6 max-w-md">
                         <Button
                           variant="ghost"
                           size="sm"
                           className={cn(
-                            "h-7 md:h-8 px-2 md:px-3 rounded-full transition-all duration-200 group",
+                            "h-6 sm:h-7 md:h-8 px-1 sm:px-2 md:px-3 rounded-full transition-all duration-200 group",
                             post.has_voted
                               ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
                               : "text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20",
@@ -724,7 +722,7 @@ export default function CommunityPage() {
                         >
                           <Heart
                             className={cn(
-                              "h-3 w-3 md:h-4 md:w-4 mr-1 transition-all",
+                              "h-3 w-3 md:h-4 md:w-4 mr-0.5 sm:mr-1 transition-all",
                               post.has_voted && "fill-current scale-110",
                             )}
                           />
@@ -735,7 +733,7 @@ export default function CommunityPage() {
                           variant="ghost"
                           size="sm"
                           className={cn(
-                            "h-7 md:h-8 px-2 md:px-3 rounded-full transition-all duration-200 group",
+                            "h-6 sm:h-7 md:h-8 px-1 sm:px-2 md:px-3 rounded-full transition-all duration-200 group",
                             activePost === post.id
                               ? "text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20"
                               : "text-gray-500 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20",
@@ -749,7 +747,7 @@ export default function CommunityPage() {
                             }
                           }}
                         >
-                          <MessageCircle className="h-3 w-3 md:h-4 md:w-4 mr-1 transition-all group-hover:scale-110" />
+                          <MessageCircle className="h-3 w-3 md:h-4 md:w-4 mr-0.5 sm:mr-1 transition-all group-hover:scale-110" />
                           <span className="text-xs md:text-sm font-medium">{post.comment_count}</span>
                         </Button>
                       </div>
@@ -801,26 +799,26 @@ export default function CommunityPage() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 md:left-80 border-t border-gray-200 dark:border-gray-800 bg-white/98 dark:bg-gray-950/98 backdrop-blur-md p-3 md:p-4 z-40 shadow-lg">
+          <div className="fixed bottom-0 left-0 right-0 md:left-80 border-t border-gray-200 dark:border-gray-800 bg-white/98 dark:bg-gray-950/98 backdrop-blur-md p-2 sm:p-3 md:p-4 z-40 shadow-lg">
             {mediaPreview.length > 0 && (
               <div className="mb-2 md:mb-3 flex space-x-2 overflow-x-auto">
                 {mediaPreview.map((preview, index) => (
                   <div key={index} className="relative flex-shrink-0">
-                    <div className="w-12 h-12 md:w-16 md:h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
                       {selectedMedia[index].type.startsWith("image/") ? (
                         <img src={preview || "/placeholder.svg"} alt="Preview" className="w-full h-full object-cover" />
                       ) : selectedMedia[index].type.startsWith("video/") ? (
                         <video src={preview} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Mic className="h-4 w-4 md:h-6 md:w-6 text-gray-400" />
+                          <Mic className="h-3 w-3 sm:h-4 sm:w-4 md:h-6 md:w-6 text-gray-400" />
                         </div>
                       )}
                     </div>
                     <Button
                       variant="destructive"
                       size="sm"
-                      className="absolute -top-1 -right-1 h-5 w-5 md:h-6 md:w-6 p-0 rounded-full shadow-sm"
+                      className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 p-0 rounded-full shadow-sm"
                       onClick={() => removeMedia(index)}
                     >
                       <X className="h-2 w-2 md:h-3 md:w-3" />
@@ -832,7 +830,7 @@ export default function CommunityPage() {
 
             {isAuthenticated ? (
               <div className="flex items-end space-x-2 md:space-x-3 max-w-4xl mx-auto">
-                <Avatar className="h-8 w-8 md:h-10 md:w-10 flex-shrink-0 ring-2 ring-green-500/20">
+                <Avatar className="h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 flex-shrink-0 ring-2 ring-green-500/20">
                   <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
                   <AvatarFallback className="bg-green-500 text-white font-semibold text-xs md:text-sm">
                     {profile?.username?.charAt(0).toUpperCase() || "U"}
@@ -844,7 +842,7 @@ export default function CommunityPage() {
                     placeholder={activePost ? "Reply to this message..." : "What's on your mind?"}
                     value={unifiedInput}
                     onChange={(e) => setUnifiedInput(e.target.value)}
-                    className="pr-20 md:pr-32 rounded-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm md:text-[16px] min-h-[40px] md:min-h-[44px]"
+                    className="pr-16 sm:pr-20 md:pr-32 rounded-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm md:text-[16px] min-h-[36px] sm:min-h-[40px] md:min-h-[44px]"
                     onKeyPress={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault()
@@ -856,7 +854,7 @@ export default function CommunityPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 md:h-8 md:w-8 p-0 rounded-full hover:bg-green-50 dark:hover:bg-green-900/20"
+                      className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 p-0 rounded-full hover:bg-green-50 dark:hover:bg-green-900/20"
                       onClick={() => fileInputRef.current?.click()}
                     >
                       <ImageIcon className="h-3 w-3 md:h-4 md:w-4 text-green-500" />
@@ -864,7 +862,7 @@ export default function CommunityPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 md:h-8 md:w-8 p-0 rounded-full hover:bg-green-50 dark:hover:bg-green-900/20"
+                      className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 p-0 rounded-full hover:bg-green-50 dark:hover:bg-green-900/20"
                     >
                       <Smile className="h-3 w-3 md:h-4 md:w-4 text-green-500" />
                     </Button>
@@ -873,7 +871,7 @@ export default function CommunityPage() {
                 <Button
                   onClick={handleUnifiedSubmit}
                   disabled={!unifiedInput.trim() && selectedMedia.length === 0}
-                  className="h-8 w-8 md:h-10 md:w-10 p-0 rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 shadow-sm transition-all duration-200 hover:scale-105"
+                  className="h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 p-0 rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 shadow-sm transition-all duration-200 hover:scale-105"
                 >
                   <Send className="h-3 w-3 md:h-4 md:w-4" />
                 </Button>
