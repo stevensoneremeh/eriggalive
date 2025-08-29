@@ -59,10 +59,11 @@ function validatePurchaseRequest(data: any) {
     errors.push("Invalid coin amount")
   }
 
-  // Validate exchange rate (1 coin = 0.5 NGN)
-  const expectedAmount = Math.floor(data.coins * 0.5)
-  if (Math.abs(data.amount - expectedAmount) > 1) {
-    errors.push("Amount doesn't match expected exchange rate")
+  const expectedAmount = Math.round(data.coins * 0.5 * 100) / 100 // Round to 2 decimal places
+  const tolerance = Math.max(1, expectedAmount * 0.02) // 2% tolerance or 1 NGN minimum
+
+  if (Math.abs(data.amount - expectedAmount) > tolerance) {
+    errors.push(`Amount mismatch: expected ₦${expectedAmount}, got ₦${data.amount}`)
   }
 
   return errors
@@ -134,6 +135,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const currentExchangeRate = 0.5
+
     // Validate request data
     const validationErrors = validatePurchaseRequest(requestData)
     if (validationErrors.length > 0) {
@@ -142,6 +145,7 @@ export async function POST(request: NextRequest) {
           success: false,
           error: validationErrors.join(", "),
           code: "VALIDATION_ERROR",
+          exchangeRate: currentExchangeRate, // Help frontend sync
         },
         { status: 400 },
       )
@@ -331,6 +335,7 @@ export async function POST(request: NextRequest) {
         newBalance: updatedProfile.coins,
         message: `Successfully purchased ${coins.toLocaleString()} Erigga Coins`,
         isPreviewMode: isPreviewMode(),
+        exchangeRate: currentExchangeRate, // Include exchange rate in response
       })
     } catch (error) {
       console.error("Database operation error:", error)

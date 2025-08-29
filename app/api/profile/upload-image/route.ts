@@ -2,6 +2,8 @@ import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { type NextRequest, NextResponse } from "next/server"
 
+export const dynamic = "force-dynamic"
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies })
@@ -42,6 +44,34 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Uploading file:", fileName)
 
+    try {
+      // First, try to get bucket info to check if it exists
+      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets()
+
+      if (bucketsError) {
+        console.error("[v0] Error listing buckets:", bucketsError)
+      }
+
+      const bucketExists = buckets?.some((bucket) => bucket.name === "user-uploads")
+
+      if (!bucketExists) {
+        console.log("[v0] Creating user-uploads bucket...")
+        const { error: createBucketError } = await supabase.storage.createBucket("user-uploads", {
+          public: true,
+          allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
+          fileSizeLimit: 5242880, // 5MB
+        })
+
+        if (createBucketError) {
+          console.error("[v0] Error creating bucket:", createBucketError)
+          // Continue anyway, bucket might exist but not be visible
+        }
+      }
+    } catch (bucketError) {
+      console.error("[v0] Bucket check/creation error:", bucketError)
+      // Continue with upload attempt
+    }
+
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("user-uploads")
       .upload(fileName, file, {
@@ -51,6 +81,65 @@ export async function POST(request: NextRequest) {
 
     if (uploadError) {
       console.error("[v0] Upload error:", uploadError)
+
+      if (uploadError.message.includes("Bucket not found")) {
+        console.log("[v0] Trying alternative bucket: avatars")
+        const { data: altUploadData, error: altUploadError } = await supabase.storage
+          .from("avatars")
+          .upload(fileName, file, {
+            cacheControl: "3600",
+            upsert: false,
+          })
+
+        if (altUploadError) {
+          console.error("[v0] Alternative upload error:", altUploadError)
+          return NextResponse.json(
+            {
+              error: "Upload failed: " + altUploadError.message,
+              details: "Please ensure storage bucket is properly configured",
+            },
+            { status: 500 },
+          )
+        }
+
+        // Use alternative upload data
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("avatars").getPublicUrl(fileName)
+
+        console.log("[v0] Alternative upload successful, public URL:", publicUrl)
+
+        // Update profile with alternative URL
+        const { error: updateError } = await supabase.from("user_profiles").upsert({
+          user_id: user.id,
+          profile_image_url: publicUrl,
+          avatar_url: publicUrl,
+          updated_at: new Date().toISOString(),
+        })
+
+        if (updateError) {
+          console.error("[v0] Profile update error:", updateError)
+          const { error: usersUpdateError } = await supabase
+            .from("users")
+            .update({
+              profile_image_url: publicUrl,
+              avatar_url: publicUrl,
+            })
+            .eq("auth_user_id", user.id)
+
+          if (usersUpdateError) {
+            console.error("[v0] Users table update error:", usersUpdateError)
+            return NextResponse.json({ error: "Failed to update profile" }, { status: 500 })
+          }
+        }
+
+        return NextResponse.json({
+          success: true,
+          imageUrl: publicUrl,
+          message: "Profile image updated successfully",
+        })
+      }
+
       return NextResponse.json({ error: "Upload failed: " + uploadError.message }, { status: 500 })
     }
 
@@ -79,7 +168,7 @@ export async function POST(request: NextRequest) {
           profile_image_url: publicUrl,
           avatar_url: publicUrl,
         })
-        .eq("id", user.id)
+        .eq("auth_user_id", user.id)
 
       if (usersUpdateError) {
         console.error("[v0] Users table update error:", usersUpdateError)
