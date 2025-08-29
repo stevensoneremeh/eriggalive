@@ -76,13 +76,11 @@ export default function CommunityPage() {
   const [unifiedInput, setUnifiedInput] = useState("")
   const [activePost, setActivePost] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [communityNavOpen, setCommunityNavOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedMedia, setSelectedMedia] = useState<File[]>([])
   const [mediaPreview, setMediaPreview] = useState<string[]>([])
   const [isClient, setIsClient] = useState(false)
-  const [showFloatingButton, setShowFloatingButton] = useState(true)
-  const [headerVisible, setHeaderVisible] = useState(true)
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -487,12 +485,10 @@ export default function CommunityPage() {
     <div className="min-h-screen bg-background">
       <div className="flex h-screen overflow-hidden bg-white dark:bg-gray-950">
         <motion.div
-          initial={{ x: -300 }}
-          animate={{ x: sidebarOpen || (isClient && window.innerWidth >= 768) ? 0 : -300 }}
-          transition={{ type: "spring", damping: 25, stiffness: 200 }}
+          initial={{ x: 0 }}
           className={cn(
             "w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col",
-            "fixed md:relative z-50 md:z-auto h-full shadow-xl md:shadow-none max-h-screen overflow-hidden",
+            "hidden md:flex relative z-auto h-full shadow-none max-h-screen overflow-hidden",
           )}
         >
           <div className="p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
@@ -506,14 +502,6 @@ export default function CommunityPage() {
                   <p className="text-sm text-gray-600 dark:text-gray-400">Stay connected</p>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="md:hidden hover:bg-gray-100 dark:hover:bg-gray-800"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <X className="h-5 w-5" />
-              </Button>
             </div>
           </div>
 
@@ -539,12 +527,11 @@ export default function CommunityPage() {
                   className={cn(
                     "flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-all duration-200",
                     selectedCategory === category.id
-                      ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 shadow-sm"
+                      ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
                       : "hover:bg-gray-50 dark:hover:bg-gray-800",
                   )}
                   onClick={() => {
                     setSelectedCategory(category.id)
-                    setSidebarOpen(false)
                     setActivePost(null)
                   }}
                 >
@@ -586,23 +573,66 @@ export default function CommunityPage() {
           )}
         </motion.div>
 
-        <div className="flex-1 flex flex-col bg-white dark:bg-gray-950 min-w-0 w-full md:ml-0">
-          <motion.div
-            initial={{ y: 0 }}
-            animate={{ y: headerVisible ? 0 : -100 }}
-            transition={{ type: "spring", damping: 20, stiffness: 300 }}
-            className="p-2 sm:p-3 md:p-4 bg-white/98 dark:bg-gray-950/98 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 sticky top-0 z-20 shadow-sm"
-          >
+        <div className="flex-1 flex flex-col bg-white dark:bg-gray-950 min-w-0 w-full">
+          <div className="md:hidden fixed top-20 left-4 z-50">
+            <Button
+              onClick={() => setCommunityNavOpen(!communityNavOpen)}
+              className="h-12 w-12 rounded-full bg-green-500 hover:bg-green-600 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+            >
+              <motion.div animate={{ rotate: communityNavOpen ? 45 : 0 }} transition={{ duration: 0.2 }}>
+                <Menu className="h-5 w-5 text-white" />
+              </motion.div>
+            </Button>
+          </div>
+
+          <AnimatePresence>
+            {communityNavOpen && isClient && window.innerWidth < 768 && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                className="md:hidden fixed top-16 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-lg overflow-hidden"
+              >
+                <div className="p-4 max-h-80 overflow-y-auto">
+                  <div className="space-y-2">
+                    {categories.map((category) => (
+                      <motion.div
+                        key={category.id}
+                        whileTap={{ scale: 0.98 }}
+                        className={cn(
+                          "flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-all duration-200",
+                          selectedCategory === category.id
+                            ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
+                            : "hover:bg-gray-50 dark:hover:bg-gray-800",
+                        )}
+                        onClick={() => {
+                          setSelectedCategory(category.id)
+                          setCommunityNavOpen(false)
+                          setActivePost(null)
+                        }}
+                      >
+                        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-lg">
+                          {category.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-gray-900 dark:text-white truncate">{category.name}</div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                            {posts.filter((p) => p.category.id === category.id).length} messages
+                          </div>
+                        </div>
+                        {selectedCategory === category.id && <div className="w-2 h-2 rounded-full bg-green-500"></div>}
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="p-2 sm:p-3 md:p-4 bg-white/98 dark:bg-gray-950/98 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 sticky top-0 z-20 shadow-sm">
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center space-x-2 md:space-x-3 flex-1 min-w-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="md:hidden hover:bg-gray-100 dark:hover:bg-gray-800 h-8 w-8 p-0 flex-shrink-0"
-                  onClick={() => setSidebarOpen(true)}
-                >
-                  <Menu className="h-4 w-4" />
-                </Button>
                 <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-sm md:text-lg flex-shrink-0">
                   {categories.find((c) => c.id === selectedCategory)?.icon || "💬"}
                 </div>
@@ -642,33 +672,9 @@ export default function CommunityPage() {
                 </Button>
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          <AnimatePresence>
-            {showFloatingButton && isClient && window.innerWidth < 768 && (
-              <motion.div
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0, opacity: 0 }}
-                className="fixed top-4 left-4 z-30"
-              >
-                <Button
-                  onClick={() => {
-                    setHeaderVisible(!headerVisible)
-                    setShowFloatingButton(false)
-                    setTimeout(() => setShowFloatingButton(true), 3000)
-                  }}
-                  className="h-10 w-10 rounded-full bg-green-500 hover:bg-green-600 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-110"
-                >
-                  <motion.div animate={{ rotate: headerVisible ? 45 : 0 }} transition={{ duration: 0.2 }}>
-                    <span className="text-white text-lg font-light">+</span>
-                  </motion.div>
-                </Button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pb-20 sm:pb-24 md:pb-32">
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pb-20 sm:pb-24 md:pb-32 pt-0 md:pt-0">
             <AnimatePresence>
               {filteredPosts.map((post, index) => (
                 <motion.div
@@ -799,7 +805,7 @@ export default function CommunityPage() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 md:left-80 border-t border-gray-200 dark:border-gray-800 bg-white/98 dark:bg-gray-950/98 backdrop-blur-md p-2 sm:p-3 md:p-4 z-40 shadow-lg">
+          <div className="fixed bottom-0 left-0 right-0 md:left-80 border-t border-gray-200 dark:border-gray-800 bg-white/98 dark:bg-gray-950/98 backdrop-blur-md p-2 sm:p-3 md:p-4 z-30 shadow-lg">
             {mediaPreview.length > 0 && (
               <div className="mb-2 md:mb-3 flex space-x-2 overflow-x-auto">
                 {mediaPreview.map((preview, index) => (
@@ -903,10 +909,10 @@ export default function CommunityPage() {
           </div>
         </div>
 
-        {sidebarOpen && (
+        {communityNavOpen && (
           <div
-            className="fixed inset-0 bg-black/20 z-40 md:hidden backdrop-blur-sm"
-            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 bg-black/20 z-30 md:hidden backdrop-blur-sm"
+            onClick={() => setCommunityNavOpen(false)}
           />
         )}
       </div>
