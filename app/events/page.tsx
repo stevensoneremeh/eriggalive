@@ -5,12 +5,15 @@ import { motion } from "framer-motion"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, MapPin, Users, Ticket, Star, Music, Phone } from "lucide-react"
+import { Calendar, MapPin, Users, Ticket, Star, Music, Phone, Loader2 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 
 export default function EventsPage() {
   const [loading, setLoading] = useState(false)
+
+  const paystackTicketsEnabled = process.env.NEXT_PUBLIC_FEATURE_PAYSTACK_TICKETS === "true"
+  const ticketFixedPrice = Number(process.env.NEXT_PUBLIC_TICKET_FIXED_PRICE) || 20000
 
   const event = {
     id: "erigga-intimate-session-2025",
@@ -24,7 +27,7 @@ export default function EventsPage() {
     event_date: "2025-09-03T20:00:00",
     max_capacity: 200,
     current_attendance: 45,
-    ticket_price_naira: 20000,
+    ticket_price_naira: ticketFixedPrice,
     ticket_price_coins: 10000,
     original_price_naira: 50000,
     image_url: "/events/erigga-intimate-session.png",
@@ -50,6 +53,40 @@ export default function EventsPage() {
       currency: "NGN",
       minimumFractionDigits: 0,
     }).format(amount)
+  }
+
+  const handleDirectCheckout = async () => {
+    if (!paystackTicketsEnabled) {
+      // Fallback to survey flow
+      window.location.href = `/events/survey?event=${event.id}`
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await fetch("/api/tickets/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventId: event.id,
+          surveyData: null, // Skip survey for direct checkout
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Checkout failed")
+      }
+
+      // Redirect to Paystack
+      window.location.href = data.authorization_url
+    } catch (error: any) {
+      console.error("Checkout error:", error)
+      alert(`Checkout failed: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -91,6 +128,16 @@ export default function EventsPage() {
           >
             An exclusive evening with Nigeria's rap legend in an intimate setting
           </motion.p>
+          {paystackTicketsEnabled && (
+            <motion.p
+              className="text-lg text-green-400 max-w-2xl mx-auto"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+            >
+              🎫 Fixed ticket price: ₦{ticketFixedPrice.toLocaleString()}
+            </motion.p>
+          )}
         </div>
 
         <motion.div
@@ -229,18 +276,42 @@ export default function EventsPage() {
               </div>
 
               <div className="text-center">
-                <Link href={`/events/survey?event=${event.id}`}>
+                {paystackTicketsEnabled ? (
                   <Button
                     size="lg"
                     className="bg-gradient-to-r from-red-600 via-orange-500 to-yellow-500 hover:from-red-700 hover:via-orange-600 hover:to-yellow-600 text-white font-black text-xl px-12 py-6 rounded-xl shadow-2xl hover:shadow-red-500/30 transition-all duration-300 transform hover:scale-105"
+                    onClick={handleDirectCheckout}
+                    disabled={loading}
                     style={{
                       boxShadow: "0 0 30px rgba(239, 68, 68, 0.5), 0 0 60px rgba(239, 68, 68, 0.2)",
                     }}
                   >
-                    <Ticket className="h-6 w-6 mr-3" />
-                    BUY TICKET NOW
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-6 w-6 mr-3 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Ticket className="h-6 w-6 mr-3" />
+                        BUY TICKET - ₦{ticketFixedPrice.toLocaleString()}
+                      </>
+                    )}
                   </Button>
-                </Link>
+                ) : (
+                  <Link href={`/events/survey?event=${event.id}`}>
+                    <Button
+                      size="lg"
+                      className="bg-gradient-to-r from-red-600 via-orange-500 to-yellow-500 hover:from-red-700 hover:via-orange-600 hover:to-yellow-600 text-white font-black text-xl px-12 py-6 rounded-xl shadow-2xl hover:shadow-red-500/30 transition-all duration-300 transform hover:scale-105"
+                      style={{
+                        boxShadow: "0 0 30px rgba(239, 68, 68, 0.5), 0 0 60px rgba(239, 68, 68, 0.2)",
+                      }}
+                    >
+                      <Ticket className="h-6 w-6 mr-3" />
+                      BUY TICKET NOW
+                    </Button>
+                  </Link>
+                )}
               </div>
             </CardContent>
           </Card>

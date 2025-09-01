@@ -209,9 +209,13 @@ interface DeliveryAddress {
 function ProductCard({
   product,
   onAddToCart,
+  onPaystackPreorder,
+  preorderPrice,
 }: {
   product: (typeof products)[0]
   onAddToCart: (product: (typeof products)[0], size: string, paymentMethod: "cash" | "coins") => void
+  onPaystackPreorder?: (itemId: string, itemName: string) => void
+  preorderPrice?: number
 }) {
   const { profile } = useAuth()
   const [selectedSize, setSelectedSize] = useState(product.sizes[0])
@@ -305,11 +309,20 @@ function ProductCard({
 
         <div className="flex items-center justify-between mb-4">
           <div className="space-y-1">
-            <div className="font-bold text-lg">₦{product.price.toLocaleString()}</div>
-            <div className="flex items-center text-sm text-muted-foreground">
-              <Coins className="h-3 w-3 text-yellow-500 mr-1" />
-              {product.coin_price.toLocaleString()} coins
-            </div>
+            {preorderPrice ? (
+              <>
+                <div className="font-bold text-lg">₦{preorderPrice.toLocaleString()}</div>
+                <div className="text-sm text-muted-foreground line-through">₦{product.price.toLocaleString()}</div>
+              </>
+            ) : (
+              <>
+                <div className="font-bold text-lg">₦{product.price.toLocaleString()}</div>
+                <div className="flex items-center text-sm text-muted-foreground">
+                  <Coins className="h-3 w-3 text-yellow-500 mr-1" />
+                  {product.coin_price.toLocaleString()} coins
+                </div>
+              </>
+            )}
           </div>
           <Badge variant="outline" className="text-xs">
             {product.status === "preorder"
@@ -321,106 +334,118 @@ function ProductCard({
         </div>
 
         {canPurchase() ? (
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="w-full bg-orange-500 hover:bg-orange-600 text-black merch-button">
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                {product.status === "preorder" ? "Preorder Now" : "Add to Cart"}
+          <div className="space-y-2">
+            {onPaystackPreorder && preorderPrice && (
+              <Button
+                className="w-full bg-green-600 hover:bg-green-700 text-white merch-button"
+                onClick={() => onPaystackPreorder(product.id.toString(), product.name)}
+              >
+                <CreditCard className="h-4 w-4 mr-2" />
+                Buy Preorder (₦{preorderPrice.toLocaleString()})
               </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md merch-dialog">
-              <DialogHeader>
-                <DialogTitle>Add to Cart</DialogTitle>
-                <DialogDescription>Configure your purchase options for {product.name}</DialogDescription>
-              </DialogHeader>
+            )}
 
-              <div className="space-y-6 py-4">
-                <div className="space-y-2">
-                  <Label>Size</Label>
-                  <Select value={selectedSize} onValueChange={setSelectedSize}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {product.sizes.map((size) => (
-                        <SelectItem key={size} value={size}>
-                          {size}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full bg-orange-500 hover:bg-orange-600 text-black merch-button">
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  {product.status === "preorder" ? "Preorder Now" : "Add to Cart"}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md merch-dialog">
+                <DialogHeader>
+                  <DialogTitle>Add to Cart</DialogTitle>
+                  <DialogDescription>Configure your purchase options for {product.name}</DialogDescription>
+                </DialogHeader>
 
-                <div className="space-y-4">
-                  <Label>Payment Method</Label>
-                  <RadioGroup
-                    value={paymentMethod}
-                    onValueChange={(value) => setPaymentMethod(value as "cash" | "coins")}
-                    className="grid grid-cols-1 gap-3"
-                  >
-                    <div
-                      className={`border rounded-lg p-4 cursor-pointer ${paymentMethod === "cash" ? "border-orange-500 bg-orange-500/10" : ""}`}
+                <div className="space-y-6 py-4">
+                  <div className="space-y-2">
+                    <Label>Size</Label>
+                    <Select value={selectedSize} onValueChange={setSelectedSize}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {product.sizes.map((size) => (
+                          <SelectItem key={size} value={size}>
+                            {size}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-4">
+                    <Label>Payment Method</Label>
+                    <RadioGroup
+                      value={paymentMethod}
+                      onValueChange={(value) => setPaymentMethod(value as "cash" | "coins")}
+                      className="grid grid-cols-1 gap-3"
                     >
-                      <RadioGroupItem value="cash" id="cash" className="sr-only" />
-                      <Label htmlFor="cash" className="flex items-center cursor-pointer">
-                        <CreditCard className="h-5 w-5 mr-3" />
-                        <div>
-                          <div className="font-medium">Paystack Payment</div>
-                          <div className="text-sm text-muted-foreground">₦{product.price.toLocaleString()}</div>
-                        </div>
-                      </Label>
-                    </div>
+                      <div
+                        className={`border rounded-lg p-4 cursor-pointer ${paymentMethod === "cash" ? "border-orange-500 bg-orange-500/10" : ""}`}
+                      >
+                        <RadioGroupItem value="cash" id="cash" className="sr-only" />
+                        <Label htmlFor="cash" className="flex items-center cursor-pointer">
+                          <CreditCard className="h-5 w-5 mr-3" />
+                          <div>
+                            <div className="font-medium">Paystack Payment</div>
+                            <div className="text-sm text-muted-foreground">₦{product.price.toLocaleString()}</div>
+                          </div>
+                        </Label>
+                      </div>
 
-                    <div
-                      className={`border rounded-lg p-4 cursor-pointer ${paymentMethod === "coins" ? "border-orange-500 bg-orange-500/10" : ""}`}
-                    >
-                      <RadioGroupItem value="coins" id="coins" className="sr-only" />
-                      <Label htmlFor="coins" className="flex items-center cursor-pointer">
-                        <Coins className="h-5 w-5 mr-3 text-yellow-500" />
-                        <div>
-                          <div className="font-medium">Erigga Coins</div>
-                          <div className="text-sm text-muted-foreground">
-                            {product.coin_price.toLocaleString()} coins
+                      <div
+                        className={`border rounded-lg p-4 cursor-pointer ${paymentMethod === "coins" ? "border-orange-500 bg-orange-500/10" : ""}`}
+                      >
+                        <RadioGroupItem value="coins" id="coins" className="sr-only" />
+                        <Label htmlFor="coins" className="flex items-center cursor-pointer">
+                          <Coins className="h-5 w-5 mr-3 text-yellow-500" />
+                          <div>
+                            <div className="font-medium">Erigga Coins</div>
+                            <div className="text-sm text-muted-foreground">
+                              {product.coin_price.toLocaleString()} coins
+                            </div>
+                          </div>
+                        </Label>
+                      </div>
+                    </RadioGroup>
+
+                    {paymentMethod === "coins" && profile && (
+                      <div className="p-3 bg-muted rounded-lg">
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Your Balance:</span>
+                          <div className="flex items-center font-medium">
+                            <Coins className="h-4 w-4 text-yellow-500 mr-1" />
+                            {profile.coins.toLocaleString()} coins
                           </div>
                         </div>
-                      </Label>
-                    </div>
-                  </RadioGroup>
-
-                  {paymentMethod === "coins" && profile && (
-                    <div className="p-3 bg-muted rounded-lg">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Your Balance:</span>
-                        <div className="flex items-center font-medium">
-                          <Coins className="h-4 w-4 text-yellow-500 mr-1" />
-                          {profile.coins.toLocaleString()} coins
-                        </div>
+                        {profile.coins < product.coin_price && (
+                          <p className="text-xs text-red-500 mt-1">
+                            Insufficient coins. You need {(product.coin_price - profile.coins).toLocaleString()} more
+                            coins.
+                          </p>
+                        )}
                       </div>
-                      {profile.coins < product.coin_price && (
-                        <p className="text-xs text-red-500 mt-1">
-                          Insufficient coins. You need {(product.coin_price - profile.coins).toLocaleString()} more
-                          coins.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
 
-                <div className="flex gap-4">
-                  <Button
-                    className="flex-1 bg-orange-500 hover:bg-orange-600 text-black"
-                    onClick={handlePurchase}
-                    disabled={paymentMethod === "coins" && profile && profile.coins < product.coin_price}
-                  >
-                    Add to Cart
-                  </Button>
-                  <Button variant="outline" className="flex-1 bg-transparent" onClick={() => setIsDialogOpen(false)}>
-                    Cancel
-                  </Button>
+                  <div className="flex gap-4">
+                    <Button
+                      className="flex-1 bg-orange-500 hover:bg-orange-600 text-black"
+                      onClick={handlePurchase}
+                      disabled={paymentMethod === "coins" && profile && profile.coins < product.coin_price}
+                    >
+                      Add to Cart
+                    </Button>
+                    <Button variant="outline" className="flex-1 bg-transparent" onClick={() => setIsDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          </div>
         ) : (
           <Button disabled className="w-full merch-button">
             {product.status === "out_of_stock"
@@ -537,6 +562,37 @@ export default function MerchPage() {
     }
   }
 
+  const paystackMerchEnabled = process.env.NEXT_PUBLIC_FEATURE_PAYSTACK_MERCH === "true"
+  const merchPreorderPrice = Number(process.env.NEXT_PUBLIC_MERCH_PREORDER_PRICE) || 80000
+
+  const handlePaystackPreorder = async (itemId: string, itemName: string) => {
+    if (!user || !paystackMerchEnabled) return
+
+    try {
+      const response = await fetch("/api/merch/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itemId,
+          itemName,
+          deliveryAddress,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Checkout failed")
+      }
+
+      // Redirect to Paystack
+      window.location.href = data.authorization_url
+    } catch (error: any) {
+      console.error("Preorder error:", error)
+      alert(`Preorder failed: ${error.message}`)
+    }
+  }
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   }
@@ -562,6 +618,11 @@ export default function MerchPage() {
             <p className="text-muted-foreground">
               Official Erigga G.O.A.T collection - All items available for preorder
             </p>
+            {paystackMerchEnabled && (
+              <p className="text-sm text-orange-500 mt-2">
+                🔥 Fixed preorder price: ₦{merchPreorderPrice.toLocaleString()} for all items
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
@@ -594,7 +655,13 @@ export default function MerchPage() {
         {/* Products Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
           {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
+            <ProductCard
+              key={product.id}
+              product={product}
+              onAddToCart={handleAddToCart}
+              onPaystackPreorder={paystackMerchEnabled ? handlePaystackPreorder : undefined}
+              preorderPrice={paystackMerchEnabled ? merchPreorderPrice : undefined}
+            />
           ))}
         </div>
 
