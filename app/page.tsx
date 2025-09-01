@@ -120,7 +120,7 @@ export default function HomePage() {
     },
     {
       name: "Pro",
-      price: "₦5,000",
+      price: "₦10,000",
       period: "monthly",
       description: "Enhanced access with exclusive content and perks",
       features: [
@@ -142,8 +142,8 @@ export default function HomePage() {
     },
     {
       name: "Enterprise",
-      price: "₦15,000",
-      period: "monthly",
+      price: "Custom",
+      period: "annually",
       description: "Ultimate fan experience with direct artist access",
       features: [
         "All Pro features",
