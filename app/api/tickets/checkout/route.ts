@@ -22,14 +22,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Feature not available" }, { status: 403 })
     }
 
-    const { eventId, surveyData } = await request.json()
+    const { eventId, surveyData, amount } = await request.json()
 
     if (!eventId) {
       return NextResponse.json({ error: "Event ID is required" }, { status: 400 })
     }
 
-    // Fixed ticket price
-    const price = Number(process.env.TICKET_FIXED_PRICE) || 20000
+    const price = 20000 // Fixed price for all tickets
     const amountInKobo = price * 100
 
     // Generate unique reference
@@ -52,6 +51,7 @@ export async function POST(request: NextRequest) {
           event_id: eventId,
           order_type: "ticket",
           survey_data: surveyData,
+          fixed_price: price,
         },
       }),
     })
@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
         event_id: eventId,
         survey_data: surveyData,
         paystack_reference: reference,
+        fixed_price: price,
       },
     })
 
@@ -86,6 +87,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       authorization_url: paystackData.data.authorization_url,
       reference,
+      amount: price,
     })
   } catch (error) {
     console.error("Ticket checkout error:", error)

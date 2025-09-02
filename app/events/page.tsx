@@ -13,7 +13,7 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(false)
 
   const paystackTicketsEnabled = process.env.NEXT_PUBLIC_FEATURE_PAYSTACK_TICKETS === "true"
-  const ticketFixedPrice = Number(process.env.NEXT_PUBLIC_TICKET_FIXED_PRICE) || 20000
+  const ticketFixedPrice = 20000
 
   const event = {
     id: "erigga-intimate-session-2025",
@@ -70,6 +70,7 @@ export default function EventsPage() {
         body: JSON.stringify({
           eventId: event.id,
           surveyData: null, // Skip survey for direct checkout
+          amount: ticketFixedPrice,
         }),
       })
 

@@ -22,14 +22,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Feature not available" }, { status: 403 })
     }
 
-    const { itemId, itemName, deliveryAddress } = await request.json()
+    const { itemId, itemName, deliveryAddress, amount } = await request.json()
 
     if (!itemId) {
       return NextResponse.json({ error: "Item ID is required" }, { status: 400 })
     }
 
-    // Fixed preorder price
-    const price = Number(process.env.MERCH_PREORDER_PRICE) || 80000
+    const price = 80000 // Fixed price for all preorders
     const amountInKobo = price * 100
 
     // Generate unique reference
@@ -52,6 +51,7 @@ export async function POST(request: NextRequest) {
           item_id: itemId,
           item_name: itemName,
           order_type: "preorder",
+          fixed_price: price,
         },
       }),
     })
@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
       metadata: {
         paystack_reference: reference,
         item_details: { itemId, itemName },
+        fixed_price: price,
       },
     })
 
@@ -86,6 +87,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       authorization_url: paystackData.data.authorization_url,
       reference,
+      amount: price,
     })
   } catch (error) {
     console.error("Merch checkout error:", error)

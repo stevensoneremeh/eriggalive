@@ -563,7 +563,7 @@ export default function MerchPage() {
   }
 
   const paystackMerchEnabled = process.env.NEXT_PUBLIC_FEATURE_PAYSTACK_MERCH === "true"
-  const merchPreorderPrice = Number(process.env.NEXT_PUBLIC_MERCH_PREORDER_PRICE) || 80000
+  const merchPreorderPrice = 80000
 
   const handlePaystackPreorder = async (itemId: string, itemName: string) => {
     if (!user || !paystackMerchEnabled) return
@@ -576,6 +576,7 @@ export default function MerchPage() {
           itemId,
           itemName,
           deliveryAddress,
+          amount: merchPreorderPrice,
         }),
       })
 
@@ -889,13 +890,14 @@ export default function MerchPage() {
               <div className="space-y-4">
                 {getTotalCash() > 0 && (
                   <PaystackIntegration
-                    amount={getTotalCash()}
+                    amount={paystackMerchEnabled ? merchPreorderPrice : getTotalCash()}
                     email={user?.email || ""}
                     metadata={{
                       cart: JSON.stringify(cart.filter((item) => item.paymentMethod === "cash")),
                       delivery_address: JSON.stringify(deliveryAddress),
                       user_id: user?.id,
                       order_type: "merch_preorder",
+                      fixed_price: paystackMerchEnabled ? merchPreorderPrice : undefined,
                     }}
                     onSuccess={(reference) => {
                       console.log("[v0] Paystack payment successful:", reference)
@@ -909,7 +911,9 @@ export default function MerchPage() {
                   >
                     <Button className="w-full bg-green-600 hover:bg-green-700 text-white min-h-[44px]">
                       <CreditCard className="h-4 w-4 mr-2" />
-                      Pay ₦{getTotalCash().toLocaleString()} with Paystack
+                      Pay ₦
+                      {paystackMerchEnabled ? merchPreorderPrice.toLocaleString() : getTotalCash().toLocaleString()}{" "}
+                      with Paystack
                     </Button>
                   </PaystackIntegration>
                 )}

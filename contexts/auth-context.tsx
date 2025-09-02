@@ -40,12 +40,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profileCache, setProfileCache] = useState<{ [key: string]: UserProfile }>({})
   const router = useRouter()
 
-  const supabase = createClient()
+  const [supabaseError, setSupabaseError] = useState<string | null>(null)
+
+  let supabase: any
+  try {
+    supabase = createClient()
+  } catch (error: any) {
+    console.error("Failed to initialize Supabase client:", error)
+    setSupabaseError(error.message)
+    supabase = null
+  }
 
   const fetchProfile = useCallback(
     async (userId: string): Promise<UserProfile | null> => {
       try {
-        if (!supabase) {
+        if (!supabase || supabaseError) {
           console.warn("Supabase client not available")
           return null
         }
@@ -71,11 +80,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return null
       }
     },
-    [supabase, profileCache],
+    [supabase, profileCache, supabaseError],
   )
 
   const refreshProfile = useCallback(async () => {
-    if (user) {
+    if (user && !supabaseError) {
       setProfileCache((prev) => {
         const newCache = { ...prev }
         delete newCache[user.id]
@@ -84,10 +93,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const profileData = await fetchProfile(user.id)
       setProfile(profileData)
     }
-  }, [user, fetchProfile])
+  }, [user, fetchProfile, supabaseError])
 
   const refreshSession = useCallback(async () => {
     try {
+      if (!supabase || supabaseError) {
+        console.warn("Cannot refresh session: Supabase not available")
+        return
+      }
+
       const {
         data: { session },
         error,
@@ -110,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error: any) {
       console.error("Error in refreshSession:", error.message)
     }
-  }, [supabase, fetchProfile])
+  }, [supabase, fetchProfile, supabaseError])
 
   const handleAuthStateChange = useCallback(
     async (event: string, session: Session | null) => {
@@ -119,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session)
       setUser(session?.user ?? null)
 
-      if (session?.user) {
+      if (session?.user && !supabaseError) {
         fetchProfile(session.user.id).then((profileData) => {
           setProfile(profileData)
         })
@@ -151,7 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setLoading(false)
     },
-    [fetchProfile, router, initialized],
+    [fetchProfile, router, initialized, supabaseError],
   )
 
   useEffect(() => {
@@ -159,6 +173,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initializeAuth = async () => {
       try {
+        if (!supabase || supabaseError) {
+          console.warn("Skipping auth initialization: Supabase not available")
+          if (mounted) {
+            setLoading(false)
+            setInitialized(true)
+          }
+          return
+        }
+
         const {
           data: { session: initialSession },
           error,
@@ -182,19 +205,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initializeAuth()
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(handleAuthStateChange)
+    let subscription: any
+    if (supabase && !supabaseError) {
+      const {
+        data: { subscription: authSubscription },
+      } = supabase.auth.onAuthStateChange(handleAuthStateChange)
+      subscription = authSubscription
+    }
 
     return () => {
       mounted = false
-      subscription.unsubscribe()
+      if (subscription) {
+        subscription.unsubscribe()
+      }
     }
-  }, [supabase.auth, handleAuthStateChange])
+  }, [supabase, handleAuthStateChange, supabaseError])
 
   const signIn = useCallback(
     async (email: string, password: string) => {
       try {
+        if (!supabase || supabaseError) {
+          return { error: { message: "Authentication service not available" } }
+        }
+
         setLoading(true)
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
@@ -212,7 +245,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: { message: error.message || "An unexpected error occurred" } }
       }
     },
-    [supabase.auth],
+    [supabase, supabaseError],
   )
 
   const signUp = useCallback(
@@ -222,6 +255,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userData: { username: string; full_name: string; tier?: string; payment_reference?: string },
     ) => {
       try {
+        if (!supabase || supabaseError) {
+          return { error: { message: "Authentication service not available" } }
+        }
+
         setLoading(true)
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -254,7 +291,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: { message: error.message || "An unexpected error occurred" } }
       }
     },
-    [supabase.auth, router],
+    [supabase, router, supabaseError],
   )
 
   const signOut = useCallback(async () => {
@@ -265,7 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(null)
       setProfile(null)
 
-      if (supabase) {
+      if (supabase && !supabaseError) {
         const { error } = await supabase.auth.signOut()
         if (error) {
           console.error("Error signing out:", error.message)
@@ -278,11 +315,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }, [supabase, router])
+  }, [supabase, router, supabaseError])
 
   const resetPassword = useCallback(
     async (email: string) => {
       try {
+        if (!supabase || supabaseError) {
+          return { error: { message: "Authentication service not available" } }
+        }
+
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/reset-password`,
         })
@@ -291,12 +332,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: { message: error.message || "An unexpected error occurred" } }
       }
     },
-    [supabase.auth],
+    [supabase, supabaseError],
   )
 
   const updatePassword = useCallback(
     async (password: string) => {
       try {
+        if (!supabase || supabaseError) {
+          return { error: { message: "Authentication service not available" } }
+        }
+
         const { error } = await supabase.auth.updateUser({
           password: password,
         })
@@ -305,7 +350,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: { message: error.message || "An unexpected error occurred" } }
       }
     },
-    [supabase.auth],
+    [supabase, supabaseError],
   )
 
   const value = {
