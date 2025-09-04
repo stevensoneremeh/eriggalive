@@ -294,7 +294,12 @@ export default function CommunityPage() {
 
         toast.success("Reply sent!")
       } else {
-        if (!selectedCategory) return
+        if (!selectedCategory) {
+          toast.error("Please select a category")
+          return
+        }
+
+        console.log("[v0] Creating post with category:", selectedCategory, "content:", trimmedContent)
 
         const formData = new FormData()
         formData.append("content", trimmedContent)
@@ -306,13 +311,15 @@ export default function CommunityPage() {
         })
 
         const result = await response.json()
+        console.log("[v0] API Response:", result)
 
         if (!response.ok) {
-          throw new Error(result.error || "Failed to create post")
+          console.error("[v0] API Error:", result)
+          throw new Error(result.error || `HTTP ${response.status}: Failed to create post`)
         }
 
         if (result.success && result.post) {
-          const newPost = {
+          const newPost: Post = {
             id: result.post.id,
             content: result.post.content,
             created_at: result.post.created_at,
@@ -322,10 +329,10 @@ export default function CommunityPage() {
             media_type: result.post.media_type,
             user: result.post.user || {
               id: profile.id,
-              username: profile.username,
-              full_name: profile.full_name,
+              username: profile.username || "Unknown",
+              full_name: profile.full_name || profile.username || "Unknown User",
               avatar_url: profile.avatar_url,
-              tier: profile.tier,
+              tier: profile.tier || "FREE",
             },
             category: result.post.category || {
               id: selectedCategory,
@@ -335,9 +342,12 @@ export default function CommunityPage() {
             has_voted: false,
           }
 
+          console.log("[v0] Adding new post to state:", newPost)
           setPosts((prev) => [...prev, newPost])
           setTimeout(scrollToBottom, 100)
           toast.success("Message posted!")
+        } else {
+          throw new Error("Invalid response format from server")
         }
       }
 
@@ -345,7 +355,7 @@ export default function CommunityPage() {
       setSelectedMedia([])
       setMediaPreview([])
     } catch (error) {
-      console.error("Error submitting:", error)
+      console.error("[v0] Error submitting:", error)
       toast.error(error instanceof Error ? error.message : "Failed to send message. Please try again.")
     }
   }
