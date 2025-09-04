@@ -257,23 +257,6 @@ export default function CommunityPage() {
     }
 
     try {
-      const mediaUrl = null
-      let mediaType = null
-
-      if (selectedMedia.length > 0) {
-        const file = selectedMedia[0]
-        const fileExt = file.name.split(".").pop()
-        const fileName = `${Math.random()}.${fileExt}`
-
-        if (file.type.startsWith("image/")) {
-          mediaType = "image"
-        } else if (file.type.startsWith("video/")) {
-          mediaType = "video"
-        } else if (file.type.startsWith("audio/")) {
-          mediaType = "audio"
-        }
-      }
-
       if (activePost) {
         const { data, error } = await supabase
           .from("community_comments")
@@ -313,42 +296,49 @@ export default function CommunityPage() {
       } else {
         if (!selectedCategory) return
 
-        const { data, error } = await supabase
-          .from("community_posts")
-          .insert({
-            content: trimmedContent,
-            user_id: profile.id,
-            category_id: selectedCategory,
-            media_url: mediaUrl,
-            media_type: mediaType,
-            is_published: true,
-            is_deleted: false,
-          })
-          .select(`
-            *,
-            user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
-            category:community_categories!community_posts_category_id_fkey(id, name, slug)
-          `)
-          .single()
+        const formData = new FormData()
+        formData.append("content", trimmedContent)
+        formData.append("categoryId", selectedCategory.toString())
 
-        if (error) throw error
+        const response = await fetch("/api/community/posts", {
+          method: "POST",
+          body: formData,
+        })
 
-        const newPost = {
-          id: data.id,
-          content: data.content,
-          created_at: data.created_at,
-          vote_count: 0,
-          comment_count: 0,
-          media_url: data.media_url,
-          media_type: data.media_type,
-          user: data.user,
-          category: data.category,
-          has_voted: false,
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.error || "Failed to create post")
         }
 
-        setPosts((prev) => [...prev, newPost])
-        setTimeout(scrollToBottom, 100)
-        toast.success("Message posted!")
+        if (result.success && result.post) {
+          const newPost = {
+            id: result.post.id,
+            content: result.post.content,
+            created_at: result.post.created_at,
+            vote_count: result.post.vote_count || 0,
+            comment_count: result.post.comment_count || 0,
+            media_url: result.post.media_url,
+            media_type: result.post.media_type,
+            user: result.post.user || {
+              id: profile.id,
+              username: profile.username,
+              full_name: profile.full_name,
+              avatar_url: profile.avatar_url,
+              tier: profile.tier,
+            },
+            category: result.post.category || {
+              id: selectedCategory,
+              name: categories.find((c) => c.id === selectedCategory)?.name || "General",
+              slug: categories.find((c) => c.id === selectedCategory)?.slug || "general",
+            },
+            has_voted: false,
+          }
+
+          setPosts((prev) => [...prev, newPost])
+          setTimeout(scrollToBottom, 100)
+          toast.success("Message posted!")
+        }
       }
 
       setUnifiedInput("")
@@ -356,7 +346,7 @@ export default function CommunityPage() {
       setMediaPreview([])
     } catch (error) {
       console.error("Error submitting:", error)
-      toast.error("Failed to send message. Please try again.")
+      toast.error(error instanceof Error ? error.message : "Failed to send message. Please try again.")
     }
   }
 
