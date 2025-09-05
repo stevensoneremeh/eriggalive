@@ -5,16 +5,21 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createClient()
 
-    // Get current user
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
-    if (authError || !user) {
+
+    if (authError) {
+      console.error("[v0] Auth error in missions:", authError)
+      return NextResponse.json({ success: false, error: "Authentication failed" }, { status: 401 })
+    }
+
+    if (!user) {
+      console.error("[v0] No user found in missions")
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get all active missions
     const { data: missions, error: missionsError } = await supabase
       .from("missions")
       .select("*")
@@ -22,23 +27,34 @@ export async function GET(request: NextRequest) {
       .order("mission_type", { ascending: true })
 
     if (missionsError) {
-      throw missionsError
+      console.error("[v0] Missions query error:", missionsError)
+      if (missionsError.code === "42P01") {
+        return NextResponse.json({ success: false, error: "Missions table not found" }, { status: 404 })
+      }
+      return NextResponse.json({ success: false, error: "Failed to fetch missions" }, { status: 500 })
     }
 
-    // Get user's mission progress
     const { data: userProgress, error: progressError } = await supabase
       .from("user_missions")
       .select("*")
       .eq("user_id", user.id)
 
     if (progressError) {
-      throw progressError
+      console.error("[v0] User progress query error:", progressError)
+      if (progressError.code === "42P01") {
+        // Table doesn't exist, return missions without progress
+        return NextResponse.json({
+          success: true,
+          missions: missions.map((mission) => ({ ...mission, user_progress: null })),
+        })
+      }
+      return NextResponse.json({ success: false, error: "Failed to fetch user progress" }, { status: 500 })
     }
 
     // Combine missions with user progress
     const missionsWithProgress = missions.map((mission) => ({
       ...mission,
-      user_progress: userProgress.find((p) => p.mission_id === mission.id),
+      user_progress: userProgress?.find((p) => p.mission_id === mission.id) || null,
     }))
 
     return NextResponse.json({
@@ -46,7 +62,14 @@ export async function GET(request: NextRequest) {
       missions: missionsWithProgress,
     })
   } catch (error) {
-    console.error("Error fetching missions:", error)
-    return NextResponse.json({ success: false, error: "Failed to fetch missions" }, { status: 500 })
+    console.error("[v0] Unexpected error in missions:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Internal server error",
+        details: process.env.NODE_ENV === "development" ? error.message : undefined,
+      },
+      { status: 500 },
+    )
   }
 }

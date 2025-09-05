@@ -10,7 +10,14 @@ export async function GET(request: NextRequest) {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
-    if (authError || !user) {
+
+    if (authError) {
+      console.error("[v0] Auth error in referrals/me:", authError)
+      return NextResponse.json({ success: false, error: "Authentication failed" }, { status: 401 })
+    }
+
+    if (!user) {
+      console.error("[v0] No user found in referrals/me")
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
 
@@ -22,7 +29,16 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (userError) {
-      throw userError
+      console.error("[v0] Database error in referrals/me:", userError)
+      if (userError.code === "PGRST116") {
+        return NextResponse.json({ success: false, error: "User not found" }, { status: 404 })
+      }
+      return NextResponse.json({ success: false, error: "Database query failed" }, { status: 500 })
+    }
+
+    if (!userData) {
+      console.error("[v0] No user data found for ID:", user.id)
+      return NextResponse.json({ success: false, error: "User data not found" }, { status: 404 })
     }
 
     return NextResponse.json({
@@ -31,7 +47,14 @@ export async function GET(request: NextRequest) {
       referralCount: userData.referral_count || 0,
     })
   } catch (error) {
-    console.error("Error fetching referral data:", error)
-    return NextResponse.json({ success: false, error: "Failed to fetch referral data" }, { status: 500 })
+    console.error("[v0] Unexpected error in referrals/me:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Internal server error",
+        details: process.env.NODE_ENV === "development" ? error.message : undefined,
+      },
+      { status: 500 },
+    )
   }
 }

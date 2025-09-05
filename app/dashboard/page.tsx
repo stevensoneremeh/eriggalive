@@ -105,7 +105,7 @@ export default function DashboardPage() {
           .eq("user_id", profile.id)
           .eq("is_deleted", false),
         supabase.from("community_post_votes").select("*", { count: "exact", head: true }).eq("user_id", profile.id),
-        supabase.from("tickets").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+        supabase.from("event_tickets").select("*", { count: "exact", head: true }).eq("user_id", user.id),
         supabase.from("store_purchases").select("*", { count: "exact", head: true }).eq("user_id", user.id),
         supabase.from("vault_views").select("*", { count: "exact", head: true }).eq("user_id", user.id),
         supabase.from("user_follows").select("*", { count: "exact", head: true }).eq("following_id", profile.id),
@@ -161,7 +161,7 @@ export default function DashboardPage() {
           .order("created_at", { ascending: false })
           .limit(3),
         supabase
-          .from("tickets")
+          .from("event_tickets")
           .select("id, ticket_number, created_at, events(title)")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
