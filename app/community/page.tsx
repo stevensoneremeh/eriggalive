@@ -238,6 +238,7 @@ export default function CommunityPage() {
     if (!unifiedInput.trim() || !isAuthenticated || !profile) {
       if (!isAuthenticated) {
         toast.error("Please sign in to participate")
+        window.location.href = "/login"
       }
       return
     }
@@ -301,6 +302,18 @@ export default function CommunityPage() {
 
         console.log("[v0] Creating post with category:", selectedCategory, "content:", trimmedContent)
 
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession()
+
+        if (sessionError || !session) {
+          console.error("[v0] Session error:", sessionError)
+          toast.error("Authentication expired. Please sign in again.")
+          window.location.href = "/login"
+          return
+        }
+
         const formData = new FormData()
         formData.append("content", trimmedContent)
         formData.append("categoryId", selectedCategory.toString())
@@ -308,6 +321,10 @@ export default function CommunityPage() {
         const response = await fetch("/api/community/posts", {
           method: "POST",
           body: formData,
+          credentials: "include",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
         })
 
         const result = await response.json()
@@ -315,6 +332,13 @@ export default function CommunityPage() {
 
         if (!response.ok) {
           console.error("[v0] API Error:", result)
+
+          if (response.status === 401) {
+            toast.error("Authentication required. Please sign in again.")
+            window.location.href = "/login"
+            return
+          }
+
           throw new Error(result.error || `HTTP ${response.status}: Failed to create post`)
         }
 
