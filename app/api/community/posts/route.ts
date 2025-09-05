@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { type NextRequest, NextResponse } from "next/server"
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
 import { revalidatePath } from "next/cache"
 
 export async function GET(request: NextRequest) {
@@ -7,9 +8,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const categoryId = searchParams.get("categoryId")
     const sortBy = searchParams.get("sortBy") || "newest"
-    const limit = parseInt(searchParams.get("limit") || "20")
+    const limit = Number.parseInt(searchParams.get("limit") || "20")
 
-    const supabase = createClientComponentClient()
+    const supabase = createRouteHandlerClient({ cookies })
 
     let query = supabase
       .from("community_posts")
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
       .eq("is_deleted", false)
 
     if (categoryId && categoryId !== "all") {
-      query = query.eq("category_id", parseInt(categoryId))
+      query = query.eq("category_id", Number.parseInt(categoryId))
     }
 
     // Apply sorting
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClientComponentClient()
+    const supabase = createRouteHandlerClient({ cookies })
 
     // Get authenticated user
     const {
@@ -67,19 +68,11 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !authUser) {
+      console.error("[v0] Auth error:", authError)
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
-    // Get user profile
-    const { data: userProfile, error: profileError } = await supabase
-      .from("user_profiles")
-      .select("*")
-      .eq("id", authUser.id)
-      .single()
-
-    if (profileError || !userProfile) {
-      return NextResponse.json({ error: "User profile not found" }, { status: 404 })
-    }
+    console.log("[v0] Authenticated user:", authUser.email)
 
     const formData = await request.formData()
     const content = formData.get("content") as string
@@ -100,8 +93,8 @@ export async function POST(request: NextRequest) {
     }
 
     const postData = {
-      user_id: userProfile.id,
-      category_id: parseInt(categoryId),
+      user_id: authUser.id,
+      category_id: Number.parseInt(categoryId),
       content: content.trim(),
       is_published: true,
       is_deleted: false,
