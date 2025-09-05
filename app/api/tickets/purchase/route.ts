@@ -190,6 +190,7 @@ export async function POST(request: NextRequest) {
         .eq("id", user.id)
 
       if (coinsError) {
+        console.error("Coins deduction error:", coinsError) // Added error logging
         return NextResponse.json({ success: false, error: "Failed to deduct coins" }, { status: 500 })
       }
     }

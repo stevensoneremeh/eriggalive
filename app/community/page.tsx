@@ -302,6 +302,29 @@ export default function CommunityPage() {
 
         console.log("[v0] Creating post with category:", selectedCategory, "content:", trimmedContent)
 
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession()
+
+        if (sessionError || !session) {
+          console.error("[v0] Session error:", sessionError)
+          const { error: refreshError } = await supabase.auth.refreshSession()
+          if (refreshError) {
+            toast.error("Session expired. Please refresh the page.")
+            return
+          }
+
+          const {
+            data: { session: newSession },
+          } = await supabase.auth.getSession()
+          if (!newSession) {
+            toast.error("Authentication required. Please sign in again.")
+            window.location.href = "/login"
+            return
+          }
+        }
+
         const formData = new FormData()
         formData.append("content", trimmedContent)
         formData.append("categoryId", selectedCategory.toString())
@@ -319,7 +342,13 @@ export default function CommunityPage() {
           console.error("[v0] API Error:", result)
 
           if (response.status === 401) {
+            const { error: refreshError } = await supabase.auth.refreshSession()
+            if (!refreshError) {
+              toast.error("Please try posting again.")
+              return
+            }
             toast.error("Authentication required. Please sign in again.")
+            window.location.href = "/login"
             return
           }
 
@@ -700,7 +729,7 @@ export default function CommunityPage() {
                   <div className="flex space-x-2 md:space-x-3">
                     <Avatar className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 flex-shrink-0 ring-2 ring-gray-200 dark:ring-gray-700">
                       <AvatarImage src={post.user.avatar_url || "/placeholder-user.jpg"} />
-                      <AvatarFallback className="bg-green-500 text-white font-semibold text-xs sm:text-sm">
+                      <AvatarFallback className="bg-green-500 text-white font-semibold text-xs sm:text-sm md:text-base truncate">
                         {post.user.username.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>

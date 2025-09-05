@@ -133,7 +133,7 @@ export default function TicketsPage() {
   const fetchTickets = async () => {
     try {
       const { data, error } = await supabase
-        .from("event_tickets")
+        .from("tickets")
         .select(`
           *,
           events (
@@ -161,7 +161,7 @@ export default function TicketsPage() {
         .from("events")
         .select(`
           *,
-          event_tickets(count)
+          tickets!inner(count)
         `)
         .eq("status", "active")
         .gte("event_date", new Date().toISOString())
@@ -172,8 +172,8 @@ export default function TicketsPage() {
       const eventsWithSoldCount =
         data?.map((event) => ({
           ...event,
-          sold: event.event_tickets?.length || 0,
-          tickets_sold: event.event_tickets?.length || 0,
+          sold: event.tickets?.length || 0,
+          tickets_sold: event.tickets?.length || 0,
         })) || []
 
       setEvents(eventsWithSoldCount)

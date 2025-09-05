@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     // Check user's coin balance
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("coins")
+      .select("coins_balance") // Changed from "coins" to "coins_balance" for consistency
       .eq("id", userId)
       .single()
 
@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch user profile" }, { status: 500 })
     }
 
-    if (profile.coins < coinAmount) {
+    if (profile.coins_balance < coinAmount) {
+      // Updated to use coins_balance
       return NextResponse.json({ error: "Insufficient coin balance" }, { status: 400 })
     }
 
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
     // Deduct coins from user balance
     const { error: balanceError } = await supabase
       .from("profiles")
-      .update({ coins: profile.coins - coinAmount })
+      .update({ coins_balance: profile.coins_balance - coinAmount }) // Updated to use coins_balance consistently
       .eq("id", userId)
 
     if (balanceError) {

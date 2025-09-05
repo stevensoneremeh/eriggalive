@@ -3,6 +3,8 @@ import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { revalidatePath } from "next/cache"
 
+export const dynamic = "force-dynamic"
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -74,6 +76,20 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Authenticated user:", authUser.email)
 
+    const { data: userProfile, error: profileError } = await supabase
+      .from("user_profiles")
+      .select("id, username, full_name, avatar_url, tier")
+      .eq("id", authUser.id)
+      .single()
+
+    if (profileError || !userProfile) {
+      console.error("[v0] User profile not found:", profileError)
+      return NextResponse.json(
+        { error: "User profile not found. Please complete your profile setup." },
+        { status: 409 },
+      )
+    }
+
     const formData = await request.formData()
     const content = formData.get("content") as string
     const categoryId = formData.get("categoryId") as string
@@ -86,51 +102,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Category is required" }, { status: 400 })
     }
 
+    const categoryIdNum = Number.parseInt(categoryId)
+    if (isNaN(categoryIdNum)) {
+      return NextResponse.json({ error: "Invalid category ID" }, { status: 400 })
+    }
+
+    const { data: category, error: categoryError } = await supabase
+      .from("community_categories")
+      .select("id, name, slug")
+      .eq("id", categoryIdNum)
+      .eq("is_active", true)
+      .single()
+
+    if (categoryError || !category) {
+      console.error("[v0] Category not found:", categoryError)
+      return NextResponse.json({ error: "Category not found or inactive" }, { status: 409 })
+    }
+
     // Validate content for URLs
     const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi
     if (urlRegex.test(content)) {
       return NextResponse.json({ error: "Posts cannot contain external links or URLs" }, { status: 400 })
     }
 
-    let { data: userProfile, error: profileError } = await supabase
-      .from("user_profiles")
-      .select("id, username, full_name, avatar_url, tier")
-      .eq("id", authUser.id)
-      .single()
-
-    // If user profile doesn't exist, create it
-    if (profileError && profileError.code === "PGRST116") {
-      console.log("[v0] Creating user profile for:", authUser.email)
-      const { data: newProfile, error: createError } = await supabase
-        .from("user_profiles")
-        .insert({
-          id: authUser.id,
-          username: authUser.email?.split("@")[0] || "user",
-          full_name: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "User",
-          avatar_url: authUser.user_metadata?.avatar_url || null,
-          tier: "citizen",
-        })
-        .select("id, username, full_name, avatar_url, tier")
-        .single()
-
-      if (createError) {
-        console.error("[v0] Error creating user profile:", createError)
-        return NextResponse.json({ error: "Failed to create user profile" }, { status: 500 })
-      }
-
-      userProfile = newProfile
-    } else if (profileError) {
-      console.error("[v0] Error fetching user profile:", profileError)
-      return NextResponse.json({ error: "Failed to fetch user profile" }, { status: 500 })
+    if (content.trim().length > 2000) {
+      return NextResponse.json({ error: "Post content is too long (max 2000 characters)" }, { status: 400 })
     }
 
     const postData = {
       user_id: authUser.id,
-      category_id: Number.parseInt(categoryId),
+      category_id: categoryIdNum,
       content: content.trim(),
       is_published: true,
       is_deleted: false,
+      vote_count: 0,
+      comment_count: 0,
     }
+
+    console.log("[v0] Creating post with data:", postData)
 
     const { data: newPost, error: insertError } = await supabase
       .from("community_posts")
@@ -144,23 +153,44 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       console.error("[v0] Error creating post:", insertError)
+
       if (insertError.code === "23503") {
-        return NextResponse.json({ error: "Invalid category or user reference" }, { status: 409 })
+        return NextResponse.json(
+          { error: "Foreign key constraint violation. Please refresh and try again." },
+          { status: 409 },
+        )
       }
-      return NextResponse.json({ error: insertError.message }, { status: 500 })
+
+      if (insertError.code === "23505") {
+        return NextResponse.json(
+          { error: "Duplicate post detected. Please wait before posting again." },
+          { status: 409 },
+        )
+      }
+
+      if (insertError.code === "23514") {
+        return NextResponse.json({ error: "Post content violates community guidelines." }, { status: 409 })
+      }
+
+      return NextResponse.json(
+        {
+          error: insertError.message || "Failed to create post",
+          code: insertError.code,
+        },
+        { status: 500 },
+      )
     }
 
-    console.log("[v0] Post created successfully:", newPost.id)
-    revalidatePath("/community")
+    const responsePost = {
+      ...newPost,
+      user: newPost.user || userProfile,
+      category: newPost.category || category,
+    }
 
-    return NextResponse.json({
-      success: true,
-      post: newPost,
-      user: {
-        id: authUser.id,
-        email: authUser.email,
-      },
-    })
+    console.log("[v0] Post created successfully:", responsePost.id)
+
+    revalidatePath("/community")
+    return NextResponse.json({ success: true, post: responsePost })
   } catch (error: any) {
     console.error("[v0] API Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
