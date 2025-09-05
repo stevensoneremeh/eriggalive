@@ -2,6 +2,8 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import type { Database } from "@/types/database"
 
+const serverClientCache = new Map<string, ReturnType<typeof createServerClient<Database>>>()
+
 export async function createClient() {
   const cookieStore = await cookies()
 
@@ -14,7 +16,13 @@ export async function createClient() {
     throw new Error("Missing Supabase environment variables")
   }
 
-  return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
+  const cacheKey = `${supabaseUrl}-${supabaseAnonKey}-server`
+
+  if (serverClientCache.has(cacheKey)) {
+    return serverClientCache.get(cacheKey)!
+  }
+
+  const client = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll()
@@ -27,7 +35,26 @@ export async function createClient() {
         }
       },
     },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+    global: {
+      headers: {
+        "X-Client-Info": "eriggalive-server",
+        "X-Client-Version": "1.0.0",
+      },
+    },
   })
+
+  serverClientCache.set(cacheKey, client)
+
+  setTimeout(() => {
+    serverClientCache.delete(cacheKey)
+  }, 30000) // 30 seconds
+
+  return client
 }
 
 export async function createAdminClient() {
@@ -39,7 +66,13 @@ export async function createAdminClient() {
     throw new Error("Missing Supabase admin environment variables")
   }
 
-  return createServerClient<Database>(supabaseUrl, supabaseServiceKey, {
+  const cacheKey = `${supabaseUrl}-admin`
+
+  if (serverClientCache.has(cacheKey)) {
+    return serverClientCache.get(cacheKey)!
+  }
+
+  const adminClient = createServerClient<Database>(supabaseUrl, supabaseServiceKey, {
     cookies: {
       getAll() {
         return []
@@ -51,49 +84,32 @@ export async function createAdminClient() {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
+      detectSessionInUrl: false,
     },
-  })
-}
-
-// Alternative function for cases where cookies() might not be available
-export function createClientComponentClient() {
-  // This should only be used in client components
-  if (typeof window === "undefined") {
-    throw new Error("createClientComponentClient should only be used in client components")
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing Supabase environment variables")
-  }
-
-  return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return document.cookie.split(";").map((cookie) => {
-          const [name, value] = cookie.trim().split("=")
-          return { name, value: decodeURIComponent(value || "") }
-        })
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          let cookieString = `${name}=${encodeURIComponent(value)}`
-          if (options?.maxAge) cookieString += `; max-age=${options.maxAge}`
-          if (options?.path) cookieString += `; path=${options.path}`
-          if (options?.domain) cookieString += `; domain=${options.domain}`
-          if (options?.secure) cookieString += "; secure"
-          if (options?.httpOnly) cookieString += "; httponly"
-          if (options?.sameSite) cookieString += `; samesite=${options.sameSite}`
-          document.cookie = cookieString
-        })
+    global: {
+      headers: {
+        "X-Client-Info": "eriggalive-admin",
+        "X-Client-Version": "1.0.0",
       },
     },
   })
+
+  serverClientCache.set(cacheKey, adminClient)
+
+  setTimeout(() => {
+    serverClientCache.delete(cacheKey)
+  }, 60000) // 60 seconds for admin client
+
+  return adminClient
 }
+
+// Use the browser client from lib/supabase/client.ts instead
 
 export const createServerSupabaseClient = createClient
 export const createAdminSupabaseClient = createAdminClient
+
+export function clearServerClientCache() {
+  serverClientCache.clear()
+}
 
 export { createClient as createServerClient }
