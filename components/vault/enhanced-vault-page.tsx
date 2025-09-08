@@ -27,6 +27,10 @@ import {
   Unlock,
   ExternalLink,
   Minimize,
+  Maximize,
+  Pause,
+  Volume2,
+  VolumeX,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { formatDistanceToNow } from "date-fns"
@@ -103,6 +107,38 @@ const videoGalleryData: MediaItem[] = [
     created_at: "2024-01-15T12:00:00Z",
     tags: ["documentary", "behind-scenes", "exclusive"],
   },
+  {
+    id: "v4",
+    title: "Erigga - Street Motivation",
+    description: "Motivational street anthem",
+    type: "video",
+    url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    youtube_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    thumbnail: `https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg`,
+    tier_required: "free",
+    is_premium: false,
+    views: 12300,
+    likes: 756,
+    created_at: "2024-01-12T14:20:00Z",
+    tags: ["motivation", "street", "anthem"],
+  },
+  {
+    id: "v5",
+    title: "Erigga Live Performance - Lagos Concert",
+    description: "Exclusive live performance footage",
+    type: "video",
+    url: "https://www.youtube.com/watch?v=9bZkp7q19f0",
+    youtube_url: "https://www.youtube.com/watch?v=9bZkp7q19f0",
+    thumbnail: `https://img.youtube.com/vi/9bZkp7q19f0/maxresdefault.jpg`,
+    tier_required: "pro",
+    is_premium: true,
+    unlock_price_coins: 750,
+    unlock_price_naira: 400,
+    views: 6890,
+    likes: 423,
+    created_at: "2024-01-10T19:45:00Z",
+    tags: ["live", "concert", "performance", "lagos"],
+  },
 ]
 
 const musicData: MediaItem[] = [
@@ -136,6 +172,21 @@ const musicData: MediaItem[] = [
     created_at: "2024-01-16T10:00:00Z",
     tags: ["audio", "good-loving", "love-song"],
   },
+  {
+    id: "m3",
+    title: "Paper Boi Anthem",
+    description: "Street classic audio",
+    type: "audio",
+    url: "https://www.youtube.com/watch?v=ScMzIvxBSi4",
+    youtube_url: "https://www.youtube.com/watch?v=ScMzIvxBSi4",
+    thumbnail: `https://img.youtube.com/vi/ScMzIvxBSi4/maxresdefault.jpg`,
+    tier_required: "free",
+    is_premium: false,
+    views: 67890,
+    likes: 4230,
+    created_at: "2024-01-14T11:15:00Z",
+    tags: ["audio", "paper-boi", "street-classic"],
+  },
 ]
 
 const allMediaItems = [
@@ -152,42 +203,130 @@ interface YouTubePlayerProps {
 }
 
 function YouTubePlayer({ videoId, title, isFullscreen, onToggleFullscreen, onClose }: YouTubePlayerProps) {
+  const [isPlaying, setIsPlaying] = useState(true)
+  const [isMuted, setIsMuted] = useState(false)
+
   return (
     <AnimatePresence>
-      {isFullscreen && (
+      {isFullscreen ? (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 bg-black z-50 flex items-center justify-center"
         >
-          <div className="relative w-full h-full max-w-6xl max-h-[90vh] mx-4">
-            <div className="absolute top-4 right-4 z-10 flex gap-2">
-              <Button
-                onClick={onToggleFullscreen}
-                size="sm"
-                variant="secondary"
-                className="bg-black/50 hover:bg-black/70 text-white"
-              >
-                <Minimize className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={onClose}
-                size="sm"
-                variant="secondary"
-                className="bg-black/50 hover:bg-black/70 text-white"
-              >
-                ✕
-              </Button>
+          <div className="relative w-full h-full">
+            <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <h3 className="text-white font-medium text-lg truncate max-w-md">{title}</h3>
+                  <Badge className="bg-red-600 text-white">
+                    <div className="w-2 h-2 bg-white rounded-full animate-pulse mr-2" />
+                    LIVE
+                  </Badge>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    onClick={onToggleFullscreen}
+                    size="sm"
+                    variant="ghost"
+                    className="text-white hover:bg-white/20"
+                  >
+                    <Minimize className="h-5 w-5" />
+                  </Button>
+                  <Button onClick={onClose} size="sm" variant="ghost" className="text-white hover:bg-white/20">
+                    ✕
+                  </Button>
+                </div>
+              </div>
             </div>
             <iframe
-              src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`}
+              src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&controls=1`}
               title={title}
-              className="w-full h-full rounded-lg"
+              className="w-full h-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
             />
           </div>
+        </motion.div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          onClick={onClose}
+        >
+          <motion.div
+            className="bg-black rounded-xl overflow-hidden shadow-2xl max-w-4xl w-full max-h-[80vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-r from-gray-900 to-black p-4 border-b border-gray-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                  <h3 className="text-white font-medium text-lg truncate">{title}</h3>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    onClick={onToggleFullscreen}
+                    size="sm"
+                    variant="ghost"
+                    className="text-white hover:bg-white/20"
+                  >
+                    <Maximize className="h-4 w-4" />
+                  </Button>
+                  <Button onClick={onClose} size="sm" variant="ghost" className="text-white hover:bg-white/20">
+                    ✕
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="relative aspect-video bg-black">
+              <iframe
+                src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&controls=1`}
+                title={title}
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+
+            <div className="bg-gradient-to-r from-gray-900 to-black p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-white hover:bg-white/20"
+                    onClick={() => setIsPlaying(!isPlaying)}
+                  >
+                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-white hover:bg-white/20"
+                    onClick={() => setIsMuted(!isMuted)}
+                  >
+                    {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="bg-red-600 hover:bg-red-700 text-white border-red-600"
+                    onClick={() => window.open(`https://www.youtube.com/watch?v=${videoId}`, "_blank")}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Watch on YouTube
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
@@ -269,11 +408,11 @@ export function EnhancedVaultPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedType, setSelectedType] = useState<string>("all")
   const [selectedTier, setSelectedTier] = useState<string>("all")
-  const [selectedCategory, setSelectedCategory] = useState<string>("all") // Added category filter
+  const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [sortBy, setSortBy] = useState<string>("newest")
   const [currentPlayer, setCurrentPlayer] = useState<{ videoId: string; title: string; isFullscreen: boolean } | null>(
     null,
-  ) // Added player state
+  )
   const [unlockModal, setUnlockModal] = useState<{ item: MediaItem; isOpen: boolean }>({
     item: {} as MediaItem,
     isOpen: false,
@@ -281,7 +420,7 @@ export function EnhancedVaultPage() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setMediaItems(allMediaItems) // Using combined media items
+      setMediaItems(allMediaItems)
       setLoading(false)
     }, 1000)
 
@@ -387,7 +526,7 @@ export function EnhancedVaultPage() {
 
     const matchesType = selectedType === "all" || item.type === selectedType
     const matchesTier = selectedTier === "all" || item.tier_required === selectedTier
-    const matchesCategory = selectedCategory === "all" || (item as any).category === selectedCategory // Added category filtering
+    const matchesCategory = selectedCategory === "all" || (item as any).category === selectedCategory
 
     return matchesSearch && matchesType && matchesTier && matchesCategory
   })
@@ -584,13 +723,12 @@ export function EnhancedVaultPage() {
                             </motion.div>
                           )}
 
-                          {/* Overlay */}
                           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-t-lg">
                             {hasAccess ? (
                               <div className="flex gap-2">
                                 <Button
                                   size="sm"
-                                  className="bg-white/20 hover:bg-white/30 text-white"
+                                  className="bg-red-600 hover:bg-red-700 text-white shadow-lg"
                                   onClick={() => playVideo(item)}
                                 >
                                   <Play className="h-4 w-4 mr-2" />
@@ -600,7 +738,7 @@ export function EnhancedVaultPage() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="bg-red-600 hover:bg-red-700 text-white border-red-600"
+                                    className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm"
                                     onClick={() => redirectToYouTube(item.youtube_url!)}
                                   >
                                     <ExternalLink className="h-4 w-4 mr-2" />
@@ -611,7 +749,7 @@ export function EnhancedVaultPage() {
                             ) : (
                               <Button
                                 size="sm"
-                                className="bg-orange-500 hover:bg-orange-600 text-white"
+                                className="bg-orange-500 hover:bg-orange-600 text-white shadow-lg"
                                 onClick={() => setUnlockModal({ item, isOpen: true })}
                               >
                                 <Unlock className="h-4 w-4 mr-2" />

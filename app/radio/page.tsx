@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import {
   Play,
   Pause,
@@ -35,6 +35,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { createClient } from "@/lib/supabase/client"
 import { AnimatedRadioCharacter } from "@/components/radio/animated-radio-character"
 import { useTheme } from "next-themes"
+import { ShoutOutDisplay } from "@/components/shout-out-display"
 
 interface Track {
   id: string
@@ -415,195 +416,11 @@ export default function RadioPage() {
   }
 
   return (
-    <div
-      className={cn(
-        "min-h-screen transition-all duration-1000",
-        theme === "dark"
-          ? selectedMoodData.gradient
-          : `bg-gradient-to-br from-gray-50 to-gray-100 dark:${selectedMoodData.gradient}`,
-      )}
-    >
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 opacity-5 dark:opacity-5">
-          {/* Lagos Skyline Silhouettes */}
-          <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/20 to-transparent" />
+    <div className="min-h-screen bg-background">
+      <ShoutOutDisplay position="top" />
 
-          {/* Floating Graffiti Elements */}
-          {[...Array(8)].map((_, i) => (
-            <motion.div
-              key={i}
-              className={cn(
-                "absolute rounded-lg",
-                theme === "dark" ? selectedMoodData.color.replace("from-", "bg-") : "bg-gray-300/30",
-              )}
-              style={{
-                width: `${20 + i * 10}px`,
-                height: `${20 + i * 10}px`,
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-              }}
-              animate={
-                prefersReducedMotion
-                  ? {}
-                  : {
-                      x: [0, 50, -50, 0],
-                      y: [0, -30, 30, 0],
-                      rotate: [0, 180, 360],
-                      opacity: [0.1, 0.3, 0.1],
-                    }
-              }
-              transition={{
-                duration: 15 + i * 3,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "easeInOut",
-              }}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="relative z-10 container mx-auto px-4 py-8">
-        {/* Hero Section */}
-        <motion.div
-          className="text-center mb-12"
-          initial={{ opacity: 0, y: -50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-        >
-          <motion.h1
-            className={cn(
-              "text-6xl md:text-8xl font-black mb-4 bg-gradient-to-r bg-clip-text text-transparent",
-              theme === "dark" ? "from-white via-gray-200 to-white" : "from-gray-900 via-gray-700 to-gray-900",
-            )}
-            style={{
-              textShadow: theme === "dark" ? "2px 2px 4px rgba(0,0,0,0.5)" : "2px 2px 4px rgba(255,255,255,0.5)",
-              fontFamily: "Impact, Arial Black, sans-serif",
-              letterSpacing: "0.1em",
-            }}
-            animate={
-              prefersReducedMotion
-                ? {}
-                : {
-                    textShadow:
-                      theme === "dark"
-                        ? [
-                            "2px 2px 4px rgba(0,0,0,0.5)",
-                            "4px 4px 8px rgba(255,0,0,0.3)",
-                            "2px 2px 4px rgba(0,0,0,0.5)",
-                          ]
-                        : [
-                            "2px 2px 4px rgba(255,255,255,0.5)",
-                            "4px 4px 8px rgba(255,0,0,0.2)",
-                            "2px 2px 4px rgba(255,255,255,0.5)",
-                          ],
-                  }
-            }
-            transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY }}
-          >
-            ERIGGA RADIO
-          </motion.h1>
-          <motion.p
-            className={cn("text-2xl md:text-3xl font-bold mb-2", theme === "dark" ? "text-white/90" : "text-gray-800")}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-          >
-            Vibes for Every Mood
-          </motion.p>
-
-          {/* Live Indicator */}
-          <AnimatePresence>
-            {isLive && (
-              <motion.div
-                className="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-full font-bold"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0 }}
-              >
-                <motion.div
-                  className="w-3 h-3 bg-white rounded-full"
-                  animate={{ opacity: [1, 0.3, 1] }}
-                  transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY }}
-                />
-                LIVE: {liveTitle}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-
-        {/* Daily Quote */}
-        {dailyQuote && (
-          <motion.div
-            className={cn(
-              "glass-card rounded-2xl p-6 mb-8 text-center",
-              theme === "dark"
-                ? "bg-white/10 backdrop-blur-md border-white/20"
-                : "bg-white/80 backdrop-blur-md border-gray-200/50 shadow-lg",
-            )}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3 }}
-          >
-            <p className={cn("text-lg italic", theme === "dark" ? "text-white/90" : "text-gray-800")}>"{dailyQuote}"</p>
-            <p className={cn("text-sm mt-2", theme === "dark" ? "text-white/70" : "text-gray-600")}>- Erigga</p>
-          </motion.div>
-        )}
-
-        {/* Mood Selector Grid */}
-        <motion.div
-          className="mb-12"
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <h2 className={cn("text-3xl font-bold mb-6 text-center", theme === "dark" ? "text-white" : "text-gray-900")}>
-            Choose Your Vibe
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {moodCategories.map((mood, index) => (
-              <motion.div
-                key={mood.id}
-                className={cn(
-                  "rounded-2xl p-6 cursor-pointer transition-all duration-300",
-                  "hover:scale-105 hover:shadow-2xl",
-                  selectedMood === mood.id ? "ring-4 scale-105" : "",
-                  theme === "dark"
-                    ? "glass-card ring-white/50"
-                    : "bg-white/90 backdrop-blur-md border border-gray-200/50 shadow-lg ring-gray-400/50",
-                )}
-                onClick={() => handleMoodSelect(mood.id)}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 * index }}
-                whileHover={prefersReducedMotion ? {} : { y: -5 }}
-                whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
-              >
-                <div
-                  className={cn(
-                    "w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center",
-                    mood.color.replace("from-", "bg-").replace("to-", ""),
-                  )}
-                >
-                  {mood.icon}
-                </div>
-                <h3
-                  className={cn(
-                    "text-lg font-bold text-center mb-2",
-                    theme === "dark" ? "text-white" : "text-gray-900",
-                  )}
-                >
-                  {mood.name}
-                </h3>
-                <p className={cn("text-sm text-center", theme === "dark" ? "text-white/70" : "text-gray-600")}>
-                  {mood.description}
-                </p>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex flex-col lg:flex-row gap-8">
           {/* Main Player */}
           <div className="lg:col-span-2">
             <motion.div

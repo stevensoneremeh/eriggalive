@@ -11,6 +11,7 @@ import { Music, Video, Users, ShoppingBag, Calendar, Play, Star, ArrowRight, Cro
 import { cn } from "@/lib/utils"
 import { SafeHeroVideoCarousel } from "@/components/safe-hero-video-carousel"
 import { getOptimizedVideoSources } from "@/utils/video-utils"
+import { ShoutOutDisplay } from "@/components/shout-out-display"
 
 export default function HomePage() {
   const { theme } = useTheme()
@@ -196,6 +197,8 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen overflow-x-hidden">
+      <ShoutOutDisplay position="top" />
+
       <section className="relative h-[100vh] w-full overflow-hidden">
         {/* Background with enhanced parallax effect */}
         <motion.div className="absolute inset-0" style={{ y: heroY, scale: heroScale }}>
