@@ -20,18 +20,18 @@ interface ShoutOutContextType {
 
 const ShoutOutContext = createContext<ShoutOutContextType | undefined>(undefined)
 
-// Erigga lyric quotes for fallback display
+// Erigga-inspired quotes for fallback display (generic phrases inspired by themes, not direct lyrics)
 const erigga_quotes = [
-  "Paper Boi, I dey hustle for the money",
-  "Street credibility na my priority",
-  "From Warri to the world, we dey represent",
-  "No be by mouth, na by action we dey show",
-  "Hustle hard, pray harder, that's the motto",
-  "Real recognize real, fake recognize fake",
-  "Street wisdom pass book knowledge sometimes",
-  "Money no be everything but everything need money",
-  "Stay focused, stay blessed, stay grinding",
-  "From the streets to the top, we never forget where we come from",
+  "Hustle hard, no time to waste",
+  "From the streets to the stage",
+  "Real ones know the struggle",
+  "Stay focused on the grind",
+  "Paper chase never stops",
+  "Warri no dey carry last",
+  "Dreams bigger than obstacles",
+  "Success is the only option",
+  "Respect the journey",
+  "True wisdom comes from experience",
 ]
 
 export function ShoutOutProvider({ children }: { children: React.ReactNode }) {
@@ -100,11 +100,11 @@ export function ShoutOutProvider({ children }: { children: React.ReactNode }) {
     setIsVisible(true)
     setShowingQuote(false)
 
-    // Hide shout-out after 5 minutes (300 seconds)
+    // Hide shout-out after 10 minutes (600 seconds) - increased from 5 minutes
     setTimeout(() => {
       setIsVisible(false)
       setCurrentShoutOut(null)
-    }, 300000)
+    }, 600000) // 10 minutes
   }, [])
 
   const hideShoutOut = useCallback(() => {

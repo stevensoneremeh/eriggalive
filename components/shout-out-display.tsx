@@ -1,116 +1,69 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useShoutOut } from "@/contexts/shout-out-context"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { X, Mic, Quote } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { X } from "lucide-react"
 
 interface ShoutOutDisplayProps {
   position?: "top" | "bottom"
-  className?: string
 }
 
-export function ShoutOutDisplay({ position = "top", className }: ShoutOutDisplayProps) {
+export function ShoutOutDisplay({ position = "top" }: ShoutOutDisplayProps) {
   const { currentShoutOut, isVisible, hideShoutOut, currentQuote, showingQuote } = useShoutOut()
+  const [mounted, setMounted] = useState(false)
 
-  const shouldShow = isVisible && currentShoutOut
-  const shouldShowQuote = showingQuote && !shouldShow
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
+
+  const positionClasses = position === "top" ? "top-20 md:top-24" : "bottom-4"
 
   return (
     <AnimatePresence>
-      {(shouldShow || shouldShowQuote) && (
+      {isVisible && currentShoutOut ? (
         <motion.div
-          initial={{ opacity: 0, y: position === "top" ? -100 : 100, scale: 0.9 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: position === "top" ? -100 : 100, scale: 0.9 }}
-          transition={{
-            type: "spring",
-            damping: 25,
-            stiffness: 200,
-            duration: 0.6,
-          }}
-          className={cn(
-            "fixed left-1/2 transform -translate-x-1/2 z-50 max-w-4xl w-full mx-4",
-            position === "top" ? "top-20" : "bottom-20",
-            className,
-          )}
+          initial={{ opacity: 0, y: position === "top" ? -50 : 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: position === "top" ? -50 : 50 }}
+          transition={{ duration: 0.5 }}
+          className={`fixed left-0 right-0 z-40 mx-auto max-w-3xl px-4 ${positionClasses}`}
         >
-          {shouldShow && currentShoutOut && (
-            <Card className="bg-gradient-to-r from-red-500/95 to-orange-500/95 backdrop-blur-md border-2 border-yellow-400/50 shadow-2xl">
-              <CardContent className="p-4 md:p-6">
-                <div className="flex items-center gap-3">
-                  <div className="flex-shrink-0">
-                    <div className="w-4 h-4 bg-yellow-400 rounded-full animate-pulse"></div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Mic className="w-4 h-4 text-white" />
-                      <p className="text-white font-bold text-sm uppercase tracking-wide">
-                        Live Shout-out from {currentShoutOut.user_name}
-                      </p>
-                    </div>
-                    <div className="overflow-hidden">
-                      <motion.p
-                        className="text-white text-lg md:text-xl font-medium leading-tight whitespace-nowrap"
-                        animate={{
-                          x: currentShoutOut.message.length > 50 ? [0, -200, 0] : 0,
-                        }}
-                        transition={{
-                          duration: currentShoutOut.message.length > 50 ? 8 : 0,
-                          repeat: currentShoutOut.message.length > 50 ? Number.POSITIVE_INFINITY : 0,
-                          ease: "linear",
-                        }}
-                      >
-                        {currentShoutOut.message}
-                      </motion.p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={hideShoutOut}
-                    className="text-white hover:bg-white/20 flex-shrink-0"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
+          <div className="relative rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 p-1 shadow-lg">
+            <div className="rounded-md bg-background p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-medium text-primary">Shout Out from {currentShoutOut.user_name}</p>
+                  <p className="mt-1 text-sm">{currentShoutOut.message}</p>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {shouldShowQuote && (
-            <Card className="bg-gradient-to-r from-purple-600/90 to-blue-600/90 backdrop-blur-md border-2 border-cyan-400/50 shadow-2xl">
-              <CardContent className="p-4 md:p-6">
-                <div className="flex items-center gap-3">
-                  <div className="flex-shrink-0">
-                    <Quote className="w-5 h-5 text-cyan-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-cyan-100 font-bold text-sm uppercase tracking-wide mb-2">Erigga Wisdom</p>
-                    <div className="overflow-hidden">
-                      <motion.p
-                        className="text-white text-lg md:text-xl font-medium leading-tight whitespace-nowrap"
-                        animate={{
-                          x: currentQuote.length > 40 ? [0, -150, 0] : 0,
-                        }}
-                        transition={{
-                          duration: currentQuote.length > 40 ? 6 : 0,
-                          repeat: currentQuote.length > 40 ? Number.POSITIVE_INFINITY : 0,
-                          ease: "linear",
-                        }}
-                      >
-                        "{currentQuote}"
-                      </motion.p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                <button
+                  onClick={hideShoutOut}
+                  className="ml-4 rounded-full p-1 hover:bg-muted transition-colors"
+                  aria-label="Close shout out"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+          </div>
         </motion.div>
-      )}
+      ) : showingQuote ? (
+        <motion.div
+          initial={{ opacity: 0, y: position === "top" ? -50 : 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: position === "top" ? -50 : 50 }}
+          transition={{ duration: 0.5 }}
+          className={`fixed left-0 right-0 z-40 mx-auto max-w-2xl px-4 ${positionClasses}`}
+        >
+          <div className="rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 p-1 shadow-lg">
+            <div className="rounded-md bg-background p-3">
+              <p className="text-center text-sm italic">"{currentQuote}"</p>
+            </div>
+          </div>
+        </motion.div>
+      ) : null}
     </AnimatePresence>
   )
 }

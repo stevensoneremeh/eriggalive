@@ -1,76 +1,26 @@
 "use client"
+
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
+import { useTheme } from "@/contexts/theme-context"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Menu,
-  Home,
-  Target,
-  Users,
-  Music,
-  Coins,
-  MessageCircle,
-  User,
-  Settings,
-  LogOut,
-  Crown,
-  Phone,
-  ShoppingBag,
-  Calendar,
-  Radio,
-  Ticket,
-  Info,
-  LayoutDashboard,
-  Wallet,
-  X,
-  Sun,
-  Moon,
-  Monitor,
-} from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
-import { useTheme } from "@/contexts/theme-context"
-import { DynamicLogo } from "@/components/dynamic-logo"
-import { Badge } from "@/components/ui/badge"
+import { Menu, X, Sun, Moon, Home, Music, Users, Radio, ShoppingBag, Ticket, Coins } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { CoinBalance } from "@/components/coin-balance"
 
-const navigationItems = [
-  { name: "Home", href: "/", icon: Home },
-  { name: "Mission", href: "/mission", icon: Target },
-  { name: "Community", href: "/community", icon: Users },
-  { name: "Radio", href: "/radio", icon: Radio },
-  { name: "Events", href: "/events", icon: Calendar },
-  { name: "Vault", href: "/vault", icon: Music },
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Chat", href: "/chat", icon: MessageCircle },
-  { name: "Meet & Greet", href: "/meet-and-greet", icon: Phone },
-  { name: "Merch", href: "/merch", icon: ShoppingBag },
-  { name: "Chronicles", href: "/chronicles", icon: Calendar },
-  { name: "Coins", href: "/coins", icon: Coins },
-  { name: "Wallet", href: "/wallet", icon: Wallet },
-  { name: "Tickets", href: "/tickets", icon: Ticket },
-  { name: "About", href: "/about", icon: Info },
-]
-
-export function UnifiedNavigation() {
-  const { user, profile, signOut } = useAuth()
-  const { theme, setTheme, resolvedTheme } = useTheme()
-  const pathname = usePathname()
-  const [isOpen, setIsOpen] = useState(false)
+export function Navigation() {
+  const { theme, setTheme } = useTheme()
+  const { user, isAuthenticated, signOut } = useAuth()
   const [isScrolled, setIsScrolled] = useState(false)
-  const [isCommunityPage, setIsCommunityPage] = useState(false)
-  const [communityCategories, setCommunityCategories] = useState([])
-  const [selectedCommunityCategory, setSelectedCommunityCategory] = useState(null)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const pathname = usePathname()
 
+  // Handle scroll effect for navigation
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10)
@@ -79,396 +29,234 @@ export function UnifiedNavigation() {
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
-  useEffect(() => {
-    const handleCommunityActive = (event) => {
-      setIsCommunityPage(true)
-      setCommunityCategories(event.detail.categories || [])
-      setSelectedCommunityCategory(event.detail.selectedCategory)
-    }
+  // Navigation links
+  const navLinks = [
+    { name: "Home", href: "/", icon: Home },
+    { name: "Vault", href: "/vault", icon: Music },
+    { name: "Community", href: "/community", icon: Users },
+    { name: "Radio", href: "/radio", icon: Radio },
+    { name: "Merch", href: "/merch", icon: ShoppingBag },
+    { name: "Tickets", href: "/tickets", icon: Ticket },
+  ]
 
-    const handleCommunityInactive = () => {
-      setIsCommunityPage(false)
-      setCommunityCategories([])
-      setSelectedCommunityCategory(null)
-    }
-
-    window.addEventListener("communityPageActive", handleCommunityActive)
-    window.addEventListener("communityPageInactive", handleCommunityInactive)
-
-    return () => {
-      window.removeEventListener("communityPageActive", handleCommunityActive)
-      window.removeEventListener("communityPageInactive", handleCommunityInactive)
-    }
-  }, [])
-
-  useEffect(() => {
-    setIsOpen(false)
-  }, [pathname])
-
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-    } catch (error) {
-      console.error("Error signing out:", error)
-    }
-  }
-
-  const getTierColor = (tier: string) => {
-    switch (tier) {
-      case "grassroot":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-      case "pioneer":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
-      case "elder":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-      case "blood_brotherhood":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
-    }
-  }
-
-  const getDesktopNavItems = () => {
-    if (user) {
-      return [
-        navigationItems[0], // Home
-        navigationItems[1], // Mission
-        navigationItems[2], // Community
-        navigationItems[3], // Radio
-        navigationItems[4], // Events
-        navigationItems[5], // Vault
-        navigationItems[6], // Dashboard
-        navigationItems[12], // Wallet
-      ]
-    } else {
-      return [
-        navigationItems[0], // Home
-        navigationItems[1], // Mission
-        navigationItems[2], // Community
-        navigationItems[3], // Radio
-        navigationItems[4], // Events
-        navigationItems[5], // Vault
-        navigationItems[14], // About
-      ]
-    }
-  }
-
-  const getMobileNavItems = () => {
-    if (isCommunityPage && communityCategories.length > 0) {
-      const communityNavItems = communityCategories.map((category) => ({
-        name: category.name,
-        href: `/community?category=${category.id}`,
-        icon: Users,
-        isCommunityCategory: true,
-        categoryId: category.id,
-      }))
-
-      return [
-        navigationItems[0], // Home
-        ...communityNavItems,
-        ...(user ? [] : [navigationItems[14]]), // Only About for non-authenticated users
-      ]
-    }
-
-    return navigationItems
+  // Check if a link is active
+  const isActive = (path: string) => {
+    if (path === "/" && pathname !== "/") return false
+    return pathname.startsWith(path)
   }
 
   return (
-    <nav
+    <header
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b",
-        isScrolled
-          ? "bg-background/95 backdrop-blur-md shadow-lg dark:bg-gray-950/95"
-          : "bg-background/80 backdrop-blur-sm dark:bg-gray-950/80",
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+        isScrolled ? "bg-background/80 backdrop-blur-md shadow-md" : "bg-transparent",
       )}
     >
-      <div className="container mx-auto px-3 sm:px-4">
-        <div className="flex items-center justify-between h-14 sm:h-16">
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2 flex-shrink-0">
-            <DynamicLogo responsive={true} className="h-6 w-auto sm:h-8" />
+          <Link href="/" className="flex items-center">
+            <div className="relative h-8 w-32 md:h-10 md:w-40">
+              <Image
+                src={theme === "dark" ? "/images/loggotrans-light.png" : "/images/loggotrans-dark.png"}
+                alt="Erigga Live"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center space-x-1 flex-1 justify-center max-w-2xl">
-            {getDesktopNavItems().map((item) => {
-              const isActive =
-                pathname === item.href || (item.href === "/dashboard" && pathname?.startsWith("/dashboard"))
-              return (
-                <Button
-                  key={item.name}
-                  asChild
-                  variant={isActive ? "default" : "ghost"}
-                  size="sm"
-                  className={cn(
-                    "flex items-center space-x-2 transition-all duration-200",
-                    isActive ? "bg-lime-500 text-teal-900 hover:bg-lime-600" : "hover:bg-accent",
-                  )}
-                >
-                  <Link href={item.href}>
-                    <item.icon className="h-4 w-4" />
-                    <span className="hidden xl:inline">{item.name}</span>
-                  </Link>
-                </Button>
-              )
-            })}
-          </div>
-
-          {/* User Menu / Auth Buttons */}
-          <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4 flex-shrink-0">
-            {user ? (
-              <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3">
-                {profile?.coins !== undefined && (
-                  <div className="hidden sm:flex items-center space-x-1 bg-yellow-100 dark:bg-yellow-900/20 px-2 md:px-3 py-1 rounded-full">
-                    <Coins className="h-3 w-3 md:h-4 md:w-4 text-yellow-600" />
-                    <span className="text-xs md:text-sm font-medium text-yellow-700 dark:text-yellow-400">
-                      {profile.coins.toLocaleString()}
-                    </span>
-                  </div>
+          <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
+            {navLinks.map((link) => (
+              <Link
+                key={link.name}
+                href={link.href}
+                className={cn(
+                  "px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  isActive(link.href) ? "bg-primary/10 text-primary" : "hover:bg-accent hover:text-accent-foreground",
                 )}
+              >
+                {link.name}
+              </Link>
+            ))}
+          </nav>
 
-                {/* User Dropdown */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 rounded-full p-0">
-                      <Avatar className="h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10">
-                        <AvatarImage
-                          src={profile?.profile_image_url || profile?.avatar_url || "/placeholder-user.jpg"}
-                          alt={profile?.username || "User"}
-                        />
-                        <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold text-xs sm:text-sm">
-                          {profile?.full_name?.charAt(0) ||
-                            profile?.username?.charAt(0) ||
-                            user?.email?.charAt(0) ||
-                            "U"}
-                        </AvatarFallback>
-                      </Avatar>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56" align="end" forceMount>
-                    <div className="flex items-center justify-start gap-2 p-2">
-                      <div className="flex flex-col space-y-1 leading-none">
-                        <p className="font-medium">{profile?.full_name || profile?.username || "User"}</p>
-                        <p className="w-[200px] truncate text-sm text-muted-foreground">{user.email}</p>
-                        {profile?.tier && (
-                          <Badge className={`w-fit text-xs ${getTierColor(profile.tier)}`}>
-                            <Crown className="w-3 h-3 mr-1" />
-                            {profile.tier.replace("_", " ").toUpperCase()}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href="/dashboard" className="flex items-center">
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Dashboard</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/wallet" className="flex items-center">
-                        <Wallet className="mr-2 h-4 w-4" />
-                        <span>Wallet</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/profile" className="flex items-center">
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Settings</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Log out</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+          {/* Right side actions */}
+          <div className="flex items-center space-x-2 md:space-x-4">
+            {/* Theme Toggle */}
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="p-2 rounded-full hover:bg-accent transition-colors"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+
+            {/* Coin Balance - Only show when authenticated */}
+            {isAuthenticated && <CoinBalance />}
+
+            {/* User Menu or Auth Buttons */}
+            {isAuthenticated ? (
+              <Link href="/profile">
+                <Avatar className="h-8 w-8 cursor-pointer hover:ring-2 hover:ring-primary transition-all">
+                  <AvatarImage src={user?.avatar_url || ""} alt={user?.username || "User"} />
+                  <AvatarFallback className="bg-primary/20 text-primary">
+                    {user?.username?.charAt(0).toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
             ) : (
-              <div className="hidden sm:flex items-center space-x-2">
-                <Button asChild variant="ghost" size="sm">
-                  <Link href="/login">Sign In</Link>
+              <div className="hidden md:flex items-center space-x-2">
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/login">Login</Link>
                 </Button>
-                <Button asChild size="sm" className="bg-lime-500 text-teal-900 hover:bg-lime-600">
-                  <Link href="/signup">Join Now</Link>
+                <Button size="sm" asChild>
+                  <Link href="/signup">Sign Up</Link>
                 </Button>
               </div>
             )}
 
-            {/* Mobile Menu */}
-            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+            {/* Mobile Menu Button */}
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 p-0">
-                  <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span className="sr-only">Toggle menu</span>
+                <Button variant="ghost" size="icon" className="md:hidden" aria-label="Menu">
+                  <Menu size={24} />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[280px] sm:w-[350px] p-0 bg-background/95 backdrop-blur-md">
-                <div className="flex flex-col h-full">
-                  {/* Mobile Header */}
-                  <div className="flex items-center justify-between p-4 border-b">
-                    <DynamicLogo responsive={false} className="h-8 w-auto" />
-                    <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
-                      <X className="h-5 w-5" />
-                    </Button>
-                  </div>
+              <SheetContent side="right" className="w-[80%] sm:w-[350px] pt-12">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-4 right-4"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <X size={24} />
+                </Button>
 
-                  {/* User Info in Mobile */}
-                  {user && (
-                    <div className="flex items-center space-x-3 p-4 bg-muted/30 backdrop-blur-sm">
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage
-                          src={profile?.profile_image_url || profile?.avatar_url || "/placeholder-user.jpg"}
-                          alt={profile?.username || "User"}
-                        />
-                        <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold">
-                          {profile?.full_name?.charAt(0) ||
-                            profile?.username?.charAt(0) ||
-                            user?.email?.charAt(0) ||
-                            "U"}
+                <div className="flex flex-col space-y-6 mt-4">
+                  {/* Mobile User Section */}
+                  {isAuthenticated ? (
+                    <div className="flex items-center space-x-4 p-4 bg-accent/30 rounded-lg">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={user?.avatar_url || ""} alt={user?.username || "User"} />
+                        <AvatarFallback className="bg-primary/20 text-primary">
+                          {user?.username?.charAt(0).toUpperCase() || "U"}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex flex-col flex-1 min-w-0">
-                        <p className="font-medium truncate">{profile?.full_name || profile?.username || "User"}</p>
-                        <p className="text-sm text-muted-foreground truncate">{user.email}</p>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          {profile?.tier && (
-                            <Badge className={`text-xs ${getTierColor(profile.tier)}`}>
-                              <Crown className="w-3 h-3 mr-1" />
-                              {profile.tier.replace("_", " ").toUpperCase()}
-                            </Badge>
-                          )}
-                          {profile?.coins !== undefined && (
-                            <div className="flex items-center space-x-1 text-xs bg-yellow-100 dark:bg-yellow-900/20 px-2 py-0.5 rounded-full">
-                              <Coins className="h-3 w-3 text-yellow-600" />
-                              <span className="font-medium text-yellow-700 dark:text-yellow-400">
-                                {profile.coins.toLocaleString()}
-                              </span>
-                            </div>
-                          )}
-                        </div>
+                      <div>
+                        <p className="font-medium">{user?.username || "User"}</p>
+                        <p className="text-sm text-muted-foreground">{user?.email}</p>
                       </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col space-y-2 p-4 bg-accent/30 rounded-lg">
+                      <Button asChild>
+                        <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                          Login
+                        </Link>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)}>
+                          Sign Up
+                        </Link>
+                      </Button>
                     </div>
                   )}
 
-                  {/* Navigation Items */}
-                  <div className="flex-1 overflow-y-auto p-4">
-                    <div className="space-y-1">
-                      {getMobileNavItems().map((item) => {
-                        const isActive = item.isCommunityCategory
-                          ? selectedCommunityCategory === item.categoryId
-                          : pathname === item.href || (item.href === "/dashboard" && pathname?.startsWith("/dashboard"))
+                  {/* Mobile Navigation Links */}
+                  <nav className="flex flex-col space-y-1">
+                    {navLinks.map((link) => (
+                      <Link
+                        key={link.name}
+                        href={link.href}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={cn(
+                          "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors",
+                          isActive(link.href) ? "bg-primary/10 text-primary font-medium" : "hover:bg-accent",
+                        )}
+                      >
+                        <link.icon size={20} />
+                        <span>{link.name}</span>
+                      </Link>
+                    ))}
 
-                        return (
-                          <Button
-                            key={`${item.name}-${item.categoryId || "main"}`}
-                            asChild
-                            variant={isActive ? "default" : "ghost"}
-                            className={cn(
-                              "w-full justify-start h-11 transition-all duration-200",
-                              isActive ? "bg-lime-500 text-teal-900 hover:bg-lime-600 shadow-sm" : "hover:bg-accent/50",
-                              item.isCommunityCategory && "ml-4 text-sm",
-                            )}
-                            onClick={() => setIsOpen(false)}
-                          >
-                            <Link href={item.href} className="flex items-center space-x-3">
-                              <item.icon className="h-5 w-5 flex-shrink-0" />
-                              <span className="font-medium">{item.name}</span>
-                              {item.isCommunityCategory && (
-                                <span className="text-xs opacity-60">#{item.name.toLowerCase()}</span>
-                              )}
-                            </Link>
-                          </Button>
-                        )
-                      })}
-                    </div>
-                  </div>
+                    {/* Additional Mobile Links */}
+                    <Link
+                      href="/coins"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={cn(
+                        "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors",
+                        isActive("/coins") ? "bg-primary/10 text-primary font-medium" : "hover:bg-accent",
+                      )}
+                    >
+                      <Coins size={20} />
+                      <span>Coins</span>
+                    </Link>
 
-                  {/* Auth Buttons for Mobile */}
-                  <div className="p-4 border-t">
-                    {user ? (
-                      <div className="space-y-2">
-                        <Button asChild variant="outline" className="w-full justify-start bg-transparent">
-                          <Link href="/profile" onClick={() => setIsOpen(false)}>
-                            <Settings className="mr-2 h-4 w-4" />
-                            Settings
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-red-600 hover:text-red-600 bg-transparent border-red-200 hover:bg-red-50 dark:hover:bg-red-950"
-                          onClick={() => {
-                            handleSignOut()
-                            setIsOpen(false)
-                          }}
-                        >
-                          <LogOut className="mr-2 h-4 w-4" />
-                          Sign Out
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Button
-                          asChild
-                          variant="outline"
-                          className="w-full bg-transparent"
-                          onClick={() => setIsOpen(false)}
-                        >
-                          <Link href="/login">Sign In</Link>
-                        </Button>
-                        <Button
-                          asChild
-                          className="w-full bg-lime-500 text-teal-900 hover:bg-lime-600"
-                          onClick={() => setIsOpen(false)}
-                        >
-                          <Link href="/signup">Join Now</Link>
-                        </Button>
-                      </div>
+                    {isAuthenticated && (
+                      <Link
+                        href="/profile"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={cn(
+                          "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors",
+                          isActive("/profile") ? "bg-primary/10 text-primary font-medium" : "hover:bg-accent",
+                        )}
+                      >
+                        <Avatar className="h-5 w-5">
+                          <AvatarFallback className="text-xs">
+                            {user?.username?.charAt(0).toUpperCase() || "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>Profile</span>
+                      </Link>
                     )}
-                  </div>
 
-                  {/* Theme Toggle Section for Mobile */}
-                  <div className="p-4 border-t bg-muted/20">
-                    <div className="mb-4">
-                      <p className="text-sm font-medium mb-3 text-muted-foreground">Theme</p>
-                      <div className="grid grid-cols-3 gap-2">
-                        <Button
-                          variant={theme === "light" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTheme("light")}
-                          className="flex flex-col items-center py-3 h-auto text-xs"
+                    {/* Theme Toggle in Mobile Menu */}
+                    <button
+                      onClick={() => {
+                        setTheme(theme === "dark" ? "light" : "dark")
+                      }}
+                      className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-accent text-left w-full"
+                    >
+                      {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
+                      <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+                    </button>
+
+                    {/* Sign Out Button (Only when authenticated) */}
+                    {isAuthenticated && (
+                      <button
+                        onClick={() => {
+                          signOut()
+                          setIsMobileMenuOpen(false)
+                        }}
+                        className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-accent text-left w-full text-red-500 hover:text-red-600"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
                         >
-                          <Sun className="h-4 w-4 mb-1" />
-                          Light
-                        </Button>
-                        <Button
-                          variant={theme === "dark" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTheme("dark")}
-                          className="flex flex-col items-center py-3 h-auto text-xs"
-                        >
-                          <Moon className="h-4 w-4 mb-1" />
-                          Dark
-                        </Button>
-                        <Button
-                          variant={theme === "system" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setTheme("system")}
-                          className="flex flex-col items-center py-3 h-auto text-xs"
-                        >
-                          <Monitor className="h-4 w-4 mb-1" />
-                          Auto
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                          />
+                        </svg>
+                        <span>Sign Out</span>
+                      </button>
+                    )}
+                  </nav>
                 </div>
               </SheetContent>
             </Sheet>
           </div>
         </div>
       </div>
-    </nav>
+    </header>
   )
 }
