@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       .from("community_posts")
       .select(`
         *,
-        user:user_profiles!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
+        user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
         category:community_categories!community_posts_category_id_fkey(id, name, slug)
       `)
       .eq("is_published", true)
@@ -77,9 +77,9 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Authenticated user:", authUser.email)
 
     const { data: userProfile, error: profileError } = await supabase
-      .from("user_profiles")
+      .from("users")
       .select("id, username, full_name, avatar_url, tier")
-      .eq("id", authUser.id)
+      .eq("auth_user_id", authUser.id)
       .single()
 
     if (profileError || !userProfile) {
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
     }
 
     const postData = {
-      user_id: authUser.id,
+      user_id: userProfile.id,
       category_id: categoryIdNum,
       content: content.trim(),
       is_published: true,
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
       .insert(postData)
       .select(`
         *,
-        user:user_profiles!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
+        user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
         category:community_categories!community_posts_category_id_fkey(id, name, slug)
       `)
       .single()
