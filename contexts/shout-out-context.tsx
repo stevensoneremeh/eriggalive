@@ -20,18 +20,27 @@ interface ShoutOutContextType {
 
 const ShoutOutContext = createContext<ShoutOutContextType | undefined>(undefined)
 
-// Erigga-inspired quotes for fallback display (generic phrases inspired by themes, not direct lyrics)
 const erigga_quotes = [
-  "Hustle hard, no time to waste",
-  "From the streets to the stage",
-  "Real ones know the struggle",
-  "Stay focused on the grind",
-  "Paper chase never stops",
-  "Warri no dey carry last",
-  "Dreams bigger than obstacles",
-  "Success is the only option",
-  "Respect the journey",
-  "True wisdom comes from experience",
+  "Paper Boi, I dey hustle for the money",
+  "Street credibility na my priority",
+  "From Warri to the world, we dey represent",
+  "No be by mouth, na by action we dey show",
+  "Hustle hard, pray harder, that's the motto",
+  "Real recognize real, fake recognize fake",
+  "Street wisdom pass book knowledge sometimes",
+  "Money no be everything but everything need money",
+  "Stay focused, stay blessed, stay grinding",
+  "From the streets to the top, we never forget where we come from",
+  "Na God dey make person, no be man",
+  "If you no get money, you no get voice",
+  "Area scatter, but we still dey stand strong",
+  "Motivation na the key to success",
+  "Delta State, we dey rep am well well",
+  "No dulling, we dey move with purpose",
+  "Street don teach me say life no balance",
+  "Make you no forget where you come from",
+  "Warri boys, we no dey carry last",
+  "Success na journey, no be destination",
 ]
 
 export function ShoutOutProvider({ children }: { children: React.ReactNode }) {
@@ -39,6 +48,7 @@ export function ShoutOutProvider({ children }: { children: React.ReactNode }) {
   const [isVisible, setIsVisible] = useState(false)
   const [currentQuote, setCurrentQuote] = useState("")
   const [showingQuote, setShowingQuote] = useState(false)
+  const [isSticky, setIsSticky] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -50,18 +60,18 @@ export function ShoutOutProvider({ children }: { children: React.ReactNode }) {
     // Initial quote
     rotateQuote()
 
-    // Rotate quotes every 30 seconds when no shout-out is showing
     const quoteInterval = setInterval(() => {
       if (!currentShoutOut && !isVisible) {
         rotateQuote()
         setShowingQuote(true)
+        setIsSticky(true)
 
-        // Hide quote after 8 seconds
         setTimeout(() => {
           setShowingQuote(false)
-        }, 8000)
+          setIsSticky(false)
+        }, 15000)
       }
-    }, 30000)
+    }, 20000) // Show every 20 seconds
 
     return () => clearInterval(quoteInterval)
   }, [currentShoutOut, isVisible])
@@ -99,26 +109,29 @@ export function ShoutOutProvider({ children }: { children: React.ReactNode }) {
     setCurrentShoutOut(shoutOut)
     setIsVisible(true)
     setShowingQuote(false)
+    setIsSticky(true)
 
-    // Hide shout-out after 10 minutes (600 seconds) - increased from 5 minutes
     setTimeout(() => {
       setIsVisible(false)
       setCurrentShoutOut(null)
-    }, 600000) // 10 minutes
+      setIsSticky(false)
+    }, 600000)
   }, [])
 
   const hideShoutOut = useCallback(() => {
     setIsVisible(false)
     setCurrentShoutOut(null)
+    setIsSticky(false)
   }, [])
 
-  const contextValue: ShoutOutContextType & { currentQuote: string; showingQuote: boolean } = {
+  const contextValue: ShoutOutContextType & { currentQuote: string; showingQuote: boolean; isSticky: boolean } = {
     currentShoutOut,
     isVisible,
     showShoutOut,
     hideShoutOut,
     currentQuote,
     showingQuote,
+    isSticky,
   }
 
   return <ShoutOutContext.Provider value={contextValue}>{children}</ShoutOutContext.Provider>
@@ -129,5 +142,5 @@ export function useShoutOut() {
   if (context === undefined) {
     throw new Error("useShoutOut must be used within a ShoutOutProvider")
   }
-  return context as ShoutOutContextType & { currentQuote: string; showingQuote: boolean }
+  return context as ShoutOutContextType & { currentQuote: string; showingQuote: boolean; isSticky: boolean }
 }

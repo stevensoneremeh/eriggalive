@@ -124,13 +124,13 @@ export default function MissionPage() {
       title: "Loyalty",
       subtitle: "I no dey switch sides",
       description:
-        "Real recognize real. I stand by my people through thick and thin. No matter how high I climb, I remember those who held me down when I was nothing.",
+        "Listen, for this street life, loyalty na everything. I no be the type wey go forget my people when money enter. The same boys wey dey with me when I no get nothing, na dem still dey with me now. That's how we roll for Warri - we keep am real, we keep am solid.",
       icon: "shield",
       examples: [
-        "Never abandon the community that raised me",
-        "Support upcoming artists from my area",
-        "Keep the same energy with old friends",
-        "Represent Delta State everywhere I go",
+        "Never abandon the community that raised me - Warri boys for life",
+        "Support upcoming artists from my area - we rise together",
+        "Keep the same energy with old friends - no fake love",
+        "Represent Delta State everywhere I go - area scatter!",
       ],
     },
     {
@@ -138,13 +138,13 @@ export default function MissionPage() {
       title: "Truth",
       subtitle: "I talk am as e be",
       description:
-        "No sugar coating, no fake stories. My music reflects real life - the struggles, the pain, the victories. I speak for those who no get voice.",
+        "You see this music thing? I no dey do am for hype. Every line wey I drop na real life experience. I talk about the struggle, the hustle, the pain, the joy - everything as e be. No sugar coating, no fake lifestyle. If you wan hear lies, go listen to another person music.",
       icon: "target",
       examples: [
-        "Rap about real street experiences",
-        "Call out injustice when I see am",
-        "No fake lifestyle for social media",
-        "Tell the government wetin dey happen for ground",
+        "Rap about real street experiences - no cap in my lyrics",
+        "Call out injustice when I see am - somebody must talk",
+        "No fake lifestyle for social media - what you see na what you get",
+        "Tell the government wetin dey happen for ground - we dey suffer",
       ],
     },
     {
@@ -152,13 +152,13 @@ export default function MissionPage() {
       title: "Legacy",
       subtitle: "I dey build for tomorrow",
       description:
-        "This no be just about me. Na about the generation wey dey come. I want make my story inspire others to believe say dem fit make am too.",
+        "This thing wey I dey do no be just for today. I wan make sure say when I comot this world, I don leave something wey go help the next generation. Make dem know say one Warri boy make am, so dem too fit make am. That's the real success - when your story inspire others.",
       icon: "crown",
       examples: [
-        "Invest in youth development programs",
-        "Create opportunities for upcoming artists",
-        "Build institutions that will outlast me",
-        "Document the culture for future generations",
+        "Invest in youth development programs - catch them young",
+        "Create opportunities for upcoming artists - open doors",
+        "Build institutions that will outlast me - permanent impact",
+        "Document the culture for future generations - preserve our story",
       ],
     },
   ]
@@ -371,7 +371,7 @@ export default function MissionPage() {
             </h1>
 
             <p className="text-2xl md:text-3xl font-bold text-gray-300 max-w-2xl mx-auto">
-              This no be music. Na movement.
+              This no be music. Na movement. We dey change lives, one song at a time.
             </p>
 
             <Button
@@ -398,7 +398,7 @@ export default function MissionPage() {
           <div className="text-center mb-16">
             <h2 className="text-5xl font-black text-white mb-6">REAL IMPACT, REAL CHANGE</h2>
             <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              Actions speak louder than lyrics. See how we dey change lives for real.
+              Actions speak louder than lyrics. See how we dey change lives for real. No be mouth, na action.
             </p>
           </div>
 
@@ -448,7 +448,7 @@ export default function MissionPage() {
           <div className="text-center mb-16">
             <h2 className="text-5xl font-black text-white mb-6">THE CODE I LIVE BY</h2>
             <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              These no be just words. Na principles wey guide every move I make.
+              These no be just words. Na principles wey guide every move I make. This na wetin make me who I be.
             </p>
           </div>
 
@@ -508,8 +508,8 @@ export default function MissionPage() {
             <div className="text-center mb-16">
               <h2 className="text-5xl font-black text-white mb-6 pulse-glow">WHO IS ERIGGA TO YOU?</h2>
               <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-                Your voice matters. Help us understand how this movement touches your life and how we can take it
-                further.
+                Your voice matters pass anything. Help us understand how this movement dey touch your life and how we
+                fit take am go another level. Make we hear from you!
               </p>
             </div>
 
@@ -619,7 +619,7 @@ export default function MissionPage() {
         <div className="container mx-auto px-4 text-center">
           <div className="max-w-4xl mx-auto space-y-12">
             <blockquote className="text-4xl md:text-6xl font-black text-white leading-tight">
-              "If you dey feel this, you already belong."
+              "If you dey feel this movement, you already belong. Welcome to the family."
             </blockquote>
 
             <div className="space-y-8">
@@ -719,9 +719,9 @@ export default function MissionPage() {
 
             <div className="text-center md:text-right">
               <blockquote className="text-2xl md:text-3xl font-black text-red-500 leading-tight">
-                "Na legacy we dey build. No be hype."
+                "Na legacy we dey build. No be hype. This thing go last forever."
               </blockquote>
-              <p className="text-gray-400 mt-4">- Erigga, The Paperboi</p>
+              <p className="text-gray-400 mt-4">- Erigga, The Paperboi of Africa</p>
             </div>
           </div>
 
