@@ -105,10 +105,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const {
         data: { session },
         error,
-      } = await supabase.auth.getSession()
+      } = await supabase.auth.refreshSession()
 
       if (error) {
         console.error("Error refreshing session:", error.message)
+        // If refresh fails, try to get current session
+        const { data: currentSession } = await supabase.auth.getSession()
+        setSession(currentSession.session)
+        setUser(currentSession.session?.user ?? null)
+
+        if (currentSession.session?.user) {
+          const profileData = await fetchProfile(currentSession.session.user.id)
+          setProfile(profileData)
+        } else {
+          setProfile(null)
+        }
         return
       }
 
@@ -213,13 +224,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription = authSubscription
     }
 
+    const refreshInterval = setInterval(
+      () => {
+        if (user && supabase && !supabaseError) {
+          refreshSession()
+        }
+      },
+      4 * 60 * 1000,
+    ) // Refresh every 4 minutes
+
     return () => {
       mounted = false
       if (subscription) {
         subscription.unsubscribe()
       }
+      clearInterval(refreshInterval)
     }
-  }, [supabase, handleAuthStateChange, supabaseError])
+  }, [supabase, handleAuthStateChange, supabaseError, user, refreshSession])
 
   const signIn = useCallback(
     async (email: string, password: string) => {

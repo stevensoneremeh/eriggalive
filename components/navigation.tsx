@@ -263,25 +263,23 @@ function NavigationContent() {
                   {/* Mobile Navigation */}
                   <nav className="flex-1 p-4">
                     <ul className="space-y-2">
-                      {navItems
-                        .filter((item) => item.name !== "Merch")
-                        .map((item) => (
-                          <li key={item.name}>
-                            <Link
-                              href={item.href}
-                              className={cn(
-                                "flex items-center px-3 py-3 rounded-md transition-all duration-200",
-                                isActive(item.href)
-                                  ? "bg-primary/10 text-primary"
-                                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                              )}
-                              onClick={() => setIsMobileMenuOpen(false)}
-                            >
-                              <span className="mr-3">{item.icon}</span>
-                              {item.name}
-                            </Link>
-                          </li>
-                        ))}
+                      {navItems.map((item) => (
+                        <li key={item.name}>
+                          <Link
+                            href={item.href}
+                            className={cn(
+                              "flex items-center px-3 py-3 rounded-md transition-all duration-200",
+                              isActive(item.href)
+                                ? "bg-primary/10 text-primary"
+                                : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                            )}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <span className="mr-3">{item.icon}</span>
+                            {item.name}
+                          </Link>
+                        </li>
+                      ))}
                     </ul>
                   </nav>
 

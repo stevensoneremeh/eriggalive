@@ -46,9 +46,26 @@ export async function updateSession(request: NextRequest) {
 
     if (user) {
       try {
-        await supabase.auth.getSession()
+        const { data: session, error: sessionError } = await supabase.auth.getSession()
+
+        if (sessionError) {
+          console.warn("[SERVER] Session refresh error:", sessionError.message)
+        } else if (session?.session) {
+          const expiresAt = session.session.expires_at
+          const now = Math.floor(Date.now() / 1000)
+          const timeUntilExpiry = expiresAt ? expiresAt - now : 0
+
+          // Refresh if token expires in less than 5 minutes
+          if (timeUntilExpiry < 300) {
+            try {
+              await supabase.auth.refreshSession()
+            } catch (refreshError: any) {
+              console.warn("[SERVER] Token refresh error:", refreshError.message)
+            }
+          }
+        }
       } catch (sessionError: any) {
-        console.warn("[SERVER] Session refresh error:", sessionError.message)
+        console.warn("[SERVER] Session management error:", sessionError.message)
       }
     }
 

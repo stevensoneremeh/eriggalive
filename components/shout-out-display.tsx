@@ -56,11 +56,11 @@ export function ShoutOutDisplay({ position = "top", className }: ShoutOutDisplay
                       <motion.p
                         className="text-white text-lg md:text-xl font-medium leading-tight whitespace-nowrap"
                         animate={{
-                          x: currentShoutOut.message.length > 50 ? [0, -200, 0] : 0,
+                          x: currentShoutOut.message.length > 30 ? [0, -400, 0] : 0,
                         }}
                         transition={{
-                          duration: currentShoutOut.message.length > 50 ? 8 : 0,
-                          repeat: currentShoutOut.message.length > 50 ? Number.POSITIVE_INFINITY : 0,
+                          duration: currentShoutOut.message.length > 30 ? 12 : 0,
+                          repeat: currentShoutOut.message.length > 30 ? Number.POSITIVE_INFINITY : 0,
                           ease: "linear",
                         }}
                       >
@@ -94,11 +94,11 @@ export function ShoutOutDisplay({ position = "top", className }: ShoutOutDisplay
                       <motion.p
                         className="text-white text-lg md:text-xl font-medium leading-tight whitespace-nowrap"
                         animate={{
-                          x: currentQuote.length > 40 ? [0, -150, 0] : 0,
+                          x: currentQuote.length > 25 ? [0, -300, 0] : 0,
                         }}
                         transition={{
-                          duration: currentQuote.length > 40 ? 6 : 0,
-                          repeat: currentQuote.length > 40 ? Number.POSITIVE_INFINITY : 0,
+                          duration: currentQuote.length > 25 ? 10 : 0,
+                          repeat: currentQuote.length > 25 ? Number.POSITIVE_INFINITY : 0,
                           ease: "linear",
                         }}
                       >
