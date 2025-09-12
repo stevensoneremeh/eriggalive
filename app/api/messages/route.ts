@@ -18,6 +18,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
+    // Get internal user ID - try both table structures
+    let internalUserId = null
+    const { data: userProfile } = await supabase
+      .from("user_profiles")
+      .select("id")
+      .eq("id", user.id)
+      .single()
+
+    if (userProfile) {
+      internalUserId = userProfile.id
+    } else {
+      const { data: userData } = await supabase
+        .from("users")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .single()
+      
+      if (userData) {
+        internalUserId = userData.id
+      }
+    }
+
+    if (!internalUserId) {
+      return NextResponse.json({ error: "User profile not found" }, { status: 404 })
+    }
+
     if (conversationId) {
       // Get messages for specific conversation - try both schemas
       let messages: any[] = []
@@ -63,7 +89,7 @@ export async function GET(request: NextRequest) {
           conversation_id,
           conversations!inner(*, last_message:messages(content, created_at))
         `)
-        .eq("user_id", userProfile.id)
+        .eq("user_id", internalUserId)
         .order("conversations.updated_at", { ascending: false })
 
       if (conversationsError) {
