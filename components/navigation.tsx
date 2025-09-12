@@ -186,7 +186,7 @@ function NavigationContent() {
                 {isAuthenticated && profile ? (
                   <>
                     <div className="hidden md:flex items-center space-x-2">
-                      <CoinBalance coins={profile.coins} size="sm" />
+                      <CoinBalance size="sm" />
                       <UserTierBadge tier={profile.tier} />
                     </div>
                     <Link href="/dashboard">
@@ -254,7 +254,7 @@ function NavigationContent() {
                         </div>
                       </div>
                       <div className="flex items-center justify-between">
-                        <CoinBalance coins={profile.coins} size="sm" />
+                        <CoinBalance size="sm" />
                         <UserTierBadge tier={profile.tier} />
                       </div>
                     </div>

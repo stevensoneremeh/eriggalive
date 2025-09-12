@@ -1,0 +1,82 @@
+3116-382aba2560939f37.js:1 Auth state change: INITIAL_SESSION ereremeh@outlook.com
+layout-ae5d281628e95e03.js:1 [v0] Current theme: light Logo src: /images/erigga-live-logo.png
+3116-382aba2560939f37.js:1 Auth state change: INITIAL_SESSION ereremeh@outlook.com
+layout-ae5d281628e95e03.js:1 [v0] Current theme: light Logo src: /images/erigga-live-logo.png
+3116-382aba2560939f37.js:1 Auth state change: INITIAL_SESSION ereremeh@outlook.com
+layout-ae5d281628e95e03.js:1 [v0] Current theme: light Logo src: /images/erigga-live-logo.png
+3116-382aba2560939f37.js:1 Auth state change: INITIAL_SESSION ereremeh@outlook.com
+layout-ae5d281628e95e03.js:1 [v0] Current theme: light Logo src: /images/erigga-live-logo.png
+1234-ca8c4c2c067be369.js:21   HEAD https://brrrpvejydmewblhrzlk.supabase.co/rest/v1/vault_views?select=*&user_id=eq.30032748-8863-4618-94fb-e0978752ea78 503 (Service Unavailable)
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+h @ 1234-ca8c4c2c067be369.js:21
+r @ 1234-ca8c4c2c067be369.js:21
+Promise.then
+i @ 1234-ca8c4c2c067be369.js:21
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+then @ 1234-ca8c4c2c067be369.js:1
+1234-ca8c4c2c067be369.js:21   HEAD https://brrrpvejydmewblhrzlk.supabase.co/rest/v1/user_follows?select=*&following_id=eq.dfcb6ea9-d6ab-4d52-b141-e127692c9c78 503 (Service Unavailable)
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+h @ 1234-ca8c4c2c067be369.js:21
+r @ 1234-ca8c4c2c067be369.js:21
+Promise.then
+i @ 1234-ca8c4c2c067be369.js:21
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+then @ 1234-ca8c4c2c067be369.js:1
+3116-382aba2560939f37.js:1 Auth state change: INITIAL_SESSION ereremeh@outlook.com
+layout-ae5d281628e95e03.js:1 [v0] Current theme: light Logo src: /images/erigga-live-logo.png
+3116-382aba2560939f37.js:1 Auth state change: INITIAL_SESSION ereremeh@outlook.com
+layout-ae5d281628e95e03.js:1 [v0] Current theme: light Logo src: /images/erigga-live-logo.png
+3116-382aba2560939f37.js:1 Auth state change: INITIAL_SESSION ereremeh@outlook.com
+layout-ae5d281628e95e03.js:1 [v0] Current theme: light Logo src: /images/erigga-live-logo.png
+1234-ca8c4c2c067be369.js:21   HEAD https://brrrpvejydmewblhrzlk.supabase.co/rest/v1/store_purchases?select=*&user_id=eq.30032748-8863-4618-94fb-e0978752ea78 403 (Forbidden)
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+h @ 1234-ca8c4c2c067be369.js:21
+r @ 1234-ca8c4c2c067be369.js:21
+Promise.then
+i @ 1234-ca8c4c2c067be369.js:21
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+then @ 1234-ca8c4c2c067be369.js:1
+1234-ca8c4c2c067be369.js:21   HEAD https://brrrpvejydmewblhrzlk.supabase.co/rest/v1/vault_views?select=*&user_id=eq.30032748-8863-4618-94fb-e0978752ea78 403 (Forbidden)
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+h @ 1234-ca8c4c2c067be369.js:21
+r @ 1234-ca8c4c2c067be369.js:21
+Promise.then
+i @ 1234-ca8c4c2c067be369.js:21
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+then @ 1234-ca8c4c2c067be369.js:1
+3116-382aba2560939f37.js:1 Auth state change: INITIAL_SESSION ereremeh@outlook.com
+layout-ae5d281628e95e03.js:1 [v0] Current theme: light Logo src: /images/erigga-live-logo.png
+3116-382aba2560939f37.js:1 Auth state change: INITIAL_SESSION ereremeh@outlook.com
+layout-ae5d281628e95e03.js:1 [v0] Current theme: light Logo src: /images/erigga-live-logo.png
+3116-382aba2560939f37.js:1 Auth state change: INITIAL_SESSION ereremeh@outlook.com
+layout-ae5d281628e95e03.js:1 [v0] Current theme: light Logo src: /images/erigga-live-logo.png
+3116-382aba2560939f37.js:1 Auth state change: INITIAL_SESSION ereremeh@outlook.com
+layout-ae5d281628e95e03.js:1 [v0] Current theme: light Logo src: /images/erigga-live-logo.png
+1234-ca8c4c2c067be369.js:21   HEAD https://brrrpvejydmewblhrzlk.supabase.co/rest/v1/user_follows?select=*&follower_id=eq.dfcb6ea9-d6ab-4d52-b141-e127692c9c78 403 (Forbidden)
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+h @ 1234-ca8c4c2c067be369.js:21
+r @ 1234-ca8c4c2c067be369.js:21
+Promise.then
+i @ 1234-ca8c4c2c067be369.js:21
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+then @ 1234-ca8c4c2c067be369.js:1
+3116-382aba2560939f37.js:1 Auth state change: INITIAL_SESSION ereremeh@outlook.com
+layout-ae5d281628e95e03.js:1 [v0] Current theme: light Logo src: /images/erigga-live-logo.png
+3116-382aba2560939f37.js:1 Auth state change: INITIAL_SESSION ereremeh@outlook.com
+layout-ae5d281628e95e03.js:1 [v0] Current theme: light Logo src: /images/erigga-live-logo.png
+1234-ca8c4c2c067be369.js:21   HEAD https://brrrpvejydmewblhrzlk.supabase.co/rest/v1/event_tickets?select=*&user_id=eq.30032748-8863-4618-94fb-e0978752ea78 503 (Service Unavailable)
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+h @ 1234-ca8c4c2c067be369.js:21
+r @ 1234-ca8c4c2c067be369.js:21
+Promise.then
+i @ 1234-ca8c4c2c067be369.js:21
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+(anonymous) @ 1234-ca8c4c2c067be369.js:21
+then @ 1234-ca8c4c2c067be369.js:1
+3116-382aba2560939f37.js:1 Auth state change: INITIAL_SESSION ereremeh@outlook.com
+layout-ae5d281628e95e03.js:1 [v0] Current theme: light Logo src: /images/erigga-live-logo.png

@@ -164,7 +164,7 @@ export default function CommunityPage() {
 
       if (error) throw error
 
-      const transformedPosts = (data || []).map((post) => ({
+      const transformedPosts = (data || []).map((post: any) => ({
         id: post.id,
         content: post.content,
         created_at: post.created_at,
@@ -211,7 +211,7 @@ export default function CommunityPage() {
 
         if (error) throw error
 
-        const transformedComments = (data || []).map((comment) => ({
+        const transformedComments = (data || []).map((comment: any) => ({
           id: comment.id,
           content: comment.content,
           created_at: comment.created_at,
@@ -479,7 +479,7 @@ export default function CommunityPage() {
           table: "community_posts",
           filter: `category_id=eq.${selectedCategory}`,
         },
-        (payload) => {
+        (payload: any) => {
           loadPosts()
         },
       )
