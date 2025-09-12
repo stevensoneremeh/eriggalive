@@ -67,7 +67,8 @@ export interface CommunityCategory {
   updated_at: string
 }
 
-export interface CommunityPost {
+// Base database row type (without joined fields)
+export interface CommunityPostRow {
   id: number
   user_id: number
   category_id: number
@@ -87,6 +88,10 @@ export interface CommunityPost {
   deleted_at?: string
   created_at: string
   updated_at: string
+}
+
+// Extended type with joined data for API responses
+export interface CommunityPost extends CommunityPostRow {
   // Joined data
   user?: Pick<User, "id" | "auth_user_id" | "username" | "full_name" | "avatar_url" | "tier">
   category?: Pick<CommunityCategory, "id" | "name" | "slug">
@@ -207,7 +212,7 @@ export interface Database {
         Relationships: []
       }
       community_posts: {
-        Row: CommunityPost
+        Row: CommunityPostRow
         Insert: {
           id?: number
           user_id: number
@@ -220,6 +225,11 @@ export interface Database {
           comment_count?: number
           is_pinned?: boolean
           is_locked?: boolean
+          tags?: string[]
+          mentions?: { user_id: string; username: string; position: number }[]
+          is_published?: boolean
+          is_edited?: boolean
+          is_deleted?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -235,6 +245,11 @@ export interface Database {
           comment_count?: number
           is_pinned?: boolean
           is_locked?: boolean
+          tags?: string[]
+          mentions?: { user_id: string; username: string; position: number }[]
+          is_published?: boolean
+          is_edited?: boolean
+          is_deleted?: boolean
           created_at?: string
           updated_at?: string
         }
