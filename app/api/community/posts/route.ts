@@ -235,11 +235,7 @@ export async function POST(request: NextRequest) {
     const { data: newPost, error: insertError } = await supabase
       .from("community_posts")
       .insert(postData)
-      .select(`
-        *,
-        user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
-        category:community_categories!community_posts_category_id_fkey(id, name, slug)
-      `)
+      .select("*")
       .single()
 
     if (insertError) {
@@ -272,10 +268,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Fetch related user and category data separately for compatibility
     const responsePost = {
       ...newPost,
-      user: newPost.user || userProfile,
-      category: newPost.category || category,
+      user_profiles: userProfile,
+      community_categories: category,
+      user: userProfile, // For backward compatibility
+      category: category, // For backward compatibility
     }
 
     console.log("[v0] Post created successfully:", responsePost.id)
