@@ -1,8 +1,9 @@
-modules = ["nodejs-20", "web"]
+modules = ["nodejs-20", "web", "postgresql-16"]
 run = "npm run dev"
 
 [nix]
 channel = "stable-24_05"
+packages = ["jq"]
 
 [deployment]
 run = ["sh", "-c", "npm run dev"]
@@ -18,10 +19,6 @@ externalPort = 3001
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 40873
-externalPort = 3002
 
 [[ports]]
 localPort = 45465
