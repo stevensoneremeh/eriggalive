@@ -14,14 +14,28 @@ const nextConfig = {
       'eriggalive.com',
       'www.eriggalive.com',
       'eriggalive.vercel.app',
+      '*.replit.dev',
+      '*.repl.co',
     ],
     remotePatterns: [
       {
         protocol: 'https',
         hostname: '**.supabase.co',
       },
+      {
+        protocol: 'https',
+        hostname: '**.replit.dev',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.repl.co',
+      },
     ],
     unoptimized: true,
+  },
+  // Enable allowedHosts for Replit proxy environment
+  async rewrites() {
+    return []
   },
   async headers() {
     return [
