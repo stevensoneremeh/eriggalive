@@ -26,7 +26,10 @@ async function getCurrentUser() {
     return { user, profile: null }
   }
 
-  return { user, profile: { ...profile, email: user.email } }
+  return { 
+    user, 
+    profile: profile && typeof profile === 'object' ? { ...profile, email: user.email } : null 
+  }
 }
 
 async function getCommunityData() {

@@ -56,7 +56,10 @@ export function DynamicLogo({ width, height, className = "", responsive = true }
       ? "/images/erigga-live-logo-dark.png" // User's exact uploaded logo with red ERIGGA and white Live text
       : "/images/erigga-live-logo.png" // Light theme logo
 
-  console.log("[v0] Current theme:", currentTheme, "Logo src:", logoSrc) // Debug theme switching
+  // Debug theme switching only in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log("[v0] Current theme:", currentTheme, "Logo src:", logoSrc)
+  }
 
   return (
     <div className={`relative ${className}`}>
@@ -89,10 +92,14 @@ export function DynamicLogo({ width, height, className = "", responsive = true }
             : `${finalWidth}px`
         }
         onError={() => {
-          console.warn("[v0] Logo image failed to load:", logoSrc)
+          if (process.env.NODE_ENV === 'development') {
+            console.warn("[v0] Logo image failed to load:", logoSrc)
+          }
         }}
         onLoad={() => {
-          console.log("[v0] Logo loaded successfully:", logoSrc)
+          if (process.env.NODE_ENV === 'development') {
+            console.log("[v0] Logo loaded successfully:", logoSrc)
+          }
         }}
       />
     </div>

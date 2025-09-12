@@ -14,45 +14,104 @@ export async function GET(request: NextRequest) {
 
     const supabase = createRouteHandlerClient({ cookies })
 
-    let query = supabase
-      .from("community_posts")
-      .select(`
-        *,
-        user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
-        category:community_categories!community_posts_category_id_fkey(id, name, slug)
-      `)
-      .eq("is_published", true)
-      .eq("is_deleted", false)
+    // Try different database schemas for compatibility
+    let posts: any[] = []
+    let error: any = null
+    
+    // First try with user_profiles table
+    try {
+      let query = supabase
+        .from("community_posts")
+        .select(`
+          *,
+          user_profiles!inner(id, username, full_name, avatar_url, tier, coins, reputation_score),
+          community_categories!inner(id, name, slug, icon, color),
+          post_votes(user_id)
+        `)
+        .eq("is_published", true)
+        .eq("is_deleted", false)
 
-    if (categoryId && categoryId !== "all") {
-      query = query.eq("category_id", Number.parseInt(categoryId))
+      if (categoryId && categoryId !== "all") {
+        query = query.eq("category_id", Number.parseInt(categoryId))
+      }
+
+      // Apply sorting
+      switch (sortBy) {
+        case "newest":
+          query = query.order("created_at", { ascending: false })
+          break
+        case "oldest":
+          query = query.order("created_at", { ascending: true })
+          break
+        case "top":
+          query = query.order("vote_count", { ascending: false })
+          break
+        default:
+          query = query.order("created_at", { ascending: false })
+      }
+
+      query = query.limit(limit)
+
+      const { data: userProfilePosts, error: profileError } = await query
+
+      if (userProfilePosts && userProfilePosts.length > 0) {
+        posts = userProfilePosts
+      } else {
+        // Throw error to trigger fallback - either because of actual error or empty results
+        throw profileError || new Error("No posts found with user_profiles schema")
+      }
+    } catch (userProfileError) {
+      // Fallback to users table
+      let query = supabase
+        .from("community_posts")
+        .select(`
+          *,
+          user:users!community_posts_user_id_fkey(id, username, full_name, avatar_url, tier),
+          category:community_categories!community_posts_category_id_fkey(id, name, slug),
+          post_votes(user_id)
+        `)
+        .eq("is_published", true)
+        .eq("is_deleted", false)
+
+      if (categoryId && categoryId !== "all") {
+        query = query.eq("category_id", Number.parseInt(categoryId))
+      }
+
+      // Apply sorting
+      switch (sortBy) {
+        case "newest":
+          query = query.order("created_at", { ascending: false })
+          break
+        case "oldest":
+          query = query.order("created_at", { ascending: true })
+          break
+        case "top":
+          query = query.order("vote_count", { ascending: false })
+          break
+        default:
+          query = query.order("created_at", { ascending: false })
+      }
+
+      query = query.limit(limit)
+
+      const { data: usersPosts, error: usersError } = await query
+
+      if (usersError) {
+        console.error("Error fetching posts:", usersError)
+        return NextResponse.json({ error: usersError.message }, { status: 500 })
+      }
+
+      posts = usersPosts || []
     }
 
-    // Apply sorting
-    switch (sortBy) {
-      case "newest":
-        query = query.order("created_at", { ascending: false })
-        break
-      case "oldest":
-        query = query.order("created_at", { ascending: true })
-        break
-      case "top":
-        query = query.order("vote_count", { ascending: false })
-        break
-      default:
-        query = query.order("created_at", { ascending: false })
-    }
+    // Normalize response format for client
+    const normalizedPosts = (posts || []).map(post => ({
+      ...post,
+      user_profiles: post.user || post.user_profiles,
+      community_categories: post.category || post.community_categories,
+    }))
 
-    query = query.limit(limit)
-
-    const { data: posts, error } = await query
-
-    if (error) {
-      console.error("Error fetching posts:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ posts: posts || [] })
+    return NextResponse.json({ success: true, posts: normalizedPosts })
   } catch (error: any) {
     console.error("API Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -76,13 +135,35 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Authenticated user:", authUser.email)
 
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
+    // Try both user table structures for compatibility
+    let userProfile = null
+    let profileError = null
+    
+    // First try user_profiles table
+    const { data: userProfileData, error: userProfileError } = await supabase
+      .from("user_profiles")
       .select("id, username, full_name, avatar_url, tier")
-      .eq("auth_user_id", authUser.id)
+      .eq("id", authUser.id)
       .single()
+    
+    if (userProfileData) {
+      userProfile = userProfileData
+    } else {
+      // Fallback to users table
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("id, username, full_name, avatar_url, tier")
+        .eq("auth_user_id", authUser.id)
+        .single()
+      
+      if (userData) {
+        userProfile = userData
+      } else {
+        profileError = userError || userProfileError
+      }
+    }
 
-    if (profileError || !userProfile) {
+    if (!userProfile) {
       console.error("[v0] User profile not found:", profileError)
       return NextResponse.json(
         { error: "User profile not found. Please complete your profile setup." },
@@ -90,9 +171,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const formData = await request.formData()
-    const content = formData.get("content") as string
-    const categoryId = formData.get("categoryId") as string
+    // Handle both JSON and FormData
+    let content: string, categoryId: string
+    const contentType = request.headers.get("content-type")
+    
+    if (contentType?.includes("application/json")) {
+      const body = await request.json()
+      content = body.content
+      categoryId = body.categoryId
+    } else {
+      const formData = await request.formData()
+      content = formData.get("content") as string
+      categoryId = formData.get("categoryId") as string
+    }
 
     if (!content?.trim()) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 })

@@ -139,7 +139,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleAuthStateChange = useCallback(
     async (event: string, session: Session | null) => {
-      console.log("Auth state change:", event, session?.user?.email)
+      // Only log in development to prevent console spam
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Auth state change:", event, session?.user?.email)
+      }
 
       setSession(session)
       setUser(session?.user ?? null)
