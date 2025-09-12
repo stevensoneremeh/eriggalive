@@ -8,9 +8,7 @@ export async function middleware(request: NextRequest) {
     return response
   } catch (error: any) {
     console.error("[SERVER] Middleware execution failed:", error.message)
-    return NextResponse.next({
-      request,
-    })
+    return NextResponse.next()
   }
 }
 
