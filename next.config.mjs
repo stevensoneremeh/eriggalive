@@ -7,6 +7,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Configuration for Replit proxy environment
   images: {
     domains: [
       'localhost',

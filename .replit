@@ -1,12 +1,14 @@
-modules = ["nodejs-20", "web", "postgresql-16"]
+modules = ["nodejs-20", "web"]
 run = "npm run dev"
 
 [nix]
-channel = "stable-24_05"
+channel = "stable-25_05"
 packages = ["jq"]
 
 [deployment]
-run = ["sh", "-c", "npm run dev"]
+run = ["pnpm", "run"]
+deploymentTarget = "autoscale"
+build = ["pnpm", "run", "build"]
 
 [[ports]]
 localPort = 3000
@@ -21,7 +23,7 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 45465
+localPort = 41475
 externalPort = 3000
 
 [workflows]
@@ -43,19 +45,19 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Next.js Dev Server"
+args = "Dev Server"
 
 [[workflows.workflow]]
-name = "Next.js Dev Server"
+name = "Dev Server"
 author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pnpm exec next dev --hostname 0.0.0.0 --port 5000"
 waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [agent]
 expertMode = true
