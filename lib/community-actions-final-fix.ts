@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 
 export async function fetchCommunityPosts() {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { data: posts, error } = await supabase
       .from("community_posts")
@@ -33,7 +33,7 @@ export async function fetchCommunityPosts() {
 
 export async function createCommunityPost(formData: FormData) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const title = formData.get("title") as string
     const content = formData.get("content") as string
@@ -85,7 +85,7 @@ export async function createCommunityPost(formData: FormData) {
 
 export async function fetchCommunityCategories() {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { data: categories, error } = await supabase
       .from("community_categories")

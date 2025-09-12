@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/auth-context"
-import { createCommunityPostAction } from "@/lib/community-actions-fixed"
+import { createCommunityPost } from "@/lib/community-actions-final-fix"
 import { useToast } from "@/components/ui/use-toast"
 import type { CommunityCategory } from "@/types/database"
 import { ImagePlus, Video, Mic, Send, Loader2, X } from "lucide-react"
@@ -87,7 +87,7 @@ export function CreatePostForm({ categories, userId }: CreatePostFormProps) {
 
     startTransition(async () => {
       try {
-        const result = await createCommunityPostAction(formData)
+        const result = await createCommunityPost(formData)
 
         if (result.success) {
           toast({
