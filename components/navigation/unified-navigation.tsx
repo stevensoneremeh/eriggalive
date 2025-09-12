@@ -68,9 +68,9 @@ export function UnifiedNavigation() {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isCommunityPage, setIsCommunityPage] = useState(false);
-  const [communityCategories, setCommunityCategories] = useState([]);
+  const [communityCategories, setCommunityCategories] = useState<any[]>([]);
   const [selectedCommunityCategory, setSelectedCommunityCategory] =
-    useState(null);
+    useState<string | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -81,10 +81,11 @@ export function UnifiedNavigation() {
   }, []);
 
   useEffect(() => {
-    const handleCommunityActive = (event) => {
+    const handleCommunityActive = (event: Event) => {
+      const customEvent = event as CustomEvent;
       setIsCommunityPage(true);
-      setCommunityCategories(event.detail.categories || []);
-      setSelectedCommunityCategory(event.detail.selectedCategory);
+      setCommunityCategories(customEvent.detail.categories || []);
+      setSelectedCommunityCategory(customEvent.detail.selectedCategory);
     };
 
     const handleCommunityInactive = () => {
@@ -141,6 +142,7 @@ export function UnifiedNavigation() {
         navigationItems[3], // Radio
         navigationItems[4], // Events
         navigationItems[5], // Vault
+        navigationItems[9], // Merch
         navigationItems[6], // Dashboard
         navigationItems[12], // Wallet
       ];
@@ -152,6 +154,7 @@ export function UnifiedNavigation() {
         navigationItems[3], // Radio
         navigationItems[4], // Events
         navigationItems[5], // Vault
+        navigationItems[9], // Merch
         navigationItems[14], // About
       ];
     }
@@ -159,7 +162,7 @@ export function UnifiedNavigation() {
 
   const getMobileNavItems = () => {
     if (isCommunityPage && communityCategories.length > 0) {
-      const communityNavItems = communityCategories.map((category) => ({
+      const communityNavItems = communityCategories.map((category: any) => ({
         name: category.name,
         href: `/community?category=${category.id}`,
         icon: Users,
@@ -245,11 +248,11 @@ export function UnifiedNavigation() {
                       <Avatar className="h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10">
                         <AvatarImage
                           src={
-                            profile?.profile_image_url ||
-                            profile?.avatar_url ||
+                            (profile as any)?.profile_image_url ||
+                            (profile as any)?.avatar_url ||
                             "/placeholder-user.jpg"
                           }
-                          alt={profile?.username || "User"}
+                          alt={(profile as any)?.username || "User"}
                         />
                         <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold text-xs sm:text-sm">
                           {profile?.full_name?.charAt(0) ||
@@ -359,11 +362,11 @@ export function UnifiedNavigation() {
                       <Avatar className="h-12 w-12">
                         <AvatarImage
                           src={
-                            profile?.profile_image_url ||
-                            profile?.avatar_url ||
+                            (profile as any)?.profile_image_url ||
+                            (profile as any)?.avatar_url ||
                             "/placeholder-user.jpg"
                           }
-                          alt={profile?.username || "User"}
+                          alt={(profile as any)?.username || "User"}
                         />
                         <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold">
                           {profile?.full_name?.charAt(0) ||
@@ -374,7 +377,7 @@ export function UnifiedNavigation() {
                       </Avatar>
                       <div className="flex flex-col flex-1 min-w-0">
                         <p className="font-medium truncate">
-                          {profile?.full_name || profile?.username || "User"}
+                          {(profile as any)?.full_name || (profile as any)?.username || "User"}
                         </p>
                         <p className="text-sm text-muted-foreground truncate">
                           {user.email}
@@ -404,7 +407,7 @@ export function UnifiedNavigation() {
                   {/* Navigation Items */}
                   <div className="flex-1 overflow-y-auto p-4">
                     <div className="space-y-1">
-                      {getMobileNavItems().map((item) => {
+                      {getMobileNavItems().map((item: any) => {
                         const isActive = item.isCommunityCategory
                           ? selectedCommunityCategory === item.categoryId
                           : pathname === item.href ||
