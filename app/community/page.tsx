@@ -5,20 +5,61 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Heart, MessageCircle, Share2, Bookmark, TrendingUp, Users, Trophy, Star } from "lucide-react"
+import { createCommunityPost } from "@/lib/community-actions-final-fix"
+import { voteOnPost } from "@/lib/community-actions-final"
+import { redirect } from "next/navigation"
+
+// Client component for showing feedback messages
+function FeedbackMessages({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+  const success = typeof searchParams.success === 'string' ? searchParams.success : null
+  const error = typeof searchParams.error === 'string' ? searchParams.error : null
+  
+  if (!success && !error) return null
+  
+  return (
+    <div className="mb-6">
+      {success && (
+        <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center gap-2">
+          <span className="text-xl">✅</span>
+          <span>{success}</span>
+        </div>
+      )}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center gap-2">
+          <span className="text-xl">❌</span>
+          <span>{error}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Enhanced post creation with redirect feedback
+async function createPostWithFeedback(formData: FormData) {
+  "use server"
+  
+  const result = await createCommunityPost(formData)
+  
+  if (result.error) {
+    redirect(`/community?error=${encodeURIComponent('Failed to create post. Please try again.')}`)
+  } else {
+    redirect('/community?success=Post created successfully!')
+  }
+}
 
 async function getCommunityData() {
   const supabase = await createClient()
 
   try {
     // Get categories
-    const { data: categories } = await supabase
+    const { data: categories, error: categoriesError } = await supabase
       .from("community_categories")
       .select("*")
       .eq("is_active", true)
       .order("display_order")
 
     // Get posts with user data and category data
-    const { data: posts } = await supabase
+    const { data: posts, error: postsError } = await supabase
       .from("community_posts")
       .select(`
         *,
@@ -42,7 +83,7 @@ async function getCommunityData() {
       .limit(20)
 
     // Get trending hashtags
-    const { data: hashtags } = await supabase
+    const { data: hashtags, error: hashtagsError } = await supabase
       .from("hashtags")
       .select("*")
       .eq("is_trending", true)
@@ -50,11 +91,46 @@ async function getCommunityData() {
       .limit(10)
 
     // Get leaderboard data
-    const { data: topUsers } = await supabase
+    const { data: topUsers, error: usersError } = await supabase
       .from("users")
       .select("id, username, full_name, avatar_url, tier, reputation_score, posts_count, followers_count")
       .order("reputation_score", { ascending: false })
       .limit(10)
+
+    // Check for errors and return mock data if any queries failed
+    if (categoriesError || postsError || hashtagsError || usersError) {
+      console.log("Database errors detected (using mock data):", {
+        categoriesError, postsError, hashtagsError, usersError
+      })
+      return {
+        categories: [
+          { id: 1, name: "General Discussion", icon: "💬", post_count: 24 },
+          { id: 2, name: "Music Talk", icon: "🎵", post_count: 18 },
+          { id: 3, name: "Street Stories", icon: "🏙️", post_count: 12 },
+          { id: 4, name: "Fan Art", icon: "🎨", post_count: 8 },
+        ],
+        posts: [
+          {
+            id: 1,
+            content: "Welcome to EriggaLive! The community is powered by mock data while we set up the database. 🎵",
+            users: { username: "erigga", full_name: "Erigga", tier: "admin" },
+            community_categories: { name: "General Discussion", color: "#3B82F6" },
+            created_at: "2025-09-13T12:00:00Z",
+            vote_count: 25,
+            comment_count: 8,
+            view_count: 156
+          }
+        ],
+        hashtags: [
+          { id: 1, name: "EriggaLive", usage_count: 156 },
+          { id: 2, name: "PaperBoi", usage_count: 89 },
+          { id: 3, name: "WarriVibes", usage_count: 67 },
+        ],
+        topUsers: [
+          { id: 1, username: "erigga", full_name: "Erigga", tier: "admin", reputation_score: 1500 }
+        ],
+      }
+    }
 
     return {
       categories: categories || [],
@@ -105,7 +181,7 @@ function formatTimeAgo(date: string) {
   return `${Math.floor(diffInSeconds / 86400)}d ago`
 }
 
-export default async function CommunityPage() {
+export default async function CommunityPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
   const { categories, posts, hashtags, topUsers } = await getCommunityData()
 
   return (
@@ -119,6 +195,8 @@ export default async function CommunityPage() {
           <p className="text-gray-600 dark:text-gray-400">Connect, share, and celebrate the culture with fellow fans</p>
         </div>
 
+        <FeedbackMessages searchParams={searchParams} />
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Left Sidebar */}
           <div className="lg:col-span-1 space-y-6">
@@ -131,7 +209,7 @@ export default async function CommunityPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {categories.map((category) => (
+                {categories.map((category: any) => (
                   <Button key={category.id} variant="ghost" className="w-full justify-start">
                     <span className="mr-2">{category.icon || "📂"}</span>
                     {category.name}
@@ -154,7 +232,7 @@ export default async function CommunityPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
-                    {hashtags.map((hashtag) => (
+                    {hashtags.map((hashtag: any) => (
                       <Badge
                         key={hashtag.id}
                         variant="outline"
@@ -177,31 +255,29 @@ export default async function CommunityPage() {
                 <CardTitle>Share Your Thoughts</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <form action={createPostWithFeedback} className="space-y-4">
                   <Textarea
+                    name="content"
                     placeholder="What's on your mind? Use #hashtags and @mentions..."
                     className="min-h-[100px]"
-                    disabled
+                    required
                   />
                   <div className="flex justify-between items-center">
-                    <Select disabled>
-                      <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.id.toString()}>
-                            {category.icon || "📂"} {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button disabled>Share Post</Button>
+                    <select 
+                      name="categoryId" 
+                      required 
+                      className="px-3 py-2 border border-gray-200 rounded-md bg-white dark:bg-gray-800 dark:border-gray-700 w-48"
+                    >
+                      <option value="">Select category</option>
+                      {categories.map((category: any) => (
+                        <option key={category.id} value={category.id.toString()}>
+                          {category.icon || "📂"} {category.name}
+                        </option>
+                      ))}
+                    </select>
+                    <Button type="submit">Share Post</Button>
                   </div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    💡 Connect your Supabase database to enable posting functionality
-                  </p>
-                </div>
+                </form>
               </CardContent>
             </Card>
 
@@ -218,7 +294,7 @@ export default async function CommunityPage() {
                   </CardContent>
                 </Card>
               ) : (
-                posts.map((post) => (
+                posts.map((post: any) => (
                   <Card key={post.id} className="hover:shadow-lg transition-shadow">
                     <CardContent className="p-6">
                       {/* Post Header */}
@@ -275,20 +351,22 @@ export default async function CommunityPage() {
                       {/* Post Actions */}
                       <div className="flex items-center justify-between pt-4 border-t">
                         <div className="flex items-center gap-4">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="flex items-center gap-2 hover:text-red-500"
-                            disabled
-                          >
-                            <Heart className="h-4 w-4" />
-                            <span>{post.vote_count || 0}</span>
-                          </Button>
-                          <Button variant="ghost" size="sm" className="flex items-center gap-2 hover:text-blue-500" disabled>
+                          <form action={voteOnPost.bind(null, post.id, "up")}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              type="submit"
+                              className="flex items-center gap-2 hover:text-red-500"
+                            >
+                              <Heart className="h-4 w-4" />
+                              <span>{post.vote_count || 0}</span>
+                            </Button>
+                          </form>
+                          <Button variant="ghost" size="sm" className="flex items-center gap-2 hover:text-blue-500">
                             <MessageCircle className="h-4 w-4" />
                             <span>{post.comment_count || 0}</span>
                           </Button>
-                          <Button variant="ghost" size="sm" className="hover:text-yellow-500" disabled>
+                          <Button variant="ghost" size="sm" className="hover:text-yellow-500">
                             <Bookmark className="h-4 w-4" />
                           </Button>
                         </div>
@@ -339,7 +417,7 @@ export default async function CommunityPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {topUsers.slice(0, 5).map((user, index) => (
+                  {topUsers.slice(0, 5).map((user: any, index: number) => (
                     <div key={user.id} className="flex items-center gap-3">
                       <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-bold">
                         {index + 1}

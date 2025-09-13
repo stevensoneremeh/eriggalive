@@ -45,7 +45,7 @@ import { cn } from "@/lib/utils";
 
 const navigationItems = [
   { name: "Home", href: "/", icon: Home },
-  { name: "Mission", href: "/mission", icon: Target },
+  { name: "Media", href: "/missions", icon: Target },
   { name: "Community", href: "/community", icon: Users },
   { name: "Radio", href: "/radio", icon: Radio },
   { name: "Events", href: "/events", icon: Calendar },
