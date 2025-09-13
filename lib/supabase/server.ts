@@ -11,7 +11,57 @@ export async function createClient() {
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error("[SERVER] Missing Supabase environment variables")
-    throw new Error("Missing Supabase environment variables")
+    // Return a mock client that prevents crashes
+    return {
+      auth: {
+        getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+        getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+        signInWithPassword: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+        signUp: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+        signOut: () => Promise.resolve({ error: null }),
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+        resetPasswordForEmail: () => Promise.resolve({ error: { message: "Supabase not configured" } }),
+        updateUser: () => Promise.resolve({ error: { message: "Supabase not configured" } }),
+      },
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+            single: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+            order: () => ({
+              eq: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
+            }),
+          }),
+          order: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
+        }),
+        insert: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+        update: () => ({
+          eq: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+        }),
+        delete: () => ({
+          eq: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+        }),
+      }),
+      storage: {
+        from: () => ({
+          upload: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+          download: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+          list: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
+          remove: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+        }),
+        listBuckets: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
+        createBucket: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      },
+      // Add real-time functionality for mock server client  
+      channel: (name: string) => ({
+        on: (event: string, config: any, callback: any) => ({
+          subscribe: () => ({ 
+            unsubscribe: () => {} 
+          }),
+        }),
+      }),
+      removeChannel: () => {},
+    } as any
   }
 
   return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
