@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
 export const dynamic = "force-dynamic"
@@ -12,12 +11,12 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get("sortBy") || "newest"
     const limit = Number.parseInt(searchParams.get("limit") || "20")
 
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
 
     // Try different database schemas for compatibility
     let posts: any[] = []
-    let error: any = null
-    
+    const error: any = null
+
     // First try with user_profiles table
     try {
       let query = supabase
@@ -105,7 +104,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Normalize response format for client
-    const normalizedPosts = (posts || []).map(post => ({
+    const normalizedPosts = (posts || []).map((post) => ({
       ...post,
       user_profiles: post.user || post.user_profiles,
       community_categories: post.category || post.community_categories,
@@ -120,7 +119,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
 
     // Get authenticated user
     const {
@@ -138,14 +137,14 @@ export async function POST(request: NextRequest) {
     // Try both user table structures for compatibility
     let userProfile = null
     let profileError = null
-    
+
     // First try user_profiles table
     const { data: userProfileData, error: userProfileError } = await supabase
       .from("user_profiles")
       .select("id, username, full_name, avatar_url, tier")
       .eq("id", authUser.id)
       .single()
-    
+
     if (userProfileData) {
       userProfile = userProfileData
     } else {
@@ -155,7 +154,7 @@ export async function POST(request: NextRequest) {
         .select("id, username, full_name, avatar_url, tier")
         .eq("auth_user_id", authUser.id)
         .single()
-      
+
       if (userData) {
         userProfile = userData
       } else {
@@ -174,7 +173,7 @@ export async function POST(request: NextRequest) {
     // Handle both JSON and FormData
     let content: string, categoryId: string
     const contentType = request.headers.get("content-type")
-    
+
     if (contentType?.includes("application/json")) {
       const body = await request.json()
       content = body.content

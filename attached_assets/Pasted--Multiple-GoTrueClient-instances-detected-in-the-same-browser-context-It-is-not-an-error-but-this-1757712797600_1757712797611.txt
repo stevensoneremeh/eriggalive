@@ -1,4 +1,4 @@
-  Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
 overrideMethod @ installHook.js:1
   Error creating post: 
 window.console.error @ 2279-16d707cbf852fc25.js:1

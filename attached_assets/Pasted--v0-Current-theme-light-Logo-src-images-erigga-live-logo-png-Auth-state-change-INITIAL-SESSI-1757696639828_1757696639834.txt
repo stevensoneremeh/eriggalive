@@ -1,4 +1,4 @@
- [v0] Current theme: light Logo src: /images/erigga-live-logo.png
+[v0] Current theme: light Logo src: /images/erigga-live-logo.png
  Auth state change: INITIAL_SESSION ereremeh@outlook.com
  [v0] Current theme: light Logo src: /images/erigga-live-logo.png
  Auth state change: INITIAL_SESSION ereremeh@outlook.com
