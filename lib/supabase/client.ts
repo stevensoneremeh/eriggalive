@@ -46,6 +46,15 @@ export function createClient() {
           eq: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
         }),
       }),
+      // Add real-time functionality for mock client
+      channel: (name: string) => ({
+        on: (event: string, config: any, callback: any) => ({
+          subscribe: () => ({ 
+            unsubscribe: () => {} 
+          }),
+        }),
+      }),
+      removeChannel: () => {},
     } as any
   }
 
@@ -92,6 +101,15 @@ export function createClient() {
           eq: () => Promise.resolve({ data: null, error: { message: "Supabase client error" } }),
         }),
       }),
+      // Add real-time functionality for error fallback client
+      channel: (name: string) => ({
+        on: (event: string, config: any, callback: any) => ({
+          subscribe: () => ({ 
+            unsubscribe: () => {} 
+          }),
+        }),
+      }),
+      removeChannel: () => {},
     } as any
   }
 }
