@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (userId: string): Promise<UserProfile | null> => {
       try {
         if (!supabase || supabaseError) {
-          console.warn("Supabase client not available")
+          console.warn("Supabase client not available, using offline mode")
           return null
         }
 
@@ -63,10 +63,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return profileCache[userId]
         }
 
-        const { data, error } = await supabase.from("users").select("*").eq("auth_user_id", userId).maybeSingle()
+        // Add timeout wrapper for database requests
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
+        })
+
+        const fetchPromise = supabase.from("users").select("*").eq("auth_user_id", userId).maybeSingle()
+
+        const { data, error } = await Promise.race([fetchPromise, timeoutPromise])
 
         if (error) {
-          console.error("Error fetching profile:", error.message)
+          console.warn("Profile fetch failed, continuing without profile:", error.message)
           return null
         }
 
@@ -76,7 +83,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return data
       } catch (error: any) {
-        console.error("Error in fetchProfile:", error.message)
+        if (error.message.includes("timeout") || error.message.includes("connect") || error.message.includes("503")) {
+          console.warn("Network issue detected, running in offline mode:", error.message)
+        } else {
+          console.warn("Profile fetch error, continuing gracefully:", error.message)
+        }
         return null
       }
     },
@@ -98,28 +109,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshSession = useCallback(async () => {
     try {
       if (!supabase || supabaseError) {
-        console.warn("Cannot refresh session: Supabase not available")
+        console.warn("Cannot refresh session: Running in offline mode")
         return
       }
 
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.refreshSession()
+      // Add timeout for session refresh
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("Session refresh timeout")), 3000)
+      })
+
+      const refreshPromise = supabase.auth.refreshSession()
+      const { data: { session }, error } = await Promise.race([refreshPromise, timeoutPromise])
 
       if (error) {
-        console.error("Error refreshing session:", error.message)
-        // If refresh fails, try to get current session
-        const { data: currentSession } = await supabase.auth.getSession()
-        setSession(currentSession.session)
-        setUser(currentSession.session?.user ?? null)
-
-        if (currentSession.session?.user) {
-          const profileData = await fetchProfile(currentSession.session.user.id)
-          setProfile(profileData)
-        } else {
-          setProfile(null)
-        }
+        console.warn("Session refresh failed, maintaining current state:", error.message)
         return
       }
 
