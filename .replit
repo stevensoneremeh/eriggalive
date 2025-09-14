@@ -6,9 +6,9 @@ channel = "stable-25_05"
 packages = ["jq"]
 
 [deployment]
-run = ["pnpm", "run", "start"]
+run = ["npm", "run", "start"]
 deploymentTarget = "autoscale"
-build = ["pnpm", "run", "build"]
+build = ["npm", "run", "build"]
 
 [[ports]]
 localPort = 3000
@@ -21,6 +21,10 @@ externalPort = 3001
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 38945
+externalPort = 3000
 
 [workflows]
 runButton = "Project"
@@ -49,7 +53,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "pnpm exec next dev --hostname 0.0.0.0 --port 5000"
+args = "pnpm run dev"
 waitForPort = 5000
 
 [workflows.workflow.metadata]
