@@ -9,7 +9,6 @@ export const ROUTES = {
   LOGIN: "/login",
   SIGNUP: "/signup",
   DASHBOARD: "/dashboard",
-  COMMUNITY: "/community",
   VAULT: "/vault",
   TICKETS: "/tickets",
   PREMIUM: "/premium",
@@ -21,7 +20,6 @@ export const ROUTES = {
 // Define protected routes that require authentication
 export const PROTECTED_ROUTES = [
   ROUTES.DASHBOARD,
-  ROUTES.COMMUNITY,
   ROUTES.VAULT,
   ROUTES.TICKETS,
   ROUTES.PREMIUM,

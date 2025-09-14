@@ -16,7 +16,6 @@ import {
   Menu,
   Home,
   Target,
-  Users,
   Music,
   Coins,
   MessageCircle,
@@ -46,7 +45,6 @@ import { cn } from "@/lib/utils";
 const navigationItems = [
   { name: "Home", href: "/", icon: Home },
   { name: "Media", href: "/missions", icon: Target },
-  { name: "Community", href: "/community", icon: Users },
   { name: "Radio", href: "/radio", icon: Radio },
   { name: "Events", href: "/events", icon: Calendar },
   { name: "Vault", href: "/vault", icon: Music },
@@ -67,10 +65,6 @@ export function UnifiedNavigation() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [isCommunityPage, setIsCommunityPage] = useState(false);
-  const [communityCategories, setCommunityCategories] = useState<any[]>([]);
-  const [selectedCommunityCategory, setSelectedCommunityCategory] =
-    useState<string | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -80,31 +74,6 @@ export function UnifiedNavigation() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  useEffect(() => {
-    const handleCommunityActive = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      setIsCommunityPage(true);
-      setCommunityCategories(customEvent.detail.categories || []);
-      setSelectedCommunityCategory(customEvent.detail.selectedCategory);
-    };
-
-    const handleCommunityInactive = () => {
-      setIsCommunityPage(false);
-      setCommunityCategories([]);
-      setSelectedCommunityCategory(null);
-    };
-
-    window.addEventListener("communityPageActive", handleCommunityActive);
-    window.addEventListener("communityPageInactive", handleCommunityInactive);
-
-    return () => {
-      window.removeEventListener("communityPageActive", handleCommunityActive);
-      window.removeEventListener(
-        "communityPageInactive",
-        handleCommunityInactive,
-      );
-    };
-  }, []);
 
   useEffect(() => {
     setIsOpen(false);
@@ -136,47 +105,29 @@ export function UnifiedNavigation() {
   const getDesktopNavItems = () => {
     if (user) {
       return [
-        navigationItems[0], // Home
-        navigationItems[1], // Mission
-        navigationItems[2], // Community
-        navigationItems[3], // Radio
-        navigationItems[4], // Events
-        navigationItems[5], // Vault
-        navigationItems[9], // Merch
-        navigationItems[6], // Dashboard
-        navigationItems[12], // Wallet
+        { name: "Home", href: "/", icon: Home },
+        { name: "Media", href: "/missions", icon: Target },
+        { name: "Radio", href: "/radio", icon: Radio },
+        { name: "Events", href: "/events", icon: Calendar },
+        { name: "Vault", href: "/vault", icon: Music },
+        { name: "Merch", href: "/merch", icon: ShoppingBag },
+        { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+        { name: "Wallet", href: "/wallet", icon: Wallet },
       ];
     } else {
       return [
-        navigationItems[0], // Home
-        navigationItems[1], // Mission
-        navigationItems[2], // Community
-        navigationItems[3], // Radio
-        navigationItems[4], // Events
-        navigationItems[5], // Vault
-        navigationItems[9], // Merch
-        navigationItems[14], // About
+        { name: "Home", href: "/", icon: Home },
+        { name: "Media", href: "/missions", icon: Target },
+        { name: "Radio", href: "/radio", icon: Radio },
+        { name: "Events", href: "/events", icon: Calendar },
+        { name: "Vault", href: "/vault", icon: Music },
+        { name: "Merch", href: "/merch", icon: ShoppingBag },
+        { name: "About", href: "/about", icon: Info },
       ];
     }
   };
 
   const getMobileNavItems = () => {
-    if (isCommunityPage && communityCategories.length > 0) {
-      const communityNavItems = communityCategories.map((category: any) => ({
-        name: category.name,
-        href: `/community?category=${category.id}`,
-        icon: Users,
-        isCommunityCategory: true,
-        categoryId: category.id,
-      }));
-
-      return [
-        navigationItems[0], // Home
-        ...communityNavItems,
-        ...(user ? [] : [navigationItems[14]]), // Only About for non-authenticated users
-      ];
-    }
-
     return navigationItems;
   };
 
@@ -408,15 +359,13 @@ export function UnifiedNavigation() {
                   <div className="flex-1 overflow-y-auto p-4">
                     <div className="space-y-1">
                       {getMobileNavItems().map((item: any) => {
-                        const isActive = item.isCommunityCategory
-                          ? selectedCommunityCategory === item.categoryId
-                          : pathname === item.href ||
+                        const isActive = pathname === item.href ||
                             (item.href === "/dashboard" &&
                               pathname?.startsWith("/dashboard"));
 
                         return (
                           <Button
-                            key={`${item.name}-${item.categoryId || "main"}`}
+                            key={item.name}
                             asChild
                             variant={isActive ? "default" : "ghost"}
                             className={cn(
@@ -424,7 +373,6 @@ export function UnifiedNavigation() {
                               isActive
                                 ? "bg-lime-500 text-teal-900 hover:bg-lime-600 shadow-sm"
                                 : "hover:bg-accent/50",
-                              item.isCommunityCategory && "ml-4 text-sm",
                             )}
                             onClick={() => setIsOpen(false)}
                           >
@@ -434,11 +382,6 @@ export function UnifiedNavigation() {
                             >
                               <item.icon className="h-5 w-5 flex-shrink-0" />
                               <span className="font-medium">{item.name}</span>
-                              {item.isCommunityCategory && (
-                                <span className="text-xs opacity-60">
-                                  #{item.name.toLowerCase()}
-                                </span>
-                              )}
                             </Link>
                           </Button>
                         );
