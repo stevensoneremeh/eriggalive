@@ -24,8 +24,6 @@ const nextConfig = {
       'eriggalive.com',
       'www.eriggalive.com',
       'eriggalive.vercel.app',
-      '*.replit.dev',
-      '*.repl.co',
     ],
     remotePatterns: [
       {
