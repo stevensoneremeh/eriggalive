@@ -1,4 +1,4 @@
-  Error fetching profile: upstream connect error or disconnect/reset before headers. retried and the latest reset reason: connection timeout
+Error fetching profile: upstream connect error or disconnect/reset before headers. retried and the latest reset reason: connection timeout
 overrideMethod @ installHook.js:1
   Error fetching profile: upstream connect error or disconnect/reset before headers. retried and the latest reset reason: connection timeout
 overrideMethod @ installHook.js:1
