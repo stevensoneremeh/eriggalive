@@ -185,6 +185,8 @@ export default function CommunityPage() {
     try {
       setPosting(true)
 
+      console.log("[v0] Starting post creation", { user: user?.id, title: newPost.title })
+
       // Use the new database function
       const { data, error } = await supabase.rpc("create_community_post", {
         post_title: newPost.title.trim(),
@@ -193,7 +195,12 @@ export default function CommunityPage() {
         post_hashtags: extractHashtags(newPost.content),
       })
 
-      if (error) throw error
+      if (error) {
+        console.log("[v0] Error creating post:", error)
+        throw error
+      }
+
+      console.log("[v0] Post created successfully:", data)
 
       toast({
         title: "Success",
@@ -206,7 +213,7 @@ export default function CommunityPage() {
       console.error("Error creating post:", error)
       toast({
         title: "Error",
-        description: "Failed to create post",
+        description: "Failed to create post. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -230,13 +237,19 @@ export default function CommunityPage() {
     }
 
     try {
+      console.log("[v0] Toggling vote for post:", postId)
+
       // Use the new database function
       const { data, error } = await supabase.rpc("toggle_post_vote", {
         post_id_param: postId,
       })
 
-      if (error) throw error
+      if (error) {
+        console.log("[v0] Error voting:", error)
+        throw error
+      }
 
+      console.log("[v0] Vote toggled successfully:", data)
       fetchPosts() // Refresh posts to show updated vote counts
     } catch (error) {
       console.error("Error voting:", error)
