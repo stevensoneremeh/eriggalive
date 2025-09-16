@@ -1,0 +1,304 @@
+{
+  "project_id": "YOUR_SUPABASE_PROJECT_ID",
+  "environment": "production",
+  "tables": [
+    {
+      "schema": "public",
+      "name": "users",
+      "primary_key_column": "id",
+      "ownership_column": "auth_user_id",
+      "access_intent": "public-read",
+      "roles_allowed": ["authenticated"],
+      "extra_notes": "Main user profiles table with auth integration - foreign key constraint errors need fixing"
+    },
+    {
+      "schema": "public",
+      "name": "community_posts",
+      "primary_key_column": "id",
+      "ownership_column": "user_id",
+      "access_intent": "public-read",
+      "roles_allowed": ["authenticated"],
+      "extra_notes": "Community posts with voting system - 409 conflict errors on create_community_post RPC"
+    },
+    {
+      "schema": "public",
+      "name": "community_post_votes",
+      "primary_key_column": "id",
+      "ownership_column": "user_id",
+      "access_intent": "owner-only",
+      "roles_allowed": ["authenticated"],
+      "extra_notes": "Vote tracking table - unique constraint violations"
+    },
+    {
+      "schema": "public",
+      "name": "community_comments",
+      "primary_key_column": "id",
+      "ownership_column": "user_id",
+      "access_intent": "public-read",
+      "roles_allowed": ["authenticated"],
+      "extra_notes": "Comments system with nested replies"
+    },
+    {
+      "schema": "public",
+      "name": "community_categories",
+      "primary_key_column": "id",
+      "ownership_column": null,
+      "access_intent": "public-read",
+      "roles_allowed": ["authenticated", "anon"],
+      "extra_notes": "Categories for organizing community posts"
+    },
+    {
+      "schema": "public",
+      "name": "payments",
+      "primary_key_column": "id",
+      "ownership_column": "user_id",
+      "access_intent": "owner-only",
+      "roles_allowed": ["authenticated"],
+      "extra_notes": "Payment processing with Paystack integration"
+    },
+    {
+      "schema": "public",
+      "name": "transactions",
+      "primary_key_column": "id",
+      "ownership_column": "user_id",
+      "access_intent": "owner-only",
+      "roles_allowed": ["authenticated"],
+      "extra_notes": "Financial transaction history"
+    },
+    {
+      "schema": "public",
+      "name": "wallet",
+      "primary_key_column": "id",
+      "ownership_column": "user_id",
+      "access_intent": "owner-only",
+      "roles_allowed": ["authenticated"],
+      "extra_notes": "User wallet balances"
+    },
+    {
+      "schema": "public",
+      "name": "event_tickets",
+      "primary_key_column": "id",
+      "ownership_column": "user_id",
+      "access_intent": "owner-only",
+      "roles_allowed": ["authenticated"],
+      "extra_notes": "Event ticket management - 400 Bad Request errors"
+    },
+    {
+      "schema": "public",
+      "name": "store_purchases",
+      "primary_key_column": "id",
+      "ownership_column": "user_id",
+      "access_intent": "owner-only",
+      "roles_allowed": ["authenticated"],
+      "extra_notes": "Merchandise purchase tracking - 403 Forbidden errors"
+    },
+    {
+      "schema": "public",
+      "name": "user_follows",
+      "primary_key_column": "id",
+      "ownership_column": "follower_id",
+      "access_intent": "public-read",
+      "roles_allowed": ["authenticated"],
+      "extra_notes": "User following system - 403 Forbidden errors"
+    },
+    {
+      "schema": "public",
+      "name": "missions",
+      "primary_key_column": "id",
+      "ownership_column": null,
+      "access_intent": "public-read",
+      "roles_allowed": ["authenticated"],
+      "extra_notes": "User missions/achievements system - 404 Not Found errors"
+    },
+    {
+      "schema": "public",
+      "name": "referrals",
+      "primary_key_column": "id",
+      "ownership_column": "user_id",
+      "access_intent": "owner-only",
+      "roles_allowed": ["authenticated"],
+      "extra_notes": "Referral system - 500 Internal Server errors"
+    }
+  ],
+  "functions_to_fix_search_path": [
+    "create_community_post",
+    "handle_post_vote",
+    "increment_user_coins",
+    "increment_wallet_balance",
+    "process_membership_upgrade",
+    "handle_new_user",
+    "update_user_coins",
+    "update_user_wallet",
+    "increment_post_votes",
+    "decrement_post_votes",
+    "update_post_comment_count"
+  ],
+  "extensions": [
+    {
+      "name": "pg_trgm",
+      "current_schema": "public",
+      "preferred_schema": "extensions"
+    },
+    {
+      "name": "uuid-ossp",
+      "current_schema": "public",
+      "preferred_schema": "extensions"
+    }
+  ],
+  "edge_functions": [
+    {
+      "slug": "paystack-webhook",
+      "uses_service_role_key": true,
+      "intended_visibility": "webhook",
+      "jwt_required": false,
+      "frontend_route_name": "/api/paystack-webhook",
+      "backend_rpc_to_use_if_any": "process_payment_webhook",
+      "notes": "Paystack webhook processing with signature verification"
+    },
+    {
+      "slug": "community-posts",
+      "uses_service_role_key": false,
+      "intended_visibility": "public",
+      "jwt_required": true,
+      "frontend_route_name": "/api/community/posts",
+      "backend_rpc_to_use_if_any": "create_community_post",
+      "notes": "Community post creation and retrieval"
+    },
+    {
+      "slug": "post-voting",
+      "uses_service_role_key": false,
+      "intended_visibility": "authenticated",
+      "jwt_required": true,
+      "frontend_route_name": "/api/community/posts/[id]/vote",
+      "backend_rpc_to_use_if_any": "handle_post_vote",
+      "notes": "Post voting system with coin rewards"
+    },
+    {
+      "slug": "coin-operations",
+      "uses_service_role_key": false,
+      "intended_visibility": "authenticated",
+      "jwt_required": true,
+      "frontend_route_name": "/api/coins/*",
+      "backend_rpc_to_use_if_any": "increment_user_coins",
+      "notes": "Coin purchase, withdrawal, and balance management"
+    }
+  ],
+  "rpc_functions_to_create_or_use": [
+    {
+      "name": "create_community_post_safe",
+      "purpose": "Safely create community posts with user validation and auto-user creation",
+      "input_params": [
+        { "name": "p_title", "type": "text" },
+        { "name": "p_content", "type": "text" },
+        { "name": "p_category_id", "type": "bigint" },
+        { "name": "p_auth_user_id", "type": "uuid" },
+        { "name": "p_media_url", "type": "text" },
+        { "name": "p_media_type", "type": "text" }
+      ],
+      "returns": "record"
+    },
+    {
+      "name": "handle_post_vote_safe",
+      "purpose": "Handle post voting with automatic user creation and coin rewards",
+      "input_params": [{ "name": "p_post_id", "type": "bigint" }, { "name": "p_auth_user_id", "type": "uuid" }],
+      "returns": "record"
+    },
+    {
+      "name": "ensure_user_exists",
+      "purpose": "Create user profile if it doesn't exist from auth.users data",
+      "input_params": [
+        { "name": "p_auth_user_id", "type": "uuid" },
+        { "name": "p_email", "type": "text" },
+        { "name": "p_username", "type": "text" },
+        { "name": "p_full_name", "type": "text" }
+      ],
+      "returns": "bigint"
+    },
+    {
+      "name": "process_payment_webhook_safe",
+      "purpose": "Process Paystack webhooks with proper error handling and duplicate prevention",
+      "input_params": [
+        { "name": "p_reference", "type": "text" },
+        { "name": "p_amount_kobo", "type": "bigint" },
+        { "name": "p_email", "type": "text" },
+        { "name": "p_status", "type": "text" },
+        { "name": "p_metadata", "type": "jsonb" }
+      ],
+      "returns": "record"
+    },
+    {
+      "name": "get_community_posts_with_votes",
+      "purpose": "Get community posts with user vote status and complete user data",
+      "input_params": [
+        { "name": "p_auth_user_id", "type": "uuid" },
+        { "name": "p_category_slug", "type": "text" },
+        { "name": "p_limit", "type": "integer" }
+      ],
+      "returns": "table"
+    }
+  ],
+  "jwt_claims_and_roles": {
+    "admin_claim_key": "user_role",
+    "admin_claim_value": "admin",
+    "tenant_claim_key": "user_id",
+    "tenant_claim_type": "uuid"
+  },
+  "naming_conventions": {
+    "edge_function_route_prefix": "/api",
+    "rpc_prefix": "",
+    "policy_name_prefix": "policy_"
+  },
+  "perform_actions_choice": "B",
+  "contact_for_followup": {
+    "name": "Erigga Live Developer",
+    "email": "dev@eriggalive.com",
+    "slack": "@dev"
+  },
+  "specific_errors_to_fix": [
+    {
+      "error_type": "Foreign Key Constraint",
+      "error_message": "user_id not present in users table",
+      "affected_tables": ["community_posts", "community_post_votes", "community_comments"],
+      "solution_needed": "Auto-create user profiles when auth users interact with community features"
+    },
+    {
+      "error_type": "409 Conflict",
+      "error_message": "create_community_post RPC conflict",
+      "affected_functions": ["create_community_post"],
+      "solution_needed": "Fix RPC function to handle user creation and prevent conflicts"
+    },
+    {
+      "error_type": "403 Forbidden",
+      "error_message": "RLS policy blocking access",
+      "affected_tables": ["user_follows", "store_purchases", "event_tickets"],
+      "solution_needed": "Review and fix RLS policies for proper access control"
+    },
+    {
+      "error_type": "404 Not Found",
+      "error_message": "API endpoints returning 404",
+      "affected_endpoints": ["/api/missions", "/api/referrals/me"],
+      "solution_needed": "Create missing API endpoints and database functions"
+    },
+    {
+      "error_type": "500 Internal Server",
+      "error_message": "Database function errors",
+      "affected_functions": ["increment_user_coins", "process_membership_upgrade"],
+      "solution_needed": "Fix function logic and error handling"
+    },
+    {
+      "error_type": "React Minified Error",
+      "error_message": "Frontend React errors #425 and #422",
+      "affected_components": ["Community page", "Post creation"],
+      "solution_needed": "Fix state management and component lifecycle issues"
+    }
+  ],
+  "priority_fixes": [
+    "Fix user profile auto-creation on auth signup",
+    "Resolve community post creation conflicts",
+    "Fix RLS policies for proper access control",
+    "Create missing API endpoints for missions and referrals",
+    "Fix payment webhook processing",
+    "Resolve foreign key constraint violations",
+    "Fix React state management errors"
+  ]
+}
