@@ -45,22 +45,13 @@ interface CommunityPost {
   updated_at: string
   user_id: string
   category_id: number
-  is_published: boolean
-  is_deleted: boolean
-  users: {
-    id: string
-    username: string
-    full_name: string
-    avatar_url?: string
-    tier: string
-  }
-  community_categories: {
-    id: number
-    name: string
-    slug: string
-    color: string
-    icon: string
-  }
+  category_name: string
+  category_color: string
+  category_icon: string
+  username: string
+  full_name: string
+  avatar_url?: string
+  user_voted: boolean
 }
 
 interface CommunityCategory {
@@ -128,52 +119,37 @@ export default function CommunityPage() {
   const fetchPosts = async () => {
     try {
       setLoading(true)
-      let query = supabase
-        .from("community_posts")
-        .select(`
-          *,
-          users (
-            id,
-            username,
-            full_name,
-            avatar_url,
-            tier
-          ),
-          community_categories (
-            id,
-            name,
-            slug,
-            color,
-            icon
-          )
-        `)
-        .eq("is_published", true)
-        .eq("is_deleted", false)
 
-      // Filter by category
+      // Get category ID if filtering by specific category
+      let categoryFilter = null
       if (selectedCategory !== "all") {
         const category = categories.find((c) => c.slug === selectedCategory)
         if (category) {
-          query = query.eq("category_id", category.id)
+          categoryFilter = category.id
         }
       }
 
-      // Sort posts
-      switch (sortBy) {
-        case "popular":
-          query = query.order("vote_count", { ascending: false })
-          break
-        case "trending":
-          query = query.order("comment_count", { ascending: false })
-          break
-        default:
-          query = query.order("created_at", { ascending: false })
-      }
-
-      const { data, error } = await query.limit(50)
+      // Use the new database function
+      const { data, error } = await supabase.rpc("get_community_posts_with_user_data", {
+        category_filter: categoryFilter,
+      })
 
       if (error) throw error
-      setPosts(data || [])
+
+      // Sort posts on client side since the function returns them in creation order
+      let sortedPosts = data || []
+      switch (sortBy) {
+        case "popular":
+          sortedPosts = sortedPosts.sort((a, b) => b.vote_count - a.vote_count)
+          break
+        case "trending":
+          sortedPosts = sortedPosts.sort((a, b) => b.comment_count - a.comment_count)
+          break
+        default:
+          sortedPosts = sortedPosts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      }
+
+      setPosts(sortedPosts)
     } catch (error) {
       console.error("Error fetching posts:", error)
       toast({
@@ -208,19 +184,14 @@ export default function CommunityPage() {
 
     try {
       setPosting(true)
-      const { data, error } = await supabase
-        .from("community_posts")
-        .insert({
-          title: newPost.title.trim(),
-          content: newPost.content.trim(),
-          category_id: newPost.category_id,
-          user_id: user.id,
-          is_published: true,
-          hashtags: extractHashtags(newPost.content),
-          vote_count: 0,
-          comment_count: 0,
-        })
-        .select()
+
+      // Use the new database function
+      const { data, error } = await supabase.rpc("create_community_post", {
+        post_title: newPost.title.trim(),
+        post_content: newPost.content.trim(),
+        post_category_id: newPost.category_id,
+        post_hashtags: extractHashtags(newPost.content),
+      })
 
       if (error) throw error
 
@@ -259,29 +230,14 @@ export default function CommunityPage() {
     }
 
     try {
-      // Check if user already voted
-      const { data: existingVote } = await supabase
-        .from("community_post_votes")
-        .select("id")
-        .eq("post_id", postId)
-        .eq("user_id", user.id)
-        .single()
+      // Use the new database function
+      const { data, error } = await supabase.rpc("toggle_post_vote", {
+        post_id_param: postId,
+      })
 
-      if (existingVote) {
-        // Remove vote
-        await supabase.from("community_post_votes").delete().eq("post_id", postId).eq("user_id", user.id)
+      if (error) throw error
 
-        // Update post vote count
-        await supabase.rpc("decrement_post_votes", { post_id: postId })
-      } else {
-        // Add vote
-        await supabase.from("community_post_votes").insert({ post_id: postId, user_id: user.id })
-
-        // Update post vote count
-        await supabase.rpc("increment_post_votes", { post_id: postId })
-      }
-
-      fetchPosts() // Refresh posts
+      fetchPosts() // Refresh posts to show updated vote counts
     } catch (error) {
       console.error("Error voting:", error)
       toast({
@@ -297,7 +253,7 @@ export default function CommunityPage() {
       searchQuery === "" ||
       post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      post.users.username.toLowerCase().includes(searchQuery.toLowerCase()),
+      post.username.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
   const getCategoryIcon = (iconName: string) => {
@@ -475,25 +431,25 @@ export default function CommunityPage() {
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3">
                               <Avatar className="h-10 w-10">
-                                <AvatarImage src={post.users.avatar_url || "/placeholder.svg"} />
-                                <AvatarFallback>{post.users.username?.[0]?.toUpperCase()}</AvatarFallback>
+                                <AvatarImage src={post.avatar_url || "/placeholder.svg"} />
+                                <AvatarFallback>{post.username?.[0]?.toUpperCase()}</AvatarFallback>
                               </Avatar>
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <p className="font-medium">{post.users.username}</p>
+                                  <p className="font-medium">{post.username}</p>
                                   <Badge
                                     variant="secondary"
                                     className="text-xs"
-                                    style={{ backgroundColor: post.community_categories.color + "20" }}
+                                    style={{ backgroundColor: post.category_color + "20" }}
                                   >
-                                    {post.users.tier}
+                                    Fan
                                   </Badge>
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                   <Clock className="h-3 w-3" />
                                   {new Date(post.created_at).toLocaleDateString()}
                                   <Badge variant="outline" className="text-xs">
-                                    {post.community_categories.name}
+                                    {post.category_name}
                                   </Badge>
                                 </div>
                               </div>
@@ -527,9 +483,9 @@ export default function CommunityPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleVotePost(post.id)}
-                                className="flex items-center gap-2 hover:text-red-500"
+                                className={`flex items-center gap-2 hover:text-red-500 ${post.user_voted ? "text-red-500" : ""}`}
                               >
-                                <Heart className="h-4 w-4" />
+                                <Heart className={`h-4 w-4 ${post.user_voted ? "fill-current" : ""}`} />
                                 {post.vote_count}
                               </Button>
                               <Button variant="ghost" size="sm" className="flex items-center gap-2">
