@@ -11,7 +11,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Send,
   Heart,
@@ -315,33 +314,20 @@ export default function CommunityPage() {
             </div>
           </div>
 
-          {/* Category Tabs - WhatsApp Style with improved mobile layout */}
-          <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full">
-            <TabsList className="w-full h-auto p-1 bg-muted/50 overflow-x-auto">
-              <div className="flex gap-2 min-w-max">
-                <TabsTrigger
-                  value="all"
-                  className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground whitespace-nowrap"
-                >
-                  <Users className="h-4 w-4" />
-                  <span className="text-sm">All</span>
-                </TabsTrigger>
-                {categories.map((category) => {
-                  const IconComponent = getCategoryIcon(category.icon)
-                  return (
-                    <TabsTrigger
-                      key={category.id}
-                      value={category.slug}
-                      className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground whitespace-nowrap"
-                    >
-                      <IconComponent className="h-4 w-4" />
-                      <span className="text-sm">{category.name}</span>
-                    </TabsTrigger>
-                  )
-                })}
-              </div>
-            </TabsList>
-          </Tabs>
+          <div className="flex items-center gap-4">
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="px-4 py-2 rounded-lg bg-muted/50 border-0 focus:ring-2 focus:ring-primary text-sm min-w-[150px]"
+            >
+              <option value="all">All Categories</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.slug}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -349,66 +335,6 @@ export default function CommunityPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-4 sm:space-y-6">
-            {/* Create Post Form - Improved mobile layout */}
-            {isAuthenticated && (
-              <Card className="glass-card">
-                <CardContent className="p-4 sm:p-6">
-                  <form onSubmit={handleCreatePost} className="space-y-4">
-                    <div className="flex items-center gap-3 mb-4">
-                      <Avatar className="h-8 w-8 sm:h-10 sm:w-10">
-                        <AvatarImage src={user?.avatar_url || "/placeholder.svg"} />
-                        <AvatarFallback>{user?.username?.[0]?.toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-sm sm:text-base">{user?.username}</p>
-                        <Badge variant="secondary" className="text-xs">
-                          {user?.tier || "Free"}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <Input
-                      placeholder="What's the title of your post?"
-                      value={newPost.title}
-                      onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-                      className="border-0 bg-muted/50 focus-visible:ring-1 text-sm sm:text-base"
-                    />
-
-                    <Textarea
-                      placeholder="Share your thoughts with the community... Use #hashtags to categorize your post!"
-                      value={newPost.content}
-                      onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
-                      className="border-0 bg-muted/50 focus-visible:ring-1 min-h-[80px] sm:min-h-[100px] resize-none text-sm sm:text-base"
-                      rows={4}
-                    />
-
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                      <select
-                        value={newPost.category_id}
-                        onChange={(e) => setNewPost({ ...newPost, category_id: Number.parseInt(e.target.value) })}
-                        className="px-3 py-2 rounded-lg bg-muted/50 border-0 focus:ring-1 focus:ring-primary text-sm w-full sm:w-auto"
-                      >
-                        {categories.map((category) => (
-                          <option key={category.id} value={category.id}>
-                            {category.name}
-                          </option>
-                        ))}
-                      </select>
-
-                      <Button type="submit" disabled={posting} className="rounded-full w-full sm:w-auto">
-                        {posting ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                        ) : (
-                          <Send className="h-4 w-4" />
-                        )}
-                        <span className="ml-2">{posting ? "Posting..." : "Post"}</span>
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Posts Feed - Improved mobile layout */}
             <div className="space-y-4">
               {loading ? (
@@ -535,6 +461,65 @@ export default function CommunityPage() {
               )}
               <div ref={messagesEndRef} />
             </div>
+
+            {isAuthenticated && (
+              <Card className="glass-card sticky bottom-4 z-20">
+                <CardContent className="p-4 sm:p-6">
+                  <form onSubmit={handleCreatePost} className="space-y-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Avatar className="h-8 w-8 sm:h-10 sm:w-10">
+                        <AvatarImage src={user?.avatar_url || "/placeholder.svg"} />
+                        <AvatarFallback>{user?.username?.[0]?.toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium text-sm sm:text-base">{user?.username}</p>
+                        <Badge variant="secondary" className="text-xs">
+                          {user?.tier || "Free"}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <Input
+                      placeholder="What's the title of your post?"
+                      value={newPost.title}
+                      onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
+                      className="border-0 bg-muted/50 focus-visible:ring-1 text-sm sm:text-base"
+                    />
+
+                    <Textarea
+                      placeholder="Share your thoughts with the community... Use #hashtags to categorize your post!"
+                      value={newPost.content}
+                      onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
+                      className="border-0 bg-muted/50 focus-visible:ring-1 min-h-[100px] sm:min-h-[120px] resize-none text-sm sm:text-base"
+                      rows={4}
+                    />
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                      <select
+                        value={newPost.category_id}
+                        onChange={(e) => setNewPost({ ...newPost, category_id: Number.parseInt(e.target.value) })}
+                        className="px-3 py-2 rounded-lg bg-muted/50 border-0 focus:ring-1 focus:ring-primary text-sm w-full sm:w-auto"
+                      >
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <Button type="submit" disabled={posting} className="rounded-full w-full sm:w-auto">
+                        {posting ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                        <span className="ml-2">{posting ? "Posting..." : "Post"}</span>
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Sidebar - Improved mobile layout */}

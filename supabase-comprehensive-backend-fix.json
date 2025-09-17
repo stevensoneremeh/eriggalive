@@ -1,0 +1,319 @@
+{
+  "task": "Complete Backend Error Resolution for Erigga Fan Platform",
+  "priority": "CRITICAL - Multiple 403, 404, 409, 500 errors affecting core functionality",
+  "description": "Comprehensive audit and fix of all backend database issues, RLS policies, missing functions, and API endpoints",
+
+  "current_issues": {
+    "authentication_errors": [
+      "Foreign key constraint: user_id not present in users table",
+      "409 Conflict for create_community_post RPC",
+      "User profiles not auto-created on auth signup"
+    ],
+    "api_errors": [
+      "404 Not Found: /api/missions endpoint missing",
+      "500 Internal Server Error: /api/referrals/me",
+      "400 Bad Request: event_tickets endpoint",
+      "403 Forbidden: Multiple Supabase RPC calls"
+    ],
+    "database_errors": [
+      "RLS policies blocking authenticated users",
+      "Missing database functions for core features",
+      "Inconsistent table relationships"
+    ]
+  },
+
+  "required_tables": [
+    {
+      "name": "users",
+      "columns": [
+        "id (uuid)",
+        "auth_user_id (uuid)",
+        "email",
+        "username",
+        "full_name",
+        "avatar_url",
+        "tier",
+        "coins",
+        "reputation_score",
+        "is_active",
+        "is_verified",
+        "created_at",
+        "updated_at"
+      ],
+      "relationships": ["auth.users (auth_user_id)"],
+      "issues": ["Auto-creation trigger missing", "RLS policies too restrictive"]
+    },
+    {
+      "name": "community_posts",
+      "columns": [
+        "id (bigint)",
+        "title",
+        "content",
+        "user_id (uuid)",
+        "category_id (bigint)",
+        "hashtags (text[])",
+        "vote_count",
+        "comment_count",
+        "media_url",
+        "media_type",
+        "is_published",
+        "is_deleted",
+        "created_at",
+        "updated_at"
+      ],
+      "relationships": ["users (user_id)", "community_categories (category_id)"],
+      "issues": ["409 conflicts on creation", "Vote counting broken"]
+    },
+    {
+      "name": "community_categories",
+      "columns": [
+        "id (bigint)",
+        "name",
+        "slug",
+        "description",
+        "color",
+        "icon",
+        "display_order",
+        "is_active",
+        "created_at"
+      ],
+      "issues": ["Missing default categories"]
+    },
+    {
+      "name": "community_post_votes",
+      "columns": ["id (bigint)", "post_id (bigint)", "user_id (uuid)", "created_at"],
+      "relationships": ["community_posts (post_id)", "users (user_id)"],
+      "issues": ["Duplicate vote prevention broken"]
+    },
+    {
+      "name": "community_comments",
+      "columns": [
+        "id (bigint)",
+        "post_id (bigint)",
+        "user_id (uuid)",
+        "content",
+        "parent_comment_id (bigint)",
+        "like_count",
+        "is_deleted",
+        "created_at",
+        "updated_at"
+      ],
+      "relationships": ["community_posts (post_id)", "users (user_id)", "community_comments (parent_comment_id)"],
+      "issues": ["Not implemented yet"]
+    },
+    {
+      "name": "missions",
+      "columns": [
+        "id (bigint)",
+        "title",
+        "description",
+        "reward_coins",
+        "requirement_type",
+        "requirement_value",
+        "is_active",
+        "created_at"
+      ],
+      "issues": ["Table missing - causing 404 errors"]
+    },
+    {
+      "name": "user_missions",
+      "columns": ["id (bigint)", "user_id (uuid)", "mission_id (bigint)", "completed_at", "claimed_at"],
+      "relationships": ["users (user_id)", "missions (mission_id)"],
+      "issues": ["Table missing"]
+    },
+    {
+      "name": "referrals",
+      "columns": ["id (bigint)", "referrer_id (uuid)", "referred_id (uuid)", "reward_coins", "status", "created_at"],
+      "relationships": ["users (referrer_id)", "users (referred_id)"],
+      "issues": ["Causing 500 errors in /api/referrals/me"]
+    },
+    {
+      "name": "event_tickets",
+      "columns": [
+        "id (bigint)",
+        "user_id (uuid)",
+        "event_name",
+        "ticket_type",
+        "price",
+        "payment_status",
+        "paystack_reference",
+        "created_at"
+      ],
+      "relationships": ["users (user_id)"],
+      "issues": ["400 errors on ticket purchase"]
+    }
+  ],
+
+  "required_functions": [
+    {
+      "name": "handle_new_user",
+      "type": "trigger_function",
+      "purpose": "Auto-create user profile when auth user signs up",
+      "trigger_on": "auth.users AFTER INSERT",
+      "critical": true
+    },
+    {
+      "name": "get_community_posts_with_user_data",
+      "type": "rpc",
+      "parameters": ["category_filter bigint"],
+      "returns": "TABLE with post and user data",
+      "purpose": "Fetch posts with user info and vote status",
+      "critical": true
+    },
+    {
+      "name": "create_community_post",
+      "type": "rpc",
+      "parameters": ["post_title text", "post_content text", "post_category_id bigint", "post_hashtags text[]"],
+      "returns": "bigint (post_id)",
+      "purpose": "Create new community posts with user validation",
+      "critical": true
+    },
+    {
+      "name": "toggle_post_vote",
+      "type": "rpc",
+      "parameters": ["post_id_param bigint"],
+      "returns": "boolean (voted_status)",
+      "purpose": "Handle like/unlike functionality",
+      "critical": true
+    },
+    {
+      "name": "get_user_missions",
+      "type": "rpc",
+      "parameters": ["user_id_param uuid"],
+      "returns": "TABLE with mission data",
+      "purpose": "Get available and completed missions for user",
+      "missing": true
+    },
+    {
+      "name": "complete_mission",
+      "type": "rpc",
+      "parameters": ["mission_id_param bigint"],
+      "returns": "boolean",
+      "purpose": "Mark mission as completed and award coins",
+      "missing": true
+    },
+    {
+      "name": "get_user_referrals",
+      "type": "rpc",
+      "parameters": ["user_id_param uuid"],
+      "returns": "TABLE with referral data",
+      "purpose": "Get user's referral history and earnings",
+      "missing": true
+    },
+    {
+      "name": "create_referral",
+      "type": "rpc",
+      "parameters": ["referred_email text"],
+      "returns": "text (referral_code)",
+      "purpose": "Create new referral link",
+      "missing": true
+    },
+    {
+      "name": "purchase_event_ticket",
+      "type": "rpc",
+      "parameters": ["event_name text", "ticket_type text", "paystack_reference text"],
+      "returns": "bigint (ticket_id)",
+      "purpose": "Process ticket purchases",
+      "missing": true
+    }
+  ],
+
+  "rls_policies_needed": [
+    {
+      "table": "users",
+      "policies": [
+        "Users can view their own profile (SELECT)",
+        "Users can update their own profile (UPDATE)",
+        "Auto-insert for authenticated users (INSERT)",
+        "Public profiles viewable by all (SELECT for public data)"
+      ]
+    },
+    {
+      "table": "community_posts",
+      "policies": [
+        "Anyone can view published posts (SELECT)",
+        "Authenticated users can create posts (INSERT)",
+        "Users can update their own posts (UPDATE)",
+        "Users can delete their own posts (DELETE)"
+      ]
+    },
+    {
+      "table": "community_post_votes",
+      "policies": [
+        "Anyone can view votes (SELECT)",
+        "Authenticated users can vote (INSERT)",
+        "Users can remove their own votes (DELETE)"
+      ]
+    },
+    {
+      "table": "missions",
+      "policies": ["Anyone can view active missions (SELECT)"]
+    },
+    {
+      "table": "user_missions",
+      "policies": ["Users can view their own missions (SELECT)", "System can create mission completions (INSERT)"]
+    }
+  ],
+
+  "default_data_needed": [
+    {
+      "table": "community_categories",
+      "data": [
+        { "name": "General Discussion", "slug": "general", "color": "#3B82F6", "icon": "users", "display_order": 1 },
+        { "name": "Music & Lyrics", "slug": "music", "color": "#8B5CF6", "icon": "music", "display_order": 2 },
+        { "name": "Fan Art & Media", "slug": "media", "color": "#10B981", "icon": "image", "display_order": 3 },
+        { "name": "Events & News", "slug": "events", "color": "#F59E0B", "icon": "calendar", "display_order": 4 },
+        { "name": "Questions & Help", "slug": "help", "color": "#EF4444", "icon": "help-circle", "display_order": 5 }
+      ]
+    },
+    {
+      "table": "missions",
+      "data": [
+        {
+          "title": "Welcome to the Community",
+          "description": "Create your first community post",
+          "reward_coins": 50,
+          "requirement_type": "post_count",
+          "requirement_value": 1
+        },
+        {
+          "title": "Social Butterfly",
+          "description": "Like 10 community posts",
+          "reward_coins": 25,
+          "requirement_type": "vote_count",
+          "requirement_value": 10
+        },
+        {
+          "title": "Conversation Starter",
+          "description": "Get 5 likes on a post",
+          "reward_coins": 75,
+          "requirement_type": "post_likes",
+          "requirement_value": 5
+        }
+      ]
+    }
+  ],
+
+  "api_endpoints_to_create": [
+    {
+      "path": "/api/missions",
+      "methods": ["GET"],
+      "purpose": "Get available missions for user",
+      "currently": "404 Not Found"
+    },
+    {
+      "path": "/api/referrals/me",
+      "methods": ["GET"],
+      "purpose": "Get user's referral data",
+      "currently": "500 Internal Server Error"
+    },
+    {
+      "path": "/api/community/comments",
+      "methods": ["GET", "POST"],
+      "purpose": "Handle post comments",
+      "currently": "Missing"
+    }
+  ],
+
+  "instructions": "Please create a complete SQL script that addresses ALL the issues above. Include: 1) Drop and recreate all problematic functions, 2) Create missing tables with proper relationships, 3) Set up comprehensive RLS policies, 4) Create all missing database functions, 5) Insert default data, 6) Create proper triggers for user auto-creation, 7) Fix all foreign key constraints. Make this a ONE-TIME comprehensive fix that resolves all backend errors."
+}
