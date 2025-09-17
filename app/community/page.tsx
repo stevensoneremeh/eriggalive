@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Send,
   Heart,
@@ -26,10 +27,14 @@ import {
   Clock,
   Search,
   Filter,
+  Radio,
+  Mic,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
+import { ShoutOutDisplay } from "@/components/shout-out-display"
+import { AnimatedRadioCharacter } from "@/components/radio/animated-radio-character"
 
 interface CommunityPost {
   id: number
@@ -281,7 +286,9 @@ export default function CommunityPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pt-16">
+    <div className="min-h-screen bg-background">
+      <ShoutOutDisplay position="top" />
+
       {/* Header - Fixed positioning issue */}
       <div className="sticky top-16 z-30 bg-background/95 backdrop-blur-sm border-b">
         <div className="container mx-auto px-4 py-3 sm:py-4">
@@ -313,21 +320,6 @@ export default function CommunityPage() {
               </Button>
             </div>
           </div>
-
-          <div className="flex items-center gap-4">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-4 py-2 rounded-lg bg-muted/50 border-0 focus:ring-2 focus:ring-primary text-sm min-w-[150px]"
-            >
-              <option value="all">All Categories</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.slug}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
       </div>
 
@@ -336,7 +328,7 @@ export default function CommunityPage() {
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-4 sm:space-y-6">
             {/* Posts Feed - Improved mobile layout */}
-            <div className="space-y-4">
+            <div className="space-y-4 pb-32">
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -461,69 +453,68 @@ export default function CommunityPage() {
               )}
               <div ref={messagesEndRef} />
             </div>
-
-            {isAuthenticated && (
-              <Card className="glass-card sticky bottom-4 z-20">
-                <CardContent className="p-4 sm:p-6">
-                  <form onSubmit={handleCreatePost} className="space-y-4">
-                    <div className="flex items-center gap-3 mb-4">
-                      <Avatar className="h-8 w-8 sm:h-10 sm:w-10">
-                        <AvatarImage src={user?.avatar_url || "/placeholder.svg"} />
-                        <AvatarFallback>{user?.username?.[0]?.toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-sm sm:text-base">{user?.username}</p>
-                        <Badge variant="secondary" className="text-xs">
-                          {user?.tier || "Free"}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <Input
-                      placeholder="What's the title of your post?"
-                      value={newPost.title}
-                      onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-                      className="border-0 bg-muted/50 focus-visible:ring-1 text-sm sm:text-base"
-                    />
-
-                    <Textarea
-                      placeholder="Share your thoughts with the community... Use #hashtags to categorize your post!"
-                      value={newPost.content}
-                      onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
-                      className="border-0 bg-muted/50 focus-visible:ring-1 min-h-[100px] sm:min-h-[120px] resize-none text-sm sm:text-base"
-                      rows={4}
-                    />
-
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                      <select
-                        value={newPost.category_id}
-                        onChange={(e) => setNewPost({ ...newPost, category_id: Number.parseInt(e.target.value) })}
-                        className="px-3 py-2 rounded-lg bg-muted/50 border-0 focus:ring-1 focus:ring-primary text-sm w-full sm:w-auto"
-                      >
-                        {categories.map((category) => (
-                          <option key={category.id} value={category.id}>
-                            {category.name}
-                          </option>
-                        ))}
-                      </select>
-
-                      <Button type="submit" disabled={posting} className="rounded-full w-full sm:w-auto">
-                        {posting ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                        ) : (
-                          <Send className="h-4 w-4" />
-                        )}
-                        <span className="ml-2">{posting ? "Posting..." : "Post"}</span>
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
-            )}
           </div>
 
-          {/* Sidebar - Improved mobile layout */}
+          {/* Sidebar */}
           <div className="space-y-4 sm:space-y-6">
+            {/* Shoutout Feature */}
+            <Card className="glass-card">
+              <CardContent className="p-4 sm:p-6">
+                <h3 className="font-semibold mb-4 text-sm sm:text-base flex items-center gap-2">
+                  <Mic className="h-4 w-4" />
+                  Live Shoutouts
+                </h3>
+                <div className="flex justify-center mb-4">
+                  <AnimatedRadioCharacter
+                    isPlaying={true}
+                    isLive={true}
+                    shoutouts={["Welcome to the community!", "Erigga fans unite!", "Paper Boi forever!"]}
+                    className="w-full"
+                  />
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground mb-2">Send a shoutout to go live!</p>
+                  <Link href="/radio">
+                    <Button size="sm" className="w-full">
+                      <Radio className="h-3 w-3 mr-2" />
+                      Go to Radio
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Mini Erigga Radio */}
+            <Card className="glass-card">
+              <CardContent className="p-4 sm:p-6">
+                <h3 className="font-semibold mb-4 text-sm sm:text-base flex items-center gap-2">
+                  <Radio className="h-4 w-4" />
+                  Erigga Radio
+                </h3>
+                <div className="text-center space-y-3">
+                  <div className="relative">
+                    <motion.div
+                      className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center"
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+                    >
+                      <Radio className="h-6 w-6 text-white" />
+                    </motion.div>
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Now Playing</p>
+                    <p className="text-xs text-muted-foreground">Paper Boi Vibes</p>
+                  </div>
+                  <Link href="/radio">
+                    <Button size="sm" className="w-full">
+                      Listen Live
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Community Stats */}
             <Card className="glass-card">
               <CardContent className="p-4 sm:p-6">
@@ -545,23 +536,6 @@ export default function CommunityPage() {
               </CardContent>
             </Card>
 
-            {/* Trending Hashtags */}
-            <Card className="glass-card">
-              <CardContent className="p-4 sm:p-6">
-                <h3 className="font-semibold mb-4 text-sm sm:text-base">Trending Topics</h3>
-                <div className="space-y-2">
-                  {["#EriggaLive", "#PaperBoi", "#WarriPikin", "#NewMusic", "#Community"].map((tag, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                      <Badge variant="secondary" className="text-xs">
-                        {tag}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">{Math.floor(Math.random() * 50) + 10}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Community Guidelines */}
             <Card className="glass-card">
               <CardContent className="p-4 sm:p-6">
@@ -578,6 +552,73 @@ export default function CommunityPage() {
           </div>
         </div>
       </div>
+
+      {isAuthenticated && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t">
+          <div className="container mx-auto px-4 py-4">
+            <form onSubmit={handleCreatePost} className="space-y-3">
+              {/* Category Selection Dropdown */}
+              <div className="flex items-center gap-3">
+                <Avatar className="h-8 w-8 flex-shrink-0">
+                  <AvatarImage src={user?.avatar_url || "/placeholder.svg"} />
+                  <AvatarFallback>{user?.username?.[0]?.toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <Select
+                  value={selectedCategory}
+                  onValueChange={(value) => {
+                    setSelectedCategory(value)
+                    const category = categories.find((c) => c.slug === value)
+                    if (category) {
+                      setNewPost({ ...newPost, category_id: category.id })
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-40 h-8 text-xs">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.slug} className="text-xs">
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Title Input */}
+              <Input
+                placeholder="What's on your mind?"
+                value={newPost.title}
+                onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
+                className="border-0 bg-muted/50 focus-visible:ring-1 text-sm"
+              />
+
+              {/* Content and Send Button */}
+              <div className="flex items-end gap-2">
+                <Textarea
+                  placeholder="Share your thoughts with the community... Use #hashtags!"
+                  value={newPost.content}
+                  onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
+                  className="border-0 bg-muted/50 focus-visible:ring-1 min-h-[60px] resize-none text-sm flex-1"
+                  rows={2}
+                />
+                <Button
+                  type="submit"
+                  disabled={posting || !newPost.title.trim() || !newPost.content.trim()}
+                  className="rounded-full h-10 w-10 p-0 flex-shrink-0"
+                >
+                  {posting ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
