@@ -10,7 +10,7 @@ interface UserTierBadgeProps {
 
 export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierBadgeProps) {
   const tierInfo = {
-    // Legacy grassroot system (keeping for backward compatibility) - Updated to use new badge names
+    // Legacy grassroot system (keeping for backward compatibility)
     grassroot: {
       label: "Erigga Citizen",
       icon: User,
@@ -35,7 +35,7 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
       color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",
       tooltip: "Enterprise tier member with VIP gold access",
     },
-    // New membership tier system - Updated with new badge colors and names
+    // New membership tier system
     FREE: {
       label: "Erigga Citizen",
       icon: User,
