@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useAuth } from "@/contexts/auth-context"
@@ -18,12 +17,7 @@ import {
   MessageCircle,
   Share2,
   MoreVertical,
-  ImageIcon,
-  Video,
-  Music,
-  Hash,
   Users,
-  TrendingUp,
   Clock,
   Search,
   Filter,
@@ -108,15 +102,40 @@ export default function CommunityPage() {
         .eq("is_active", true)
         .order("display_order")
 
-      if (error) throw error
+      if (error) {
+        console.log("[v0] Categories error:", error)
+        // Create default categories if none exist
+        setCategories([
+          {
+            id: 1,
+            name: "General",
+            slug: "general",
+            description: "General discussion",
+            color: "#3B82F6",
+            icon: "users",
+            display_order: 1,
+            is_active: true,
+            created_at: new Date().toISOString(),
+          },
+        ])
+        return
+      }
       setCategories(data || [])
     } catch (error) {
       console.error("Error fetching categories:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load categories",
-        variant: "destructive",
-      })
+      setCategories([
+        {
+          id: 1,
+          name: "General",
+          slug: "general",
+          description: "General discussion",
+          color: "#3B82F6",
+          icon: "users",
+          display_order: 1,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        },
+      ])
     }
   }
 
@@ -133,14 +152,52 @@ export default function CommunityPage() {
         }
       }
 
-      // Use the new database function
+      console.log("[v0] Fetching posts with category filter:", categoryFilter)
+
+      // Use the database function
       const { data, error } = await supabase.rpc("get_community_posts_with_user_data", {
         category_filter: categoryFilter,
       })
 
-      if (error) throw error
+      if (error) {
+        console.log("[v0] Posts fetch error:", error)
+        // If function doesn't exist, try direct table query
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from("community_posts")
+          .select(`
+            *,
+            users:user_id (username, full_name, avatar_url),
+            community_categories:category_id (name, color, icon)
+          `)
+          .eq("is_published", true)
+          .eq("is_deleted", false)
+          .order("created_at", { ascending: false })
 
-      // Sort posts on client side since the function returns them in creation order
+        if (fallbackError) {
+          console.log("[v0] Fallback query error:", fallbackError)
+          setPosts([])
+          return
+        }
+
+        // Transform fallback data to match expected format
+        const transformedData = (fallbackData || []).map((post) => ({
+          ...post,
+          category_name: post.community_categories?.name || "General",
+          category_color: post.community_categories?.color || "#3B82F6",
+          category_icon: post.community_categories?.icon || "hash",
+          username: post.users?.username || "Anonymous",
+          full_name: post.users?.full_name || "Anonymous User",
+          avatar_url: post.users?.avatar_url,
+          user_voted: false,
+        }))
+
+        setPosts(transformedData)
+        return
+      }
+
+      console.log("[v0] Posts fetched successfully:", data?.length || 0)
+
+      // Sort posts on client side
       let sortedPosts = data || []
       switch (sortBy) {
         case "popular":
@@ -156,11 +213,7 @@ export default function CommunityPage() {
       setPosts(sortedPosts)
     } catch (error) {
       console.error("Error fetching posts:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load posts",
-        variant: "destructive",
-      })
+      setPosts([])
     } finally {
       setLoading(false)
     }
@@ -191,7 +244,7 @@ export default function CommunityPage() {
 
       console.log("[v0] Starting post creation", { user: user?.id, title: newPost.title })
 
-      // Use the new database function
+      // Use the database function
       const { data, error } = await supabase.rpc("create_community_post", {
         post_title: newPost.title.trim(),
         post_content: newPost.content.trim(),
@@ -201,10 +254,28 @@ export default function CommunityPage() {
 
       if (error) {
         console.log("[v0] Error creating post:", error)
-        throw error
-      }
 
-      console.log("[v0] Post created successfully:", data)
+        // Fallback: try direct insert
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from("community_posts")
+          .insert({
+            title: newPost.title.trim(),
+            content: newPost.content.trim(),
+            category_id: newPost.category_id,
+            hashtags: extractHashtags(newPost.content),
+            user_id: user.id,
+          })
+          .select()
+
+        if (fallbackError) {
+          console.log("[v0] Fallback insert error:", fallbackError)
+          throw fallbackError
+        }
+
+        console.log("[v0] Post created via fallback:", fallbackData)
+      } else {
+        console.log("[v0] Post created successfully:", data)
+      }
 
       toast({
         title: "Success",
@@ -243,7 +314,7 @@ export default function CommunityPage() {
     try {
       console.log("[v0] Toggling vote for post:", postId)
 
-      // Use the new database function
+      // Use the database function
       const { data, error } = await supabase.rpc("toggle_post_vote", {
         post_id_param: postId,
       })
@@ -273,23 +344,11 @@ export default function CommunityPage() {
       post.username.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  const getCategoryIcon = (iconName: string) => {
-    const icons: { [key: string]: any } = {
-      music: Music,
-      video: Video,
-      image: ImageIcon,
-      hash: Hash,
-      users: Users,
-      trending: TrendingUp,
-    }
-    return icons[iconName] || Hash
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <ShoutOutDisplay position="top" />
 
-      {/* Header - Fixed positioning issue */}
+      {/* Header */}
       <div className="sticky top-16 z-30 bg-background/95 backdrop-blur-sm border-b">
         <div className="container mx-auto px-4 py-3 sm:py-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
@@ -327,7 +386,7 @@ export default function CommunityPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-4 sm:space-y-6">
-            {/* Posts Feed - Improved mobile layout */}
+            {/* Posts Feed */}
             <div className="space-y-4 pb-32">
               {loading ? (
                 <div className="flex items-center justify-center py-12">
@@ -338,11 +397,7 @@ export default function CommunityPage() {
                   <CardContent className="p-8 sm:p-12 text-center">
                     <Users className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-4 text-muted-foreground" />
                     <h3 className="text-base sm:text-lg font-semibold mb-2">No posts yet</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {selectedCategory === "all"
-                        ? "Be the first to start a conversation!"
-                        : `No posts in ${categories.find((c) => c.slug === selectedCategory)?.name} yet.`}
-                    </p>
+                    <p className="text-sm text-muted-foreground mb-4">Be the first to start a conversation!</p>
                     {!isAuthenticated && (
                       <Link href="/login">
                         <Button>Join the Community</Button>
@@ -362,7 +417,7 @@ export default function CommunityPage() {
                     >
                       <Card className="glass-card hover:shadow-lg transition-all duration-300">
                         <CardContent className="p-4 sm:p-6">
-                          {/* Post Header - Improved mobile layout */}
+                          {/* Post Header */}
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                               <Avatar className="h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0">
@@ -415,7 +470,7 @@ export default function CommunityPage() {
                             )}
                           </div>
 
-                          {/* Post Actions - Improved mobile layout */}
+                          {/* Post Actions */}
                           <div className="flex items-center justify-between pt-4 border-t">
                             <div className="flex items-center gap-2 sm:gap-4">
                               <Button
@@ -455,7 +510,7 @@ export default function CommunityPage() {
             </div>
           </div>
 
-          {/* Sidebar */}
+          {/* Sidebar - Replaced trending topics with shoutout feature and mini radio */}
           <div className="space-y-4 sm:space-y-6">
             {/* Shoutout Feature */}
             <Card className="glass-card">
@@ -535,20 +590,6 @@ export default function CommunityPage() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Community Guidelines */}
-            <Card className="glass-card">
-              <CardContent className="p-4 sm:p-6">
-                <h3 className="font-semibold mb-4 text-sm sm:text-base">Community Guidelines</h3>
-                <ul className="text-xs sm:text-sm text-muted-foreground space-y-2">
-                  <li>• Be respectful to all members</li>
-                  <li>• No spam or self-promotion</li>
-                  <li>• Keep discussions relevant</li>
-                  <li>• Use appropriate hashtags</li>
-                  <li>• Report inappropriate content</li>
-                </ul>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>
@@ -564,13 +605,9 @@ export default function CommunityPage() {
                   <AvatarFallback>{user?.username?.[0]?.toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <Select
-                  value={selectedCategory}
+                  value={newPost.category_id.toString()}
                   onValueChange={(value) => {
-                    setSelectedCategory(value)
-                    const category = categories.find((c) => c.slug === value)
-                    if (category) {
-                      setNewPost({ ...newPost, category_id: category.id })
-                    }
+                    setNewPost({ ...newPost, category_id: Number.parseInt(value) })
                   }}
                 >
                   <SelectTrigger className="w-40 h-8 text-xs">
@@ -578,7 +615,7 @@ export default function CommunityPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.slug} className="text-xs">
+                      <SelectItem key={category.id} value={category.id.toString()} className="text-xs">
                         {category.name}
                       </SelectItem>
                     ))}

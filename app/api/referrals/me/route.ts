@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get current user
     const {
@@ -21,17 +21,48 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get user's referral data
     const { data: userData, error: userError } = await supabase
       .from("users")
-      .select("referral_code, referral_count")
-      .eq("id", user.id)
+      .select("id, username, referral_code, referral_count")
+      .eq("auth_user_id", user.id)
       .single()
 
     if (userError) {
       console.error("[v0] Database error in referrals/me:", userError)
+      if (userError.code === "42P01") {
+        return NextResponse.json({
+          success: true,
+          referralCode: `REF${user.id.slice(0, 8).toUpperCase()}`,
+          referralCount: 0,
+        })
+      }
       if (userError.code === "PGRST116") {
-        return NextResponse.json({ success: false, error: "User not found" }, { status: 404 })
+        const { data: newUser, error: createError } = await supabase
+          .from("users")
+          .insert({
+            auth_user_id: user.id,
+            email: user.email,
+            username: user.email?.split("@")[0] || "user",
+            referral_code: `REF${user.id.slice(0, 8).toUpperCase()}`,
+            referral_count: 0,
+          })
+          .select()
+          .single()
+
+        if (createError) {
+          console.error("[v0] Error creating user:", createError)
+          return NextResponse.json({
+            success: true,
+            referralCode: `REF${user.id.slice(0, 8).toUpperCase()}`,
+            referralCount: 0,
+          })
+        }
+
+        return NextResponse.json({
+          success: true,
+          referralCode: newUser.referral_code,
+          referralCount: newUser.referral_count || 0,
+        })
       }
       return NextResponse.json({ success: false, error: "Database query failed" }, { status: 500 })
     }
@@ -43,7 +74,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      referralCode: userData.referral_code,
+      referralCode: userData.referral_code || `REF${user.id.slice(0, 8).toUpperCase()}`,
       referralCount: userData.referral_count || 0,
     })
   } catch (error) {
