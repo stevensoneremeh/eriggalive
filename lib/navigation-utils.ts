@@ -123,7 +123,7 @@ export class NavigationManager {
     // 2. Stored redirect path from cookies/localStorage
     // 3. Default dashboard
 
-    let targetPath = ROUTES.DASHBOARD
+    let targetPath: string = ROUTES.DASHBOARD
 
     // Check for intended path from URL
     if (intendedPath && this.isValidRedirectPath(intendedPath)) {
@@ -132,7 +132,7 @@ export class NavigationManager {
       // Check for stored redirect path
       const storedPath = this.getStoredRedirectPath()
       if (storedPath && this.isValidRedirectPath(storedPath)) {
-        targetPath = storedPath
+        targetPath = storedPath as string
       }
     }
 
