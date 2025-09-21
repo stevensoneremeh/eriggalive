@@ -1,8 +1,8 @@
 -- =====================================================
--- COMPLETE PRODUCTION MIGRATION FOR ERIGGA LIVE
+-- COMPLETE ONE-TIME PRODUCTION MIGRATION FOR ERIGGA LIVE
 -- =====================================================
 -- This script safely migrates the existing database to the new schema
--- Handles existing data and updates tier system
+-- Handles existing data and updates tier system with proper auth integration
 
 -- First, let's check what exists and create what's missing
 DO $$
@@ -123,7 +123,18 @@ BEGIN
     ELSE
         -- Add missing columns to existing users table
         BEGIN
-            ALTER TABLE users ADD COLUMN IF NOT EXISTS id UUID DEFAULT uuid_generate_v4();
+            -- Check if id column exists and is the right type
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'id' AND data_type = 'uuid') THEN
+                -- If id column doesn't exist or is wrong type, add it
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS id UUID DEFAULT uuid_generate_v4();
+                -- Make it primary key if it's not already
+                BEGIN
+                    ALTER TABLE users ADD PRIMARY KEY (id);
+                EXCEPTION
+                    WHEN OTHERS THEN
+                        RAISE NOTICE 'Primary key already exists or cannot be added';
+                END;
+            END IF;
         EXCEPTION WHEN OTHERS THEN
             RAISE NOTICE 'Column id already exists or cannot be added';
         END;

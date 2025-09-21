@@ -1,18 +1,18 @@
-import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { type NextRequest, NextResponse } from "next/server"
+
+export const dynamic = "force-dynamic"
 
 export async function GET(request: NextRequest) {
   try {
+    const supabase = await createClient()
     const { searchParams } = new URL(request.url)
-    const categoryId = searchParams.get("category")
-    const limit = Number.parseInt(searchParams.get("limit") || "20")
-    const offset = Number.parseInt(searchParams.get("offset") || "0")
+    const category = searchParams.get("category")
+    const sort = searchParams.get("sort") || "newest"
 
-    const supabase = createClient()
-
-    // Use the database function to get posts with user data
+    // Get posts using the database function
     const { data: posts, error } = await supabase.rpc("get_community_posts_with_user_data", {
-      category_filter: categoryId || null,
+      category_filter: category || null,
     })
 
     if (error) {
@@ -20,41 +20,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch posts" }, { status: 500 })
     }
 
-    // Apply pagination
-    const paginatedPosts = posts?.slice(offset, offset + limit) || []
+    // Sort posts based on the sort parameter
+    let sortedPosts = posts || []
+    switch (sort) {
+      case "popular":
+        sortedPosts = sortedPosts.sort((a, b) => b.vote_count - a.vote_count)
+        break
+      case "discussed":
+        sortedPosts = sortedPosts.sort((a, b) => b.comment_count - a.comment_count)
+        break
+      case "newest":
+      default:
+        sortedPosts = sortedPosts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        break
+    }
 
-    // Transform the data to match frontend expectations
-    const formattedPosts = paginatedPosts.map((post: any) => ({
-      id: post.id,
-      title: post.title,
-      content: post.content,
-      media_url: post.media_url,
-      media_type: post.media_type,
-      vote_count: post.vote_count,
-      comment_count: post.comment_count,
-      created_at: post.created_at,
-      updated_at: post.updated_at,
-      user_voted: post.user_voted,
-      user: {
-        id: post.user_id,
-        username: post.username,
-        full_name: post.full_name,
-        avatar_url: post.avatar_url,
-        tier: post.tier,
-      },
-      category: {
-        id: post.category_id,
-        name: post.category_name,
-        color: post.category_color,
-        icon: post.category_icon,
-      },
-    }))
-
-    return NextResponse.json({
-      posts: formattedPosts,
-      total: posts?.length || 0,
-      hasMore: offset + limit < (posts?.length || 0),
-    })
+    return NextResponse.json({ posts: sortedPosts })
   } catch (error) {
     console.error("Error in posts API:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -63,9 +44,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
-    // Get the current user
+    // Get the authenticated user
     const {
       data: { user },
       error: authError,
@@ -75,7 +56,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get the user profile
+    // Get user profile
     const { data: profile, error: profileError } = await supabase
       .from("users")
       .select("id")
@@ -94,7 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the post
-    const { data: post, error: createError } = await supabase
+    const { data: post, error: postError } = await supabase
       .from("community_posts")
       .insert({
         user_id: profile.id,
@@ -107,12 +88,12 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (createError) {
-      console.error("Error creating post:", createError)
+    if (postError) {
+      console.error("Error creating post:", postError)
       return NextResponse.json({ error: "Failed to create post" }, { status: 500 })
     }
 
-    return NextResponse.json({ post }, { status: 201 })
+    return NextResponse.json({ post })
   } catch (error) {
     console.error("Error in POST posts API:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

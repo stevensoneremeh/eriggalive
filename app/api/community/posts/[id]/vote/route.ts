@@ -1,11 +1,14 @@
-import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { type NextRequest, NextResponse } from "next/server"
+
+export const dynamic = "force-dynamic"
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
+    const postId = params.id
 
-    // Get the current user
+    // Get the authenticated user
     const {
       data: { user },
       error: authError,
@@ -15,14 +18,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const postId = params.id
-
-    if (!postId) {
-      return NextResponse.json({ error: "Post ID is required" }, { status: 400 })
-    }
-
     // Use the database function to toggle vote
-    const { data, error } = await supabase.rpc("toggle_post_vote", {
+    const { data: result, error } = await supabase.rpc("toggle_post_vote", {
       post_id_param: postId,
     })
 
@@ -31,12 +28,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Failed to toggle vote" }, { status: 500 })
     }
 
-    // Check if the response indicates an error
-    if (data && typeof data === "object" && "error" in data) {
-      return NextResponse.json({ error: data.error }, { status: 400 })
-    }
-
-    return NextResponse.json(data)
+    return NextResponse.json(result)
   } catch (error) {
     console.error("Error in vote API:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

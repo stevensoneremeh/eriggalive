@@ -1,108 +1,29 @@
-import { User, Building, Star } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { getTierDisplayInfo } from "@/hooks/useMembership"
 
 interface UserTierBadgeProps {
   tier: string
   size?: "sm" | "md" | "lg" | "xs" | "xxs"
   showLabel?: boolean
+  className?: string
 }
 
-export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierBadgeProps) {
-  const tierInfo = {
-    // New tier system
-    erigga_citizen: {
-      label: "Erigga Citizen",
-      icon: User,
-      color: "bg-green-500/20 text-green-600 border-green-500",
-      tooltip: "Free tier member - Erigga Citizen",
-    },
-    erigga_indigen: {
-      label: "Erigga Indigen",
-      icon: Star,
-      color: "bg-blue-500/20 text-blue-600 border-blue-500",
-      tooltip: "Pro tier member - Erigga Indigen with premium access",
-    },
-    enterprise: {
-      label: "E",
-      icon: Building,
-      color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",
-      tooltip: "Enterprise tier member with VIP gold access",
-    },
-    // Legacy tier mappings for backward compatibility
-    grassroot: {
-      label: "Erigga Citizen",
-      icon: User,
-      color: "bg-green-500/20 text-green-600 border-green-500",
-      tooltip: "Free tier member - Erigga Citizen",
-    },
-    pioneer: {
-      label: "Erigga Indigen",
-      icon: Star,
-      color: "bg-blue-500/20 text-blue-600 border-blue-500",
-      tooltip: "Pro tier member - Erigga Indigen with premium access",
-    },
-    elder: {
-      label: "Erigga Indigen",
-      icon: Star,
-      color: "bg-blue-500/20 text-blue-600 border-blue-500",
-      tooltip: "Pro tier member - Erigga Indigen with premium access",
-    },
-    blood: {
-      label: "E",
-      icon: Building,
-      color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",
-      tooltip: "Enterprise tier member with VIP gold access",
-    },
-    blood_brotherhood: {
-      label: "E",
-      icon: Building,
-      color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",
-      tooltip: "Enterprise tier member with VIP gold access",
-    },
-    // Alternative mappings
-    FREE: {
-      label: "Erigga Citizen",
-      icon: User,
-      color: "bg-green-500/20 text-green-600 border-green-500",
-      tooltip: "Free tier member - Erigga Citizen",
-    },
-    free: {
-      label: "Erigga Citizen",
-      icon: User,
-      color: "bg-green-500/20 text-green-600 border-green-500",
-      tooltip: "Free tier member - Erigga Citizen",
-    },
-    PRO: {
-      label: "Erigga Indigen",
-      icon: Star,
-      color: "bg-blue-500/20 text-blue-600 border-blue-500",
-      tooltip: "Pro tier member - Erigga Indigen with premium access",
-    },
-    pro: {
-      label: "Erigga Indigen",
-      icon: Star,
-      color: "bg-blue-500/20 text-blue-600 border-blue-500",
-      tooltip: "Pro tier member - Erigga Indigen with premium access",
-    },
-    ENT: {
-      label: "E",
-      icon: Building,
-      color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",
-      tooltip: "Enterprise tier member with VIP gold access",
-    },
-    ent: {
-      label: "E",
-      icon: Building,
-      color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",
-      tooltip: "Enterprise tier member with VIP gold access",
-    },
+export function UserTierBadge({ tier, size = "md", showLabel = true, className = "" }: UserTierBadgeProps) {
+  const tierInfo = getTierDisplayInfo(tier)
+
+  const getBadgeVariant = (color: string) => {
+    switch (color) {
+      case "green":
+        return "bg-green-100 text-green-800 border-green-200 hover:bg-green-200"
+      case "blue":
+        return "bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200"
+      case "yellow":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200"
+    }
   }
-
-  const normalizedTier = tier?.toLowerCase() || "erigga_citizen"
-  const tierData = tierInfo[normalizedTier as keyof typeof tierInfo] || tierInfo.erigga_citizen
-
-  const IconComponent = tierData.icon
 
   const sizeClasses = {
     xxs: "text-xs py-0 px-1",
@@ -120,17 +41,15 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
     lg: "h-5 w-5",
   }
 
-  const isEnterprise =
-    normalizedTier === "enterprise" ||
-    normalizedTier === "ent" ||
-    normalizedTier === "blood" ||
-    normalizedTier === "blood_brotherhood"
+  const isEnterprise = tier === "enterprise" || tier === "ent" || tier === "blood" || tier === "blood_brotherhood"
 
   const enterpriseClasses = isEnterprise
     ? "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500 shadow-lg shadow-yellow-400/25 hover:shadow-yellow-400/40 hover:from-yellow-400/40 hover:to-amber-500/40 font-bold"
     : ""
 
-  const enterpriseTextStyle = isEnterprise && tierData.label === "E" ? "font-black text-xl tracking-wider" : ""
+  const enterpriseTextStyle = isEnterprise && tierInfo.label === "E" ? "font-black text-xl tracking-wider" : ""
+
+  const IconComponent = tierInfo.icon
 
   return (
     <TooltipProvider>
@@ -138,14 +57,14 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
         <TooltipTrigger asChild>
           <Badge
             variant="outline"
-            className={`${isEnterprise ? enterpriseClasses : tierData.color} ${sizeClasses[size]} font-medium transition-all duration-300 ${isEnterprise ? "animate-pulse" : ""}`}
+            className={`${getBadgeVariant(tierInfo.color)} ${className} ${sizeClasses[size]} font-medium transition-all duration-300 ${isEnterprise ? "animate-pulse" : ""}`}
           >
             <IconComponent className={`${iconSizes[size]} ${showLabel ? "mr-1" : ""}`} />
-            {showLabel && <span className={enterpriseTextStyle}>{tierData.label}</span>}
+            {showLabel && <span className={enterpriseTextStyle}>{tierInfo.label}</span>}
           </Badge>
         </TooltipTrigger>
         <TooltipContent>
-          <p>{tierData.tooltip}</p>
+          <p>{tierInfo.tooltip}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
