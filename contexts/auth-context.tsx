@@ -314,8 +314,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false)
         return { error: null }
       } catch (error: any) {
+        console.error('Signup error:', error)
         setLoading(false)
-        return { error: { message: error.message || "An unexpected error occurred" } }
+        return { error: { message: error.message || "An unexpected error occurred during signup" } }
       }
     },
     [supabase, router, supabaseError],

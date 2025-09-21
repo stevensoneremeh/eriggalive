@@ -207,16 +207,20 @@ export default function SignupPage() {
         username: formData.username,
         full_name: formData.fullName,
         tier: formData.tier,
-        interval: formData.interval,
         payment_reference: paymentReference,
         custom_amount: formData.tier === "ENT" ? formData.customAmount : undefined,
       })
 
       if (error) {
+        console.error('Signup error:', error)
         setError(error.message || "Failed to create account")
       } else {
-        // Success - redirect will be handled by auth context
-        router.push("/dashboard")
+        // Success - redirect to success page for email verification or dashboard
+        if (formData.tier === "FREE") {
+          router.push("/signup/success")
+        } else {
+          router.push("/dashboard")
+        }
       }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred")
