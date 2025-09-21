@@ -17,7 +17,20 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
       color: "bg-green-500/20 text-green-600 border-green-500",
       tooltip: "Free tier member - Erigga Citizen",
     },
+    // New tier system
+    erigga_citizen: {
+      label: "Erigga Citizen",
+      icon: User,
+      color: "bg-green-500/20 text-green-600 border-green-500",
+      tooltip: "Free tier member - Erigga Citizen",
+    },
     pioneer: {
+      label: "Erigga Indigen",
+      icon: Star,
+      color: "bg-blue-500/20 text-blue-600 border-blue-500",
+      tooltip: "Pro tier member - Erigga Indigen with premium access",
+    },
+    erigga_indigen: {
       label: "Erigga Indigen",
       icon: Star,
       color: "bg-blue-500/20 text-blue-600 border-blue-500",
@@ -35,7 +48,13 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
       color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",
       tooltip: "Enterprise tier member with VIP gold access",
     },
-    // New membership tier system
+    enterprise: {
+      label: "E",
+      icon: Building,
+      color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",
+      tooltip: "Enterprise tier member with VIP gold access",
+    },
+    // Alternative tier mappings
     FREE: {
       label: "Erigga Citizen",
       icon: User,
@@ -66,7 +85,7 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
       color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",
       tooltip: "Enterprise tier member with VIP gold access",
     },
-    enterprise: {
+    ent: {
       label: "E",
       icon: Building,
       color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",

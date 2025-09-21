@@ -1,16 +1,25 @@
 export function getTierDisplayInfo(tier: string) {
   const tierMap = {
-    grassroot: { label: "ECor Erigga Citizen", color: "gray", level: 0 },
+    // Legacy tier mappings for backward compatibility
+    grassroot: { label: "Erigga Citizen", color: "gray", level: 0 },
     pioneer: { label: "Erigga Indigen", color: "blue", level: 1 },
-    elder: { label: "Elder", color: "gold", level: 2 },
-    blood: { label: "Blood", color: "red", level: 3 },
-    FREE: { label: "ECor Erigga Citizen", color: "gray", level: 0 },
+    elder: { label: "Erigga Indigen", color: "blue", level: 1 },
+    blood: { label: "E", color: "yellow", level: 2 },
+    // New tier system
+    erigga_citizen: { label: "Erigga Citizen", color: "gray", level: 0 },
+    erigga_indigen: { label: "Erigga Indigen", color: "blue", level: 1 },
+    enterprise: { label: "E", color: "yellow", level: 2 },
+    // Alternative mappings
+    FREE: { label: "Erigga Citizen", color: "gray", level: 0 },
+    free: { label: "Erigga Citizen", color: "gray", level: 0 },
     PRO: { label: "Erigga Indigen", color: "blue", level: 1 },
+    pro: { label: "Erigga Indigen", color: "blue", level: 1 },
     ENT: { label: "E", color: "yellow", level: 2 },
+    ent: { label: "E", color: "yellow", level: 2 },
   }
 
-  const normalizedTier = tier?.toUpperCase() || "FREE"
-  return tierMap[normalizedTier as keyof typeof tierMap] || tierMap.FREE
+  const normalizedTier = tier?.toLowerCase() || "free"
+  return tierMap[normalizedTier as keyof typeof tierMap] || tierMap.erigga_citizen
 }
 
 export function hasTierAccess(userTier: string, requiredTier: string): boolean {
