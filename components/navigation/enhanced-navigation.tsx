@@ -47,7 +47,6 @@ import { cn } from "@/lib/utils"
 
 const NAVIGATION_ITEMS = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/community", label: "Community", icon: Users },
   { href: "/chronicles", label: "Chronicles", icon: BookOpen },
   { href: "/vault", label: "Vault", icon: Vault },
   { href: "/tickets", label: "Tickets", icon: Ticket },

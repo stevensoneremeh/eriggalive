@@ -46,7 +46,6 @@ import { cn } from "@/lib/utils"
 const navigationItems = [
   { name: "Home", href: "/", icon: Home },
   { name: "Media", href: "/missions", icon: Target },
-  { name: "Community", href: "/community", icon: Users },
   { name: "Radio", href: "/radio", icon: Radio },
   { name: "Events", href: "/events", icon: Calendar },
   { name: "Vault", href: "/vault", icon: Music },
@@ -108,7 +107,6 @@ export function UnifiedNavigation() {
       return [
         { name: "Home", href: "/", icon: Home },
         { name: "Media", href: "/missions", icon: Target },
-        { name: "Community", href: "/community", icon: Users },
         { name: "Radio", href: "/radio", icon: Radio },
         { name: "Events", href: "/events", icon: Calendar },
         { name: "Vault", href: "/vault", icon: Music },
@@ -120,7 +118,6 @@ export function UnifiedNavigation() {
       return [
         { name: "Home", href: "/", icon: Home },
         { name: "Media", href: "/missions", icon: Target },
-        { name: "Community", href: "/community", icon: Users },
         { name: "Radio", href: "/radio", icon: Radio },
         { name: "Events", href: "/events", icon: Calendar },
         { name: "Vault", href: "/vault", icon: Music },
