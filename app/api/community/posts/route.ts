@@ -1,137 +1,144 @@
-import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = createClient()
     const { searchParams } = new URL(request.url)
-
     const category = searchParams.get("category")
-    const sort = searchParams.get("sort") || "recent"
-    const limit = Number.parseInt(searchParams.get("limit") || "50")
+    const limit = Number.parseInt(searchParams.get("limit") || "20")
+    const offset = Number.parseInt(searchParams.get("offset") || "0")
 
-    // Get category ID if filtering by specific category
-    let categoryFilter = null
-    if (category && category !== "all") {
-      const { data: categoryData } = await supabase
-        .from("community_categories")
-        .select("id")
-        .eq("slug", category)
-        .single()
-
-      if (categoryData) {
-        categoryFilter = categoryData.id
-      }
-    }
-
-    // Use the database function for better performance
-    const { data, error } = await supabase.rpc("get_community_posts_with_user_data", {
-      category_filter: categoryFilter,
-    })
-
-    if (error) {
-      console.error("Database error:", error)
-      return NextResponse.json({ error: "Failed to fetch posts" }, { status: 500 })
-    }
-
-    // Sort posts on the server side
-    let sortedPosts = data || []
-    switch (sort) {
-      case "popular":
-        sortedPosts = sortedPosts.sort((a: any, b: any) => b.vote_count - a.vote_count)
-        break
-      case "trending":
-        sortedPosts = sortedPosts.sort((a: any, b: any) => b.comment_count - a.comment_count)
-        break
-      default:
-        sortedPosts = sortedPosts.sort(
-          (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-        )
-    }
-
-    return NextResponse.json({ posts: sortedPosts.slice(0, limit) })
-  } catch (error) {
-    console.error("API error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = await createClient()
-
-    // Get the authenticated user
+    // Get current user
     const {
       data: { user },
-      error: authError,
     } = await supabase.auth.getUser()
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
-    }
-
-    const body = await request.json()
-    const { title, content, category_id, media_url, media_type } = body
-
-    if (!title?.trim() || !content?.trim()) {
-      return NextResponse.json({ error: "Title and content are required" }, { status: 400 })
-    }
-
-    // Extract hashtags from content
-    const hashtags = content.match(/#\w+/g)?.map((tag: string) => tag.toLowerCase()) || []
-
-    // Get user ID from users table
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("id")
-      .eq("auth_user_id", user.id)
-      .single()
-
-    if (userError || !userData) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
-    }
-
-    const { data, error } = await supabase
+    let query = supabase
       .from("community_posts")
-      .insert({
-        title: title.trim(),
-        content: content.trim(),
-        category_id: category_id || null,
-        user_id: userData.id,
-        media_url,
-        media_type,
-        hashtags,
-        is_published: true,
-        vote_count: 0,
-        comment_count: 0,
-      })
-      .select(`
+      .select(
+        `
         *,
-        users (
+        users!community_posts_user_id_fkey (
           id,
           username,
           full_name,
           avatar_url,
           tier
         ),
-        community_categories (
+        community_categories!community_posts_category_id_fkey (
           id,
           name,
           slug,
-          color,
-          icon
+          icon,
+          color
         )
-      `)
+      `,
+      )
+      .eq("is_published", true)
+      .eq("is_deleted", false)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1)
+
+    if (category && category !== "all") {
+      query = query.eq("category_id", category)
+    }
+
+    const { data: posts, error } = await query
+
+    if (error) {
+      console.error("Error fetching posts:", error)
+      return NextResponse.json({ error: "Failed to fetch posts" }, { status: 500 })
+    }
+
+    // Get vote status for authenticated users
+    if (user && posts) {
+      const postIds = posts.map((post) => post.id)
+      const { data: userVotes } = await supabase
+        .from("community_post_votes")
+        .select("post_id")
+        .in("post_id", postIds)
+        .eq("user_id", user.id)
+
+      const votedPostIds = new Set(userVotes?.map((vote) => vote.post_id) || [])
+
+      posts.forEach((post) => {
+        post.has_voted = votedPostIds.has(post.id)
+      })
+    }
+
+    return NextResponse.json({ posts })
+  } catch (error) {
+    console.error("Error in GET /api/community/posts:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // Get user profile
+    const { data: profile } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
+
+    if (!profile) {
+      return NextResponse.json({ error: "User profile not found" }, { status: 404 })
+    }
+
+    const body = await request.json()
+    const { title, content, category_id, media_url, media_type, hashtags } = body
+
+    if (!content) {
+      return NextResponse.json({ error: "Content is required" }, { status: 400 })
+    }
+
+    const { data: post, error } = await supabase
+      .from("community_posts")
+      .insert({
+        user_id: profile.id,
+        title: title || null,
+        content,
+        category_id: category_id || null,
+        media_url: media_url || null,
+        media_type: media_type || null,
+        hashtags: hashtags || [],
+      })
+      .select(
+        `
+        *,
+        users!community_posts_user_id_fkey (
+          id,
+          username,
+          full_name,
+          avatar_url,
+          tier
+        ),
+        community_categories!community_posts_category_id_fkey (
+          id,
+          name,
+          slug,
+          icon,
+          color
+        )
+      `,
+      )
       .single()
 
     if (error) {
-      console.error("Database error:", error)
+      console.error("Error creating post:", error)
       return NextResponse.json({ error: "Failed to create post" }, { status: 500 })
     }
 
-    return NextResponse.json({ post: data }, { status: 201 })
+    return NextResponse.json({ post })
   } catch (error) {
-    console.error("API error:", error)
+    console.error("Error in POST /api/community/posts:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

@@ -1,6 +1,6 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
-export type UserTier = "free" | "pro" | "enterprise"
+export type UserTier = "erigga_citizen" | "erigga_indigen" | "enterprise"
 export type UserRole = "user" | "moderator" | "admin" | "super_admin"
 export type SubscriptionStatus = "active" | "canceled" | "past_due" | "incomplete" | "trialing"
 export type PaymentStatus = "pending" | "processing" | "completed" | "failed" | "refunded" | "canceled"
@@ -15,7 +15,7 @@ export type ReportReason = "spam" | "harassment" | "hate_speech" | "misinformati
 export type ReportTargetType = "post" | "comment"
 
 export interface User {
-  id: number
+  id: string
   auth_user_id: string
   username: string
   full_name: string | null
@@ -41,7 +41,7 @@ export interface User {
   last_login?: string
   login_count: number
   referral_code?: string
-  referred_by?: number
+  referred_by?: string
   subscription_expires_at?: string
   email_verified: boolean
   phone_verified: boolean
@@ -55,7 +55,7 @@ export interface User {
 }
 
 export interface CommunityCategory {
-  id: number
+  id: string
   name: string
   slug: string
   description: string | null
@@ -69,9 +69,9 @@ export interface CommunityCategory {
 
 // Base database row type (without joined fields)
 export interface CommunityPostRow {
-  id: number
-  user_id: number
-  category_id: number
+  id: string
+  user_id: string
+  category_id: string
   title: string | null
   content: string
   media_url: string | null
@@ -93,23 +93,23 @@ export interface CommunityPostRow {
 // Extended type with joined data for API responses
 export interface CommunityPost extends CommunityPostRow {
   // Joined data
-  user?: Pick<User, "id" | "auth_user_id" | "username" | "full_name" | "avatar_url" | "tier">
-  category?: Pick<CommunityCategory, "id" | "name" | "slug">
+  users?: Pick<User, "id" | "auth_user_id" | "username" | "full_name" | "avatar_url" | "tier">
+  community_categories?: Pick<CommunityCategory, "id" | "name" | "slug">
   has_voted?: boolean
   comments?: CommunityComment[]
 }
 
 export interface CommunityPostVote {
-  post_id: number
-  user_id: number
+  post_id: string
+  user_id: string
   created_at: string
 }
 
 export interface CommunityComment {
-  id: number
-  post_id: number
-  user_id: number
-  parent_id: number | null
+  id: string
+  post_id: string
+  user_id: string
+  parent_comment_id: string | null
   content: string
   vote_count: number
   like_count: number
@@ -120,21 +120,21 @@ export interface CommunityComment {
   created_at: string
   updated_at: string
   // Joined data
-  user?: Pick<User, "id" | "auth_user_id" | "username" | "full_name" | "avatar_url" | "tier">
+  users?: Pick<User, "id" | "auth_user_id" | "username" | "full_name" | "avatar_url" | "tier">
   replies?: CommunityComment[]
   has_liked?: boolean
 }
 
 export interface CommunityCommentLike {
-  comment_id: number
-  user_id: number
+  comment_id: string
+  user_id: string
   created_at: string
 }
 
 export interface CommunityReport {
-  id: number
-  reporter_user_id: number
-  target_id: number
+  id: string
+  reporter_user_id: string
+  target_id: string
   target_type: ReportTargetType
   reason: ReportReason
   additional_notes?: string
@@ -150,7 +150,7 @@ export interface Database {
       users: {
         Row: User
         Insert: {
-          id?: number
+          id?: string
           auth_user_id: string
           username: string
           full_name?: string | null
@@ -169,7 +169,7 @@ export interface Database {
           updated_at?: string
         }
         Update: {
-          id?: number
+          id?: string
           auth_user_id?: string
           username?: string
           full_name?: string | null
@@ -192,7 +192,7 @@ export interface Database {
       community_categories: {
         Row: CommunityCategory
         Insert: {
-          id?: number
+          id?: string
           name: string
           slug: string
           description?: string | null
@@ -201,7 +201,7 @@ export interface Database {
           updated_at?: string
         }
         Update: {
-          id?: number
+          id?: string
           name?: string
           slug?: string
           description?: string | null
@@ -214,9 +214,9 @@ export interface Database {
       community_posts: {
         Row: CommunityPostRow
         Insert: {
-          id?: number
-          user_id: number
-          category_id: number
+          id?: string
+          user_id: string
+          category_id: string
           title?: string | null
           content: string
           media_url?: string | null
@@ -234,9 +234,9 @@ export interface Database {
           updated_at?: string
         }
         Update: {
-          id?: number
-          user_id?: number
-          category_id?: number
+          id?: string
+          user_id?: string
+          category_id?: string
           title?: string | null
           content?: string
           media_url?: string | null
@@ -273,10 +273,10 @@ export interface Database {
       community_comments: {
         Row: CommunityComment
         Insert: {
-          id?: number
-          post_id: number
-          user_id: number
-          parent_id?: number | null
+          id?: string
+          post_id: string
+          user_id: string
+          parent_comment_id?: string | null
           content: string
           vote_count?: number
           like_count?: number
@@ -285,10 +285,10 @@ export interface Database {
           updated_at?: string
         }
         Update: {
-          id?: number
-          post_id?: number
-          user_id?: number
-          parent_id?: number | null
+          id?: string
+          post_id?: string
+          user_id?: string
+          parent_comment_id?: string | null
           content?: string
           vote_count?: number
           like_count?: number
@@ -298,8 +298,8 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: "community_comments_parent_id_fkey"
-            columns: ["parent_id"]
+            foreignKeyName: "community_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
             isOneToOne: false
             referencedRelation: "community_comments"
             referencedColumns: ["id"]
@@ -320,48 +320,32 @@ export interface Database {
           },
         ]
       }
-      community_votes: {
+      community_post_votes: {
         Row: {
-          id: number
-          user_id: number
-          post_id: number | null
-          comment_id: number | null
-          vote_type: "up" | "down"
+          post_id: string
+          user_id: string
           created_at: string
         }
         Insert: {
-          id?: number
-          user_id: number
-          post_id?: number | null
-          comment_id?: number | null
-          vote_type: "up" | "down"
+          post_id: string
+          user_id: string
           created_at?: string
         }
         Update: {
-          id?: number
-          user_id?: number
-          post_id?: number | null
-          comment_id?: number | null
-          vote_type?: "up" | "down"
+          post_id?: string
+          user_id?: string
           created_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "community_votes_comment_id_fkey"
-            columns: ["comment_id"]
-            isOneToOne: false
-            referencedRelation: "community_comments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "community_votes_post_id_fkey"
+            foreignKeyName: "community_post_votes_post_id_fkey"
             columns: ["post_id"]
             isOneToOne: false
             referencedRelation: "community_posts"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "community_votes_user_id_fkey"
+            foreignKeyName: "community_post_votes_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -374,10 +358,30 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_post_votes: {
+        Args: {
+          post_id: string
+        }
+        Returns: undefined
+      }
+      decrement_post_votes: {
+        Args: {
+          post_id: string
+        }
+        Returns: undefined
+      }
+      toggle_post_vote: {
+        Args: {
+          post_id_param: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
-      [_ in never]: never
+      user_tier: "erigga_citizen" | "erigga_indigen" | "enterprise"
+      user_role: "user" | "moderator" | "admin" | "super_admin"
+      report_reason: "spam" | "harassment" | "hate_speech" | "misinformation" | "inappropriate_content" | "other"
+      report_target_type: "post" | "comment"
     }
     CompositeTypes: {
       [_ in never]: never

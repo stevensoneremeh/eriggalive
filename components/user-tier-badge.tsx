@@ -10,13 +10,6 @@ interface UserTierBadgeProps {
 
 export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierBadgeProps) {
   const tierInfo = {
-    // Legacy grassroot system (keeping for backward compatibility)
-    grassroot: {
-      label: "Erigga Citizen",
-      icon: User,
-      color: "bg-green-500/20 text-green-600 border-green-500",
-      tooltip: "Free tier member - Erigga Citizen",
-    },
     // New tier system
     erigga_citizen: {
       label: "Erigga Citizen",
@@ -24,13 +17,26 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
       color: "bg-green-500/20 text-green-600 border-green-500",
       tooltip: "Free tier member - Erigga Citizen",
     },
-    pioneer: {
+    erigga_indigen: {
       label: "Erigga Indigen",
       icon: Star,
       color: "bg-blue-500/20 text-blue-600 border-blue-500",
       tooltip: "Pro tier member - Erigga Indigen with premium access",
     },
-    erigga_indigen: {
+    enterprise: {
+      label: "E",
+      icon: Building,
+      color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",
+      tooltip: "Enterprise tier member with VIP gold access",
+    },
+    // Legacy tier mappings for backward compatibility
+    grassroot: {
+      label: "Erigga Citizen",
+      icon: User,
+      color: "bg-green-500/20 text-green-600 border-green-500",
+      tooltip: "Free tier member - Erigga Citizen",
+    },
+    pioneer: {
       label: "Erigga Indigen",
       icon: Star,
       color: "bg-blue-500/20 text-blue-600 border-blue-500",
@@ -48,7 +54,7 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
       color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",
       tooltip: "Enterprise tier member with VIP gold access",
     },
-    enterprise: {
+    blood_brotherhood: {
       label: "E",
       icon: Building,
       color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",
@@ -93,8 +99,8 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
     },
   }
 
-  const normalizedTier = tier?.toLowerCase() || "free"
-  const tierData = tierInfo[normalizedTier as keyof typeof tierInfo] || tierInfo.free
+  const normalizedTier = tier?.toLowerCase() || "erigga_citizen"
+  const tierData = tierInfo[normalizedTier as keyof typeof tierInfo] || tierInfo.erigga_citizen
 
   const IconComponent = tierData.icon
 
@@ -114,7 +120,11 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
     lg: "h-5 w-5",
   }
 
-  const isEnterprise = normalizedTier === "ent" || normalizedTier === "enterprise" || normalizedTier === "blood"
+  const isEnterprise =
+    normalizedTier === "enterprise" ||
+    normalizedTier === "ent" ||
+    normalizedTier === "blood" ||
+    normalizedTier === "blood_brotherhood"
 
   const enterpriseClasses = isEnterprise
     ? "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500 shadow-lg shadow-yellow-400/25 hover:shadow-yellow-400/40 hover:from-yellow-400/40 hover:to-amber-500/40 font-bold"
