@@ -6,9 +6,9 @@ channel = "stable-25_05"
 packages = ["jq"]
 
 [deployment]
-run = ["pnpm", "run", "start"]
+run = ["npm", "run", "start"]
 deploymentTarget = "autoscale"
-build = ["pnpm", "run", "build"]
+build = ["npm", "run", "build"]
 
 [[ports]]
 localPort = 3000
