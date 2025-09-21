@@ -31,7 +31,7 @@ import { ShoutOutDisplay } from "@/components/shout-out-display"
 import { AnimatedRadioCharacter } from "@/components/radio/animated-radio-character"
 
 interface CommunityPost {
-  id: number
+  id: string
   title: string
   content: string
   media_url?: string
@@ -42,7 +42,7 @@ interface CommunityPost {
   created_at: string
   updated_at: string
   user_id: string
-  category_id: number
+  category_id: string
   category_name: string
   category_color: string
   category_icon: string
@@ -53,7 +53,7 @@ interface CommunityPost {
 }
 
 interface CommunityCategory {
-  id: number
+  id: string
   name: string
   slug: string
   description: string
@@ -72,7 +72,7 @@ export default function CommunityPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [loading, setLoading] = useState(true)
   const [posting, setPosting] = useState(false)
-  const [newPost, setNewPost] = useState({ title: "", content: "", category_id: 1 })
+  const [newPost, setNewPost] = useState({ title: "", content: "", category_id: "" })
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState<"recent" | "popular" | "trending">("recent")
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -107,12 +107,12 @@ export default function CommunityPage() {
         // Create default categories if none exist
         setCategories([
           {
-            id: 1,
+            id: "1",
             name: "General",
             slug: "general",
             description: "General discussion",
             color: "#3B82F6",
-            icon: "users",
+            icon: "💬",
             display_order: 1,
             is_active: true,
             created_at: new Date().toISOString(),
@@ -125,12 +125,12 @@ export default function CommunityPage() {
       console.error("Error fetching categories:", error)
       setCategories([
         {
-          id: 1,
+          id: "1",
           name: "General",
           slug: "general",
           description: "General discussion",
           color: "#3B82F6",
-          icon: "users",
+          icon: "💬",
           display_order: 1,
           is_active: true,
           created_at: new Date().toISOString(),
@@ -143,74 +143,19 @@ export default function CommunityPage() {
     try {
       setLoading(true)
 
-      // Get category ID if filtering by specific category
-      let categoryFilter = null
-      if (selectedCategory !== "all") {
-        const category = categories.find((c) => c.slug === selectedCategory)
-        if (category) {
-          categoryFilter = category.id
-        }
-      }
+      console.log("[v0] Fetching posts with category:", selectedCategory, "sort:", sortBy)
 
-      console.log("[v0] Fetching posts with category filter:", categoryFilter)
+      const response = await fetch(`/api/community/posts?category=${selectedCategory}&sort=${sortBy}&limit=50`)
+      const result = await response.json()
 
-      // Use the database function
-      const { data, error } = await supabase.rpc("get_community_posts_with_user_data", {
-        category_filter: categoryFilter,
-      })
-
-      if (error) {
-        console.log("[v0] Posts fetch error:", error)
-        // If function doesn't exist, try direct table query
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from("community_posts")
-          .select(`
-            *,
-            users:user_id (username, full_name, avatar_url),
-            community_categories:category_id (name, color, icon)
-          `)
-          .eq("is_published", true)
-          .eq("is_deleted", false)
-          .order("created_at", { ascending: false })
-
-        if (fallbackError) {
-          console.log("[v0] Fallback query error:", fallbackError)
-          setPosts([])
-          return
-        }
-
-        // Transform fallback data to match expected format
-        const transformedData = (fallbackData || []).map((post: any) => ({
-          ...post,
-          category_name: post.community_categories?.name || "General",
-          category_color: post.community_categories?.color || "#3B82F6",
-          category_icon: post.community_categories?.icon || "hash",
-          username: post.users?.username || "Anonymous",
-          full_name: post.users?.full_name || "Anonymous User",
-          avatar_url: post.users?.avatar_url,
-          user_voted: false,
-        }))
-
-        setPosts(transformedData)
+      if (!response.ok) {
+        console.log("[v0] Posts fetch error:", result.error)
+        setPosts([])
         return
       }
 
-      console.log("[v0] Posts fetched successfully:", data?.length || 0)
-
-      // Sort posts on client side
-      let sortedPosts = data || []
-      switch (sortBy) {
-        case "popular":
-          sortedPosts = sortedPosts.sort((a: any, b: any) => b.vote_count - a.vote_count)
-          break
-        case "trending":
-          sortedPosts = sortedPosts.sort((a: any, b: any) => b.comment_count - a.comment_count)
-          break
-        default:
-          sortedPosts = sortedPosts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      }
-
-      setPosts(sortedPosts)
+      console.log("[v0] Posts fetched successfully:", result.posts?.length || 0)
+      setPosts(result.posts || [])
     } catch (error) {
       console.error("Error fetching posts:", error)
       setPosts([])
@@ -244,51 +189,39 @@ export default function CommunityPage() {
 
       console.log("[v0] Starting post creation", { user: user?.id, title: newPost.title })
 
-      // Use the database function
-      const { data, error } = await supabase.rpc("create_community_post", {
-        post_title: newPost.title.trim(),
-        post_content: newPost.content.trim(),
-        post_category_id: newPost.category_id,
-        post_hashtags: extractHashtags(newPost.content),
+      const response = await fetch("/api/community/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: newPost.title.trim(),
+          content: newPost.content.trim(),
+          category_id: newPost.category_id || null,
+        }),
       })
 
-      if (error) {
-        console.log("[v0] Error creating post:", error)
+      const result = await response.json()
 
-        // Fallback: try direct insert
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from("community_posts")
-          .insert({
-            title: newPost.title.trim(),
-            content: newPost.content.trim(),
-            category_id: newPost.category_id,
-            hashtags: extractHashtags(newPost.content),
-            user_id: user.id,
-          })
-          .select()
-
-        if (fallbackError) {
-          console.log("[v0] Fallback insert error:", fallbackError)
-          throw fallbackError
-        }
-
-        console.log("[v0] Post created via fallback:", fallbackData)
-      } else {
-        console.log("[v0] Post created successfully:", data)
+      if (!response.ok) {
+        console.log("[v0] Error creating post:", result.error)
+        throw new Error(result.error || "Failed to create post")
       }
+
+      console.log("[v0] Post created successfully:", result.post)
 
       toast({
         title: "Success",
         description: "Your post has been created!",
       })
 
-      setNewPost({ title: "", content: "", category_id: 1 })
+      setNewPost({ title: "", content: "", category_id: "" })
       fetchPosts() // Refresh posts
     } catch (error) {
       console.error("Error creating post:", error)
       toast({
         title: "Error",
-        description: "Failed to create post. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to create post. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -296,12 +229,7 @@ export default function CommunityPage() {
     }
   }
 
-  const extractHashtags = (content: string): string[] => {
-    const hashtags = content.match(/#\w+/g) || []
-    return hashtags.map((tag) => tag.toLowerCase())
-  }
-
-  const handleVotePost = async (postId: number) => {
+  const handleVotePost = async (postId: string) => {
     if (!isAuthenticated || !user) {
       toast({
         title: "Authentication Required",
@@ -314,23 +242,24 @@ export default function CommunityPage() {
     try {
       console.log("[v0] Toggling vote for post:", postId)
 
-      // Use the database function
-      const { data, error } = await supabase.rpc("toggle_post_vote", {
-        post_id_param: postId,
+      const response = await fetch(`/api/community/posts/${postId}/vote`, {
+        method: "POST",
       })
 
-      if (error) {
-        console.log("[v0] Error voting:", error)
-        throw error
+      const result = await response.json()
+
+      if (!response.ok) {
+        console.log("[v0] Error voting:", result.error)
+        throw new Error(result.error || "Failed to vote")
       }
 
-      console.log("[v0] Vote toggled successfully:", data)
+      console.log("[v0] Vote toggled successfully:", result)
       fetchPosts() // Refresh posts to show updated vote counts
     } catch (error) {
       console.error("Error voting:", error)
       toast({
         title: "Error",
-        description: "Failed to vote on post",
+        description: error instanceof Error ? error.message : "Failed to vote on post",
         variant: "destructive",
       })
     }
@@ -605,9 +534,9 @@ export default function CommunityPage() {
                   <AvatarFallback>{(user as any)?.username?.[0]?.toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <Select
-                  value={newPost.category_id.toString()}
+                  value={newPost.category_id}
                   onValueChange={(value) => {
-                    setNewPost({ ...newPost, category_id: Number.parseInt(value) })
+                    setNewPost({ ...newPost, category_id: value })
                   }}
                 >
                   <SelectTrigger className="w-40 h-8 text-xs">
@@ -615,7 +544,7 @@ export default function CommunityPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id.toString()} className="text-xs">
+                      <SelectItem key={category.id} value={category.id} className="text-xs">
                         {category.name}
                       </SelectItem>
                     ))}

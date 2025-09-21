@@ -10,29 +10,8 @@ export async function GET(request: NextRequest) {
     const sort = searchParams.get("sort") || "recent"
     const limit = Number.parseInt(searchParams.get("limit") || "50")
 
-    let query = supabase
-      .from("community_posts")
-      .select(`
-        *,
-        users (
-          id,
-          username,
-          full_name,
-          avatar_url,
-          tier
-        ),
-        community_categories (
-          id,
-          name,
-          slug,
-          color,
-          icon
-        )
-      `)
-      .eq("is_published", true)
-      .eq("is_deleted", false)
-
-    // Filter by category
+    // Get category ID if filtering by specific category
+    let categoryFilter = null
     if (category && category !== "all") {
       const { data: categoryData } = await supabase
         .from("community_categories")
@@ -41,30 +20,36 @@ export async function GET(request: NextRequest) {
         .single()
 
       if (categoryData) {
-        query = query.eq("category_id", categoryData.id)
+        categoryFilter = categoryData.id
       }
     }
 
-    // Sort posts
-    switch (sort) {
-      case "popular":
-        query = query.order("vote_count", { ascending: false })
-        break
-      case "trending":
-        query = query.order("comment_count", { ascending: false })
-        break
-      default:
-        query = query.order("created_at", { ascending: false })
-    }
-
-    const { data, error } = await query.limit(limit)
+    // Use the database function for better performance
+    const { data, error } = await supabase.rpc("get_community_posts_with_user_data", {
+      category_filter: categoryFilter,
+    })
 
     if (error) {
       console.error("Database error:", error)
       return NextResponse.json({ error: "Failed to fetch posts" }, { status: 500 })
     }
 
-    return NextResponse.json({ posts: data || [] })
+    // Sort posts on the server side
+    let sortedPosts = data || []
+    switch (sort) {
+      case "popular":
+        sortedPosts = sortedPosts.sort((a: any, b: any) => b.vote_count - a.vote_count)
+        break
+      case "trending":
+        sortedPosts = sortedPosts.sort((a: any, b: any) => b.comment_count - a.comment_count)
+        break
+      default:
+        sortedPosts = sortedPosts.sort(
+          (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        )
+    }
+
+    return NextResponse.json({ posts: sortedPosts.slice(0, limit) })
   } catch (error) {
     console.error("API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -95,13 +80,24 @@ export async function POST(request: NextRequest) {
     // Extract hashtags from content
     const hashtags = content.match(/#\w+/g)?.map((tag: string) => tag.toLowerCase()) || []
 
+    // Get user ID from users table
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .single()
+
+    if (userError || !userData) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
+
     const { data, error } = await supabase
       .from("community_posts")
       .insert({
         title: title.trim(),
         content: content.trim(),
-        category_id: category_id || 1,
-        user_id: user.id,
+        category_id: category_id || null,
+        user_id: userData.id,
         media_url,
         media_type,
         hashtags,

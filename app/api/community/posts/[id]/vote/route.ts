@@ -15,57 +15,32 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
-    const postId = Number.parseInt(params.id)
+    const postId = params.id
 
-    if (isNaN(postId)) {
-      return NextResponse.json({ error: "Invalid post ID" }, { status: 400 })
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(postId)) {
+      return NextResponse.json({ error: "Invalid post ID format" }, { status: 400 })
     }
 
-    // Check if user already voted
-    const { data: existingVote } = await supabase
-      .from("community_post_votes")
-      .select("id")
-      .eq("post_id", postId)
-      .eq("user_id", user.id)
-      .single()
+    // Use the database function to toggle vote
+    const { data, error } = await supabase.rpc("toggle_post_vote", {
+      post_id_param: postId,
+    })
 
-    if (existingVote) {
-      // Remove vote
-      const { error: deleteError } = await supabase
-        .from("community_post_votes")
-        .delete()
-        .eq("post_id", postId)
-        .eq("user_id", user.id)
-
-      if (deleteError) throw deleteError
-
-      // Decrement vote count
-      const { error: updateError } = await supabase
-        .from("community_posts")
-        .update({ vote_count: supabase.raw("vote_count - 1") })
-        .eq("id", postId)
-
-      if (updateError) throw updateError
-
-      return NextResponse.json({ voted: false, message: "Vote removed" })
-    } else {
-      // Add vote
-      const { error: insertError } = await supabase
-        .from("community_post_votes")
-        .insert({ post_id: postId, user_id: user.id })
-
-      if (insertError) throw insertError
-
-      // Increment vote count
-      const { error: updateError } = await supabase
-        .from("community_posts")
-        .update({ vote_count: supabase.raw("vote_count + 1") })
-        .eq("id", postId)
-
-      if (updateError) throw updateError
-
-      return NextResponse.json({ voted: true, message: "Vote added" })
+    if (error) {
+      console.error("Database error:", error)
+      return NextResponse.json({ error: "Failed to toggle vote" }, { status: 500 })
     }
+
+    if (data.error) {
+      return NextResponse.json({ error: data.error }, { status: 400 })
+    }
+
+    return NextResponse.json({
+      voted: data.voted,
+      message: data.message,
+    })
   } catch (error) {
     console.error("API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

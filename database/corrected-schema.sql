@@ -1,3 +1,9 @@
+-- =====================================================
+-- CORRECTED ERIGGA LIVE PLATFORM DATABASE SCHEMA
+-- =====================================================
+-- This script creates the corrected backend schema for the Erigga Live platform
+-- with proper UUID handling and improved community features
+
 -- Enable necessary extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -7,6 +13,11 @@ CREATE TYPE user_tier AS ENUM ('grassroot', 'pioneer', 'elder', 'blood', 'admin'
 CREATE TYPE user_role AS ENUM ('user', 'moderator', 'admin', 'super_admin');
 CREATE TYPE report_reason AS ENUM ('spam', 'harassment', 'hate_speech', 'misinformation', 'inappropriate_content', 'other');
 CREATE TYPE report_target_type AS ENUM ('post', 'comment');
+CREATE TYPE transaction_type AS ENUM ('purchase', 'reward', 'refund', 'bonus', 'withdrawal');
+CREATE TYPE transaction_status AS ENUM ('pending', 'completed', 'failed', 'cancelled');
+CREATE TYPE post_type AS ENUM ('text', 'image', 'video', 'audio', 'poll');
+CREATE TYPE content_type AS ENUM ('music', 'video', 'podcast', 'exclusive');
+CREATE TYPE vote_type AS ENUM ('up', 'down');
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
@@ -73,6 +84,7 @@ CREATE TABLE IF NOT EXISTS community_posts (
   media_url TEXT,
   media_type VARCHAR(20),
   media_metadata JSONB,
+  hashtags TEXT[] DEFAULT '{}',
   vote_count INTEGER DEFAULT 0,
   comment_count INTEGER DEFAULT 0,
   tags TEXT[],
@@ -109,7 +121,7 @@ CREATE TABLE IF NOT EXISTS community_comments (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Community Comment Votes (this was missing in the original schema)
+-- Comment votes (corrected to use UUID)
 CREATE TABLE IF NOT EXISTS comment_votes (
   comment_id UUID NOT NULL REFERENCES community_comments(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -138,6 +150,51 @@ CREATE TABLE IF NOT EXISTS community_reports (
   resolved_by UUID REFERENCES auth.users(id),
   resolved_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Additional tables for full platform functionality
+CREATE TABLE IF NOT EXISTS coin_transactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    transaction_type transaction_type NOT NULL,
+    status transaction_status DEFAULT 'pending',
+    amount INTEGER NOT NULL,
+    item_type TEXT,
+    item_id TEXT,
+    payment_method TEXT,
+    external_transaction_id TEXT,
+    notes TEXT,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title TEXT NOT NULL,
+    description TEXT,
+    location TEXT,
+    venue TEXT,
+    image_url TEXT,
+    event_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    ticket_price NUMERIC(10,2) DEFAULT 0,
+    max_tickets INTEGER,
+    tickets_sold INTEGER DEFAULT 0,
+    required_tier user_tier DEFAULT 'grassroot',
+    is_published BOOLEAN DEFAULT true,
+    is_featured BOOLEAN DEFAULT false,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS missions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    reward_coins INTEGER DEFAULT 10,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Insert default categories
@@ -239,6 +296,51 @@ BEGIN
     AND cp.is_deleted = false
     AND (category_filter IS NULL OR cp.category_id = category_filter)
   ORDER BY cp.created_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to toggle post vote
+CREATE OR REPLACE FUNCTION toggle_post_vote(post_id_param UUID)
+RETURNS JSON AS $$
+DECLARE
+    v_user_id UUID;
+    v_existing_vote BOOLEAN;
+BEGIN
+    -- Get current user ID
+    SELECT id INTO v_user_id FROM users WHERE auth_user_id = auth.uid();
+    
+    IF v_user_id IS NULL THEN
+        RETURN json_build_object('error', 'User not authenticated');
+    END IF;
+    
+    -- Check for existing vote
+    SELECT EXISTS(
+        SELECT 1 FROM community_post_votes 
+        WHERE post_id = post_id_param AND user_id = v_user_id
+    ) INTO v_existing_vote;
+    
+    IF v_existing_vote THEN
+        -- Remove vote
+        DELETE FROM community_post_votes 
+        WHERE post_id = post_id_param AND user_id = v_user_id;
+        
+        -- Decrement vote count
+        PERFORM decrement_post_votes(post_id_param);
+        
+        RETURN json_build_object('success', true, 'voted', false, 'message', 'Vote removed');
+    ELSE
+        -- Add vote
+        INSERT INTO community_post_votes (post_id, user_id)
+        VALUES (post_id_param, v_user_id);
+        
+        -- Increment vote count
+        PERFORM increment_post_votes(post_id_param);
+        
+        RETURN json_build_object('success', true, 'voted', true, 'message', 'Vote added');
+    END IF;
+    
+EXCEPTION WHEN OTHERS THEN
+    RETURN json_build_object('error', SQLERRM);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
