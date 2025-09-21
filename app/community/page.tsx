@@ -180,7 +180,7 @@ export default function CommunityPage() {
         }
 
         // Transform fallback data to match expected format
-        const transformedData = (fallbackData || []).map((post) => ({
+        const transformedData = (fallbackData || []).map((post: any) => ({
           ...post,
           category_name: post.community_categories?.name || "General",
           category_color: post.community_categories?.color || "#3B82F6",
@@ -201,13 +201,13 @@ export default function CommunityPage() {
       let sortedPosts = data || []
       switch (sortBy) {
         case "popular":
-          sortedPosts = sortedPosts.sort((a, b) => b.vote_count - a.vote_count)
+          sortedPosts = sortedPosts.sort((a: any, b: any) => b.vote_count - a.vote_count)
           break
         case "trending":
-          sortedPosts = sortedPosts.sort((a, b) => b.comment_count - a.comment_count)
+          sortedPosts = sortedPosts.sort((a: any, b: any) => b.comment_count - a.comment_count)
           break
         default:
-          sortedPosts = sortedPosts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          sortedPosts = sortedPosts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       }
 
       setPosts(sortedPosts)
@@ -601,8 +601,8 @@ export default function CommunityPage() {
               {/* Category Selection Dropdown */}
               <div className="flex items-center gap-3">
                 <Avatar className="h-8 w-8 flex-shrink-0">
-                  <AvatarImage src={user?.avatar_url || "/placeholder.svg"} />
-                  <AvatarFallback>{user?.username?.[0]?.toUpperCase()}</AvatarFallback>
+                  <AvatarImage src={(user as any)?.avatar_url || "/placeholder.svg"} />
+                  <AvatarFallback>{(user as any)?.username?.[0]?.toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <Select
                   value={newPost.category_id.toString()}
