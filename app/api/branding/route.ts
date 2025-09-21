@@ -1,14 +1,23 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/server"
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+// Force dynamic rendering
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const { data, error } = await supabase.from("branding").select("dark_logo_url,dark_bg_hex").single()
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase.from("branding").select("dark_logo_url,dark_bg_hex").single()
 
-  if (error && error.code !== "PGRST116") {
-    console.error("Branding fetch error:", error)
+    if (error) {
+      console.error("Branding fetch error:", error)
+      // Return default branding if table doesn't exist or has no data
+      return NextResponse.json({ dark_logo_url: null, dark_bg_hex: null })
+    }
+
+    return NextResponse.json(data || { dark_logo_url: null, dark_bg_hex: null })
+  } catch (error) {
+    console.error("Branding API error:", error)
+    return NextResponse.json({ dark_logo_url: null, dark_bg_hex: null })
   }
-
-  return NextResponse.json(data || { dark_logo_url: null, dark_bg_hex: null })
 }
