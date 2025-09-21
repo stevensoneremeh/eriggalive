@@ -1,77 +1,45 @@
-
 -- Fix user signup database issues
 -- This script ensures proper user profile creation during signup
 
--- Step 1: Add new enum values in separate transactions
+-- Step 1: Check existing enum values and add new ones if needed
 DO $$
 BEGIN
-    -- Add FREE if it doesn't exist
+    -- Add free if it doesn't exist (it should already exist)
     IF NOT EXISTS (
         SELECT 1 FROM pg_enum 
-        WHERE enumlabel = 'FREE' 
+        WHERE enumlabel = 'free' 
         AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'user_tier')
     ) THEN
-        ALTER TYPE user_tier ADD VALUE 'FREE';
+        ALTER TYPE user_tier ADD VALUE 'free';
     END IF;
 END $$;
 
-DO $$
-BEGIN
-    -- Add PRO if it doesn't exist
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_enum 
-        WHERE enumlabel = 'PRO' 
-        AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'user_tier')
-    ) THEN
-        ALTER TYPE user_tier ADD VALUE 'PRO';
-    END IF;
-END $$;
-
-DO $$
-BEGIN
-    -- Add ENT if it doesn't exist
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_enum 
-        WHERE enumlabel = 'ENT' 
-        AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'user_tier')
-    ) THEN
-        ALTER TYPE user_tier ADD VALUE 'ENT';
-    END IF;
-END $$;
-
--- Step 2: Update constraints and data (in a separate script section)
--- Update the constraint to accept both old and new tier values
+-- Step 2: Update users table to use correct enum values and fix constraints
+-- Drop any existing check constraints that might conflict
 ALTER TABLE public.users 
 DROP CONSTRAINT IF EXISTS users_tier_check;
 
-ALTER TABLE public.users 
-ADD CONSTRAINT users_tier_check 
-CHECK (tier IN ('FREE', 'PRO', 'ENT', 'erigga_citizen', 'erigga_indigen', 'enterprise'));
-
--- Update existing users with old tier names to new ones
+-- Update any users with old tier names to proper enum values
 UPDATE public.users 
-SET tier = 'FREE' 
-WHERE tier IN ('free', 'grassroot', 'erigga_citizen');
+SET tier = 'free'::user_tier
+WHERE tier::text NOT IN ('free', 'pro', 'enterprise');
 
-UPDATE public.users 
-SET tier = 'PRO' 
-WHERE tier IN ('pro', 'pioneer', 'erigga_indigen');
-
-UPDATE public.users 
-SET tier = 'ENT' 
-WHERE tier IN ('enterprise', 'elder', 'blood_brotherhood');
-
--- Create or replace the trigger function for user profile creation
+-- Step 3: Create or replace the trigger function for user profile creation
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 DECLARE
-    user_tier text := 'FREE';
+    user_tier_val user_tier := 'free';
     user_username text;
     user_full_name text;
     user_payment_ref text;
 BEGIN
     -- Extract metadata from auth.users
-    user_tier := COALESCE(NEW.raw_user_meta_data->>'tier', 'FREE');
+    user_tier_val := CASE 
+        WHEN NEW.raw_user_meta_data->>'tier' = 'PRO' THEN 'pro'
+        WHEN NEW.raw_user_meta_data->>'tier' = 'ENT' THEN 'enterprise'
+        ELSE 'free'
+    END;
+
     user_username := COALESCE(NEW.raw_user_meta_data->>'username', split_part(NEW.email, '@', 1));
     user_full_name := COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1));
     user_payment_ref := NEW.raw_user_meta_data->>'payment_reference';
@@ -101,10 +69,10 @@ BEGIN
         user_username,
         user_full_name,
         NEW.email,
-        user_tier::user_tier,  -- Cast to enum type
+        user_tier_val,
         NEW.email_confirmed_at IS NOT NULL,
         user_payment_ref,
-        CASE WHEN user_tier = 'PRO' THEN 1000 WHEN user_tier = 'ENT' THEN 12000 ELSE 100 END,
+        CASE WHEN user_tier_val = 'pro' THEN 1000 WHEN user_tier_val = 'enterprise' THEN 12000 ELSE 100 END,
         1,
         0,
         true,
