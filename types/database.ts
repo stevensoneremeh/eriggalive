@@ -1,6 +1,6 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
-export type UserTier = "erigga_citizen" | "erigga_indigen" | "enterprise"
+export type UserTier = "FREE" | "PRO" | "ENT" | "erigga_citizen" | "erigga_indigen" | "enterprise"
 export type UserRole = "user" | "moderator" | "admin" | "super_admin"
 export type SubscriptionStatus = "active" | "canceled" | "past_due" | "incomplete" | "trialing"
 export type PaymentStatus = "pending" | "processing" | "completed" | "failed" | "refunded" | "canceled"

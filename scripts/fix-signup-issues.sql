@@ -2,15 +2,35 @@
 -- Fix user signup database issues
 -- This script ensures proper user profile creation during signup
 
--- First, ensure the users table has the correct structure
+-- First, we need to properly handle the enum type conversion
+DO $$
+BEGIN
+    -- Check if we need to update the enum
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_enum 
+        WHERE enumlabel IN ('FREE', 'PRO', 'ENT') 
+        AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'user_tier')
+    ) THEN
+        -- Add new enum values if they don't exist
+        BEGIN
+            ALTER TYPE user_tier ADD VALUE IF NOT EXISTS 'FREE';
+            ALTER TYPE user_tier ADD VALUE IF NOT EXISTS 'PRO'; 
+            ALTER TYPE user_tier ADD VALUE IF NOT EXISTS 'ENT';
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Could not add enum values, they may already exist';
+        END;
+    END IF;
+END $$;
+
+-- Update the constraint to accept both old and new tier values
 ALTER TABLE public.users 
 DROP CONSTRAINT IF EXISTS users_tier_check;
 
 ALTER TABLE public.users 
 ADD CONSTRAINT users_tier_check 
-CHECK (tier IN ('FREE', 'PRO', 'ENT'));
+CHECK (tier IN ('FREE', 'PRO', 'ENT', 'erigga_citizen', 'erigga_indigen', 'enterprise'));
 
--- Update existing users with old tier names
+-- Update existing users with old tier names to new ones
 UPDATE public.users 
 SET tier = 'FREE' 
 WHERE tier IN ('free', 'grassroot', 'erigga_citizen');
@@ -63,7 +83,7 @@ BEGIN
         user_username,
         user_full_name,
         NEW.email,
-        user_tier,
+        user_tier::text,  -- Cast to text to avoid enum issues
         NEW.email_confirmed_at IS NOT NULL,
         user_payment_ref,
         CASE WHEN user_tier = 'PRO' THEN 1000 WHEN user_tier = 'ENT' THEN 12000 ELSE 100 END,
