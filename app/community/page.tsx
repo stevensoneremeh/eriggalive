@@ -1,590 +1,435 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, useRef } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { useAuth } from "@/contexts/auth-context"
+import { useState, useEffect } from "react"
+import { AuthGuard } from "@/components/auth-guard"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  Send,
-  Heart,
-  MessageCircle,
-  Share2,
-  MoreVertical,
-  Users,
-  Clock,
-  Search,
-  Filter,
-  Radio,
-  Mic,
-} from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
-import { useToast } from "@/hooks/use-toast"
-import Link from "next/link"
-import { ShoutOutDisplay } from "@/components/shout-out-display"
-import { AnimatedRadioCharacter } from "@/components/radio/animated-radio-character"
+import { Separator } from "@/components/ui/separator"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CreatePost } from "@/components/create-post"
+import { UserTierBadge } from "@/components/user-tier-badge"
+import { VoteButtons } from "@/components/vote-buttons"
+import { MessageCircle, TrendingUp, Clock, Users, Hash, Filter, RefreshCw } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
+import { toast } from "sonner"
+import { motion, AnimatePresence } from "framer-motion"
+import { formatDistanceToNow } from "date-fns"
+import type { CommunityPost, CommunityCategory } from "@/types/database"
 
-interface CommunityPost {
-  id: string
-  title: string
-  content: string
-  media_url?: string
-  media_type?: string
-  hashtags: string[]
-  vote_count: number
-  comment_count: number
-  created_at: string
-  updated_at: string
-  user_id: string
-  category_id: string
-  category_name: string
-  category_color: string
-  category_icon: string
-  username: string
-  full_name: string
-  avatar_url?: string
-  user_voted: boolean
-}
-
-interface CommunityCategory {
-  id: string
-  name: string
-  slug: string
-  description: string
-  color: string
-  icon: string
-  display_order: number
-  is_active: boolean
-  created_at: string
+interface PostWithUser extends CommunityPost {
+  user: {
+    id: string
+    username: string
+    full_name: string
+    avatar_url?: string
+    tier: string
+  }
+  category: {
+    id: string
+    name: string
+    color: string
+    icon: string
+  }
 }
 
 export default function CommunityPage() {
-  const { user, isAuthenticated } = useAuth()
-  const { toast } = useToast()
-  const [posts, setPosts] = useState<CommunityPost[]>([])
+  const { user } = useAuth()
+  const [posts, setPosts] = useState<PostWithUser[]>([])
   const [categories, setCategories] = useState<CommunityCategory[]>([])
-  const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [loading, setLoading] = useState(true)
-  const [posting, setPosting] = useState(false)
-  const [newPost, setNewPost] = useState({ title: "", content: "", category_id: "" })
-  const [searchQuery, setSearchQuery] = useState("")
-  const [sortBy, setSortBy] = useState<"recent" | "popular" | "trending">("recent")
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [sortBy, setSortBy] = useState<"recent" | "popular">("recent")
 
-  const supabase = createClient()
-
-  // Fetch categories
-  useEffect(() => {
-    fetchCategories()
-  }, [])
-
-  // Fetch posts when category or sort changes
-  useEffect(() => {
-    fetchPosts()
-  }, [selectedCategory, sortBy])
-
-  // Auto-scroll to bottom for new posts
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [posts])
-
-  const fetchCategories = async () => {
+  const loadCategories = async () => {
     try {
-      const { data, error } = await supabase
-        .from("community_categories")
-        .select("*")
-        .eq("is_active", true)
-        .order("display_order")
+      const response = await fetch("/api/community/categories")
+      const data = await response.json()
 
-      if (error) {
-        console.log("[v0] Categories error:", error)
-        // Create default categories if none exist
-        setCategories([
-          {
-            id: "1",
-            name: "General",
-            slug: "general",
-            description: "General discussion",
-            color: "#3B82F6",
-            icon: "💬",
-            display_order: 1,
-            is_active: true,
-            created_at: new Date().toISOString(),
-          },
-        ])
-        return
+      if (data.categories) {
+        setCategories(data.categories)
       }
-      setCategories(data || [])
     } catch (error) {
-      console.error("Error fetching categories:", error)
-      setCategories([
-        {
-          id: "1",
-          name: "General",
-          slug: "general",
-          description: "General discussion",
-          color: "#3B82F6",
-          icon: "💬",
-          display_order: 1,
-          is_active: true,
-          created_at: new Date().toISOString(),
-        },
-      ])
+      console.error("Error loading categories:", error)
+      toast.error("Failed to load categories")
     }
   }
 
-  const fetchPosts = async () => {
+  const loadPosts = async (categoryId?: string) => {
     try {
       setLoading(true)
+      const params = new URLSearchParams()
 
-      console.log("[v0] Fetching posts with category:", selectedCategory, "sort:", sortBy)
-
-      const response = await fetch(`/api/community/posts?category=${selectedCategory}&sort=${sortBy}&limit=50`)
-      const result = await response.json()
-
-      if (!response.ok) {
-        console.log("[v0] Posts fetch error:", result.error)
-        setPosts([])
-        return
+      if (categoryId) {
+        params.append("category", categoryId)
       }
 
-      console.log("[v0] Posts fetched successfully:", result.posts?.length || 0)
-      setPosts(result.posts || [])
+      const response = await fetch(`/api/community/posts?${params}`)
+      const data = await response.json()
+
+      if (response.ok && data.posts) {
+        const sortedPosts = [...data.posts]
+
+        if (sortBy === "popular") {
+          sortedPosts.sort((a, b) => b.vote_count - a.vote_count)
+        } else {
+          sortedPosts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        }
+
+        setPosts(sortedPosts)
+      } else {
+        toast.error("Failed to load posts")
+      }
     } catch (error) {
-      console.error("Error fetching posts:", error)
-      setPosts([])
+      console.error("Error loading posts:", error)
+      toast.error("Failed to load posts")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleCreatePost = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!isAuthenticated || !user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to create posts",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (!newPost.title.trim() || !newPost.content.trim()) {
-      toast({
-        title: "Missing Content",
-        description: "Please provide both title and content",
-        variant: "destructive",
-      })
+  const handleVote = async (postId: string) => {
+    if (!user) {
+      toast.error("Please log in to vote")
       return
     }
 
     try {
-      setPosting(true)
-
-      console.log("[v0] Starting post creation", { user: user?.id, title: newPost.title })
-
-      const response = await fetch("/api/community/posts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: newPost.title.trim(),
-          content: newPost.content.trim(),
-          category_id: newPost.category_id || null,
-        }),
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        console.log("[v0] Error creating post:", result.error)
-        throw new Error(result.error || "Failed to create post")
-      }
-
-      console.log("[v0] Post created successfully:", result.post)
-
-      toast({
-        title: "Success",
-        description: "Your post has been created!",
-      })
-
-      setNewPost({ title: "", content: "", category_id: "" })
-      fetchPosts() // Refresh posts
-    } catch (error) {
-      console.error("Error creating post:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create post. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setPosting(false)
-    }
-  }
-
-  const handleVotePost = async (postId: string) => {
-    if (!isAuthenticated || !user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to vote",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      console.log("[v0] Toggling vote for post:", postId)
-
       const response = await fetch(`/api/community/posts/${postId}/vote`, {
         method: "POST",
       })
 
-      const result = await response.json()
+      const data = await response.json()
 
-      if (!response.ok) {
-        console.log("[v0] Error voting:", result.error)
-        throw new Error(result.error || "Failed to vote")
+      if (response.ok) {
+        // Update the post in the local state
+        setPosts((prev) =>
+          prev.map((post) =>
+            post.id === postId
+              ? {
+                  ...post,
+                  vote_count: data.vote_count || post.vote_count,
+                  user_voted: data.voted,
+                }
+              : post,
+          ),
+        )
+
+        toast.success(data.message || "Vote updated")
+      } else {
+        toast.error(data.error || "Failed to vote")
       }
-
-      console.log("[v0] Vote toggled successfully:", result)
-      fetchPosts() // Refresh posts to show updated vote counts
     } catch (error) {
       console.error("Error voting:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to vote on post",
-        variant: "destructive",
-      })
+      toast.error("Failed to vote")
     }
   }
 
-  const filteredPosts = posts.filter(
-    (post) =>
-      searchQuery === "" ||
-      post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      post.username.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+  const handlePostCreated = () => {
+    loadPosts(selectedCategory || undefined)
+  }
+
+  const handleCategoryChange = (categoryId: string | null) => {
+    setSelectedCategory(categoryId)
+    loadPosts(categoryId || undefined)
+  }
+
+  useEffect(() => {
+    loadCategories()
+    loadPosts()
+  }, [sortBy])
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 },
+    },
+  }
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 },
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      <ShoutOutDisplay position="top" />
-
-      {/* Header */}
-      <div className="sticky top-16 z-30 bg-background/95 backdrop-blur-sm border-b">
-        <div className="container mx-auto px-4 py-3 sm:py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold">Community</h1>
-              <p className="text-sm text-muted-foreground">Connect with fellow Erigga fans</p>
-            </div>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search posts..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-full sm:w-64"
-                />
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setSortBy(sortBy === "recent" ? "popular" : sortBy === "popular" ? "trending" : "recent")
-                }
-                className="w-full sm:w-auto"
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                {sortBy === "recent" ? "Recent" : sortBy === "popular" ? "Popular" : "Trending"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-4 py-4 sm:py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-3 space-y-4 sm:space-y-6">
-            {/* Posts Feed */}
-            <div className="space-y-4 pb-32">
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-                </div>
-              ) : filteredPosts.length === 0 ? (
-                <Card className="glass-card">
-                  <CardContent className="p-8 sm:p-12 text-center">
-                    <Users className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-4 text-muted-foreground" />
-                    <h3 className="text-base sm:text-lg font-semibold mb-2">No posts yet</h3>
-                    <p className="text-sm text-muted-foreground mb-4">Be the first to start a conversation!</p>
-                    {!isAuthenticated && (
-                      <Link href="/login">
-                        <Button>Join the Community</Button>
-                      </Link>
-                    )}
-                  </CardContent>
-                </Card>
-              ) : (
-                <AnimatePresence>
-                  {filteredPosts.map((post, index) => (
-                    <motion.div
-                      key={post.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ duration: 0.3, delay: index * 0.05 }}
-                    >
-                      <Card className="glass-card hover:shadow-lg transition-all duration-300">
-                        <CardContent className="p-4 sm:p-6">
-                          {/* Post Header */}
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <Avatar className="h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0">
-                                <AvatarImage src={post.avatar_url || "/placeholder.svg"} />
-                                <AvatarFallback>{post.username?.[0]?.toUpperCase()}</AvatarFallback>
-                              </Avatar>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="font-medium text-sm sm:text-base truncate">{post.username}</p>
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-xs flex-shrink-0"
-                                    style={{ backgroundColor: post.category_color + "20" }}
-                                  >
-                                    Fan
-                                  </Badge>
-                                </div>
-                                <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground flex-wrap">
-                                  <div className="flex items-center gap-1">
-                                    <Clock className="h-3 w-3" />
-                                    {new Date(post.created_at).toLocaleDateString()}
-                                  </div>
-                                  <Badge variant="outline" className="text-xs">
-                                    {post.category_name}
-                                  </Badge>
-                                </div>
-                              </div>
-                            </div>
-                            <Button variant="ghost" size="sm" className="flex-shrink-0">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </div>
-
-                          {/* Post Content */}
-                          <div className="mb-4">
-                            <h3 className="text-base sm:text-lg font-semibold mb-2 break-words">{post.title}</h3>
-                            <p className="text-sm sm:text-base text-foreground leading-relaxed whitespace-pre-wrap break-words">
-                              {post.content}
-                            </p>
-
-                            {/* Hashtags */}
-                            {post.hashtags && post.hashtags.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mt-3">
-                                {post.hashtags.map((hashtag, i) => (
-                                  <Badge key={i} variant="secondary" className="text-xs">
-                                    {hashtag}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Post Actions */}
-                          <div className="flex items-center justify-between pt-4 border-t">
-                            <div className="flex items-center gap-2 sm:gap-4">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleVotePost(post.id)}
-                                className={`flex items-center gap-1 sm:gap-2 hover:text-red-500 text-xs sm:text-sm ${post.user_voted ? "text-red-500" : ""}`}
-                              >
-                                <Heart className={`h-3 w-3 sm:h-4 sm:w-4 ${post.user_voted ? "fill-current" : ""}`} />
-                                {post.vote_count}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                              >
-                                <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                                {post.comment_count}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                              >
-                                <Share2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                                <span className="hidden sm:inline">Share</span>
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-          </div>
-
-          {/* Sidebar - Replaced trending topics with shoutout feature and mini radio */}
-          <div className="space-y-4 sm:space-y-6">
-            {/* Shoutout Feature */}
-            <Card className="glass-card">
-              <CardContent className="p-4 sm:p-6">
-                <h3 className="font-semibold mb-4 text-sm sm:text-base flex items-center gap-2">
-                  <Mic className="h-4 w-4" />
-                  Live Shoutouts
-                </h3>
-                <div className="flex justify-center mb-4">
-                  <AnimatedRadioCharacter
-                    isPlaying={true}
-                    isLive={true}
-                    shoutouts={["Welcome to the community!", "Erigga fans unite!", "Paper Boi forever!"]}
-                    className="w-full"
-                  />
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-muted-foreground mb-2">Send a shoutout to go live!</p>
-                  <Link href="/radio">
-                    <Button size="sm" className="w-full">
-                      <Radio className="h-3 w-3 mr-2" />
-                      Go to Radio
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Mini Erigga Radio */}
-            <Card className="glass-card">
-              <CardContent className="p-4 sm:p-6">
-                <h3 className="font-semibold mb-4 text-sm sm:text-base flex items-center gap-2">
-                  <Radio className="h-4 w-4" />
-                  Erigga Radio
-                </h3>
-                <div className="text-center space-y-3">
-                  <div className="relative">
-                    <motion.div
-                      className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center"
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-                    >
-                      <Radio className="h-6 w-6 text-white" />
-                    </motion.div>
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Now Playing</p>
-                    <p className="text-xs text-muted-foreground">Paper Boi Vibes</p>
-                  </div>
-                  <Link href="/radio">
-                    <Button size="sm" className="w-full">
-                      Listen Live
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Community Stats */}
-            <Card className="glass-card">
-              <CardContent className="p-4 sm:p-6">
-                <h3 className="font-semibold mb-4 text-sm sm:text-base">Community Stats</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm text-muted-foreground">Total Posts</span>
-                    <span className="font-medium text-sm sm:text-base">{posts.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm text-muted-foreground">Active Categories</span>
-                    <span className="font-medium text-sm sm:text-base">{categories.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm text-muted-foreground">Online Now</span>
-                    <span className="font-medium text-green-500">●</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-
-      {isAuthenticated && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t">
-          <div className="container mx-auto px-4 py-4">
-            <form onSubmit={handleCreatePost} className="space-y-3">
-              {/* Category Selection Dropdown */}
-              <div className="flex items-center gap-3">
-                <Avatar className="h-8 w-8 flex-shrink-0">
-                  <AvatarImage src={(user as any)?.avatar_url || "/placeholder.svg"} />
-                  <AvatarFallback>{(user as any)?.username?.[0]?.toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <Select
-                  value={newPost.category_id}
-                  onValueChange={(value) => {
-                    setNewPost({ ...newPost, category_id: value })
-                  }}
-                >
-                  <SelectTrigger className="w-40 h-8 text-xs">
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id} className="text-xs">
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+    <AuthGuard>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="container mx-auto px-4 py-8 max-w-6xl">
+          {/* Header */}
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                  Community
+                </h1>
+                <p className="text-gray-600 dark:text-gray-300 mt-2">
+                  Connect, share, and engage with fellow Erigga fans
+                </p>
               </div>
 
-              {/* Title Input */}
-              <Input
-                placeholder="What's on your mind?"
-                value={newPost.title}
-                onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-                className="border-0 bg-muted/50 focus-visible:ring-1 text-sm"
-              />
-
-              {/* Content and Send Button */}
-              <div className="flex items-end gap-2">
-                <Textarea
-                  placeholder="Share your thoughts with the community... Use #hashtags!"
-                  value={newPost.content}
-                  onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
-                  className="border-0 bg-muted/50 focus-visible:ring-1 min-h-[60px] resize-none text-sm flex-1"
-                  rows={2}
-                />
+              <div className="flex items-center gap-4">
                 <Button
-                  type="submit"
-                  disabled={posting || !newPost.title.trim() || !newPost.content.trim()}
-                  className="rounded-full h-10 w-10 p-0 flex-shrink-0"
+                  variant="outline"
+                  onClick={() => loadPosts(selectedCategory || undefined)}
+                  disabled={loading}
+                  className="flex items-center gap-2"
                 >
-                  {posting ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
+                  <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                  Refresh
                 </Button>
               </div>
-            </form>
+            </div>
+          </motion.div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            {/* Sidebar */}
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="lg:col-span-1">
+              <div className="space-y-6">
+                {/* Categories */}
+                <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm dark:bg-gray-800/80">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Filter className="h-5 w-5" />
+                      Categories
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <Button
+                        variant={selectedCategory === null ? "default" : "ghost"}
+                        className="w-full justify-start"
+                        onClick={() => handleCategoryChange(null)}
+                      >
+                        <Hash className="h-4 w-4 mr-2" />
+                        All Posts
+                      </Button>
+                      {categories.map((category) => (
+                        <Button
+                          key={category.id}
+                          variant={selectedCategory === category.id ? "default" : "ghost"}
+                          className="w-full justify-start"
+                          onClick={() => handleCategoryChange(category.id)}
+                        >
+                          <span className="mr-2">{category.icon}</span>
+                          {category.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Sort Options */}
+                <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm dark:bg-gray-800/80">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5" />
+                      Sort By
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Tabs value={sortBy} onValueChange={(value) => setSortBy(value as "recent" | "popular")}>
+                      <TabsList className="w-full">
+                        <TabsTrigger value="recent" className="flex-1">
+                          <Clock className="h-4 w-4 mr-2" />
+                          Recent
+                        </TabsTrigger>
+                        <TabsTrigger value="popular" className="flex-1">
+                          <TrendingUp className="h-4 w-4 mr-2" />
+                          Popular
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </CardContent>
+                </Card>
+
+                {/* Community Stats */}
+                <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm dark:bg-gray-800/80">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Community Stats
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Total Posts</span>
+                        <span className="font-semibold">{posts.length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Categories</span>
+                        <span className="font-semibold">{categories.length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Active Users</span>
+                        <span className="font-semibold">{new Set(posts.map((p) => p.user.id)).size}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </motion.div>
+
+            {/* Main Content */}
+            <div className="lg:col-span-3">
+              <div className="space-y-6">
+                {/* Create Post */}
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+                  <CreatePost categories={categories} onPostCreated={handlePostCreated} />
+                </motion.div>
+
+                {/* Posts Feed */}
+                <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
+                  {loading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+                    </div>
+                  ) : posts.length === 0 ? (
+                    <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm dark:bg-gray-800/80">
+                      <CardContent className="text-center py-12">
+                        <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No posts yet</h3>
+                        <p className="text-gray-600 dark:text-gray-300">
+                          {selectedCategory
+                            ? "No posts in this category yet. Be the first to share something!"
+                            : "Be the first to start a conversation in the community!"}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <AnimatePresence>
+                      {posts.map((post, index) => (
+                        <motion.div
+                          key={post.id}
+                          variants={itemVariants}
+                          initial="hidden"
+                          animate="visible"
+                          exit="hidden"
+                          transition={{ delay: index * 0.1 }}
+                          whileHover={{ y: -4 }}
+                          className="group"
+                        >
+                          <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm dark:bg-gray-800/80 hover:shadow-xl transition-all duration-300">
+                            <CardContent className="p-6">
+                              {/* Post Header */}
+                              <div className="flex items-start justify-between mb-4">
+                                <div className="flex items-center space-x-3">
+                                  <Avatar className="h-10 w-10 ring-2 ring-white shadow-sm">
+                                    <AvatarImage
+                                      src={post.user.avatar_url || "/placeholder-user.jpg"}
+                                      alt={post.user.username}
+                                    />
+                                    <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold">
+                                      {post.user.full_name?.charAt(0) || post.user.username?.charAt(0) || "U"}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <p className="font-semibold text-gray-900 dark:text-white">
+                                        {post.user.full_name || post.user.username}
+                                      </p>
+                                      <UserTierBadge tier={post.user.tier} size="sm" />
+                                    </div>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">@{post.user.username}</p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  {post.category && (
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-xs"
+                                      style={{
+                                        backgroundColor: `${post.category.color}20`,
+                                        color: post.category.color,
+                                        borderColor: `${post.category.color}40`,
+                                      }}
+                                    >
+                                      <span className="mr-1">{post.category.icon}</span>
+                                      {post.category.name}
+                                    </Badge>
+                                  )}
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Post Title */}
+                              {post.title && (
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                                  {post.title}
+                                </h3>
+                              )}
+
+                              {/* Post Content */}
+                              <div className="mb-4">
+                                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{post.content}</p>
+
+                                {post.media_url && (
+                                  <div className="mt-4">
+                                    {post.media_type?.startsWith("image") ? (
+                                      <img
+                                        src={post.media_url || "/placeholder.svg"}
+                                        alt="Post media"
+                                        className="rounded-lg max-w-full h-auto shadow-md"
+                                      />
+                                    ) : post.media_type?.startsWith("video") ? (
+                                      <video
+                                        src={post.media_url}
+                                        controls
+                                        className="rounded-lg max-w-full h-auto shadow-md"
+                                      />
+                                    ) : (
+                                      <a
+                                        href={post.media_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 underline"
+                                      >
+                                        View attachment
+                                      </a>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              <Separator className="my-4" />
+
+                              {/* Post Actions */}
+                              <div className="flex items-center justify-between">
+                                <VoteButtons
+                                  postId={post.id}
+                                  initialVoteCount={post.vote_count}
+                                  initialUserVoted={post.user_voted || false}
+                                  onVote={() => handleVote(post.id)}
+                                />
+
+                                <div className="flex items-center gap-4">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+                                  >
+                                    <MessageCircle className="h-4 w-4 mr-1" />
+                                    {post.comment_count || 0}
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  )}
+                </motion.div>
+              </div>
+            </div>
           </div>
         </div>
-      )}
-    </div>
+      </div>
+    </AuthGuard>
   )
 }

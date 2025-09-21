@@ -1,24 +1,24 @@
+import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { NextResponse } from "next/server"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = createClient()
 
-    const { data, error } = await supabase
+    const { data: categories, error } = await supabase
       .from("community_categories")
       .select("*")
       .eq("is_active", true)
-      .order("display_order")
+      .order("display_order", { ascending: true })
 
     if (error) {
-      console.error("Database error:", error)
+      console.error("Error fetching categories:", error)
       return NextResponse.json({ error: "Failed to fetch categories" }, { status: 500 })
     }
 
-    return NextResponse.json({ categories: data || [] })
+    return NextResponse.json({ categories: categories || [] })
   } catch (error) {
-    console.error("API error:", error)
+    console.error("Error in categories API:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

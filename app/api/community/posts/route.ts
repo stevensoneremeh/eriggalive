@@ -3,73 +3,60 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
     const { searchParams } = new URL(request.url)
-    const category = searchParams.get("category")
+    const categoryId = searchParams.get("category")
     const limit = Number.parseInt(searchParams.get("limit") || "20")
     const offset = Number.parseInt(searchParams.get("offset") || "0")
 
-    // Get current user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const supabase = createClient()
 
-    let query = supabase
-      .from("community_posts")
-      .select(
-        `
-        *,
-        users!community_posts_user_id_fkey (
-          id,
-          username,
-          full_name,
-          avatar_url,
-          tier
-        ),
-        community_categories!community_posts_category_id_fkey (
-          id,
-          name,
-          slug,
-          icon,
-          color
-        )
-      `,
-      )
-      .eq("is_published", true)
-      .eq("is_deleted", false)
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1)
-
-    if (category && category !== "all") {
-      query = query.eq("category_id", category)
-    }
-
-    const { data: posts, error } = await query
+    // Use the database function to get posts with user data
+    const { data: posts, error } = await supabase.rpc("get_community_posts_with_user_data", {
+      category_filter: categoryId || null,
+    })
 
     if (error) {
       console.error("Error fetching posts:", error)
       return NextResponse.json({ error: "Failed to fetch posts" }, { status: 500 })
     }
 
-    // Get vote status for authenticated users
-    if (user && posts) {
-      const postIds = posts.map((post) => post.id)
-      const { data: userVotes } = await supabase
-        .from("community_post_votes")
-        .select("post_id")
-        .in("post_id", postIds)
-        .eq("user_id", user.id)
+    // Apply pagination
+    const paginatedPosts = posts?.slice(offset, offset + limit) || []
 
-      const votedPostIds = new Set(userVotes?.map((vote) => vote.post_id) || [])
+    // Transform the data to match frontend expectations
+    const formattedPosts = paginatedPosts.map((post: any) => ({
+      id: post.id,
+      title: post.title,
+      content: post.content,
+      media_url: post.media_url,
+      media_type: post.media_type,
+      vote_count: post.vote_count,
+      comment_count: post.comment_count,
+      created_at: post.created_at,
+      updated_at: post.updated_at,
+      user_voted: post.user_voted,
+      user: {
+        id: post.user_id,
+        username: post.username,
+        full_name: post.full_name,
+        avatar_url: post.avatar_url,
+        tier: post.tier,
+      },
+      category: {
+        id: post.category_id,
+        name: post.category_name,
+        color: post.category_color,
+        icon: post.category_icon,
+      },
+    }))
 
-      posts.forEach((post) => {
-        post.has_voted = votedPostIds.has(post.id)
-      })
-    }
-
-    return NextResponse.json({ posts })
+    return NextResponse.json({
+      posts: formattedPosts,
+      total: posts?.length || 0,
+      hasMore: offset + limit < (posts?.length || 0),
+    })
   } catch (error) {
-    console.error("Error in GET /api/community/posts:", error)
+    console.error("Error in posts API:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -77,68 +64,57 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient()
+
+    // Get the current user
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser()
 
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get user profile
-    const { data: profile } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
+    // Get the user profile
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .single()
 
-    if (!profile) {
+    if (profileError || !profile) {
       return NextResponse.json({ error: "User profile not found" }, { status: 404 })
     }
 
     const body = await request.json()
-    const { title, content, category_id, media_url, media_type, hashtags } = body
+    const { title, content, category_id, media_url, media_type } = body
 
     if (!content) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 })
     }
 
-    const { data: post, error } = await supabase
+    // Create the post
+    const { data: post, error: createError } = await supabase
       .from("community_posts")
       .insert({
         user_id: profile.id,
+        category_id: category_id || null,
         title: title || null,
         content,
-        category_id: category_id || null,
         media_url: media_url || null,
         media_type: media_type || null,
-        hashtags: hashtags || [],
       })
-      .select(
-        `
-        *,
-        users!community_posts_user_id_fkey (
-          id,
-          username,
-          full_name,
-          avatar_url,
-          tier
-        ),
-        community_categories!community_posts_category_id_fkey (
-          id,
-          name,
-          slug,
-          icon,
-          color
-        )
-      `,
-      )
+      .select()
       .single()
 
-    if (error) {
-      console.error("Error creating post:", error)
+    if (createError) {
+      console.error("Error creating post:", createError)
       return NextResponse.json({ error: "Failed to create post" }, { status: 500 })
     }
 
-    return NextResponse.json({ post })
+    return NextResponse.json({ post }, { status: 201 })
   } catch (error) {
-    console.error("Error in POST /api/community/posts:", error)
+    console.error("Error in POST posts API:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

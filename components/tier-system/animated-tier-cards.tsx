@@ -27,8 +27,8 @@ interface TierPlan {
 
 const tierPlans: TierPlan[] = [
   {
-    id: "erigga_citizen",
-    name: "Erigga Citizen",
+    id: "free",
+    name: "Free",
     price: 0,
     period: "forever",
     icon: Star,
@@ -45,8 +45,8 @@ const tierPlans: TierPlan[] = [
     ],
   },
   {
-    id: "erigga_indigen",
-    name: "Erigga Indigen",
+    id: "pro",
+    name: "Pro",
     price: 5000,
     period: "/month",
     icon: Crown,
@@ -57,7 +57,7 @@ const tierPlans: TierPlan[] = [
     coinBonus: 1000,
     description: "Most popular choice for fans",
     features: [
-      "Everything in Erigga Citizen",
+      "Everything in Free",
       "Early access to new drops",
       "Exclusive behind-the-scenes content",
       "15% discount on merch",
@@ -80,7 +80,7 @@ const tierPlans: TierPlan[] = [
     coinBonus: 3000,
     description: "Ultimate fan experience",
     features: [
-      "Everything in Erigga Indigen",
+      "Everything in Pro",
       "VIP access to all events",
       "30% discount on all purchases",
       "Backstage access at events",
@@ -105,7 +105,7 @@ export function AnimatedTierCards({ onUpgrade }: AnimatedTierCardsProps) {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
   const [selectedCard, setSelectedCard] = useState<string | null>(null)
 
-  const currentTier = profile?.tier || "erigga_citizen"
+  const currentTier = profile?.tier || "free"
 
   const cardVariants = {
     initial: { scale: 1, y: 0 },
@@ -154,8 +154,8 @@ export function AnimatedTierCards({ onUpgrade }: AnimatedTierCardsProps) {
         const isCurrentTier = currentTier === plan.id
         const canUpgrade =
           !isCurrentTier &&
-          ((currentTier === "erigga_citizen" && (plan.id === "erigga_indigen" || plan.id === "enterprise")) ||
-            (currentTier === "erigga_indigen" && plan.id === "enterprise"))
+          ((currentTier === "free" && (plan.id === "pro" || plan.id === "enterprise")) ||
+            (currentTier === "pro" && plan.id === "enterprise"))
 
         return (
           <motion.div

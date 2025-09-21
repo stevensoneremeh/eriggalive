@@ -28,3 +28,19 @@ export function hasTierAccess(userTier: string, requiredTier: string): boolean {
   const requiredInfo = getTierDisplayInfo(requiredTier)
   return userInfo.level >= requiredInfo.level
 }
+
+export function mapLegacyTierToNew(oldTier: string): string {
+  const mapping = {
+    grassroot: "erigga_citizen",
+    pioneer: "erigga_indigen",
+    elder: "erigga_indigen",
+    blood: "enterprise",
+    blood_brotherhood: "enterprise",
+    free: "erigga_citizen",
+    pro: "erigga_indigen",
+    ent: "enterprise",
+  }
+
+  const normalized = oldTier?.toLowerCase() || "erigga_citizen"
+  return mapping[normalized as keyof typeof mapping] || "erigga_citizen"
+}

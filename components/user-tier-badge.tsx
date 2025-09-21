@@ -60,7 +60,7 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
       color: "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500",
       tooltip: "Enterprise tier member with VIP gold access",
     },
-    // Alternative tier mappings
+    // Alternative mappings
     FREE: {
       label: "Erigga Citizen",
       icon: User,

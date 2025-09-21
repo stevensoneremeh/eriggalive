@@ -1,77 +1,44 @@
-import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const supabase = createClient()
+
+    // Get the current user
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser()
 
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Get user profile
-    const { data: profile } = await supabase.from("users").select("id").eq("auth_user_id", user.id).single()
-
-    if (!profile) {
-      return NextResponse.json({ error: "User profile not found" }, { status: 404 })
     }
 
     const postId = params.id
 
-    // Check if user has already voted
-    const { data: existingVote } = await supabase
-      .from("community_post_votes")
-      .select("*")
-      .eq("post_id", postId)
-      .eq("user_id", profile.id)
-      .single()
-
-    if (existingVote) {
-      // Remove vote
-      const { error: deleteError } = await supabase
-        .from("community_post_votes")
-        .delete()
-        .eq("post_id", postId)
-        .eq("user_id", profile.id)
-
-      if (deleteError) {
-        console.error("Error removing vote:", deleteError)
-        return NextResponse.json({ error: "Failed to remove vote" }, { status: 500 })
-      }
-
-      // Decrement vote count
-      const { error: updateError } = await supabase.rpc("decrement_post_votes", { post_id: postId })
-
-      if (updateError) {
-        console.error("Error decrementing vote count:", updateError)
-      }
-
-      return NextResponse.json({ voted: false, message: "Vote removed" })
-    } else {
-      // Add vote
-      const { error: insertError } = await supabase
-        .from("community_post_votes")
-        .insert({ post_id: postId, user_id: profile.id })
-
-      if (insertError) {
-        console.error("Error adding vote:", insertError)
-        return NextResponse.json({ error: "Failed to add vote" }, { status: 500 })
-      }
-
-      // Increment vote count
-      const { error: updateError } = await supabase.rpc("increment_post_votes", { post_id: postId })
-
-      if (updateError) {
-        console.error("Error incrementing vote count:", updateError)
-      }
-
-      return NextResponse.json({ voted: true, message: "Vote added" })
+    if (!postId) {
+      return NextResponse.json({ error: "Post ID is required" }, { status: 400 })
     }
+
+    // Use the database function to toggle vote
+    const { data, error } = await supabase.rpc("toggle_post_vote", {
+      post_id_param: postId,
+    })
+
+    if (error) {
+      console.error("Error toggling vote:", error)
+      return NextResponse.json({ error: "Failed to toggle vote" }, { status: 500 })
+    }
+
+    // Check if the response indicates an error
+    if (data && typeof data === "object" && "error" in data) {
+      return NextResponse.json({ error: data.error }, { status: 400 })
+    }
+
+    return NextResponse.json(data)
   } catch (error) {
-    console.error("Error in POST /api/community/posts/[id]/vote:", error)
+    console.error("Error in vote API:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
