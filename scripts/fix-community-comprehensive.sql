@@ -1,6 +1,6 @@
 
 -- Comprehensive fix for community and user profile issues
--- This script ensures all tables exist and functions work properly
+-- This script ensures all tables exist and functions work properly with correct data types
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -13,7 +13,7 @@ DROP TABLE IF EXISTS community_categories CASCADE;
 
 -- Ensure users table exists with correct structure
 CREATE TABLE IF NOT EXISTS users (
-    id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     auth_user_id uuid UNIQUE NOT NULL,
     email text NOT NULL,
     username text UNIQUE,
@@ -54,10 +54,10 @@ CREATE TABLE community_categories (
     updated_at timestamp with time zone DEFAULT now()
 );
 
--- Create community posts table
+-- Create community posts table with correct UUID reference
 CREATE TABLE community_posts (
     id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    user_id bigint REFERENCES users(id) ON DELETE CASCADE,
+    user_id uuid REFERENCES users(id) ON DELETE CASCADE,
     category_id integer REFERENCES community_categories(id) ON DELETE SET NULL,
     title text,
     content text NOT NULL CHECK (length(content) >= 1 AND length(content) <= 10000),
@@ -79,7 +79,7 @@ CREATE TABLE community_posts (
 CREATE TABLE community_post_votes (
     id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     post_id bigint REFERENCES community_posts(id) ON DELETE CASCADE,
-    user_id bigint REFERENCES users(id) ON DELETE CASCADE,
+    user_id uuid REFERENCES users(id) ON DELETE CASCADE,
     vote_type text DEFAULT 'upvote' CHECK (vote_type IN ('upvote', 'downvote')),
     created_at timestamp with time zone DEFAULT now(),
     UNIQUE(post_id, user_id)
@@ -89,7 +89,7 @@ CREATE TABLE community_post_votes (
 CREATE TABLE community_comments (
     id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     post_id bigint REFERENCES community_posts(id) ON DELETE CASCADE,
-    user_id bigint REFERENCES users(id) ON DELETE CASCADE,
+    user_id uuid REFERENCES users(id) ON DELETE CASCADE,
     parent_comment_id bigint REFERENCES community_comments(id) ON DELETE CASCADE,
     content text NOT NULL CHECK (length(content) >= 1 AND length(content) <= 2000),
     like_count integer DEFAULT 0,
@@ -103,7 +103,7 @@ CREATE TABLE community_comments (
 CREATE TABLE community_comment_likes (
     id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     comment_id bigint REFERENCES community_comments(id) ON DELETE CASCADE,
-    user_id bigint REFERENCES users(id) ON DELETE CASCADE,
+    user_id uuid REFERENCES users(id) ON DELETE CASCADE,
     created_at timestamp with time zone DEFAULT now(),
     UNIQUE(comment_id, user_id)
 );
@@ -155,25 +155,25 @@ CREATE POLICY "Anyone can view categories" ON community_categories FOR SELECT US
 CREATE POLICY "Anyone can view published posts" ON community_posts FOR SELECT USING (is_published = true AND is_deleted = false);
 CREATE POLICY "Users can create posts" ON community_posts FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 CREATE POLICY "Users can update own posts" ON community_posts FOR UPDATE USING (
-    EXISTS (SELECT 1 FROM users WHERE users.id = community_posts.user_id AND users.auth_user_id = auth.uid())
+    auth.uid() = user_id
 );
 
 CREATE POLICY "Anyone can view votes" ON community_post_votes FOR SELECT USING (true);
 CREATE POLICY "Users can create votes" ON community_post_votes FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 CREATE POLICY "Users can delete own votes" ON community_post_votes FOR DELETE USING (
-    EXISTS (SELECT 1 FROM users WHERE users.id = community_post_votes.user_id AND users.auth_user_id = auth.uid())
+    auth.uid() = user_id
 );
 
 CREATE POLICY "Anyone can view comments" ON community_comments FOR SELECT USING (is_deleted = false);
 CREATE POLICY "Users can create comments" ON community_comments FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 CREATE POLICY "Users can update own comments" ON community_comments FOR UPDATE USING (
-    EXISTS (SELECT 1 FROM users WHERE users.id = community_comments.user_id AND users.auth_user_id = auth.uid())
+    auth.uid() = user_id
 );
 
 CREATE POLICY "Anyone can view comment likes" ON community_comment_likes FOR SELECT USING (true);
 CREATE POLICY "Users can create comment likes" ON community_comment_likes FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 CREATE POLICY "Users can delete own comment likes" ON community_comment_likes FOR DELETE USING (
-    EXISTS (SELECT 1 FROM users WHERE users.id = community_comment_likes.user_id AND users.auth_user_id = auth.uid())
+    auth.uid() = user_id
 );
 
 -- Create indexes for performance
@@ -192,6 +192,7 @@ CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS trigger AS $$
 BEGIN
     INSERT INTO public.users (
+        id,
         auth_user_id,
         email,
         username,
@@ -209,6 +210,7 @@ BEGIN
         updated_at
     )
     VALUES (
+        NEW.id,
         NEW.id,
         NEW.email,
         COALESCE(NEW.raw_user_meta_data->>'username', split_part(NEW.email, '@', 1)),
