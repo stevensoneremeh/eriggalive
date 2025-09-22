@@ -279,7 +279,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (
       email: string,
       password: string,
-      userData: { username: string; full_name: string; tier?: string; payment_reference?: string },
+      userData: { username: string; full_name: string; tier?: string; payment_reference?: string; custom_amount?: string },
     ) => {
       try {
         if (!supabase || supabaseError) {
@@ -287,6 +287,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         setLoading(true)
+        
+        // Validate required fields
+        if (!email || !password || !userData.username || !userData.full_name) {
+          setLoading(false)
+          return { error: { message: "All required fields must be provided" } }
+        }
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -294,21 +301,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             data: {
               username: userData.username,
               full_name: userData.full_name,
-              tier: userData.tier || "free",
+              tier: userData.tier || "FREE",
               payment_reference: userData.payment_reference,
+              custom_amount: userData.custom_amount,
             },
             emailRedirectTo: `${window.location.origin}/auth/callback?redirect=/dashboard`,
           },
         })
 
         if (error) {
+          console.error('Supabase signup error:', error)
           setLoading(false)
-          return { error }
+          return { error: { message: error.message || "Failed to create account" } }
         }
 
         if (data.user && !data.user.email_confirmed_at) {
           router.push("/signup/success")
         } else if (data.user) {
+          router.push("/dashboard")
         }
 
         setLoading(false)

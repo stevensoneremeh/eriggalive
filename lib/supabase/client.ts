@@ -20,42 +20,7 @@ export function createClient() {
   if (!supabaseUrl || !supabaseAnonKey) {
     console.warn("Missing Supabase environment variables. Some features may not work properly.")
     // Return a mock client that prevents crashes
-    return {
-      auth: {
-        getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-        getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-        signInWithPassword: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-        signUp: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-        signOut: () => Promise.resolve({ error: null }),
-        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-        resetPasswordForEmail: () => Promise.resolve({ error: { message: "Supabase not configured" } }),
-        updateUser: () => Promise.resolve({ error: { message: "Supabase not configured" } }),
-      },
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            maybeSingle: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-            single: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-          }),
-        }),
-        insert: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-        update: () => ({
-          eq: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-        }),
-        delete: () => ({
-          eq: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-        }),
-      }),
-      // Add real-time functionality for mock client
-      channel: (name: string) => ({
-        on: (event: string, config: any, callback: any) => ({
-          subscribe: () => ({ 
-            unsubscribe: () => {} 
-          }),
-        }),
-      }),
-      removeChannel: () => {},
-    } as any
+    return createMockClient()
   }
 
   try {
@@ -64,6 +29,11 @@ export function createClient() {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 2,
+        },
       },
       global: {
         headers: {
@@ -75,43 +45,48 @@ export function createClient() {
     return client
   } catch (error) {
     console.error("Failed to create Supabase client:", error)
-    return {
-      auth: {
-        getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-        getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-        signInWithPassword: () => Promise.resolve({ data: null, error: { message: "Supabase client error" } }),
-        signUp: () => Promise.resolve({ data: null, error: { message: "Supabase client error" } }),
-        signOut: () => Promise.resolve({ error: null }),
-        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-        resetPasswordForEmail: () => Promise.resolve({ error: { message: "Supabase client error" } }),
-        updateUser: () => Promise.resolve({ error: { message: "Supabase client error" } }),
-      },
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            maybeSingle: () => Promise.resolve({ data: null, error: { message: "Supabase client error" } }),
-            single: () => Promise.resolve({ data: null, error: { message: "Supabase client error" } }),
-          }),
-        }),
-        insert: () => Promise.resolve({ data: null, error: { message: "Supabase client error" } }),
-        update: () => ({
-          eq: () => Promise.resolve({ data: null, error: { message: "Supabase client error" } }),
-        }),
-        delete: () => ({
-          eq: () => Promise.resolve({ data: null, error: { message: "Supabase client error" } }),
-        }),
-      }),
-      // Add real-time functionality for error fallback client
-      channel: (name: string) => ({
-        on: (event: string, config: any, callback: any) => ({
-          subscribe: () => ({ 
-            unsubscribe: () => {} 
-          }),
-        }),
-      }),
-      removeChannel: () => {},
-    } as any
+    return createMockClient()
   }
+}
+
+function createMockClient() {
+  return {
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+      getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+      signInWithPassword: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      signUp: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      signOut: () => Promise.resolve({ error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      resetPasswordForEmail: () => Promise.resolve({ error: { message: "Supabase not configured" } }),
+      updateUser: () => Promise.resolve({ error: { message: "Supabase not configured" } }),
+      refreshSession: () => Promise.resolve({ data: { session: null }, error: null }),
+    },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+          single: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+        }),
+      }),
+      insert: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      update: () => ({
+        eq: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      }),
+      delete: () => ({
+        eq: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      }),
+    }),
+    // Disable realtime for mock client to prevent WebSocket errors
+    channel: () => ({
+      on: () => ({
+        subscribe: () => ({ 
+          unsubscribe: () => {} 
+        }),
+      }),
+    }),
+    removeChannel: () => {},
+  } as any
 }
 
 export function createClientComponentClient() {
