@@ -94,7 +94,7 @@ interface Post {
 }
 
 export default function CommunityPage() {
-  const { user } = useAuth()
+  const { user, profile, refreshProfile } = useAuth()
   const { toast } = useToast()
   const [posts, setPosts] = useState<Post[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -196,6 +196,21 @@ export default function CommunityPage() {
         variant: "destructive"
       })
       return
+    }
+
+    // Ensure profile exists before creating post
+    if (!profile) {
+      toast({
+        title: "Setting up your profile...",
+        description: "Please wait while we prepare your account"
+      })
+      
+      try {
+        // Try to refresh profile first
+        await refreshProfile?.()
+      } catch (error) {
+        console.error("Profile refresh failed:", error)
+      }
     }
 
     try {

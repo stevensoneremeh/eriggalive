@@ -20,7 +20,7 @@ interface AuthContextType {
   signUp: (
     email: string,
     password: string,
-    userData: { username: string; full_name: string; tier?: string; payment_reference?: string },
+    userData: { username: string; full_name: string; tier?: string; payment_reference?: string; custom_amount?: string },
   ) => Promise<{ error: any }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error: any }>
@@ -287,7 +287,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         setLoading(true)
-        
+
         // Validate required fields
         if (!email || !password || !userData.username || !userData.full_name) {
           setLoading(false)

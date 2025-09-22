@@ -16,15 +16,39 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const postId = parseInt(params.id)
 
-    // Get user profile
-    const { data: userProfile, error: profileError } = await supabase
+    // Get or create user profile
+    let { data: userProfile, error: profileError } = await supabase
       .from("users")
       .select("id")
       .eq("auth_user_id", user.id)
       .single()
 
     if (profileError || !userProfile) {
-      return NextResponse.json({ success: false, error: "User profile not found" }, { status: 404 })
+      console.log("User profile not found for voting, creating profile")
+      
+      // Create user profile if it doesn't exist
+      const { data: newUserProfile, error: createError } = await supabase
+        .from('users')
+        .insert({
+          auth_user_id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+          username: user.user_metadata?.username || user.email?.split('@')[0] || 'user',
+          tier: 'erigga_citizen',
+          coins: 100,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select("id")
+        .single()
+
+      if (createError || !newUserProfile) {
+        console.error("Failed to create user profile for voting:", createError)
+        return NextResponse.json({ success: false, error: "Unable to create user profile" }, { status: 500 })
+      }
+      
+      userProfile = newUserProfile
     }
 
     // Check if user already voted
