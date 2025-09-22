@@ -54,31 +54,32 @@ export function MissionsDashboard() {
       
       if (!response.ok) {
         console.error("Missions API returned error:", response.status, response.statusText)
-        setMissions([]) // Set empty missions on error
+        setMissions([])
+        toast({
+          title: "Notice",
+          description: "Missions are temporarily unavailable. Please try again later.",
+          variant: "default",
+        })
         return
       }
 
       const result = await response.json()
 
-      if (result.success) {
-        setMissions(result.missions || [])
+      if (result.success && result.missions) {
+        setMissions(result.missions)
       } else {
         console.error("Failed to load missions:", result.error)
-        setMissions([]) // Set empty missions on error
+        setMissions([])
         toast({
           title: "Notice",
-          description: "Missions are temporarily unavailable",
+          description: "No missions available at the moment.",
           variant: "default",
         })
       }
     } catch (error) {
       console.error("Failed to load missions:", error)
-      setMissions([]) // Set empty missions on error
-      toast({
-        title: "Notice",
-        description: "Missions are temporarily unavailable",
-        variant: "default",
-      })
+      setMissions([])
+      // Don't show error toast on network issues
     } finally {
       setLoading(false)
     }

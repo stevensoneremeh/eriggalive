@@ -30,7 +30,10 @@ import {
   Eye,
   Hash,
   Calendar,
-  Loader2
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  Reply
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
@@ -52,6 +55,19 @@ interface User {
   full_name: string
   avatar_url: string
   tier: string
+}
+
+interface Comment {
+  id: number
+  post_id: string
+  user_id: string
+  content: string
+  like_count: number
+  reply_count: number
+  parent_comment_id?: number | null
+  created_at: string
+  user: User
+  user_liked: boolean
 }
 
 interface Post {
@@ -87,6 +103,11 @@ export default function CommunityPage() {
   const [sortBy, setSortBy] = useState<string>("newest")
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false)
   const [createPostLoading, setCreatePostLoading] = useState(false)
+  const [expandedComments, setExpandedComments] = useState<Set<number>>(new Set())
+  const [comments, setComments] = useState<{ [postId: number]: Comment[] }>({})
+  const [loadingComments, setLoadingComments] = useState<Set<number>>(new Set())
+  const [newComment, setNewComment] = useState<{ [postId: number]: string }>({})
+  const [submittingComment, setSubmittingComment] = useState<Set<number>>(new Set())
   
   // Create post form
   const [newPost, setNewPost] = useState({
@@ -228,6 +249,158 @@ export default function CommunityPage() {
       }
     } catch (error) {
       console.error("Error toggling vote:", error)
+    }
+  }
+
+  const loadComments = async (postId: number) => {
+    if (loadingComments.has(postId)) return
+    
+    setLoadingComments(prev => new Set([...prev, postId]))
+    
+    try {
+      const response = await fetch(`/api/community/posts/${postId}/comments`)
+      const data = await response.json()
+      
+      if (data.success) {
+        setComments(prev => ({
+          ...prev,
+          [postId]: data.comments
+        }))
+      }
+    } catch (error) {
+      console.error("Error loading comments:", error)
+    } finally {
+      setLoadingComments(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(postId)
+        return newSet
+      })
+    }
+  }
+
+  const toggleComments = async (postId: number) => {
+    if (expandedComments.has(postId)) {
+      setExpandedComments(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(postId)
+        return newSet
+      })
+    } else {
+      setExpandedComments(prev => new Set([...prev, postId]))
+      if (!comments[postId]) {
+        await loadComments(postId)
+      }
+    }
+  }
+
+  const submitComment = async (postId: number) => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to comment",
+        variant: "destructive"
+      })
+      return
+    }
+
+    const content = newComment[postId]?.trim()
+    if (!content) {
+      toast({
+        title: "Content Required",
+        description: "Please enter a comment",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setSubmittingComment(prev => new Set([...prev, postId]))
+
+    try {
+      const response = await fetch(`/api/community/posts/${postId}/comments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ content })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setComments(prev => ({
+          ...prev,
+          [postId]: [data.comment, ...(prev[postId] || [])]
+        }))
+        
+        setNewComment(prev => ({
+          ...prev,
+          [postId]: ""
+        }))
+
+        // Update post comment count
+        setPosts(prevPosts => 
+          prevPosts.map(post => 
+            post.id === postId 
+              ? { ...post, comment_count: post.comment_count + 1 }
+              : post
+          )
+        )
+
+        toast({
+          title: "Comment Posted!",
+          description: "Your comment has been added successfully"
+        })
+      } else {
+        throw new Error(data.error || "Failed to post comment")
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to post comment",
+        variant: "destructive"
+      })
+    } finally {
+      setSubmittingComment(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(postId)
+        return newSet
+      })
+    }
+  }
+
+  const toggleCommentLike = async (postId: number, commentId: number) => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to like comments",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/community/posts/${postId}/comments/${commentId}/like`, {
+        method: "POST"
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setComments(prev => ({
+          ...prev,
+          [postId]: prev[postId]?.map(comment => 
+            comment.id === commentId 
+              ? { 
+                  ...comment, 
+                  user_liked: data.liked, 
+                  like_count: data.likeCount 
+                }
+              : comment
+          ) || []
+        }))
+      }
+    } catch (error) {
+      console.error("Error toggling comment like:", error)
     }
   }
 
@@ -642,9 +815,19 @@ export default function CommunityPage() {
                               <span>{post.vote_count}</span>
                             </Button>
 
-                            <Button variant="ghost" size="sm" className="flex items-center space-x-2 text-gray-400 hover:text-blue-400">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="flex items-center space-x-2 text-gray-400 hover:text-blue-400"
+                              onClick={() => toggleComments(post.id)}
+                            >
                               <MessageCircle className="h-4 w-4" />
                               <span>{post.comment_count}</span>
+                              {expandedComments.has(post.id) ? (
+                                <ChevronUp className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
                             </Button>
 
                             <Button variant="ghost" size="sm" className="flex items-center space-x-2 text-gray-400 hover:text-green-400">
@@ -658,6 +841,128 @@ export default function CommunityPage() {
                             <span>{Math.floor(Math.random() * 1000) + 50} views</span>
                           </div>
                         </div>
+
+                        {/* Comments Section */}
+                        <AnimatePresence>
+                          {expandedComments.has(post.id) && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="border-t border-gray-700 pt-4 space-y-4"
+                            >
+                              {/* Add Comment Form */}
+                              {user && (
+                                <div className="flex space-x-3">
+                                  <Avatar className="h-8 w-8 flex-shrink-0">
+                                    <AvatarImage src={user.user_metadata?.avatar_url} alt="You" />
+                                    <AvatarFallback className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm">
+                                      {user.email?.charAt(0).toUpperCase()}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1 space-y-2">
+                                    <Textarea
+                                      placeholder="Write a comment..."
+                                      value={newComment[post.id] || ""}
+                                      onChange={(e) => setNewComment(prev => ({
+                                        ...prev,
+                                        [post.id]: e.target.value
+                                      }))}
+                                      className="bg-gray-700 border-gray-600 text-white min-h-[80px] resize-none"
+                                    />
+                                    <div className="flex justify-end">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => submitComment(post.id)}
+                                        disabled={!newComment[post.id]?.trim() || submittingComment.has(post.id)}
+                                        className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                                      >
+                                        {submittingComment.has(post.id) ? (
+                                          <>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            Posting...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Send className="h-4 w-4 mr-2" />
+                                            Comment
+                                          </>
+                                        )}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Comments List */}
+                              {loadingComments.has(post.id) ? (
+                                <div className="flex items-center justify-center py-4">
+                                  <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                                  <span className="ml-2 text-gray-400">Loading comments...</span>
+                                </div>
+                              ) : comments[post.id] && comments[post.id].length > 0 ? (
+                                <div className="space-y-4">
+                                  {comments[post.id].map((comment) => (
+                                    <div key={comment.id} className="flex space-x-3">
+                                      <Avatar className="h-8 w-8 flex-shrink-0">
+                                        <AvatarImage src={comment.user.avatar_url} alt={comment.user.username} />
+                                        <AvatarFallback className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm">
+                                          {comment.user.username.charAt(0).toUpperCase()}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="flex-1">
+                                        <div className="bg-gray-700 rounded-lg p-3">
+                                          <div className="flex items-center space-x-2 mb-1">
+                                            <span className="font-medium text-white text-sm">{comment.user.full_name}</span>
+                                            <span className="text-gray-400 text-xs">@{comment.user.username}</span>
+                                            <Badge className={getTierColor(comment.user.tier)} variant="outline">
+                                              <Crown className="h-2 w-2 mr-1" />
+                                              {getTierDisplayName(comment.user.tier)}
+                                            </Badge>
+                                            <span className="text-gray-500 text-xs">
+                                              {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                                            </span>
+                                          </div>
+                                          <p className="text-gray-300 text-sm">{comment.content}</p>
+                                        </div>
+                                        
+                                        <div className="flex items-center space-x-4 mt-2">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => toggleCommentLike(post.id, comment.id)}
+                                            className={`flex items-center space-x-1 text-xs ${
+                                              comment.user_liked 
+                                                ? "text-red-500 hover:text-red-400" 
+                                                : "text-gray-400 hover:text-red-400"
+                                            }`}
+                                          >
+                                            <Heart className={`h-3 w-3 ${comment.user_liked ? 'fill-current' : ''}`} />
+                                            <span>{comment.like_count}</span>
+                                          </Button>
+                                          
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="flex items-center space-x-1 text-xs text-gray-400 hover:text-blue-400"
+                                          >
+                                            <Reply className="h-3 w-3" />
+                                            <span>Reply</span>
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-center py-6 text-gray-400">
+                                  <MessageCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                  <p>No comments yet. Be the first to comment!</p>
+                                </div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </CardContent>
                     </Card>
                   </motion.div>
