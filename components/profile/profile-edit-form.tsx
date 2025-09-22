@@ -192,7 +192,7 @@ export function ProfileEditForm() {
         <CardContent>
           <div className="flex items-center gap-4">
             <Avatar className="h-20 w-20">
-              <AvatarImage src={profile?.profile_image_url || profile?.avatar_url} alt={profile?.username} />
+              <AvatarImage src={profile?.profile_image_url || profile?.avatar_url || undefined} alt={profile?.username || undefined} />
               <AvatarFallback className="text-lg">
                 {profile?.full_name?.charAt(0) || profile?.username?.charAt(0) || "U"}
               </AvatarFallback>

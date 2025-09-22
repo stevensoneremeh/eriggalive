@@ -38,6 +38,7 @@ import {
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { formatDistanceToNow } from "date-fns"
+import { EmojiPicker } from "@/components/ui/emoji-picker"
 
 interface Category {
   id: number
@@ -108,6 +109,23 @@ export default function CommunityPage() {
   const [loadingComments, setLoadingComments] = useState<Set<number>>(new Set())
   const [newComment, setNewComment] = useState<{ [postId: number]: string }>({})
   const [submittingComment, setSubmittingComment] = useState<Set<number>>(new Set())
+  const [postViewCounts, setPostViewCounts] = useState<{[key: number]: number}>({})
+  
+  // Add emoji to post content
+  const addEmojiToPost = (emoji: string) => {
+    setNewPost(prev => ({
+      ...prev,
+      content: prev.content + emoji
+    }))
+  }
+
+  // Add emoji to comment
+  const addEmojiToComment = (postId: number, emoji: string) => {
+    setNewComment(prev => ({
+      ...prev,
+      [postId]: (prev[postId] || '') + emoji
+    }))
+  }
   
   // Create post form
   const [newPost, setNewPost] = useState({
@@ -139,6 +157,15 @@ export default function CommunityPage() {
       
       if (postsData.success) {
         setPosts(postsData.posts)
+        
+        // Initialize stable view counts for each post
+        const viewCounts: {[key: number]: number} = {}
+        postsData.posts.forEach((post: Post) => {
+          // Generate stable view count based on post ID and creation date
+          const seed = post.id + new Date(post.created_at).getTime()
+          viewCounts[post.id] = Math.floor((seed * 0.001) % 1000) + 50
+        })
+        setPostViewCounts(viewCounts)
       }
     } catch (error) {
       console.error("Error loading community data:", error)
@@ -241,7 +268,7 @@ export default function CommunityPage() {
               ? { 
                   ...post, 
                   user_voted: data.voted, 
-                  vote_count: data.voted ? post.vote_count + 1 : Math.max(0, post.vote_count - 1)
+                  vote_count: data.voteCount // Use the count from backend, not calculated
                 }
               : post
           )
@@ -393,7 +420,7 @@ export default function CommunityPage() {
               ? { 
                   ...comment, 
                   user_liked: data.liked, 
-                  like_count: data.liked ? comment.like_count + 1 : Math.max(0, comment.like_count - 1)
+                  like_count: data.likeCount // Use the count from backend, not calculated
                 }
               : comment
           ) || []
@@ -608,13 +635,18 @@ export default function CommunityPage() {
 
                   <div>
                     <Label htmlFor="content">Content *</Label>
-                    <Textarea
-                      id="content"
-                      placeholder="What's on your mind?"
-                      value={newPost.content}
-                      onChange={(e) => setNewPost({...newPost, content: e.target.value})}
-                      className="bg-gray-700 border-gray-600 text-white min-h-[100px]"
-                    />
+                    <div className="relative">
+                      <Textarea
+                        id="content"
+                        placeholder="What's on your mind?"
+                        value={newPost.content}
+                        onChange={(e) => setNewPost({...newPost, content: e.target.value})}
+                        className="bg-gray-700 border-gray-600 text-white min-h-[100px] pr-10"
+                      />
+                      <div className="absolute bottom-2 right-2">
+                        <EmojiPicker onEmojiSelect={addEmojiToPost} disabled={createPostLoading} />
+                      </div>
+                    </div>
                   </div>
 
                   <div>
@@ -838,7 +870,7 @@ export default function CommunityPage() {
 
                           <div className="flex items-center text-sm text-gray-500">
                             <Eye className="h-4 w-4 mr-1" />
-                            <span>{Math.floor(Math.random() * 1000) + 50} views</span>
+                            <span>{postViewCounts[post.id] || 50} views</span>
                           </div>
                         </div>
 
@@ -861,15 +893,23 @@ export default function CommunityPage() {
                                     </AvatarFallback>
                                   </Avatar>
                                   <div className="flex-1 space-y-2">
-                                    <Textarea
-                                      placeholder="Write a comment..."
-                                      value={newComment[post.id] || ""}
-                                      onChange={(e) => setNewComment(prev => ({
-                                        ...prev,
-                                        [post.id]: e.target.value
-                                      }))}
-                                      className="bg-gray-700 border-gray-600 text-white min-h-[80px] resize-none"
-                                    />
+                                    <div className="relative">
+                                      <Textarea
+                                        placeholder="Write a comment..."
+                                        value={newComment[post.id] || ""}
+                                        onChange={(e) => setNewComment(prev => ({
+                                          ...prev,
+                                          [post.id]: e.target.value
+                                        }))}
+                                        className="bg-gray-700 border-gray-600 text-white min-h-[80px] resize-none pr-10"
+                                      />
+                                      <div className="absolute bottom-2 right-2">
+                                        <EmojiPicker 
+                                          onEmojiSelect={(emoji) => addEmojiToComment(post.id, emoji)} 
+                                          disabled={submittingComment.has(post.id)} 
+                                        />
+                                      </div>
+                                    </div>
                                     <div className="flex justify-end">
                                       <Button
                                         size="sm"

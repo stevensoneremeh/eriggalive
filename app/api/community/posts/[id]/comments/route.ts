@@ -222,12 +222,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     // Update post comment count
-    await supabase
+    const { data: currentPost } = await supabase
       .from('community_posts')
-      .update({ 
-        comment_count: supabase.rpc('increment', { value: 1 })
-      })
+      .select('comment_count')
       .eq('id', postId)
+      .single()
+    
+    if (currentPost) {
+      await supabase
+        .from('community_posts')
+        .update({ comment_count: (currentPost.comment_count || 0) + 1 })
+        .eq('id', postId)
+    }
 
     // Format response with user info
     const responseComment = {
