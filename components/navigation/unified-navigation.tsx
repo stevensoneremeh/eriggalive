@@ -45,6 +45,7 @@ import { cn } from "@/lib/utils"
 
 const navigationItems = [
   { name: "Home", href: "/", icon: Home },
+  { name: "Community", href: "/community", icon: Users },
   { name: "Media", href: "/missions", icon: Target },
   { name: "Radio", href: "/radio", icon: Radio },
   { name: "Events", href: "/events", icon: Calendar },
@@ -91,6 +92,7 @@ export function UnifiedNavigation() {
     if (user) {
       return [
         { name: "Home", href: "/", icon: Home },
+        { name: "Community", href: "/community", icon: Users },
         { name: "Media", href: "/missions", icon: Target },
         { name: "Radio", href: "/radio", icon: Radio },
         { name: "Events", href: "/events", icon: Calendar },
@@ -102,6 +104,7 @@ export function UnifiedNavigation() {
     } else {
       return [
         { name: "Home", href: "/", icon: Home },
+        { name: "Community", href: "/community", icon: Users },
         { name: "Media", href: "/missions", icon: Target },
         { name: "Radio", href: "/radio", icon: Radio },
         { name: "Events", href: "/events", icon: Calendar },
