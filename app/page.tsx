@@ -109,7 +109,7 @@ export default function HomePage() {
 
   const tierPlans = [
     {
-      name: "Free",
+      name: "Erigga Citizen",
       price: "Free",
       description: "Start your journey with basic platform access",
       features: ["Community access", "Public content", "Event announcements", "Basic profile"],
@@ -125,7 +125,7 @@ export default function HomePage() {
       period: "monthly",
       description: "Enhanced access with exclusive content and perks",
       features: [
-        "All Free features",
+        "All Erigga Citizen features",
         "Early music releases",
         "Exclusive interviews",
         "15% discount on merchandise",
@@ -147,7 +147,7 @@ export default function HomePage() {
       period: "annually",
       description: "Ultimate fan experience with direct artist access",
       features: [
-        "All Pro features",
+        "All Erigga Indigen features",
         "VIP access to all events",
         "30% discount on all purchases",
         "Backstage access at events",

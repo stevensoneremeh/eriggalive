@@ -1,4 +1,3 @@
-
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
@@ -53,7 +52,7 @@ export async function GET(request: NextRequest) {
     // If Supabase is not configured or there's an error, return sample posts
     if (postsError || !posts) {
       console.log("Using sample posts - Supabase error:", postsError?.message)
-      
+
       const samplePosts = [
         {
           id: 1,
@@ -146,14 +145,14 @@ export async function GET(request: NextRequest) {
     // Get current user to check vote status
     const { data: { user } } = await supabase.auth.getUser()
     let currentUserId = null
-    
+
     if (user) {
       const { data: userProfile } = await supabase
         .from('users')
         .select('id')
         .eq('auth_user_id', user.id)
         .single()
-      
+
       currentUserId = userProfile?.id
     }
 
@@ -161,7 +160,7 @@ export async function GET(request: NextRequest) {
     const postsWithVoteStatus = await Promise.all(
       posts.map(async (post: any) => {
         let user_voted = false
-        
+
         if (currentUserId) {
           const { data: vote } = await supabase
             .from('community_post_votes')
@@ -169,10 +168,10 @@ export async function GET(request: NextRequest) {
             .eq('post_id', post.id)
             .eq('user_id', currentUserId)
             .single()
-          
+
           user_voted = !!vote
         }
-        
+
         return {
           ...post,
           user_voted
@@ -239,7 +238,7 @@ export async function POST(request: NextRequest) {
 
     if (profileError || !userProfile) {
       console.log("User profile not found, creating new profile")
-      
+
       // Create user profile if it doesn't exist
       const { data: newUserProfile, error: createError } = await supabase
         .from('users')
@@ -296,7 +295,7 @@ export async function POST(request: NextRequest) {
           isDemo: true
         })
       }
-      
+
       userProfile = newUserProfile
     }
 
@@ -325,7 +324,7 @@ export async function POST(request: NextRequest) {
 
     if (postError) {
       console.log("Supabase post creation failed, returning mock data:", postError.message)
-      
+
       // Return mock data if Supabase fails
       const mockPost = {
         id: Date.now(),
@@ -374,7 +373,7 @@ export async function POST(request: NextRequest) {
         .select('id, name, color, icon')
         .eq('id', category_id)
         .single()
-      
+
       if (category) {
         categoryInfo = category
       }

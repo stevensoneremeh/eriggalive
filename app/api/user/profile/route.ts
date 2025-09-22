@@ -26,7 +26,7 @@ export async function GET() {
 
     if (profileError || !profile) {
       console.log("Profile not found, creating new profile for user:", user.id)
-      
+
       // Create new profile
       const { data: newProfile, error: createError } = await supabase
         .from("users")
@@ -52,7 +52,7 @@ export async function GET() {
 
       if (createError || !newProfile) {
         console.error("Error creating profile:", createError)
-        
+
         // Return fallback profile if creation fails
         const fallbackProfile = {
           id: user.id,
@@ -72,14 +72,14 @@ export async function GET() {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }
-        
+
         return NextResponse.json({
           profile: { ...fallbackProfile, email: user.email },
           success: true,
           fallback: true
         })
       }
-      
+
       profile = newProfile
     }
 
@@ -89,7 +89,7 @@ export async function GET() {
     fields.forEach(field => {
       if (profile[field]) completeness += 100 / fields.length
     })
-    
+
     profile.profile_completeness = Math.round(completeness)
 
     return NextResponse.json({

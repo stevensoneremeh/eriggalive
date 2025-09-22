@@ -10,7 +10,46 @@ interface UserTierBadgeProps {
 }
 
 export function UserTierBadge({ tier, size = "md", showLabel = true, className = "" }: UserTierBadgeProps) {
-  const tierInfo = getTierDisplayInfo(tier)
+  const tierConfig = {
+  erigga_citizen: {
+    label: "Erigga Citizen",
+    color: "bg-gray-100 text-gray-800 border-gray-200",
+    darkColor: "dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700",
+    icon: "🌱"
+  },
+  grassroot: {
+    label: "Erigga Citizen",
+    color: "bg-gray-100 text-gray-800 border-gray-200",
+    darkColor: "dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700",
+    icon: "🌱"
+  },
+  erigga_indigen: {
+    label: "Erigga Indigen",
+    color: "bg-blue-100 text-blue-800 border-blue-200", 
+    darkColor: "dark:bg-blue-900 dark:text-blue-200 dark:border-blue-800",
+    icon: "🚀"
+  },
+  pioneer: {
+    label: "Erigga Indigen", 
+    color: "bg-blue-100 text-blue-800 border-blue-200",
+    darkColor: "dark:bg-blue-900 dark:text-blue-200 dark:border-blue-800",
+    icon: "🚀"
+  },
+  enterprise: {
+    label: "Enterprise",
+    color: "bg-purple-100 text-purple-800 border-purple-200",
+    darkColor: "dark:bg-purple-900 dark:text-purple-200 dark:border-purple-800",
+    icon: "👑"
+  },
+  elder: {
+    label: "Enterprise",
+    color: "bg-purple-100 text-purple-800 border-purple-200",
+    darkColor: "dark:bg-purple-900 dark:text-purple-200 dark:border-purple-800", 
+    icon: "👑"
+  },
+}
+
+  const config = tierConfig[tier as keyof typeof tierConfig] || tierConfig.erigga_citizen
 
   const getBadgeVariant = (color: string) => {
     switch (color) {
