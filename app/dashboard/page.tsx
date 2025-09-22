@@ -30,14 +30,14 @@ import {
   BarChart3,
   Sparkles,
   Play,
-  Target,
+  
 } from "lucide-react"
 import Link from "next/link"
 import { useState, useRef, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { motion, AnimatePresence } from "framer-motion"
-import { MissionsDashboard } from "@/components/missions/missions-dashboard"
+
 
 interface UserStats {
   totalPosts: number
@@ -496,21 +496,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Main Content */}
               <div className="lg:col-span-2 space-y-6">
-                {/* Missions Dashboard Integration */}
-                <motion.div variants={itemVariants} initial="hidden" animate="visible">
-                  <Card className="bg-white/5 backdrop-blur-xl border-white/10 hover:bg-white/10 transition-all duration-300">
-                    <CardHeader>
-                      <CardTitle className="flex items-center text-white">
-                        <Target className="w-5 h-5 mr-2 text-purple-400" />
-                        Daily Missions
-                      </CardTitle>
-                      <CardDescription className="text-gray-300">Complete missions to earn rewards</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <MissionsDashboard />
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                
 
                 {/* Activity Stats */}
                 <motion.div variants={itemVariants} initial="hidden" animate="visible">

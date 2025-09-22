@@ -241,7 +241,7 @@ export default function CommunityPage() {
               ? { 
                   ...post, 
                   user_voted: data.voted, 
-                  vote_count: data.voteCount 
+                  vote_count: data.voted ? post.vote_count + 1 : Math.max(0, post.vote_count - 1)
                 }
               : post
           )
@@ -393,7 +393,7 @@ export default function CommunityPage() {
               ? { 
                   ...comment, 
                   user_liked: data.liked, 
-                  like_count: data.likeCount 
+                  like_count: data.liked ? comment.like_count + 1 : Math.max(0, comment.like_count - 1)
                 }
               : comment
           ) || []
