@@ -1,101 +1,101 @@
-
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient()
-    const { searchParams } = new URL(request.url)
-    const category = searchParams.get('category')
 
-    // Get sample posts for now
-    const samplePosts = [
-      {
-        id: 1,
-        title: "Just listened to Paper Boi Chronicles again! 🔥",
-        content: "This track never gets old. Erigga's storytelling is unmatched. Anyone else got this on repeat?",
-        user_id: "1",
-        category_id: 1,
-        vote_count: 12,
-        comment_count: 5,
-        hashtags: ["paperboi", "erigga", "music"],
-        created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        updated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        user: {
-          id: "1",
-          username: "paperboi_fan",
-          full_name: "Erigga Fan",
-          avatar_url: "/placeholder-user.jpg",
-          tier: "erigga_citizen"
-        },
-        category: {
-          id: 1,
-          name: "Music Discussion",
-          color: "#8B5CF6",
-          icon: "🎵"
-        },
-        user_voted: false
+    // Get current user for vote status
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Fetch posts with user and category data
+    const { data: posts, error } = await supabase
+      .from('community_posts')
+      .select(`
+        id,
+        title,
+        content,
+        media_url,
+        media_type,
+        hashtags,
+        vote_count,
+        comment_count,
+        view_count,
+        created_at,
+        updated_at,
+        user_id,
+        category_id,
+        users!inner (
+          id,
+          username,
+          full_name,
+          avatar_url,
+          tier
+        ),
+        community_categories!inner (
+          id,
+          name,
+          color,
+          icon
+        )
+      `)
+      .eq('is_published', true)
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    if (error) {
+      console.error('Error fetching posts:', error)
+      return NextResponse.json({ success: false, error: "Failed to fetch posts" }, { status: 500 })
+    }
+
+    // Check user votes if authenticated
+    let userVotes = []
+    if (user && posts?.length > 0) {
+      const { data: votes } = await supabase
+        .from('community_post_votes')
+        .select('post_id')
+        .eq('user_id', user.id)
+        .in('post_id', posts.map(p => p.id))
+
+      userVotes = votes?.map(v => v.post_id) || []
+    }
+
+    // Format posts data
+    const formattedPosts = posts?.map(post => ({
+      id: post.id,
+      title: post.title,
+      content: post.content,
+      media_url: post.media_url,
+      media_type: post.media_type,
+      hashtags: post.hashtags || [],
+      vote_count: post.vote_count || 0,
+      comment_count: post.comment_count || 0,
+      view_count: post.view_count || 0,
+      created_at: post.created_at,
+      updated_at: post.updated_at,
+      user_id: post.user_id,
+      user: {
+        id: post.users.id,
+        username: post.users.username,
+        full_name: post.users.full_name,
+        avatar_url: post.users.avatar_url,
+        tier: post.users.tier
       },
-      {
-        id: 2,
-        title: "New fan art I created! 🎨",
-        content: "Spent the weekend working on this Erigga portrait. What y'all think?",
-        media_url: "/erigga/photoshoots/erigga-professional-shoot.jpeg",
-        user_id: "2",
-        category_id: 2,
-        vote_count: 25,
-        comment_count: 8,
-        hashtags: ["fanart", "erigga", "art"],
-        created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-        updated_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-        user: {
-          id: "2",
-          username: "artist_warri",
-          full_name: "Warri Artist",
-          avatar_url: "/placeholder-user.jpg",
-          tier: "erigga_indigen"
-        },
-        category: {
-          id: 2,
-          name: "Fan Art",
-          color: "#10B981",
-          icon: "🎨"
-        },
-        user_voted: true
+      category: {
+        id: post.community_categories.id,
+        name: post.community_categories.name,
+        color: post.community_categories.color,
+        icon: post.community_categories.icon
       },
-      {
-        id: 3,
-        title: "Anyone going to the next concert?",
-        content: "Heard Erigga might be announcing tour dates soon. Who else is ready to catch him live?",
-        user_id: "3",
-        category_id: 3,
-        vote_count: 8,
-        comment_count: 12,
-        hashtags: ["concert", "tour", "live"],
-        created_at: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
-        updated_at: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
-        user: {
-          id: "3",
-          username: "concert_lover",
-          full_name: "Live Music Fan",
-          avatar_url: "/placeholder-user.jpg",
-          tier: "erigga_citizen"
-        },
-        category: {
-          id: 3,
-          name: "Events",
-          color: "#F59E0B",
-          icon: "🎤"
-        },
-        user_voted: false
-      }
-    ]
+      user_voted: userVotes.includes(post.id)
+    })) || []
 
     return NextResponse.json({
       success: true,
-      posts: samplePosts
+      posts: formattedPosts
     })
   } catch (error) {
     console.error("Error fetching posts:", error)
@@ -116,33 +116,80 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { title, content, category_id, hashtags } = body
+    const { title, content, category_id, hashtags, media_url, media_type } = body
 
-    // For now, just return success with mock data
+    if (!content?.trim()) {
+      return NextResponse.json({ success: false, error: "Content is required" }, { status: 400 })
+    }
+
+    // Insert the post into database
+    const { data: post, error: insertError } = await supabase
+      .from('community_posts')
+      .insert({
+        title: title || null,
+        content: content.trim(),
+        user_id: user.id,
+        category_id: category_id || 1,
+        hashtags: hashtags || [],
+        media_url: media_url || null,
+        media_type: media_type || null,
+        vote_count: 0,
+        comment_count: 0,
+        view_count: 0,
+        is_published: true,
+        is_deleted: false
+      })
+      .select(`
+        id,
+        title,
+        content,
+        media_url,
+        media_type,
+        hashtags,
+        vote_count,
+        comment_count,
+        view_count,
+        created_at,
+        updated_at,
+        user_id,
+        category_id
+      `)
+      .single()
+
+    if (insertError) {
+      console.error('Error inserting post:', insertError)
+      return NextResponse.json({ success: false, error: "Failed to create post" }, { status: 500 })
+    }
+
+    // Get user and category data
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id, username, full_name, avatar_url, tier')
+      .eq('id', user.id)
+      .single()
+
+    const { data: categoryData } = await supabase
+      .from('community_categories')
+      .select('id, name, color, icon')
+      .eq('id', category_id || 1)
+      .single()
+
     const newPost = {
-      id: Date.now(),
-      title,
-      content,
-      user_id: user.id,
-      category_id: category_id || 1,
-      vote_count: 0,
-      comment_count: 0,
-      hashtags: hashtags || [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      ...post,
       user: {
-        id: user.id,
-        username: user.email?.split('@')[0] || 'user',
-        full_name: user.user_metadata?.full_name || 'User',
-        avatar_url: user.user_metadata?.avatar_url || '/placeholder-user.jpg',
-        tier: 'erigga_citizen'
+        id: userData?.id || user.id,
+        username: userData?.username || user.email?.split('@')[0] || 'user',
+        full_name: userData?.full_name || user.user_metadata?.full_name || 'User',
+        avatar_url: userData?.avatar_url || user.user_metadata?.avatar_url || '/placeholder-user.jpg',
+        tier: userData?.tier || 'erigga_citizen'
       },
       category: {
-        id: 1,
-        name: "General Discussion",
-        color: "#3B82F6",
-        icon: "💬"
-      }
+        id: categoryData?.id || 1,
+        name: categoryData?.name || 'General Discussion',
+        color: categoryData?.color || '#3B82F6',
+        icon: categoryData?.icon || '💬'
+      },
+      user_voted: false
     }
 
     return NextResponse.json({

@@ -114,8 +114,11 @@ export default function CommunityPage() {
     title: "",
     content: "",
     category_id: 1,
-    hashtags: ""
+    hashtags: "",
+    media_url: "",
+    media_type: ""
   })
+  const [uploadingImage, setUploadingImage] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -149,6 +152,46 @@ export default function CommunityPage() {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      setUploadingImage(true)
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/profile/upload-image', {
+        method: 'POST',
+        body: formData
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setNewPost({
+          ...newPost,
+          media_url: data.imageUrl,
+          media_type: 'image'
+        })
+        toast({
+          title: "Image Uploaded",
+          description: "Your image has been uploaded successfully"
+        })
+      } else {
+        throw new Error(data.error || "Failed to upload image")
+      }
+    } catch (error: any) {
+      toast({
+        title: "Upload Error",
+        description: error.message || "Failed to upload image",
+        variant: "destructive"
+      })
+    } finally {
+      setUploadingImage(false)
     }
   }
 
@@ -188,7 +231,9 @@ export default function CommunityPage() {
           title: newPost.title || null,
           content: newPost.content,
           category_id: newPost.category_id,
-          hashtags
+          hashtags,
+          media_url: newPost.media_url || null,
+          media_type: newPost.media_type || null
         })
       })
 
@@ -196,7 +241,7 @@ export default function CommunityPage() {
 
       if (data.success) {
         setPosts(prevPosts => [data.post, ...prevPosts])
-        setNewPost({ title: "", content: "", category_id: 1, hashtags: "" })
+        setNewPost({ title: "", content: "", category_id: 1, hashtags: "", media_url: "", media_type: "" })
         setIsCreatePostOpen(false)
         
         toast({
@@ -626,6 +671,33 @@ export default function CommunityPage() {
                       onChange={(e) => setNewPost({...newPost, hashtags: e.target.value})}
                       className="bg-gray-700 border-gray-600 text-white"
                     />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="image">Add Image (Optional)</Label>
+                    <Input
+                      id="image"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      disabled={uploadingImage}
+                      className="bg-gray-700 border-gray-600 text-white"
+                    />
+                    {uploadingImage && (
+                      <div className="flex items-center mt-2 text-sm text-gray-400">
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Uploading image...
+                      </div>
+                    )}
+                    {newPost.media_url && (
+                      <div className="mt-2">
+                        <img 
+                          src={newPost.media_url} 
+                          alt="Preview" 
+                          className="w-32 h-32 object-cover rounded-lg"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-end gap-2">

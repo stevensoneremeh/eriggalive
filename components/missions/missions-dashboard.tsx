@@ -54,12 +54,24 @@ export function MissionsDashboard() {
       
       if (!response.ok) {
         console.error("Missions API returned error:", response.status, response.statusText)
-        setMissions([])
-        toast({
-          title: "Notice",
-          description: "Missions are temporarily unavailable. Please try again later.",
-          variant: "default",
-        })
+        // Set some default missions to prevent twitching
+        setMissions([
+          {
+            id: 1,
+            title: "Welcome to Erigga Live",
+            description: "Complete your profile setup and explore the platform",
+            mission_type: "daily",
+            category: "onboarding",
+            points_reward: 100,
+            coins_reward: 50,
+            requirements: { profile_completion: 1 },
+            is_active: true,
+            user_progress: {
+              progress: { profile_completion: 0 },
+              is_completed: false
+            }
+          }
+        ])
         return
       }
 
@@ -70,16 +82,10 @@ export function MissionsDashboard() {
       } else {
         console.error("Failed to load missions:", result.error)
         setMissions([])
-        toast({
-          title: "Notice",
-          description: "No missions available at the moment.",
-          variant: "default",
-        })
       }
     } catch (error) {
       console.error("Failed to load missions:", error)
       setMissions([])
-      // Don't show error toast on network issues
     } finally {
       setLoading(false)
     }
