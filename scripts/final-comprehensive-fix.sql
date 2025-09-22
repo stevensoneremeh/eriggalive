@@ -2,7 +2,7 @@
 -- =====================================================
 -- FINAL COMPREHENSIVE FIX - One Time Only
 -- =====================================================
--- This script fixes table conflicts and updates tier naming
+-- This script fixes table conflicts, updates tier naming, and replaces Grassroot with Erigga Citizen
 
 -- Step 1: Drop existing tables if they exist to avoid conflicts
 DROP TABLE IF EXISTS public.community_comment_likes CASCADE;
@@ -11,33 +11,92 @@ DROP TABLE IF EXISTS public.community_comments CASCADE;
 DROP TABLE IF EXISTS public.community_posts CASCADE;
 DROP TABLE IF EXISTS public.community_categories CASCADE;
 
--- Step 2: Drop and recreate users table with proper tier enum
+-- Step 2: Create proper user_tier enum with Erigga Citizen terminology
 DROP TYPE IF EXISTS user_tier CASCADE;
 CREATE TYPE user_tier AS ENUM ('erigga_citizen', 'erigga_indigen', 'enterprise', 'admin');
 
--- Update users table to use new tier system
+-- Step 3: Update users table structure
 DO $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users') THEN
-        -- Add temporary column
-        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS new_tier user_tier DEFAULT 'erigga_citizen';
-        
-        -- Update existing data
-        UPDATE public.users SET new_tier = CASE 
-            WHEN tier = 'grassroot' OR tier = 'free' OR tier = 'Grassroot' OR tier = 'Free' THEN 'erigga_citizen'::user_tier
-            WHEN tier = 'pioneer' OR tier = 'pro' OR tier = 'Pioneer' OR tier = 'Pro' THEN 'erigga_indigen'::user_tier
-            WHEN tier = 'elder' OR tier = 'blood' OR tier = 'premium' OR tier = 'Elder' OR tier = 'Blood' OR tier = 'Premium' THEN 'enterprise'::user_tier
-            WHEN tier = 'admin' OR tier = 'Admin' THEN 'admin'::user_tier
-            ELSE 'erigga_citizen'::user_tier
-        END;
-        
-        -- Drop old tier column and rename new one
-        ALTER TABLE public.users DROP COLUMN IF EXISTS tier;
-        ALTER TABLE public.users RENAME COLUMN new_tier TO tier;
+    -- Ensure users table exists
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users' AND table_schema = 'public') THEN
+        CREATE TABLE public.users (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            auth_user_id UUID UNIQUE NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+            username TEXT UNIQUE,
+            full_name TEXT,
+            email TEXT UNIQUE NOT NULL,
+            avatar_url TEXT,
+            profile_image_url TEXT,
+            bio TEXT,
+            location TEXT,
+            website TEXT,
+            phone TEXT,
+            date_of_birth DATE,
+            social_links JSONB DEFAULT '{}',
+            tier user_tier DEFAULT 'erigga_citizen',
+            coins INTEGER DEFAULT 100,
+            points INTEGER DEFAULT 0,
+            level INTEGER DEFAULT 1,
+            reputation_score INTEGER DEFAULT 0,
+            is_active BOOLEAN DEFAULT true,
+            is_verified BOOLEAN DEFAULT false,
+            is_profile_public BOOLEAN DEFAULT true,
+            profile_completeness INTEGER DEFAULT 0,
+            last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+    ELSE
+        -- Add tier column if it doesn't exist
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'tier') THEN
+            ALTER TABLE public.users ADD COLUMN tier user_tier DEFAULT 'erigga_citizen';
+        ELSE
+            -- If tier column exists but is not the right type, fix it
+            BEGIN
+                -- Add temporary column
+                ALTER TABLE public.users ADD COLUMN IF NOT EXISTS new_tier user_tier DEFAULT 'erigga_citizen';
+                
+                -- Update existing data - handle the case where tier might be text or other type
+                UPDATE public.users SET new_tier = CASE 
+                    WHEN tier::text ILIKE '%grassroot%' OR tier::text ILIKE '%free%' THEN 'erigga_citizen'::user_tier
+                    WHEN tier::text ILIKE '%pioneer%' OR tier::text ILIKE '%pro%' THEN 'erigga_indigen'::user_tier
+                    WHEN tier::text ILIKE '%elder%' OR tier::text ILIKE '%blood%' OR tier::text ILIKE '%premium%' THEN 'enterprise'::user_tier
+                    WHEN tier::text ILIKE '%admin%' THEN 'admin'::user_tier
+                    ELSE 'erigga_citizen'::user_tier
+                END;
+                
+                -- Drop old tier column and rename new one
+                ALTER TABLE public.users DROP COLUMN tier;
+                ALTER TABLE public.users RENAME COLUMN new_tier TO tier;
+            EXCEPTION
+                WHEN OTHERS THEN
+                    -- If the column doesn't exist or conversion fails, just ensure we have the right column
+                    ALTER TABLE public.users ADD COLUMN IF NOT EXISTS tier user_tier DEFAULT 'erigga_citizen';
+            END;
+        END IF;
+
+        -- Add other missing columns
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS profile_image_url TEXT;
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS bio TEXT;
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS location TEXT;
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS website TEXT;
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS phone TEXT;
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS date_of_birth DATE;
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS social_links JSONB DEFAULT '{}';
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS coins INTEGER DEFAULT 100;
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 0;
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS level INTEGER DEFAULT 1;
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS reputation_score INTEGER DEFAULT 0;
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_profile_public BOOLEAN DEFAULT true;
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS profile_completeness INTEGER DEFAULT 0;
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT now();
     END IF;
 END $$;
 
--- Step 3: Create community tables with proper structure
+-- Step 4: Create community tables with proper structure
 CREATE TABLE public.community_categories (
     id BIGSERIAL PRIMARY KEY,
     name TEXT UNIQUE NOT NULL,
@@ -108,7 +167,7 @@ CREATE TABLE public.community_comment_likes (
     UNIQUE(comment_id, user_id)
 );
 
--- Step 4: Create indexes for performance
+-- Step 5: Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_users_auth_user_id ON public.users(auth_user_id);
 CREATE INDEX IF NOT EXISTS idx_users_tier ON public.users(tier);
 CREATE INDEX IF NOT EXISTS idx_community_posts_user_id ON public.community_posts(user_id);
@@ -121,16 +180,17 @@ CREATE INDEX IF NOT EXISTS idx_community_comments_user_id ON public.community_co
 CREATE INDEX IF NOT EXISTS idx_community_comment_likes_comment_id ON public.community_comment_likes(comment_id);
 CREATE INDEX IF NOT EXISTS idx_community_comment_likes_user_id ON public.community_comment_likes(user_id);
 
--- Step 5: Insert default categories
+-- Step 6: Insert default categories (using Erigga Citizen terminology)
 INSERT INTO public.community_categories (name, slug, description, icon, color, display_order) VALUES
 ('General Discussion', 'general', 'General conversations about Erigga and music', '💬', '#3B82F6', 1),
 ('Music & Lyrics', 'music', 'Discuss Erigga''s music and lyrics', '🎵', '#8B5CF6', 2),
 ('Fan Art & Media', 'media', 'Share fan art, photos, and media', '🎨', '#10B981', 3),
 ('Events & News', 'events', 'Latest events and news updates', '📅', '#F59E0B', 4),
-('Questions & Help', 'help', 'Ask questions and get help', '❓', '#EF4444', 5)
+('Questions & Help', 'help', 'Ask questions and get help', '❓', '#EF4444', 5),
+('Erigga Citizen Lounge', 'erigga-citizen', 'Exclusive area for Erigga Citizens', '👑', '#6366F1', 6)
 ON CONFLICT (slug) DO NOTHING;
 
--- Step 6: Create or replace automatic user creation function
+-- Step 7: Create or replace automatic user creation function
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER 
 LANGUAGE plpgsql 
@@ -160,13 +220,13 @@ EXCEPTION
 END;
 $$;
 
--- Step 7: Create trigger for new user creation
+-- Step 8: Create trigger for new user creation
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- Step 8: Enable RLS and create policies
+-- Step 9: Enable RLS and create policies
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.community_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.community_posts ENABLE ROW LEVEL SECURITY;
@@ -223,13 +283,13 @@ CREATE POLICY "Users can delete own comment likes" ON public.community_comment_l
     auth.uid() = (SELECT auth_user_id FROM public.users WHERE id = user_id)
 );
 
--- Step 9: Grant necessary permissions
+-- Step 10: Grant necessary permissions
 GRANT USAGE ON SCHEMA public TO authenticated;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 
--- Step 10: Update any remaining tier references in other tables
-UPDATE public.users SET tier = 'erigga_citizen' WHERE tier::text ILIKE '%grassroot%' OR tier::text ILIKE '%free%';
+-- Step 11: Update environment variables references (this will need to be done manually in code)
+-- This is a reminder that GRASSROOT_PASSWORD should be renamed to ERIGGA_CITIZEN_PASSWORD
 
 -- Final confirmation
-SELECT 'Database tables recreated and tier system updated successfully!' as status;
+SELECT 'Database fixed successfully! All Grassroot references updated to Erigga Citizen terminology.' as status;

@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -110,7 +109,7 @@ export default function CommunityPage() {
   const [newComment, setNewComment] = useState<{ [postId: number]: string }>({})
   const [submittingComment, setSubmittingComment] = useState<Set<number>>(new Set())
   const [postViewCounts, setPostViewCounts] = useState<{[key: number]: number}>({})
-  
+
   // Add emoji to post content
   const addEmojiToPost = (emoji: string) => {
     setNewPost(prev => ({
@@ -126,7 +125,7 @@ export default function CommunityPage() {
       [postId]: (prev[postId] || '') + emoji
     }))
   }
-  
+
   // Create post form
   const [newPost, setNewPost] = useState({
     title: "",
@@ -142,11 +141,11 @@ export default function CommunityPage() {
   const loadData = async () => {
     try {
       setLoading(true)
-      
+
       // Load categories
       const categoriesResponse = await fetch("/api/community/categories")
       const categoriesData = await categoriesResponse.json()
-      
+
       if (categoriesData.success) {
         setCategories(categoriesData.categories)
       }
@@ -154,10 +153,10 @@ export default function CommunityPage() {
       // Load posts
       const postsResponse = await fetch("/api/community/posts")
       const postsData = await postsResponse.json()
-      
+
       if (postsData.success) {
         setPosts(postsData.posts)
-        
+
         // Initialize stable view counts for each post
         const viewCounts: {[key: number]: number} = {}
         postsData.posts.forEach((post: Post) => {
@@ -204,7 +203,7 @@ export default function CommunityPage() {
         title: "Setting up your profile...",
         description: "Please wait while we prepare your account"
       })
-      
+
       try {
         // Try to refresh profile first
         await refreshProfile?.()
@@ -215,7 +214,7 @@ export default function CommunityPage() {
 
     try {
       setCreatePostLoading(true)
-      
+
       const hashtags = newPost.hashtags
         .split(',')
         .map(tag => tag.trim())
@@ -240,7 +239,7 @@ export default function CommunityPage() {
         setPosts(prevPosts => [data.post, ...prevPosts])
         setNewPost({ title: "", content: "", category_id: 1, hashtags: "" })
         setIsCreatePostOpen(false)
-        
+
         toast({
           title: "Success!",
           description: "Your post has been created successfully"
@@ -296,13 +295,13 @@ export default function CommunityPage() {
 
   const loadComments = async (postId: number) => {
     if (loadingComments.has(postId)) return
-    
+
     setLoadingComments(prev => new Set([...prev, postId]))
-    
+
     try {
       const response = await fetch(`/api/community/posts/${postId}/comments`)
       const data = await response.json()
-      
+
       if (data.success) {
         setComments(prev => ({
           ...prev,
@@ -373,7 +372,7 @@ export default function CommunityPage() {
           ...prev,
           [postId]: [data.comment, ...(prev[postId] || [])]
         }))
-        
+
         setNewComment(prev => ({
           ...prev,
           [postId]: ""
@@ -636,7 +635,7 @@ export default function CommunityPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="title">Title (Optional)</Label>
                     <Input
@@ -816,12 +815,12 @@ export default function CommunityPage() {
                           </div>
                         </div>
                       </CardHeader>
-                      
+
                       <CardContent className="space-y-4">
                         {post.title && (
                           <h3 className="text-xl font-semibold text-white">{post.title}</h3>
                         )}
-                        
+
                         <p className="text-gray-300 whitespace-pre-wrap">{post.content}</p>
 
                         {post.media_url && (
@@ -980,7 +979,7 @@ export default function CommunityPage() {
                                           </div>
                                           <p className="text-gray-300 text-sm">{comment.content}</p>
                                         </div>
-                                        
+
                                         <div className="flex items-center space-x-4 mt-2">
                                           <Button
                                             variant="ghost"
@@ -995,7 +994,7 @@ export default function CommunityPage() {
                                             <Heart className={`h-3 w-3 ${comment.user_liked ? 'fill-current' : ''}`} />
                                             <span>{comment.like_count}</span>
                                           </Button>
-                                          
+
                                           <Button
                                             variant="ghost"
                                             size="sm"

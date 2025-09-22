@@ -236,68 +236,29 @@ export async function POST(request: NextRequest) {
       .eq('auth_user_id', user.id)
       .single()
 
-    if (profileError || !userProfile) {
-      console.log("User profile not found, creating new profile")
-
-      // Create user profile if it doesn't exist
-      const { data: newUserProfile, error: createError } = await supabase
+    if (!userProfile) {
+      // Create profile if it doesn't exist
+      const { data: newProfile, error: createError } = await supabase
         .from('users')
         .insert({
           auth_user_id: user.id,
-          email: user.email,
+          email: user.email || '',
+          username: user.email?.split('@')[0] || 'user',
           full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-          username: user.user_metadata?.username || user.email?.split('@')[0] || 'user',
-          avatar_url: user.user_metadata?.avatar_url || null,
-          tier: 'erigga_citizen',
-          coins: 100,
-          points: 0,
-          level: 1,
-          reputation_score: 0,
-          is_active: true,
-          is_verified: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          tier: 'erigga_citizen'
         })
-        .select('id, username, full_name, avatar_url, tier')
-        .single()
+        .select()
+        .single();
 
-      if (createError || !newUserProfile) {
-        console.error("Failed to create user profile:", createError)
-        // Return mock response if database fails
-        return NextResponse.json({
-          success: true,
-          post: {
-            id: Date.now(),
-            title: sanitizedTitle,
-            content: sanitizedContent,
-            user_id: user.id,
-            category_id: category_id || 1,
-            vote_count: 0,
-            comment_count: 0,
-            hashtags: hashtags || [],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            user: {
-              id: user.id,
-              username: user.email?.split('@')[0] || 'user',
-              full_name: user.user_metadata?.full_name || 'User',
-              avatar_url: user.user_metadata?.avatar_url || null,
-              tier: 'erigga_citizen'
-            },
-            category: {
-              id: category_id || 1,
-              name: "General Discussion",
-              color: "#3B82F6",
-              icon: "💬"
-            },
-            user_voted: false
-          },
-          isDemo: true
-        })
+      if (createError || !newProfile) {
+        return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 });
       }
 
-      userProfile = newUserProfile
+      // Use the newly created profile
+      const finalProfile = newProfile;
+      userProfile = finalProfile; // Assign the newProfile to userProfile for subsequent use
     }
+
 
     // Try to create real post in Supabase
     const { data: newPost, error: postError } = await supabase

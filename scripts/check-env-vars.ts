@@ -8,10 +8,9 @@ const requiredEnvVars = [
   "SUPABASE_JWT_SECRET",
   "ADMIN_PASSWORD",
   "MOD_PASSWORD",
-  "GRASSROOT_PASSWORD",
-  "PIONEER_PASSWORD",
-  "ELDER_PASSWORD",
-  "BLOOD_PASSWORD",
+  "ERIGGA_CITIZEN_PASSWORD",
+  "ERIGGA_INDIGEN_PASSWORD",
+  "ENTERPRISE_PASSWORD",
 ]
 
 const missingVars = requiredEnvVars.filter((varName) => !process.env[varName])

@@ -301,7 +301,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             data: {
               username: userData.username,
               full_name: userData.full_name,
-              tier: userData.tier || "FREE",
+              tier: userData.tier || "erigga_citizen",
               payment_reference: userData.payment_reference,
               custom_amount: userData.custom_amount,
             },
