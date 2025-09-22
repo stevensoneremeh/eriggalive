@@ -274,6 +274,12 @@ export default function DashboardPage() {
         return "bg-gradient-to-r from-orange-400 to-red-500 text-white"
       case "blood_brotherhood":
         return "bg-gradient-to-r from-yellow-400 to-orange-500 text-white"
+      case "erigga_citizen":
+        return "bg-gradient-to-r from-blue-400 to-purple-500 text-white"
+      case "erigga_indigen":
+        return "bg-gradient-to-r from-orange-400 to-red-500 text-white"
+      case "erigga_elder":
+        return "bg-gradient-to-r from-yellow-400 to-orange-500 text-white"
       default:
         return "bg-gradient-to-r from-gray-400 to-gray-500 text-white"
     }
@@ -288,6 +294,12 @@ export default function DashboardPage() {
       case "elder":
         return 75
       case "blood_brotherhood":
+        return 100
+      case "erigga_citizen":
+        return 33
+      case "erigga_indigen":
+        return 66
+      case "erigga_elder":
         return 100
       default:
         return 0
@@ -584,18 +596,22 @@ export default function DashboardPage() {
                             transition={{ duration: 1, delay: 0.5 }}
                           />
                         </div>
-                        <div className="grid grid-cols-4 gap-2 text-xs">
-                          {["Grassroot", "Pioneer", "Elder", "Blood Brotherhood"].map((tier, index) => (
-                            <div key={tier} className="text-center">
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          {[
+                            { name: "Erigga Citizen", progress: 33 },
+                            { name: "Erigga Indigen", progress: 66 },
+                            { name: "E", progress: 100 }
+                          ].map((tier, index) => (
+                            <div key={tier.name} className="text-center">
                               <motion.div
                                 className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                                  getTierProgress(profile?.tier || "grassroot") >= (index + 1) * 25
+                                  getTierProgress(profile?.tier || "free") >= tier.progress
                                     ? "bg-gradient-to-r from-purple-500 to-blue-500"
                                     : "bg-white/20"
                                 }`}
                                 whileHover={{ scale: 1.2 }}
                               />
-                              <span className="text-gray-300">{tier}</span>
+                              <span className="text-gray-300">{tier.name}</span>
                             </div>
                           ))}
                         </div>

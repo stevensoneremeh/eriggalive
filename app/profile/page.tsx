@@ -155,38 +155,50 @@ export default function ProfilePage() {
   }
 
   const getTierColor = (tier: string) => {
-    switch (tier) {
-      case "FREE":
-      case "grassroot":
+    switch (tier?.toLowerCase()) {
+      case "free":
+      case "erigga_citizen":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-      case "PRO":
-      case "pioneer":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
-      case "ENT":
-      case "elder":
+      case "pro":
+      case "erigga_indigen":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-      case "blood_brotherhood":
+      case "ent":
+      case "enterprise":
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
     }
   }
 
   const getTierProgress = (tier: string) => {
-    switch (tier) {
-      case "FREE":
-      case "grassroot":
-        return 25
-      case "PRO":
-      case "pioneer":
-        return 50
-      case "ENT":
-      case "elder":
-        return 75
-      case "blood_brotherhood":
+    switch (tier?.toLowerCase()) {
+      case "free":
+      case "erigga_citizen":
+        return 33
+      case "pro":
+      case "erigga_indigen":
+        return 66
+      case "ent":
+      case "enterprise":
         return 100
       default:
-        return 0
+        return 33
+    }
+  }
+
+  const getTierDisplayName = (tier: string) => {
+    switch (tier?.toLowerCase()) {
+      case "free":
+      case "erigga_citizen":
+        return "Erigga Citizen"
+      case "pro":
+      case "erigga_indigen":
+        return "Erigga Indigen"
+      case "ent":
+      case "enterprise":
+        return "E"
+      default:
+        return "Erigga Citizen"
     }
   }
 

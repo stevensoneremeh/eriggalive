@@ -1,26 +1,22 @@
+import { Crown } from "lucide-react"
+
 export function getTierDisplayInfo(tier: string) {
   const tierMap = {
-    // New tier system
-    erigga_citizen: { label: "Erigga Citizen", color: "green", level: 0 },
-    erigga_indigen: { label: "Erigga Indigen", color: "blue", level: 1 },
-    enterprise: { label: "E", color: "yellow", level: 2 },
-    // Legacy tier mappings for backward compatibility
-    grassroot: { label: "Erigga Citizen", color: "green", level: 0 },
-    pioneer: { label: "Erigga Indigen", color: "blue", level: 1 },
-    elder: { label: "Erigga Indigen", color: "blue", level: 1 },
-    blood: { label: "E", color: "yellow", level: 2 },
-    blood_brotherhood: { label: "E", color: "yellow", level: 2 },
-    // Alternative mappings
-    FREE: { label: "Erigga Citizen", color: "green", level: 0 },
-    free: { label: "Erigga Citizen", color: "green", level: 0 },
-    PRO: { label: "Erigga Indigen", color: "blue", level: 1 },
-    pro: { label: "Erigga Indigen", color: "blue", level: 1 },
-    ENT: { label: "E", color: "yellow", level: 2 },
-    ent: { label: "E", color: "yellow", level: 2 },
+    // Primary tier system
+    erigga_citizen: { label: "Erigga Citizen", color: "green", level: 0, icon: Crown, tooltip: "Erigga Citizen - Community Member" },
+    erigga_indigen: { label: "Erigga Indigen", color: "blue", level: 1, icon: Crown, tooltip: "Erigga Indigen - Premium Member" },
+    enterprise: { label: "E", color: "yellow", level: 2, icon: Crown, tooltip: "Enterprise - VIP Member" },
+    // API tier mappings
+    FREE: { label: "Erigga Citizen", color: "green", level: 0, icon: Crown, tooltip: "Erigga Citizen - Community Member" },
+    free: { label: "Erigga Citizen", color: "green", level: 0, icon: Crown, tooltip: "Erigga Citizen - Community Member" },
+    PRO: { label: "Erigga Indigen", color: "blue", level: 1, icon: Crown, tooltip: "Erigga Indigen - Premium Member" },
+    pro: { label: "Erigga Indigen", color: "blue", level: 1, icon: Crown, tooltip: "Erigga Indigen - Premium Member" },
+    ENT: { label: "E", color: "yellow", level: 2, icon: Crown, tooltip: "Enterprise - VIP Member" },
+    ent: { label: "E", color: "yellow", level: 2, icon: Crown, tooltip: "Enterprise - VIP Member" },
   }
 
-  const normalizedTier = tier?.toLowerCase() || "erigga_citizen"
-  return tierMap[normalizedTier as keyof typeof tierMap] || tierMap.erigga_citizen
+  const normalizedTier = tier?.toLowerCase() || "free"
+  return tierMap[normalizedTier as keyof typeof tierMap] || tierMap.free
 }
 
 export function hasTierAccess(userTier: string, requiredTier: string): boolean {

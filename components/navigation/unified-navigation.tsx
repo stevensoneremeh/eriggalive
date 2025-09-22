@@ -131,6 +131,38 @@ export function UnifiedNavigation() {
     return navigationItems
   }
 
+  const getTierColor = (tier: string) => {
+    switch (tier?.toLowerCase()) {
+      case "free":
+      case "erigga_citizen":
+        return "bg-green-100 text-green-800 border-green-200"
+      case "pro":
+      case "erigga_indigen":
+        return "bg-blue-100 text-blue-800 border-blue-200"
+      case "ent":
+      case "enterprise":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      default:
+        return "bg-green-100 text-green-800 border-green-200"
+    }
+  }
+
+  const getTierDisplayName = (tier: string) => {
+    switch (tier?.toLowerCase()) {
+      case "free":
+      case "erigga_citizen":
+        return "ERIGGA CITIZEN"
+      case "pro":
+      case "erigga_indigen":
+        return "ERIGGA INDIGEN"
+      case "ent":
+      case "enterprise":
+        return "E"
+      default:
+        return "ERIGGA CITIZEN"
+    }
+  }
+
   return (
     <nav
       className={cn(
@@ -216,7 +248,7 @@ export function UnifiedNavigation() {
                         {profile?.tier && (
                           <Badge className={`w-fit text-xs ${getTierColor(profile.tier)}`}>
                             <Crown className="w-3 h-3 mr-1" />
-                            {profile.tier.replace("_", " ").toUpperCase()}
+                            {getTierDisplayName(profile.tier)}
                           </Badge>
                         )}
                       </div>
@@ -306,7 +338,7 @@ export function UnifiedNavigation() {
                           {profile?.tier && (
                             <Badge className={`text-xs ${getTierColor(profile.tier)}`}>
                               <Crown className="w-3 h-3 mr-1" />
-                              {profile.tier.replace("_", " ").toUpperCase()}
+                              {getTierDisplayName(profile.tier)}
                             </Badge>
                           )}
                           {profile?.coins !== undefined && (

@@ -22,10 +22,9 @@ export default function DashboardPage() {
     )
   }
 
-  const getTierColor = (tier: string) => {
+  // Helper function to map legacy tiers to new standardized tiers
+  const mapTierToStandard = (tier: string): string => {
     const normalizedTier = tier?.toLowerCase().replace(/[_\s]/g, "") || "free"
-
-    // Map legacy tiers to new system
     const tierMapping: Record<string, string> = {
       grassroot: "free",
       grassroots: "free",
@@ -34,35 +33,25 @@ export default function DashboardPage() {
       bloodbrotherhood: "enterprise",
       blood: "enterprise",
     }
+    return tierMapping[normalizedTier] || normalizedTier
+  }
 
-    const mappedTier = tierMapping[normalizedTier] || normalizedTier
-
+  const getTierColor = (tier: string) => {
+    const mappedTier = mapTierToStandard(tier)
     switch (mappedTier) {
       case "free":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+        return "bg-green-100 text-green-800 border-green-200"
       case "pro":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+        return "bg-blue-100 text-blue-800 border-blue-200"
       case "enterprise":
-        return "bg-gradient-to-r from-yellow-400 to-yellow-600 text-yellow-900 dark:from-yellow-500 dark:to-yellow-700 dark:text-yellow-100"
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+        return "bg-green-100 text-green-800 border-green-200"
     }
   }
 
   const getTierProgress = (tier: string) => {
-    const normalizedTier = tier?.toLowerCase().replace(/[_\s]/g, "") || "free"
-
-    const tierMapping: Record<string, string> = {
-      grassroot: "free",
-      grassroots: "free",
-      pioneer: "pro",
-      elder: "pro",
-      bloodbrotherhood: "enterprise",
-      blood: "enterprise",
-    }
-
-    const mappedTier = tierMapping[normalizedTier] || normalizedTier
-
+    const mappedTier = mapTierToStandard(tier)
     switch (mappedTier) {
       case "free":
         return 33
@@ -71,24 +60,12 @@ export default function DashboardPage() {
       case "enterprise":
         return 100
       default:
-        return 0
+        return 33
     }
   }
 
   const getTierDisplayName = (tier: string) => {
-    const normalizedTier = tier?.toLowerCase().replace(/[_\s]/g, "") || "free"
-
-    const tierMapping: Record<string, string> = {
-      grassroot: "free",
-      grassroots: "free",
-      pioneer: "pro",
-      elder: "pro",
-      bloodbrotherhood: "enterprise",
-      blood: "enterprise",
-    }
-
-    const mappedTier = tierMapping[normalizedTier] || normalizedTier
-
+    const mappedTier = mapTierToStandard(tier)
     switch (mappedTier) {
       case "free":
         return "ERIGGA CITIZEN"
