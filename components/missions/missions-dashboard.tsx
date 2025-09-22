@@ -51,24 +51,33 @@ export function MissionsDashboard() {
     try {
       setLoading(true)
       const response = await fetch("/api/missions")
+      
+      if (!response.ok) {
+        console.error("Missions API returned error:", response.status, response.statusText)
+        setMissions([]) // Set empty missions on error
+        return
+      }
+
       const result = await response.json()
 
       if (result.success) {
-        setMissions(result.missions)
+        setMissions(result.missions || [])
       } else {
         console.error("Failed to load missions:", result.error)
+        setMissions([]) // Set empty missions on error
         toast({
-          title: "Error",
-          description: "Failed to load missions",
-          variant: "destructive",
+          title: "Notice",
+          description: "Missions are temporarily unavailable",
+          variant: "default",
         })
       }
     } catch (error) {
       console.error("Failed to load missions:", error)
+      setMissions([]) // Set empty missions on error
       toast({
-        title: "Error",
-        description: "Failed to load missions",
-        variant: "destructive",
+        title: "Notice",
+        description: "Missions are temporarily unavailable",
+        variant: "default",
       })
     } finally {
       setLoading(false)
@@ -78,14 +87,31 @@ export function MissionsDashboard() {
   const loadReferralData = async () => {
     try {
       const response = await fetch("/api/referrals/me")
+      
+      if (!response.ok) {
+        console.error("Referrals API returned error:", response.status, response.statusText)
+        // Set default values if API fails
+        setReferralCode("ERG_DEFAULT")
+        setReferralCount(0)
+        return
+      }
+
       const result = await response.json()
 
       if (result.success) {
         setReferralCode(result.referralCode)
         setReferralCount(result.referralCount)
+      } else {
+        console.error("Referrals API error:", result.error)
+        // Set default values
+        setReferralCode("ERG_DEFAULT")
+        setReferralCount(0)
       }
     } catch (error) {
       console.error("Failed to load referral data:", error)
+      // Set default values if fetch fails
+      setReferralCode("ERG_DEFAULT")
+      setReferralCount(0)
     }
   }
 

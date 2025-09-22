@@ -24,6 +24,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
 
+    // Get user profile first
+    const { data: userProfile, error: profileError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .single()
+
+    if (profileError) {
+      console.error("[missions] User profile error:", profileError)
+      return NextResponse.json({ success: false, error: "User profile not found" }, { status: 404 })
+    }
+
     // Fetch all active missions
     const { data: missions, error: missionsError } = await supabase
       .from("missions")
@@ -122,19 +134,26 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch user's mission progress
-    const { data: userProgress, error: progressError } = await supabase
-      .from("user_missions")
-      .select("*")
-      .eq("user_id", user.id)
+    let userProgress = []
+    try {
+      const { data: progressData, error: progressError } = await supabase
+        .from("user_missions")
+        .select("*")
+        .eq("user_id", userProfile.id)
 
-    if (progressError && progressError.code !== "42P01") {
-      console.error("[missions] User progress query error:", progressError)
+      if (progressError && progressError.code !== "42P01") {
+        console.error("[missions] User progress query error:", progressError)
+      } else if (progressData) {
+        userProgress = progressData
+      }
+    } catch (progressErr) {
+      console.warn("[missions] User progress table not found, using empty progress")
     }
 
     // Combine missions with user progress
     const missionsWithProgress = (missions || []).map((mission) => ({
       ...mission,
-      user_progress: userProgress?.find((p) => p.mission_id === mission.id) || {
+      user_progress: userProgress.find((p) => p.mission_id === mission.id) || {
         progress: {},
         is_completed: false
       },
@@ -174,50 +193,45 @@ export async function POST(request: NextRequest) {
     const { action, mission_id, progress_data } = body
 
     if (action === "update_progress") {
-      // Update user mission progress
-      const { data: existingProgress } = await supabase
-        .from("user_missions")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("mission_id", mission_id)
+      // Get user profile
+      const { data: userProfile, error: profileError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("auth_user_id", user.id)
         .single()
 
-      if (existingProgress) {
-        // Update existing progress
-        const { error: updateError } = await supabase
-          .from("user_missions")
-          .update({
-            progress: { ...existingProgress.progress, ...progress_data },
-            updated_at: new Date().toISOString()
-          })
-          .eq("user_id", user.id)
-          .eq("mission_id", mission_id)
-
-        if (updateError) {
-          return NextResponse.json({ success: false, error: "Failed to update progress" }, { status: 500 })
-        }
-      } else {
-        // Create new progress entry
-        const { error: insertError } = await supabase
-          .from("user_missions")
-          .insert({
-            user_id: user.id,
-            mission_id,
-            progress: progress_data,
-            is_completed: false
-          })
-
-        if (insertError) {
-          return NextResponse.json({ success: false, error: "Failed to create progress" }, { status: 500 })
-        }
+      if (profileError) {
+        return NextResponse.json({ success: false, error: "User profile not found" }, { status: 404 })
       }
 
-      return NextResponse.json({ success: true })
+      // Update user mission progress
+      const { data, error } = await supabase
+        .from("user_missions")
+        .upsert({
+          user_id: userProfile.id,
+          mission_id,
+          progress: progress_data,
+          updated_at: new Date().toISOString()
+        })
+
+      if (error) {
+        console.error("[missions] Progress update error:", error)
+        return NextResponse.json({ success: false, error: "Failed to update progress" }, { status: 500 })
+      }
+
+      return NextResponse.json({ success: true, data })
     }
 
     return NextResponse.json({ success: false, error: "Invalid action" }, { status: 400 })
   } catch (error) {
     console.error("[missions] POST error:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Internal server error",
+        details: process.env.NODE_ENV === "development" ? (error as Error).message : undefined,
+      },
+      { status: 500 },
+    )
   }
 }

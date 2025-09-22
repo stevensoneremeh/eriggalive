@@ -1,3 +1,4 @@
+
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
@@ -15,45 +16,64 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      console.error("[v0] Auth error in referrals/me:", authError)
+      console.error("[referrals/me] Auth error:", authError)
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
 
     // Get user profile to get referral code
     const { data: profile, error: profileError } = await supabase
       .from("users")
-      .select("username, referral_code")
+      .select("id, username, referral_code, referral_count")
       .eq("auth_user_id", user.id)
       .single()
 
     if (profileError) {
-      console.error("[v0] Profile fetch error:", profileError)
+      console.error("[referrals/me] Profile fetch error:", profileError)
+      
       // If user profile doesn't exist, create it
       if (profileError.code === "PGRST116") {
-        const { data: newUser, error: createError } = await supabase
-          .from("users")
-          .insert({
-            auth_user_id: user.id,
-            email: user.email,
-            username: user.email?.split("@")[0] || "user",
-            referral_code: `${user.email?.split("@")[0] || 'user'}_${Math.random().toString(36).substring(2, 8)}`.toUpperCase(),
-            referral_count: 0,
-          })
-          .select("username, referral_code")
-          .single()
+        const username = user.email?.split("@")[0] || "user"
+        const referralCode = `${username}_${Math.random().toString(36).substring(2, 8)}`.toUpperCase()
+        
+        try {
+          const { data: newUser, error: createError } = await supabase
+            .from("users")
+            .insert({
+              auth_user_id: user.id,
+              email: user.email,
+              username: username,
+              referral_code: referralCode,
+              referral_count: 0,
+              full_name: username,
+              coins: 0,
+              points: 0,
+              level: 1,
+              tier: 'grassroot',
+              is_verified: false,
+              is_profile_public: true,
+              reputation_score: 0,
+              profile_completeness: 20
+            })
+            .select("id, username, referral_code, referral_count")
+            .single()
 
-        if (createError) {
-          console.error("[v0] Error creating user profile:", createError)
+          if (createError) {
+            console.error("[referrals/me] Error creating user profile:", createError)
+            return NextResponse.json({ success: false, error: "Failed to create user profile" }, { status: 500 })
+          }
+
+          return NextResponse.json({
+            success: true,
+            referralCode: newUser.referral_code,
+            referralCount: newUser.referral_count || 0,
+            referralUrl: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://eriggalive.com'}/signup?ref=${newUser.referral_code}`
+          })
+        } catch (createErr) {
+          console.error("[referrals/me] Error in user creation:", createErr)
           return NextResponse.json({ success: false, error: "Failed to create user profile" }, { status: 500 })
         }
-
-        return NextResponse.json({
-          success: true,
-          referralCode: newUser.referral_code,
-          referralCount: 0,
-          referralUrl: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://eriggalive.com'}/signup?ref=${newUser.referral_code}`
-        })
       }
+      
       return NextResponse.json({ success: false, error: "User profile not found" }, { status: 404 })
     }
 
@@ -62,37 +82,48 @@ export async function GET(request: NextRequest) {
     if (!referralCode) {
       referralCode = `${profile.username || 'user'}_${Math.random().toString(36).substring(2, 8)}`.toUpperCase()
 
-      // Update user with referral code
-      const { error: updateError } = await supabase
-        .from("users")
-        .update({ referral_code: referralCode })
-        .eq("auth_user_id", user.id)
+      try {
+        const { error: updateError } = await supabase
+          .from("users")
+          .update({ referral_code: referralCode })
+          .eq("auth_user_id", user.id)
 
-      if (updateError) {
-        console.error("[v0] Error updating user with referral code:", updateError)
+        if (updateError) {
+          console.error("[referrals/me] Error updating user with referral code:", updateError)
+          return NextResponse.json({ success: false, error: "Failed to update referral code" }, { status: 500 })
+        }
+      } catch (updateErr) {
+        console.error("[referrals/me] Error in referral code update:", updateErr)
         return NextResponse.json({ success: false, error: "Failed to update referral code" }, { status: 500 })
       }
     }
 
-    // Get referral count (mock data for now since referrals table might not exist)
-    let referralCount = 0
+    // Get referral count - try from user_referrals table first, fallback to user table
+    let referralCount = profile.referral_count || 0
+    
     try {
       const { data: referrals, error: referralError } = await supabase
-        .from("referrals")
+        .from("user_referrals")
         .select("id")
-        .eq("referrer_id", user.id)
+        .eq("referrer_id", profile.id)
 
       if (!referralError && referrals) {
         referralCount = referrals.length
+        
+        // Update the referral count in users table if it's different
+        if (referralCount !== (profile.referral_count || 0)) {
+          await supabase
+            .from("users")
+            .update({ referral_count: referralCount })
+            .eq("id", profile.id)
+        }
       } else if (referralError) {
-        console.warn("[v0] Warning fetching referrals:", referralError.message)
-        // Referrals table might not exist or there was an error, use mock data if needed
-        referralCount = Math.floor(Math.random() * 3) // 0-2 for demo
+        console.warn("[referrals/me] Warning fetching referrals:", referralError.message)
+        // Keep using the referral_count from users table or default to 0
       }
     } catch (error) {
-      // Referrals table doesn't exist, use mock data
-      console.warn("[v0] Referrals table not found, using mock data for referral count.")
-      referralCount = Math.floor(Math.random() * 3) // 0-2 for demo
+      console.warn("[referrals/me] Referrals table query failed, using fallback count")
+      // Use the referral_count from users table
     }
 
     return NextResponse.json({
@@ -102,7 +133,7 @@ export async function GET(request: NextRequest) {
       referralUrl: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://eriggalive.com'}/signup?ref=${referralCode}`
     })
   } catch (error) {
-    console.error("[v0] Unexpected error in referrals/me:", error)
+    console.error("[referrals/me] Unexpected error:", error)
     return NextResponse.json(
       {
         success: false,
