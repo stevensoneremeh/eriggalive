@@ -99,8 +99,8 @@ export function MissionsDashboard() {
       const result = await response.json()
 
       if (result.success) {
-        setReferralCode(result.referralCode)
-        setReferralCount(result.referralCount)
+        setReferralCode(result.referralCode || "ERG_DEFAULT")
+        setReferralCount(result.referralCount || 0)
       } else {
         console.error("Referrals API error:", result.error)
         // Set default values
