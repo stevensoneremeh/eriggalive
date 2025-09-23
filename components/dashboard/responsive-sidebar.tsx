@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import {
   Menu,
   Home,
@@ -233,9 +233,7 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
             "group relative",
           )}
         >
-          <Icon
-            className={cn("h-5 w-5 transition-all duration-200", !isCollapsed && "mr-3", active && "text-primary")}
-          />
+          <Icon className={cn("h-5 w-5 transition-all duration-200", !isCollapsed && "mr-3", active && "text-primary")} />
           {!isCollapsed && (
             <>
               <span className="truncate font-medium">{item.name}</span>
@@ -276,10 +274,10 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
           isCollapsed ? "flex-col space-y-2" : "space-x-3",
         )}
       >
-        <Avatar className={cn("transition-all duration-200", isCollapsed ? "h-8 w-8" : "h-12 w-12")}>
-          <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} alt={profile?.username} />
-          <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-            {profile?.username?.charAt(0).toUpperCase() || profile?.email?.charAt(0).toUpperCase() || "U"}
+        <Avatar className={`${isCollapsed ? 'h-8 w-8' : 'h-10 w-10'} flex-shrink-0`}>
+          <AvatarImage src={profile?.profile_image_url || profile?.avatar_url || "/placeholder-user.jpg"} alt={profile?.username || "User"} />
+          <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold">
+            {profile?.full_name?.charAt(0) || profile?.username?.charAt(0) || "U"}
           </AvatarFallback>
         </Avatar>
 
@@ -288,7 +286,7 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
             <p className="font-semibold truncate text-sm">{profile?.username || "User"}</p>
             <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>
             <div className="flex items-center gap-2 mt-1">
-              <UserTierBadge tier={profile?.tier || "grassroot"} size="sm" />
+              <UserTierBadge tier={profile?.tier || "citizen"} size="sm" />
             </div>
           </div>
         )}
@@ -375,7 +373,7 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
                     <DynamicLogo responsive={false} width={32} height={32} />
                   </Link>
                 </TooltipTrigger>
-                <TooltipContent side="right">Erigga Live</TooltipContent>
+                <TooltipContent side="right">Erigga Citizen</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           )}

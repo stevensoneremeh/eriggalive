@@ -55,7 +55,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (userId: string): Promise<UserProfile | null> => {
       try {
         if (!supabase || supabaseError) {
-          console.warn("Supabase client not available, using offline mode")
           return null
         }
 
@@ -63,31 +62,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return profileCache[userId]
         }
 
-        // Add timeout wrapper for database requests
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
-        })
+        // Reduce timeout and add abort controller
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 3000)
 
-        const fetchPromise = supabase.from("users").select("*").eq("auth_user_id", userId).maybeSingle()
+        const { data, error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("auth_user_id", userId)
+          .abortSignal(controller.signal)
+          .maybeSingle()
 
-        const { data, error } = await Promise.race([fetchPromise, timeoutPromise])
+        clearTimeout(timeoutId)
 
         if (error) {
-          console.warn("Profile fetch failed, continuing without profile:", error.message)
+          // Only log once to reduce console spam
+          if (!error.message.includes("aborted")) {
+            console.warn("Profile fetch failed:", error.message)
+          }
           return null
         }
 
         if (data) {
-          setProfileCache((prev) => ({ ...prev, [userId]: data }))
+          // Fix avatar URL handling
+          const profileData = {
+            ...data,
+            avatar_url: data.profile_image_url || data.avatar_url || null,
+            tier: data.tier || 'erigga_citizen'
+          }
+          setProfileCache((prev) => ({ ...prev, [userId]: profileData }))
+          return profileData
         }
 
         return data
       } catch (error: any) {
-        if (error.message.includes("timeout") || error.message.includes("connect") || error.message.includes("503")) {
-          console.warn("Network issue detected, running in offline mode:", error.message)
-        } else {
-          console.warn("Profile fetch error, continuing gracefully:", error.message)
-        }
+        // Reduce console spam for network issues
         return null
       }
     },
@@ -109,20 +118,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshSession = useCallback(async () => {
     try {
       if (!supabase || supabaseError) {
-        console.warn("Cannot refresh session: Running in offline mode")
         return
       }
 
-      // Add timeout for session refresh
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Session refresh timeout")), 3000)
-      })
-
-      const refreshPromise = supabase.auth.refreshSession()
-      const { data: { session }, error } = await Promise.race([refreshPromise, timeoutPromise])
+      const { data: { session }, error } = await supabase.auth.getSession()
 
       if (error) {
-        console.warn("Session refresh failed, maintaining current state:", error.message)
         return
       }
 
@@ -136,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null)
       }
     } catch (error: any) {
-      console.error("Error in refreshSession:", error.message)
+      // Silent fail to reduce console spam
     }
   }, [supabase, fetchProfile, supabaseError])
 
@@ -236,8 +237,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           refreshSession()
         }
       },
-      4 * 60 * 1000,
-    ) // Refresh every 4 minutes
+      10 * 60 * 1000,
+    ) // Refresh every 10 minutes to reduce network calls
 
     return () => {
       mounted = false

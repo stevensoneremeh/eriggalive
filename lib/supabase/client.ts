@@ -4,13 +4,13 @@ import type { Database } from "@/types/database"
 // Check if we're in a browser environment
 const isBrowser = typeof window !== "undefined"
 
-// Singleton client instance
-let client: ReturnType<typeof createBrowserClient<Database>> | undefined
+// Create a singleton instance to prevent multiple GoTrueClient instances
+let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null
 
 export function createClient() {
   // Return existing client if it exists (singleton pattern)
-  if (client) {
-    return client
+  if (supabaseClient) {
+    return supabaseClient
   }
 
   // Validate environment variables
@@ -24,7 +24,7 @@ export function createClient() {
   }
 
   try {
-    client = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+    supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -42,7 +42,7 @@ export function createClient() {
       },
     })
 
-    return client
+    return supabaseClient
   } catch (error) {
     console.error("Failed to create Supabase client:", error)
     return createMockClient()
@@ -80,8 +80,8 @@ function createMockClient() {
     // Disable realtime for mock client to prevent WebSocket errors
     channel: () => ({
       on: () => ({
-        subscribe: () => ({ 
-          unsubscribe: () => {} 
+        subscribe: () => ({
+          unsubscribe: () => {}
         }),
       }),
     }),
@@ -105,5 +105,5 @@ export function getSupabaseClient() {
 }
 
 export function resetClientInstance() {
-  client = undefined
+  supabaseClient = undefined
 }
