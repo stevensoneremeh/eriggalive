@@ -121,6 +121,26 @@ export default function ProfilePage() {
     const file = event.target.files?.[0]
     if (!file || !profile) return
 
+    // Validate file size before uploading (2MB limit)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "Error",
+        description: 'File too large. Please choose an image smaller than 2MB',
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Error",
+        description: 'Please select a valid image file',
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsUploadingAvatar(true)
     try {
       const formData = new FormData()
@@ -131,17 +151,49 @@ export default function ProfilePage() {
         body: formData,
       })
 
-      const result = await response.json()
-
       if (!response.ok) {
-        throw new Error(result.error || "Failed to upload image")
+        if (response.status === 413) {
+          toast({
+            title: "Error",
+            description: 'File too large. Please choose a smaller image (max 2MB)',
+            variant: "destructive",
+          })
+          return
+        }
+
+        // Try to parse error message from response
+        try {
+          const errorResult = await response.json()
+          toast({
+            title: "Error",
+            description: errorResult.error || 'Upload failed',
+            variant: "destructive",
+          })
+        } catch {
+          toast({
+            title: "Error",
+            description: 'Upload failed - please try a smaller image',
+            variant: "destructive",
+          })
+        }
+        return
       }
 
-      await refreshProfile()
-      toast({
-        title: "Success!",
-        description: "Profile picture updated successfully.",
-      })
+      const result = await response.json()
+
+      if (result.success) {
+        await refreshProfile()
+        toast({
+          title: "Success!",
+          description: result.message || "Profile picture updated successfully.",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || 'Failed to upload image',
+          variant: "destructive",
+        })
+      }
     } catch (error: any) {
       console.error("Avatar upload error:", error)
       toast({

@@ -26,9 +26,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "File must be an image" }, { status: 400 })
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json({ success: false, error: "File size must be less than 5MB" }, { status: 400 })
+    // Validate file size (max 2MB to avoid server limits)
+    if (file.size > 2 * 1024 * 1024) {
+      return NextResponse.json({ success: false, error: "File size must be less than 2MB" }, { status: 400 })
     }
 
     try {
@@ -106,6 +106,15 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error("Error uploading profile image:", error)
+    
+    // Handle specific error cases
+    if (error.code === 'LIMIT_FILE_SIZE' || error.message?.includes('413')) {
+      return NextResponse.json({ 
+        success: false, 
+        error: "File too large. Please choose a smaller image (max 2MB)" 
+      }, { status: 413 })
+    }
+    
     return NextResponse.json({ 
       success: false, 
       error: error.message || "Failed to upload image" 
