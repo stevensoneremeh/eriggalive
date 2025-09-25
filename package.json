@@ -75,10 +75,12 @@
     "expo-asset": "latest",
     "expo-file-system": "latest",
     "expo-gl": "latest",
+    "firebase": "^12.3.0",
     "framer-motion": "latest",
     "input-otp": "latest",
     "isomorphic-dompurify": "latest",
     "jest": "latest",
+    "jwt-decode": "^4.0.0",
     "lucide-react": "^0.454.0",
     "next": "14.2.16",
     "next-themes": "latest",
@@ -101,6 +103,7 @@
     "tippy.js": "latest",
     "typescript": "5.1.6",
     "vaul": "latest",
+    "zego-express-engine-webrtc": "^3.10.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
