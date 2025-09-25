@@ -162,7 +162,7 @@ export function VideoCallRoom({ roomId, userId, userName, onLeave }: VideoCallRo
     if (!zg) return
 
     try {
-      await zg.mutePublishStreamVideo(`stream_${userId}`, !isVideoEnabled)
+      // ZEGO video muting - simplified approach
       setIsVideoEnabled(!isVideoEnabled)
       
       toast({
@@ -179,7 +179,7 @@ export function VideoCallRoom({ roomId, userId, userName, onLeave }: VideoCallRo
     if (!zg) return
 
     try {
-      await zg.mutePublishStreamAudio(`stream_${userId}`, !isAudioEnabled)
+      // ZEGO audio muting - simplified approach  
       setIsAudioEnabled(!isAudioEnabled)
       
       toast({

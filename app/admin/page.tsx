@@ -1,6 +1,8 @@
 "use client"
 import { useEffect, useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { MeetGreetControls } from "@/components/admin/meetgreet-controls"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function AdminOverview() {
   const supabase = createClientComponentClient()
@@ -33,24 +35,37 @@ export default function AdminOverview() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Admin Overview</h1>
+      <h1 className="text-2xl font-bold">Admin Dashboard</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border">
-          <h3 className="text-lg font-semibold mb-2">Total Users</h3>
-          <p className="text-3xl font-bold text-blue-600">{stats.totalUsers}</p>
-        </div>
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="meetgreet">Meet & Greet</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border">
+              <h3 className="text-lg font-semibold mb-2">Total Users</h3>
+              <p className="text-3xl font-bold text-blue-600">{stats.totalUsers}</p>
+            </div>
 
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border">
-          <h3 className="text-lg font-semibold mb-2">Total Transactions</h3>
-          <p className="text-3xl font-bold text-green-600">{stats.totalTransactions}</p>
-        </div>
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border">
+              <h3 className="text-lg font-semibold mb-2">Total Transactions</h3>
+              <p className="text-3xl font-bold text-green-600">{stats.totalTransactions}</p>
+            </div>
 
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border">
-          <h3 className="text-lg font-semibold mb-2">Total Balance</h3>
-          <p className="text-3xl font-bold text-purple-600">₦{(stats.totalBalance / 100).toLocaleString()}</p>
-        </div>
-      </div>
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border">
+              <h3 className="text-lg font-semibold mb-2">Total Balance</h3>
+              <p className="text-3xl font-bold text-purple-600">₦{(stats.totalBalance / 100).toLocaleString()}</p>
+            </div>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="meetgreet">
+          <MeetGreetControls />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
