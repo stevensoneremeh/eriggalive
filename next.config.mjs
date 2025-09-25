@@ -95,12 +95,6 @@ const nextConfig = {
   serverRuntimeConfig: {
     maxFileSize: '10mb'
   },
-  // Add body parser configuration
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
 };
 
 export default nextConfig;

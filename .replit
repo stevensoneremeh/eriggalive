@@ -6,9 +6,9 @@ channel = "stable-25_05"
 packages = ["jq"]
 
 [deployment]
-run = ["npm", "run", "start"]
+run = ["sh", "-c", "pnpm run start"]
 deploymentTarget = "autoscale"
-build = ["npm", "run", "build"]
+build = ["sh", "-c", "pnpm run build"]
 
 [[ports]]
 localPort = 3000
@@ -27,7 +27,7 @@ localPort = 46443
 externalPort = 3000
 
 [workflows]
-runButton = "Project"
+runButton = "Development Server"
 
 [[workflows.workflow]]
 name = "Run"
@@ -71,6 +71,19 @@ args = "npm install"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm run dev"
+
+[[workflows.workflow]]
+name = "Development Server"
+author = 47973296
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm install"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm run dev"
 
 [agent]
 expertMode = true
