@@ -320,13 +320,7 @@ export default function ProfilePage() {
                       Edit Profile
                     </Button>
                   </div>
-                )}ndary"}>
-                    Photo {profile?.profile_image_url || profile?.avatar_url ? "✓" : "✗"}
-                  </Badge>
-                  <Badge variant={profile?.bio ? "default" : "secondary"}>Bio {profile?.bio ? "✓" : "✗"}</Badge>
-                  <Badge variant={profile?.date_of_birth ? "default" : "secondary"}>
-                    Birthday {profile?.date_of_birth ? "✓" : "✗"}
-                  </Badge>
+                )}
                 </div>
               </div>
             </CardContent>

@@ -481,7 +481,7 @@ export function MeetGreetControls() {
       </div>
     </div>
 
-      <div className="text-center">
+    <div className="text-center">
         <Button
           onClick={loadSessions}
           variant="outline"
