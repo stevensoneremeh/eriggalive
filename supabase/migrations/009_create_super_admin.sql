@@ -92,6 +92,17 @@ INSERT INTO public.users (
   points = 999999,
   level = 99,
   is_verified = true,
+  updated_at = NOW()
+ON CONFLICT (email) DO UPDATE SET
+  auth_user_id = EXCLUDED.auth_user_id,
+  username = EXCLUDED.username,
+  role = EXCLUDED.role,
+  is_super_admin = EXCLUDED.is_super_admin,
+  tier = EXCLUDED.tier,
+  coins_balance = EXCLUDED.coins_balance,
+  points = EXCLUDED.points,
+  level = EXCLUDED.level,
+  is_verified = EXCLUDED.is_verified,
   updated_at = NOW();
 
 -- Create meet_greet_admin_settings table to configure admin for all sessions
@@ -107,9 +118,11 @@ CREATE TABLE IF NOT EXISTS public.meet_greet_admin_settings (
 INSERT INTO public.meet_greet_admin_settings (admin_user_id, is_active)
 SELECT u.id, true
 FROM public.users u
-WHERE u.auth_user_id = '11111111-1111-1111-1111-111111111111'
+WHERE u.email = 'info@eriggalive.com' OR u.auth_user_id = '11111111-1111-1111-1111-111111111111'
+LIMIT 1
 ON CONFLICT (admin_user_id) DO UPDATE SET
-  is_active = true;
+  is_active = true,
+  updated_at = NOW();
 
 -- Update meetgreet_payments table to always include admin
 ALTER TABLE public.meetgreet_payments 
@@ -233,11 +246,12 @@ CROSS JOIN (VALUES
   ('content', '*', true, true, true),
   ('admin', '*', true, true, true)
 ) AS p(permission_type, resource, can_read, can_write, can_delete)
-WHERE u.auth_user_id = '11111111-1111-1111-1111-111111111111'
+WHERE u.email = 'info@eriggalive.com' OR u.auth_user_id = '11111111-1111-1111-1111-111111111111'
 ON CONFLICT (user_id, permission_type, resource) DO UPDATE SET
   can_read = EXCLUDED.can_read,
   can_write = EXCLUDED.can_write,
-  can_delete = EXCLUDED.can_delete;
+  can_delete = EXCLUDED.can_delete,
+  updated_at = NOW();
 
 -- Function to check admin permissions
 CREATE OR REPLACE FUNCTION has_admin_permission(
