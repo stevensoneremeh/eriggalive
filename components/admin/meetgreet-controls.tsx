@@ -120,7 +120,7 @@ export function MeetGreetControls() {
         .order('scheduled_date', { ascending: true });
 
       if (error) throw error;
-      
+
       // Map the data to the AdminSessionGridItem interface
       const formattedSessions = (data || []).map((session: any) => ({
         id: session.id,
@@ -479,9 +479,8 @@ export function MeetGreetControls() {
           </Card>
         ))}
       </div>
-    </div>
 
-    <div className="text-center">
+      <div className="text-center">
         <Button
           onClick={loadSessions}
           variant="outline"
