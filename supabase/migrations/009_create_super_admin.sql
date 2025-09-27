@@ -53,7 +53,21 @@ ALTER TABLE public.users
 ADD COLUMN IF NOT EXISTS role user_role DEFAULT 'user',
 ADD COLUMN IF NOT EXISTS is_super_admin BOOLEAN DEFAULT FALSE;
 
--- Insert/Update the super admin in users table
+-- First, try to update existing user by email
+UPDATE public.users SET
+  auth_user_id = '11111111-1111-1111-1111-111111111111',
+  username = 'super_admin',
+  role = 'super_admin',
+  is_super_admin = true,
+  tier = 'blood_brotherhood',
+  coins_balance = 999999,
+  points = 999999,
+  level = 99,
+  is_verified = true,
+  updated_at = NOW()
+WHERE email = 'info@eriggalive.com';
+
+-- If no rows were updated (user doesn't exist), insert new user
 INSERT INTO public.users (
   auth_user_id,
   username,
@@ -69,7 +83,8 @@ INSERT INTO public.users (
   is_verified,
   created_at,
   updated_at
-) VALUES (
+)
+SELECT 
   '11111111-1111-1111-1111-111111111111',
   'super_admin',
   'info@eriggalive.com',
@@ -84,26 +99,9 @@ INSERT INTO public.users (
   true,
   NOW(),
   NOW()
-) ON CONFLICT (auth_user_id) DO UPDATE SET
-  role = 'super_admin',
-  is_super_admin = true,
-  tier = 'blood_brotherhood',
-  coins_balance = 999999,
-  points = 999999,
-  level = 99,
-  is_verified = true,
-  updated_at = NOW()
-ON CONFLICT (email) DO UPDATE SET
-  auth_user_id = EXCLUDED.auth_user_id,
-  username = EXCLUDED.username,
-  role = EXCLUDED.role,
-  is_super_admin = EXCLUDED.is_super_admin,
-  tier = EXCLUDED.tier,
-  coins_balance = EXCLUDED.coins_balance,
-  points = EXCLUDED.points,
-  level = EXCLUDED.level,
-  is_verified = EXCLUDED.is_verified,
-  updated_at = NOW();
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.users WHERE email = 'info@eriggalive.com'
+);
 
 -- Create meet_greet_admin_settings table to configure admin for all sessions
 CREATE TABLE IF NOT EXISTS public.meet_greet_admin_settings (
