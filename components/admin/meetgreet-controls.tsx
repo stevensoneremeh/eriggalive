@@ -37,15 +37,29 @@ interface MeetGreetSession {
   }
 }
 
+// This interface is for the new grid layout, assuming new fields are added to the 'meetgreet_sessions' table
+interface AdminSessionGridItem {
+  id: string;
+  title: string;
+  status: 'active' | 'scheduled' | 'completed';
+  scheduled_date: string;
+  scheduled_time: string;
+  duration: number;
+  participants_count: number;
+}
+
+
 export function MeetGreetControls() {
   const [sessions, setSessions] = useState<MeetGreetSession[]>([])
+  const [adminSessions, setAdminSessions] = useState<AdminSessionGridItem[]>([]) // State for the new grid view
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
     loadSessions()
-    
+    loadAdminSessions() // Load data for the new grid view
+
     // Set up real-time updates
     const supabase = createClient()
     const channel = supabase
@@ -67,7 +81,7 @@ export function MeetGreetControls() {
   const loadSessions = async () => {
     try {
       const supabase = createClient()
-      
+
       const { data, error } = await supabase
         .from('meetgreet_payments')
         .select(`
@@ -96,13 +110,48 @@ export function MeetGreetControls() {
     }
   }
 
+  // Function to load data for the admin dashboard grid
+  const loadAdminSessions = async () => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('meetgreet_sessions') // Assuming a new table or a different query for admin view
+        .select('*')
+        .order('scheduled_date', { ascending: true });
+
+      if (error) throw error;
+      
+      // Map the data to the AdminSessionGridItem interface
+      const formattedSessions = (data || []).map((session: any) => ({
+        id: session.id,
+        title: session.title || 'Untitled Session',
+        status: session.status || 'scheduled',
+        scheduled_date: session.scheduled_date,
+        scheduled_time: session.scheduled_time,
+        duration: session.duration || 30,
+        participants_count: session.participants_count || 0,
+      }));
+
+      setAdminSessions(formattedSessions);
+
+    } catch (error) {
+      console.error('Error loading admin sessions:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load admin dashboard sessions",
+        variant: "destructive"
+      });
+    }
+  };
+
+
   const startSession = async (sessionId: string) => {
     setActionLoading(sessionId)
-    
+
     try {
       const roomId = `erigga-meetgreet-${Date.now()}`
       const supabase = createClient()
-      
+
       const { error } = await supabase
         .from('meetgreet_payments')
         .update({
@@ -118,7 +167,7 @@ export function MeetGreetControls() {
         title: "Session Started",
         description: "Meet & Greet session is now live!",
       })
-      
+
       await loadSessions()
     } catch (error) {
       console.error('Error starting session:', error)
@@ -134,10 +183,10 @@ export function MeetGreetControls() {
 
   const endSession = async (sessionId: string) => {
     setActionLoading(sessionId)
-    
+
     try {
       const supabase = createClient()
-      
+
       const { error } = await supabase
         .from('meetgreet_payments')
         .update({
@@ -152,7 +201,7 @@ export function MeetGreetControls() {
         title: "Session Ended",
         description: "Meet & Greet session has been completed",
       })
-      
+
       await loadSessions()
     } catch (error) {
       console.error('Error ending session:', error)
@@ -168,10 +217,10 @@ export function MeetGreetControls() {
 
   const cancelSession = async (sessionId: string) => {
     setActionLoading(sessionId)
-    
+
     try {
       const supabase = createClient()
-      
+
       const { error } = await supabase
         .from('meetgreet_payments')
         .update({
@@ -185,7 +234,7 @@ export function MeetGreetControls() {
         title: "Session Cancelled",
         description: "Meet & Greet session has been cancelled",
       })
-      
+
       await loadSessions()
     } catch (error) {
       console.error('Error cancelling session:', error)
@@ -396,6 +445,42 @@ export function MeetGreetControls() {
           ))}
         </div>
       )}
+
+      {/* Sessions Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {adminSessions.map((session) => (
+          <Card key={session.id} className="hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">{session.title}</CardTitle>
+                <div className={`w-3 h-3 rounded-full ${
+                  session.status === 'active' ? 'bg-green-400' :
+                  session.status === 'scheduled' ? 'bg-yellow-400' : 'bg-gray-400'
+                }`}></div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="text-sm text-gray-600">
+                  <div>Date: {new Date(session.scheduled_date).toLocaleDateString()}</div>
+                  <div>Time: {session.scheduled_time}</div>
+                  <div>Duration: {session.duration} minutes</div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">
+                    {session.participants_count || 0} participants
+                  </span>
+                  <Button size="sm" variant="outline">
+                    Manage
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+
 
       <div className="text-center">
         <Button

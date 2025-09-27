@@ -301,6 +301,28 @@ export default function ProfilePage() {
                   <Badge variant={profile?.profile_image_url || profile?.avatar_url ? "default" : "secondary"}>
                     Photo {profile?.profile_image_url || profile?.avatar_url ? "✓" : "✗"}
                   </Badge>
+                  <Badge variant={profile?.bio ? "default" : "secondary"}>
+                    Bio {profile?.bio ? "✓" : "✗"}
+                  </Badge>
+                  <Badge variant={profile?.location ? "default" : "secondary"}>
+                    Location {profile?.location ? "✓" : "✗"}
+                  </Badge>
+                </div>
+                {getProfileCompleteness() < 100 && (
+                  <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                      Complete Your Profile
+                    </h4>
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                      A complete profile helps you unlock exclusive features and connect better with the community.
+                    </p>
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                      Edit Profile
+                    </Button>
+                  </div>
+                )}ndary"}>
+                    Photo {profile?.profile_image_url || profile?.avatar_url ? "✓" : "✗"}
+                  </Badge>
                   <Badge variant={profile?.bio ? "default" : "secondary"}>Bio {profile?.bio ? "✓" : "✗"}</Badge>
                   <Badge variant={profile?.date_of_birth ? "default" : "secondary"}>
                     Birthday {profile?.date_of_birth ? "✓" : "✗"}

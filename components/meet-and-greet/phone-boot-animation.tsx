@@ -175,6 +175,10 @@ export function PhoneBootAnimation({ onAnimationComplete }: PhoneBootAnimationPr
           }}
           className="text-white"
         >
+          <div className="text-lg font-semibold mb-2">Initializing Meet & Greet</div>
+          <div className="text-sm opacity-75">Please wait while we prepare your experience...</div>
+        </motion.div>
+      </div>
           <div className="text-2xl font-bold mb-4">
             {isComplete ? "Ready to Connect" : "Initializing..."}
           </div>

@@ -342,7 +342,12 @@ export function MissionsDashboard() {
                                 {Object.values(mission.requirements)[0]}
                               </span>
                             </div>
-                            <Progress value={progressPercentage} />
+                            <Progress value={progressPercentage} className="h-2" />
+                            {progressPercentage === 100 && (
+                              <div className="text-xs text-green-600 dark:text-green-400 font-medium">
+                                Ready to claim!
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

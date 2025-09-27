@@ -305,9 +305,17 @@ export function AchievementSystem() {
                     )}
 
                     {achievement.is_completed && achievement.completed_at && (
-                      <p className="text-xs text-muted-foreground">
-                        Completed {new Date(achievement.completed_at).toLocaleDateString()}
-                      </p>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                            Achievement Unlocked!
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Completed {new Date(achievement.completed_at).toLocaleDateString()}
+                        </p>
+                      </div>
                     )}
                   </div>
                 </CardContent>
