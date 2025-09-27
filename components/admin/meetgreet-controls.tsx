@@ -54,9 +54,11 @@ export function MeetGreetControls() {
   const [adminSessions, setAdminSessions] = useState<AdminSessionGridItem[]>([]) // State for the new grid view
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
+    checkAdminPermissions()
     loadSessions()
     loadAdminSessions() // Load data for the new grid view
 
@@ -78,17 +80,48 @@ export function MeetGreetControls() {
     }
   }, [])
 
+  const checkAdminPermissions = async () => {
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) return
+      
+      const { data: userProfile, error } = await supabase
+        .from('users')
+        .select('role, is_super_admin')
+        .eq('auth_user_id', user.id)
+        .single()
+      
+      if (error) {
+        console.error('Error checking admin permissions:', error)
+        return
+      }
+      
+      setIsSuperAdmin(userProfile?.role === 'super_admin' || userProfile?.is_super_admin === true)
+    } catch (error) {
+      console.error('Error in admin permission check:', error)
+    }
+  }
+
   const loadSessions = async () => {
     try {
       const supabase = createClient()
 
+      // Enhanced query to include admin information
       const { data, error } = await supabase
         .from('meetgreet_payments')
         .select(`
           *,
-          user_profiles (
+          users:user_id (
             full_name,
-            email
+            email,
+            username
+          ),
+          admin_user:admin_user_id (
+            full_name,
+            email,
+            username
           )
         `)
         .eq('payment_status', 'completed')
@@ -97,7 +130,13 @@ export function MeetGreetControls() {
 
       if (error) throw error
 
-      setSessions(data || [])
+      // Transform data to match expected interface
+      const formattedSessions = (data || []).map(session => ({
+        ...session,
+        user_profiles: session.users
+      }))
+
+      setSessions(formattedSessions)
     } catch (error) {
       console.error('Error loading sessions:', error)
       toast({
@@ -149,23 +188,52 @@ export function MeetGreetControls() {
     setActionLoading(sessionId)
 
     try {
-      const roomId = `erigga-meetgreet-${Date.now()}`
+      const timestamp = Date.now()
+      const roomId = `erigga-meetgreet-${timestamp}`
+      const adminRoomId = `${roomId}_admin`
       const supabase = createClient()
 
+      // Update session with both user and admin room IDs
       const { error } = await supabase
         .from('meetgreet_payments')
         .update({
           session_room_id: roomId,
+          admin_session_room_id: adminRoomId,
           session_status: 'active',
-          session_start_time: new Date().toISOString()
+          session_start_time: new Date().toISOString(),
+          requires_admin_approval: true
         })
         .eq('id', sessionId)
 
       if (error) throw error
 
+      // Log admin action
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: adminUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .single()
+        
+        if (adminUser) {
+          await supabase.rpc('log_admin_action', {
+            admin_id: adminUser.id,
+            action: 'start_meetgreet_session',
+            resource_type: 'meetgreet_payment',
+            resource_id: sessionId,
+            new_values: { 
+              session_room_id: roomId, 
+              admin_session_room_id: adminRoomId,
+              session_status: 'active' 
+            }
+          })
+        }
+      }
+
       toast({
         title: "Session Started",
-        description: "Meet & Greet session is now live!",
+        description: "Meet & Greet session is now live with admin monitoring!",
       })
 
       await loadSessions()
@@ -291,7 +359,14 @@ export function MeetGreetControls() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Meet & Greet Sessions</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Meet & Greet Sessions</h2>
+          {isSuperAdmin && (
+            <p className="text-sm text-blue-600 font-medium mt-1">
+              Super Admin Access - All sessions monitored by info@eriggalive.com
+            </p>
+          )}
+        </div>
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
@@ -305,6 +380,12 @@ export function MeetGreetControls() {
             <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
             <span className="text-sm text-gray-600">Completed</span>
           </div>
+          {isSuperAdmin && (
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+              <span className="text-sm text-gray-600">Admin Monitored</span>
+            </div>
+          )}
         </div>
       </div>
 

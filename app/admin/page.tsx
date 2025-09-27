@@ -74,16 +74,87 @@ export default function AdminOverview() {
   })
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const [userPermissions, setUserPermissions] = useState<{
+    isSuperAdmin: boolean;
+    isAdmin: boolean;
+    canAccessMeetGreet: boolean;
+  }>({ isSuperAdmin: false, isAdmin: false, canAccessMeetGreet: false })
+
+  useEffect(() => {
+    checkPermissions()
+    loadComprehensiveStats()
+
+    // Auto-refresh every 5 minutes
+    const interval = setInterval(loadComprehensiveStats, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const checkPermissions = async () => {
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) {
+        toast({
+          title: "Access Denied",
+          description: "You need to be logged in to access admin panel",
+          variant: "destructive"
+        })
+        return
+      }
+
+      const { data: userProfile, error } = await supabase
+        .from('users')
+        .select('role, is_super_admin, email')
+        .eq('auth_user_id', user.id)
+        .single()
+
+      if (error) {
+        console.error('Error checking permissions:', error)
+        toast({
+          title: "Error",
+          description: "Failed to verify admin permissions",
+          variant: "destructive"
+        })
+        return
+      }
+
+      const isSuperAdmin = userProfile?.role === 'super_admin' || userProfile?.is_super_admin === true
+      const isAdmin = userProfile?.role === 'admin' || isSuperAdmin
+
+      setUserPermissions({
+        isSuperAdmin,
+        isAdmin,
+        canAccessMeetGreet: isSuperAdmin || userProfile?.email === 'info@eriggalive.com'
+      })
+
+      if (!isAdmin) {
+        toast({
+          title: "Access Denied",
+          description: "You don't have permission to access the admin panel",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Permission check error:', error)
+      toast({
+        title: "Error",
+        description: "Failed to verify permissions",
+        variant: "destructive"
+      })
+    }
+  }
+
 
   const loadComprehensiveStats = async () => {
     try {
       setLoading(true)
-      
+
       // User statistics
       const { data: users } = await supabase
         .from("users")
         .select("tier, created_at, is_verified, last_login")
-      
+
       const today = new Date().toDateString()
       const userStats = {
         total: users?.length || 0,
@@ -130,7 +201,7 @@ export default function AdminOverview() {
       const { data: events } = await supabase
         .from("events")
         .select("id, status, created_at")
-      
+
       const upcomingEvents = events?.filter(e => e.status === "upcoming").length || 0
 
       // Meet & Greet sessions
@@ -191,13 +262,24 @@ export default function AdminOverview() {
     }
   }
 
-  useEffect(() => {
-    loadComprehensiveStats()
-    
-    // Auto-refresh every 5 minutes
-    const interval = setInterval(loadComprehensiveStats, 5 * 60 * 1000)
-    return () => clearInterval(interval)
-  }, [])
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  if (!userPermissions.isAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
+          <p className="text-gray-600">You don't have permission to access this page.</p>
+        </div>
+      </div>
+    )
+  }
 
   const getTierColor = (tier: string) => {
     const colors: Record<string, string> = {
@@ -212,13 +294,25 @@ export default function AdminOverview() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Comprehensive Admin Dashboard</h1>
-          <p className="text-muted-foreground">
-            Last updated: {lastUpdated.toLocaleTimeString()}
-          </p>
-        </div>
+      <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Admin Dashboard
+              {userPermissions.isSuperAdmin && (
+                <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-lg">
+                  SUPERADMIN
+                </span>
+              )}
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Manage your platform
+              {userPermissions.isSuperAdmin && (
+                <span className="block text-sm text-blue-600 font-medium">
+                  Full system access - All Meet & Greet sessions managed by info@eriggalive.com
+                </span>
+              )}
+            </p>
+          </div>
         <Button onClick={loadComprehensiveStats} disabled={loading} variant="outline">
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Refresh
@@ -229,10 +323,10 @@ export default function AdminOverview() {
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="meetgreet">Meet & Greet</TabsTrigger>
+          {userPermissions.canAccessMeetGreet && <TabsTrigger value="meetgreet">Meet & Greet</TabsTrigger>}
           <TabsTrigger value="content">Content</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="overview" className="space-y-6">
           {/* Key Metrics Row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -406,10 +500,12 @@ export default function AdminOverview() {
             </Card>
           </div>
         </TabsContent>
-        
-        <TabsContent value="meetgreet">
-          <MeetGreetControls />
-        </TabsContent>
+
+        {userPermissions.canAccessMeetGreet && (
+          <TabsContent value="meetgreet">
+            <MeetGreetControls />
+          </TabsContent>
+        )}
 
         <TabsContent value="content" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

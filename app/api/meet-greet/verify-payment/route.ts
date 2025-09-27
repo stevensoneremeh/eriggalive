@@ -6,97 +6,78 @@ export const dynamic = "force-dynamic"
 
 export async function POST(request: NextRequest) {
   try {
-    const { reference } = await request.json()
+    const body = await request.json()
+    const { reference } = body
 
     if (!reference) {
-      return NextResponse.json(
-        { success: false, message: "Payment reference is required" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Payment reference is required" }, { status: 400 })
     }
 
-    // Verify payment with Paystack
-    const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY
-    if (!paystackSecretKey) {
-      return NextResponse.json(
-        { success: false, message: "Payment system configuration error" },
-        { status: 500 }
-      )
+    const supabase = createClient()
+
+    // Verify payment exists and is completed
+    const { data: payment, error: paymentError } = await supabase
+      .from('meetgreet_payments')
+      .select(`
+        *,
+        users:user_id (
+          full_name,
+          email,
+          username
+        ),
+        admin_user:admin_user_id (
+          full_name,
+          email,
+          username
+        )
+      `)
+      .eq('payment_reference', reference)
+      .eq('payment_status', 'completed')
+      .gte('expires_at', new Date().toISOString())
+      .single()
+
+    if (paymentError || !payment) {
+      return NextResponse.json({ 
+        error: "Invalid or expired payment",
+        valid: false 
+      }, { status: 404 })
     }
 
-    const verifyResponse = await fetch(
-      `https://api.paystack.co/transaction/verify/${reference}`,
-      {
-        headers: {
-          Authorization: `Bearer ${paystackSecretKey}`,
-          "Content-Type": "application/json",
-        },
+    // Ensure admin is assigned to the session
+    if (!payment.admin_user_id) {
+      const { error: updateError } = await supabase
+        .from('meetgreet_payments')
+        .update({ 
+          admin_user_id: 1, // Super admin ID
+          requires_admin_approval: true 
+        })
+        .eq('id', payment.id)
+
+      if (updateError) {
+        console.error('Error assigning admin to session:', updateError)
       }
-    )
-
-    if (!verifyResponse.ok) {
-      throw new Error("Failed to verify payment with Paystack")
-    }
-
-    const paymentData = await verifyResponse.json()
-
-    if (!paymentData.status || paymentData.data.status !== "success") {
-      return NextResponse.json(
-        { success: false, message: "Payment verification failed" },
-        { status: 400 }
-      )
-    }
-
-    // Store payment record in Supabase
-    const supabase = await createClient()
-    
-    // Get user session
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session?.user) {
-      return NextResponse.json(
-        { success: false, message: "User not authenticated" },
-        { status: 401 }
-      )
-    }
-
-    // Insert payment record
-    const { error: insertError } = await supabase
-      .from("meetgreet_payments")
-      .insert({
-        user_id: session.user.id,
-        payment_reference: reference,
-        amount: paymentData.data.amount / 100, // Convert from kobo to naira
-        currency: paymentData.data.currency,
-        payment_status: "completed",
-        paystack_data: paymentData.data,
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
-      })
-
-    if (insertError) {
-      console.error("Database insert error:", insertError)
-      return NextResponse.json(
-        { success: false, message: "Failed to record payment" },
-        { status: 500 }
-      )
     }
 
     return NextResponse.json({
-      success: true,
-      message: "Payment verified successfully",
-      reference: reference,
-      amount: paymentData.data.amount / 100,
+      valid: true,
+      payment: {
+        id: payment.id,
+        reference: payment.payment_reference,
+        amount: payment.amount,
+        currency: payment.currency,
+        sessionRoomId: payment.session_room_id,
+        adminSessionRoomId: payment.admin_session_room_id,
+        sessionStatus: payment.session_status,
+        expiresAt: payment.expires_at,
+        requiresAdminApproval: payment.requires_admin_approval,
+        userInfo: payment.users,
+        adminInfo: payment.admin_user
+      }
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Payment verification error:", error)
-    return NextResponse.json(
-      { 
-        success: false, 
-        message: error instanceof Error ? error.message : "Payment verification failed"
-      },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
@@ -139,9 +120,9 @@ export async function PATCH(request: NextRequest) {
     if (event.event === "charge.success") {
       // Handle successful payment webhook
       const reference = event.data.reference
-      
+
       const supabase = await createClient()
-      
+
       // Update payment status in database
       const { error } = await supabase
         .from("meetgreet_payments")
