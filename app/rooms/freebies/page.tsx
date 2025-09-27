@@ -187,8 +187,6 @@ export default function FreebiesRoom() {
         </div>
       </div>
     )
-      </div>
-    )
   }
 
   return (
