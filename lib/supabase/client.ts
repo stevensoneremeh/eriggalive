@@ -105,5 +105,5 @@ export function getSupabaseClient() {
 }
 
 export function resetClientInstance() {
-  supabaseClient = undefined
+  supabaseClient = null
 }
