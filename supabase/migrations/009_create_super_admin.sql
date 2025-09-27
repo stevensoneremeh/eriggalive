@@ -42,7 +42,7 @@ INSERT INTO auth.users (
   '{"username": "super_admin", "role": "super_admin"}',
   true,
   'authenticated'
-) ON CONFLICT (email) DO UPDATE SET
+) ON CONFLICT (id) DO UPDATE SET
   raw_app_meta_data = EXCLUDED.raw_app_meta_data,
   raw_user_meta_data = EXCLUDED.raw_user_meta_data,
   is_super_admin = true,
@@ -55,7 +55,6 @@ ADD COLUMN IF NOT EXISTS is_super_admin BOOLEAN DEFAULT FALSE;
 
 -- Insert/Update the super admin in users table
 INSERT INTO public.users (
-  id,
   auth_user_id,
   username,
   email,
@@ -71,7 +70,6 @@ INSERT INTO public.users (
   created_at,
   updated_at
 ) VALUES (
-  1, -- Using ID 1 for super admin
   '11111111-1111-1111-1111-111111111111',
   'super_admin',
   'info@eriggalive.com',
@@ -86,7 +84,7 @@ INSERT INTO public.users (
   true,
   NOW(),
   NOW()
-) ON CONFLICT (email) DO UPDATE SET
+) ON CONFLICT (auth_user_id) DO UPDATE SET
   role = 'super_admin',
   is_super_admin = true,
   tier = 'blood_brotherhood',
@@ -105,14 +103,17 @@ CREATE TABLE IF NOT EXISTS public.meet_greet_admin_settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Insert admin settings
+-- Insert admin settings (get the user ID dynamically)
 INSERT INTO public.meet_greet_admin_settings (admin_user_id, is_active)
-VALUES (1, true)
-ON CONFLICT DO NOTHING;
+SELECT u.id, true
+FROM public.users u
+WHERE u.auth_user_id = '11111111-1111-1111-1111-111111111111'
+ON CONFLICT (admin_user_id) DO UPDATE SET
+  is_active = true;
 
 -- Update meetgreet_payments table to always include admin
 ALTER TABLE public.meetgreet_payments 
-ADD COLUMN IF NOT EXISTS admin_user_id INTEGER REFERENCES public.users(id) DEFAULT 1,
+ADD COLUMN IF NOT EXISTS admin_user_id INTEGER REFERENCES public.users(id),
 ADD COLUMN IF NOT EXISTS admin_session_room_id VARCHAR(100),
 ADD COLUMN IF NOT EXISTS requires_admin_approval BOOLEAN DEFAULT TRUE;
 
@@ -128,8 +129,15 @@ BEGIN
   WHERE is_active = true 
   LIMIT 1;
   
-  -- Set admin for the session
-  NEW.admin_user_id := COALESCE(admin_id, 1);
+  -- Set admin for the session (get super admin user ID)
+  IF admin_id IS NULL THEN
+    SELECT id INTO admin_id 
+    FROM public.users 
+    WHERE auth_user_id = '11111111-1111-1111-1111-111111111111' 
+    LIMIT 1;
+  END IF;
+  
+  NEW.admin_user_id := admin_id;
   NEW.requires_admin_approval := true;
   
   -- Generate admin room ID if session room is set
@@ -150,7 +158,11 @@ CREATE TRIGGER ensure_admin_meetgreet_trigger
 
 -- Update existing meetgreet payments to include admin
 UPDATE public.meetgreet_payments 
-SET admin_user_id = 1, requires_admin_approval = true
+SET admin_user_id = (
+  SELECT id FROM public.users 
+  WHERE auth_user_id = '11111111-1111-1111-1111-111111111111' 
+  LIMIT 1
+), requires_admin_approval = true
 WHERE admin_user_id IS NULL;
 
 -- Enhanced RLS policies for super admin
@@ -211,14 +223,21 @@ CREATE TABLE IF NOT EXISTS public.admin_permissions (
 
 -- Grant all permissions to super admin
 INSERT INTO public.admin_permissions (user_id, permission_type, resource, can_read, can_write, can_delete)
-VALUES 
-  (1, 'global', '*', true, true, true),
-  (1, 'users', '*', true, true, true),
-  (1, 'meetgreet', '*', true, true, true),
-  (1, 'payments', '*', true, true, true),
-  (1, 'content', '*', true, true, true),
-  (1, 'admin', '*', true, true, true)
-ON CONFLICT DO NOTHING;
+SELECT u.id, p.permission_type, p.resource, p.can_read, p.can_write, p.can_delete
+FROM public.users u
+CROSS JOIN (VALUES 
+  ('global', '*', true, true, true),
+  ('users', '*', true, true, true),
+  ('meetgreet', '*', true, true, true),
+  ('payments', '*', true, true, true),
+  ('content', '*', true, true, true),
+  ('admin', '*', true, true, true)
+) AS p(permission_type, resource, can_read, can_write, can_delete)
+WHERE u.auth_user_id = '11111111-1111-1111-1111-111111111111'
+ON CONFLICT (user_id, permission_type, resource) DO UPDATE SET
+  can_read = EXCLUDED.can_read,
+  can_write = EXCLUDED.can_write,
+  can_delete = EXCLUDED.can_delete;
 
 -- Function to check admin permissions
 CREATE OR REPLACE FUNCTION has_admin_permission(
