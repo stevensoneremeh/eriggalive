@@ -41,7 +41,7 @@ export default function CoinCollectorGame({ onBack, themeColor }: CoinCollectorG
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animationRef = useRef<number>()
   const keysRef = useRef<Set<string>>(new Set())
-  const playerImageRef = useRef<HTMLImageElement>()
+  const playerImageRef = useRef<HTMLImageElement | null>(null)
   const [imageLoaded, setImageLoaded] = useState(false)
 
   const [gameState, setGameState] = useState<"menu" | "playing" | "gameOver">("menu")
@@ -54,7 +54,7 @@ export default function CoinCollectorGame({ onBack, themeColor }: CoinCollectorG
   const [player, setPlayer] = useState<Player>({
     x: 100,
     y: 400,
-    width: 40,
+    width: 40, // Increased size for better visibility of custom image
     height: 40,
     velocityY: 0,
     onGround: false,
@@ -74,20 +74,20 @@ export default function CoinCollectorGame({ onBack, themeColor }: CoinCollectorG
     const img = new Image()
     img.crossOrigin = "anonymous"
     img.onload = () => {
-      console.log("[v0] Player image loaded successfully")
+      playerImageRef.current = img
       setImageLoaded(true)
+      console.log("[v0] Player image loaded successfully")
     }
     img.onerror = () => {
       console.log("[v0] Player image failed to load, using fallback")
       setImageLoaded(false)
     }
     img.src = "/images/player-character.jpg"
-    playerImageRef.current = img
   }, [])
 
   // Load best score
   useEffect(() => {
-    const saved = localStorage.getItem("erigga-coin-collector-best-score")
+    const saved = localStorage.getItem("coin-collector-best-score")
     if (saved) setBestScore(Number.parseInt(saved))
   }, [])
 
@@ -95,7 +95,7 @@ export default function CoinCollectorGame({ onBack, themeColor }: CoinCollectorG
   useEffect(() => {
     if (score > bestScore) {
       setBestScore(score)
-      localStorage.setItem("erigga-coin-collector-best-score", score.toString())
+      localStorage.setItem("coin-collector-best-score", score.toString())
     }
   }, [score, bestScore])
 
@@ -148,46 +148,50 @@ export default function CoinCollectorGame({ onBack, themeColor }: CoinCollectorG
       keysRef.current.delete(e.key.toLowerCase())
     }
 
-    // Touch controls for mobile
     const handleTouchStart = (e: TouchEvent) => {
-      if (gameState !== "playing") return
-
+      e.preventDefault()
       const canvas = canvasRef.current
       if (!canvas) return
 
       const rect = canvas.getBoundingClientRect()
       const touch = e.touches[0]
       const x = touch.clientX - rect.left
-      const canvasWidth = rect.width
+      const y = touch.clientY - rect.top
 
-      // Left side tap = move left, right side tap = move right, center tap = jump
-      if (x < canvasWidth * 0.3) {
-        keysRef.current.add("touchleft")
-      } else if (x > canvasWidth * 0.7) {
-        keysRef.current.add("touchright")
+      // Left half = move left, right half = move right, tap to jump
+      if (x < canvas.width / 2) {
+        keysRef.current.add("a")
       } else {
-        keysRef.current.add("touchjump")
+        keysRef.current.add("d")
       }
+
+      // Any touch triggers jump
+      keysRef.current.add(" ")
     }
 
-    const handleTouchEnd = () => {
-      keysRef.current.delete("touchleft")
-      keysRef.current.delete("touchright")
-      keysRef.current.delete("touchjump")
+    const handleTouchEnd = (e: TouchEvent) => {
+      e.preventDefault()
+      keysRef.current.clear()
     }
 
     window.addEventListener("keydown", handleKeyDown)
     window.addEventListener("keyup", handleKeyUp)
-    window.addEventListener("touchstart", handleTouchStart)
-    window.addEventListener("touchend", handleTouchEnd)
+
+    const canvas = canvasRef.current
+    if (canvas) {
+      canvas.addEventListener("touchstart", handleTouchStart, { passive: false })
+      canvas.addEventListener("touchend", handleTouchEnd, { passive: false })
+    }
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown)
       window.removeEventListener("keyup", handleKeyUp)
-      window.removeEventListener("touchstart", handleTouchStart)
-      window.removeEventListener("touchend", handleTouchEnd)
+      if (canvas) {
+        canvas.removeEventListener("touchstart", handleTouchStart)
+        canvas.removeEventListener("touchend", handleTouchEnd)
+      }
     }
-  }, [gameState])
+  }, [])
 
   // Game timer
   useEffect(() => {
@@ -217,19 +221,17 @@ export default function CoinCollectorGame({ onBack, themeColor }: CoinCollectorG
       setPlayer((prevPlayer) => {
         const newPlayer = { ...prevPlayer }
 
-        if (keysRef.current.has("a") || keysRef.current.has("arrowleft") || keysRef.current.has("touchleft")) {
+        // Horizontal movement
+        if (keysRef.current.has("a") || keysRef.current.has("arrowleft")) {
           newPlayer.x = Math.max(0, newPlayer.x - 5)
         }
-        if (keysRef.current.has("d") || keysRef.current.has("arrowright") || keysRef.current.has("touchright")) {
+        if (keysRef.current.has("d") || keysRef.current.has("arrowright")) {
           newPlayer.x = Math.min(canvas.width - newPlayer.width, newPlayer.x + 5)
         }
 
         // Jumping
         if (
-          (keysRef.current.has(" ") ||
-            keysRef.current.has("w") ||
-            keysRef.current.has("arrowup") ||
-            keysRef.current.has("touchjump")) &&
+          (keysRef.current.has(" ") || keysRef.current.has("w") || keysRef.current.has("arrowup")) &&
           newPlayer.onGround
         ) {
           newPlayer.velocityY = -12
@@ -267,25 +269,24 @@ export default function CoinCollectorGame({ onBack, themeColor }: CoinCollectorG
 
       if (imageLoaded && playerImageRef.current) {
         // Draw circular avatar with border
-        const centerX = player.x + player.width / 2
-        const centerY = player.y + player.height / 2
-        const radius = player.width / 2
-
-        // Draw border
-        ctx.beginPath()
-        ctx.arc(centerX, centerY, radius + 2, 0, Math.PI * 2)
-        ctx.fillStyle = themeColor
-        ctx.fill()
-
-        // Clip to circle for image
         ctx.save()
+
+        // Create circular clipping path
         ctx.beginPath()
-        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
+        ctx.arc(player.x + player.width / 2, player.y + player.height / 2, player.width / 2 - 2, 0, Math.PI * 2)
         ctx.clip()
 
-        // Draw image
-        ctx.drawImage(playerImageRef.current, player.x, player.y, player.width, player.height)
+        // Draw the image
+        ctx.drawImage(playerImageRef.current, player.x + 2, player.y + 2, player.width - 4, player.height - 4)
+
         ctx.restore()
+
+        // Draw border
+        ctx.strokeStyle = themeColor
+        ctx.lineWidth = 3
+        ctx.beginPath()
+        ctx.arc(player.x + player.width / 2, player.y + player.height / 2, player.width / 2, 0, Math.PI * 2)
+        ctx.stroke()
       } else {
         // Fallback: Draw simple rectangle player
         ctx.fillStyle = themeColor
@@ -399,7 +400,10 @@ export default function CoinCollectorGame({ onBack, themeColor }: CoinCollectorG
 
   if (gameState === "menu") {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div
+        className="min-h-screen w-full flex flex-col items-center justify-center p-4"
+        style={{ backgroundColor: "#f0f9ff" }}
+      >
         <Button
           onClick={onBack}
           variant="outline"
@@ -410,20 +414,20 @@ export default function CoinCollectorGame({ onBack, themeColor }: CoinCollectorG
           Back
         </Button>
 
-        <Card className="w-full max-w-md shadow-xl">
-          <CardContent className="p-8 text-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 sm:p-8 text-center">
             <div className="mb-6">
               <div
-                className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center shadow-lg"
+                className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
                 style={{ backgroundColor: themeColor }}
               >
-                <span className="text-3xl">🪙</span>
+                <span className="text-2xl">🪙</span>
               </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Erigga Coin Collector</h1>
-              <p className="text-gray-600">Jump and collect coins before time runs out!</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Coin Collector</h1>
+              <p className="text-gray-600 text-sm sm:text-base">Jump and collect coins before time runs out!</p>
             </div>
 
-            <div className="space-y-4 text-sm text-gray-600 mb-6">
+            <div className="space-y-3 text-sm text-gray-600 mb-6">
               <div className="flex items-center justify-between">
                 <span>🟡 Normal Coin</span>
                 <span>10 points</span>
@@ -441,21 +445,23 @@ export default function CoinCollectorGame({ onBack, themeColor }: CoinCollectorG
             <div className="mb-6 p-4 bg-gray-50 rounded-lg text-sm">
               <p className="font-semibold mb-2">Controls:</p>
               <div className="space-y-1">
-                <p>Desktop: A/D or Arrow Keys - Move, W/Space/Up - Jump</p>
-                <p>Mobile: Tap left/right sides to move, center to jump</p>
+                <p className="hidden sm:block">A/D or Arrow Keys - Move</p>
+                <p className="hidden sm:block">W/Space/Up Arrow - Jump</p>
+                <p className="sm:hidden">Tap left/right side to move</p>
+                <p className="sm:hidden">Tap anywhere to jump</p>
               </div>
             </div>
 
             {bestScore > 0 && (
               <div className="mb-6 p-3 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-600">Best Score</p>
-                <p className="text-2xl font-bold" style={{ color: themeColor }}>
+                <p className="text-xl sm:text-2xl font-bold" style={{ color: themeColor }}>
                   {bestScore.toLocaleString()}
                 </p>
               </div>
             )}
 
-            <Button onClick={startGame} className="w-full text-white" style={{ backgroundColor: themeColor }}>
+            <Button onClick={startGame} className="w-full" style={{ backgroundColor: themeColor }}>
               <Play className="w-4 h-4 mr-2" />
               Start Game
             </Button>
@@ -467,38 +473,41 @@ export default function CoinCollectorGame({ onBack, themeColor }: CoinCollectorG
 
   if (gameState === "gameOver") {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-indigo-100">
-        <Card className="w-full max-w-md shadow-xl">
-          <CardContent className="p-8 text-center">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">Time's Up!</h1>
+      <div
+        className="min-h-screen w-full flex flex-col items-center justify-center p-4"
+        style={{ backgroundColor: "#f0f9ff" }}
+      >
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 sm:p-8 text-center">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Time's Up!</h1>
 
             <div className="space-y-4 mb-6">
               <div className="p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-600">Final Score</p>
-                <p className="text-3xl font-bold" style={{ color: themeColor }}>
+                <p className="text-2xl sm:text-3xl font-bold" style={{ color: themeColor }}>
                   {score.toLocaleString()}
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600">Coins Collected</p>
-                  <p className="text-xl font-bold text-gray-900">{coinsCollected}</p>
+                  <p className="text-xs sm:text-sm text-gray-600">Coins Collected</p>
+                  <p className="text-lg sm:text-xl font-bold text-gray-900">{coinsCollected}</p>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600">Level Reached</p>
-                  <p className="text-xl font-bold text-gray-900">{level}</p>
+                  <p className="text-xs sm:text-sm text-gray-600">Level Reached</p>
+                  <p className="text-lg sm:text-xl font-bold text-gray-900">{level}</p>
                 </div>
               </div>
 
               <div className="p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-600">Best Score</p>
-                <p className="text-2xl font-bold text-gray-900">{bestScore.toLocaleString()}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">{bestScore.toLocaleString()}</p>
               </div>
             </div>
 
-            <div className="flex gap-3">
-              <Button onClick={startGame} className="flex-1 text-white" style={{ backgroundColor: themeColor }}>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button onClick={startGame} className="flex-1" style={{ backgroundColor: themeColor }}>
                 <Play className="w-4 h-4 mr-2" />
                 Play Again
               </Button>
@@ -514,7 +523,10 @@ export default function CoinCollectorGame({ onBack, themeColor }: CoinCollectorG
   }
 
   return (
-    <div className="min-h-screen w-full relative overflow-hidden bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-700">
+    <div
+      className="min-h-screen w-full relative overflow-hidden"
+      style={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}
+    >
       <div className="absolute top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 z-10 flex justify-between items-start gap-2">
         <div className="bg-white/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 min-w-[80px] sm:min-w-[120px]">
           <div className="text-xs text-gray-600">Score</div>
@@ -543,7 +555,7 @@ export default function CoinCollectorGame({ onBack, themeColor }: CoinCollectorG
         ref={canvasRef}
         width={800}
         height={500}
-        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-sky-200 rounded-lg shadow-2xl"
+        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-sky-200 rounded-lg shadow-lg touch-none"
         style={{
           maxWidth: "95vw",
           maxHeight: "60vh",
@@ -551,10 +563,10 @@ export default function CoinCollectorGame({ onBack, themeColor }: CoinCollectorG
         }}
       />
 
-      <div className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2">
-        <div className="bg-white/90 backdrop-blur-sm rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700 text-center max-w-xs sm:max-w-none">
-          <div className="hidden sm:block">Use A/D or Arrow Keys to move, W/Space/Up to jump</div>
-          <div className="sm:hidden">Tap left/right to move, center to jump</div>
+      <div className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2 px-2">
+        <div className="bg-white/90 backdrop-blur-sm rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700 text-center">
+          <span className="hidden sm:inline">Use A/D or Arrow Keys to move, W/Space/Up to jump</span>
+          <span className="sm:hidden">Tap left/right to move, anywhere to jump</span>
         </div>
       </div>
     </div>
