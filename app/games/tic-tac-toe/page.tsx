@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { RotateCcw, Home, Trophy, Users } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 type Player = "X" | "O" | null
 type Board = Player[]
@@ -27,6 +28,12 @@ export default function TicTacToePage() {
   const [winner, setWinner] = useState<Player>(null)
   const [isDraw, setIsDraw] = useState(false)
   const [scores, setScores] = useState({ X: 0, O: 0, draws: 0 })
+  const router = useRouter()
+
+  useEffect(() => {
+    // Redirect to the new Erigga X and O game
+    router.replace("/games/erigga-x-and-o")
+  }, [router])
 
   const checkWinner = useCallback((board: Board): Player => {
     for (const combination of WINNING_COMBINATIONS) {

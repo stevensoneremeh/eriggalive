@@ -4,30 +4,52 @@ import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Gamepad2, Users, Clock, Trophy, Star, Play } from "lucide-react"
+import { Gamepad2, Users, Clock, Trophy, Star, Play, Coins } from "lucide-react"
 import Link from "next/link"
 
 const games = [
   {
-    id: "tic-tac-toe",
-    title: "Tic Tac Toe",
-    description: "Classic 3x3 grid game. Get three in a row to win!",
+    id: "erigga-x-and-o",
+    title: "Erigga X and O",
+    description: "Classic tic-tac-toe with Erigga style! Challenge friends in real-time multiplayer battles.",
     difficulty: "Easy",
     players: "2 Players",
     duration: "2-5 min",
-    rating: 4.5,
-    image: "/placeholder.svg?height=200&width=300&text=Tic+Tac+Toe",
+    rating: 4.8,
+    image: "/placeholder.svg?height=200&width=300&text=Erigga+X+and+O",
     instructions: [
-      "Players take turns placing X's and O's on a 3x3 grid",
-      "First player to get 3 in a row (horizontal, vertical, or diagonal) wins",
-      "If all 9 squares are filled and no one has 3 in a row, it's a tie",
+      "Challenge another player or join an existing game",
+      "Take turns placing X's and O's on a 3x3 grid",
+      "First player to get 3 in a row wins and earns coins",
+      "Win streaks earn bonus rewards!",
     ],
     available: true,
+    coinReward: 10,
+    features: ["Multiplayer", "Real-time", "Coin Rewards"],
+  },
+  {
+    id: "erigga-coin-collector",
+    title: "Erigga Coin Collector",
+    description: "Navigate through challenges and collect Erigga coins while avoiding obstacles!",
+    difficulty: "Medium",
+    players: "1 Player",
+    duration: "5-15 min",
+    rating: 4.6,
+    image: "/placeholder.svg?height=200&width=300&text=Coin+Collector",
+    instructions: [
+      "Use arrow keys or touch controls to move your character",
+      "Collect golden Erigga coins scattered throughout levels",
+      "Avoid obstacles and enemies that reduce your score",
+      "Complete levels to unlock new challenges and earn bonus coins",
+    ],
+    available: true,
+    coinReward: 25,
+    features: ["Single Player", "Progressive Levels", "High Scores"],
   },
   {
     id: "memory-game",
-    title: "Memory Match",
-    description: "Test your memory by matching pairs of cards",
+    title: "Erigga Memory Match",
+    description: "Test your memory by matching pairs of Erigga-themed cards",
     difficulty: "Medium",
     players: "1 Player",
     duration: "5-10 min",
@@ -40,11 +62,13 @@ const games = [
       "Win by matching all pairs in the fewest moves",
     ],
     available: false,
+    coinReward: 15,
+    features: ["Brain Training", "Timed Challenges", "Difficulty Levels"],
   },
   {
     id: "word-puzzle",
-    title: "Word Puzzle",
-    description: "Find hidden words in a grid of letters",
+    title: "Erigga Word Hunt",
+    description: "Find hidden words related to Erigga's music and career",
     difficulty: "Hard",
     players: "1 Player",
     duration: "10-15 min",
@@ -53,40 +77,25 @@ const games = [
     instructions: [
       "Find words hidden in a grid of letters",
       "Words can be horizontal, vertical, or diagonal",
-      "Words can be forwards or backwards",
-      "Find all words to complete the puzzle",
+      "All words are related to Erigga's music and career",
+      "Find all words to complete the puzzle and earn coins",
     ],
     available: false,
-  },
-  {
-    id: "number-game",
-    title: "Number Challenge",
-    description: "Solve mathematical puzzles and number sequences",
-    difficulty: "Medium",
-    players: "1 Player",
-    duration: "8-12 min",
-    rating: 4.0,
-    image: "/placeholder.svg?height=200&width=300&text=Number+Game",
-    instructions: [
-      "Solve various mathematical challenges",
-      "Complete number sequences",
-      "Use logic to find the missing numbers",
-      "Beat your best time and score",
-    ],
-    available: false,
+    coinReward: 30,
+    features: ["Music Themed", "Multiple Difficulties", "Educational"],
   },
 ]
 
 const getDifficultyColor = (difficulty: string) => {
   switch (difficulty.toLowerCase()) {
     case "easy":
-      return "bg-green-100 text-green-800 border-green-200"
+      return "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400"
     case "medium":
-      return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      return "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400"
     case "hard":
-      return "bg-red-100 text-red-800 border-red-200"
+      return "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400"
     default:
-      return "bg-gray-100 text-gray-800 border-gray-200"
+      return "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-400"
   }
 }
 
@@ -94,7 +103,7 @@ export default function GamesPage() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-purple-900 dark:to-indigo-900">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-purple-900 dark:to-indigo-900 pt-16">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-12">
@@ -106,12 +115,12 @@ export default function GamesPage() {
           </div>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Challenge yourself with our collection of fun and engaging games. Test your skills, compete with friends,
-            and earn rewards!
+            and earn Erigga coins as rewards!
           </p>
         </div>
 
         {/* Games Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2 gap-6 mb-8 max-w-6xl mx-auto">
           {games.map((game) => (
             <Card
               key={game.id}
@@ -133,8 +142,13 @@ export default function GamesPage() {
                       </Badge>
                     </div>
                   )}
-                  <div className="absolute top-3 right-3">
+                  <div className="absolute top-3 right-3 flex gap-2">
                     <Badge className={getDifficultyColor(game.difficulty)}>{game.difficulty}</Badge>
+                    {game.available && (
+                      <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400">
+                        <Coins className="h-3 w-3 mr-1" />+{game.coinReward}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -162,6 +176,15 @@ export default function GamesPage() {
                     <Clock className="h-3 w-3" />
                     {game.duration}
                   </div>
+                </div>
+
+                {/* Features */}
+                <div className="flex flex-wrap gap-1 mb-4">
+                  {game.features.map((feature, index) => (
+                    <Badge key={index} variant="outline" className="text-xs">
+                      {feature}
+                    </Badge>
+                  ))}
                 </div>
 
                 {/* Instructions Preview */}
@@ -212,10 +235,10 @@ export default function GamesPage() {
         </div>
 
         {/* Stats Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-12">
           <Card className="text-center p-6">
             <Trophy className="h-8 w-8 text-yellow-500 mx-auto mb-3" />
-            <h3 className="text-2xl font-bold">4</h3>
+            <h3 className="text-2xl font-bold">{games.filter((g) => g.available).length}</h3>
             <p className="text-muted-foreground">Games Available</p>
           </Card>
 
@@ -229,6 +252,12 @@ export default function GamesPage() {
             <Gamepad2 className="h-8 w-8 text-purple-500 mx-auto mb-3" />
             <h3 className="text-2xl font-bold">5,678</h3>
             <p className="text-muted-foreground">Games Played</p>
+          </Card>
+
+          <Card className="text-center p-6">
+            <Coins className="h-8 w-8 text-yellow-500 mx-auto mb-3" />
+            <h3 className="text-2xl font-bold">12,345</h3>
+            <p className="text-muted-foreground">Coins Earned</p>
           </Card>
         </div>
       </div>
