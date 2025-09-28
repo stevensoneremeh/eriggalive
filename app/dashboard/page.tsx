@@ -578,7 +578,7 @@ export default function DashboardPage() {
                           <motion.div
                             className="absolute top-0 left-0 h-3 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"
                             initial={{ width: 0 }}
-                            animate={{ width: `${getTierProgress(profile?.tier || "erigga_citizen")}%` }}
+                            animate={{ width: `${getTierProgress(profile?.tier || "grassroot")}%` }}
                             transition={{ duration: 1, delay: 0.5 }}
                           />
                         </div>
@@ -586,12 +586,12 @@ export default function DashboardPage() {
                           {[
                             { name: "Erigga Citizen", progress: 33 },
                             { name: "Erigga Indigen", progress: 66 },
-                            { name: "Enterprise", progress: 100 }
+                            { name: "E", progress: 100 }
                           ].map((tier, index) => (
                             <div key={tier.name} className="text-center">
                               <motion.div
                                 className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                                  getTierProgress(profile?.tier || "erigga_citizen") >= tier.progress
+                                  getTierProgress(profile?.tier || "free") >= tier.progress
                                     ? "bg-gradient-to-r from-purple-500 to-blue-500"
                                     : "bg-white/20"
                                 }`}

@@ -91,10 +91,6 @@ const nextConfig = {
   },
   // Force static generation for specific pages
   output: 'standalone',
-  // Increase body size limits for file uploads
-  serverRuntimeConfig: {
-    maxFileSize: '10mb'
-  },
 };
 
 export default nextConfig;

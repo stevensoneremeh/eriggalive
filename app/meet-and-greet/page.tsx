@@ -1,154 +1,317 @@
+"use client"
 
-'use client'
+import { useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { useAuth } from "@/contexts/auth-context"
+import { AuthGuard } from "@/components/auth-guard"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Calendar, Video, CheckCircle } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { createClient } from "@/lib/supabase/client"
 
-import { Suspense, lazy } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-
-// Dynamically import components that might cause SSR issues
-const Scene3D = lazy(() => import('@/components/meet-greet/scene-3d').catch(() => ({
-  default: () => <div className="w-full h-64 bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg flex items-center justify-center text-white">3D Scene Loading...</div>
-})))
-
-const BookingModal = lazy(() => import('@/components/meet-greet/booking-modal').catch(() => ({
-  default: () => <div>Booking component unavailable</div>
-})))
-
-function LoadingSkeleton() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center mb-8">
-          <Skeleton className="h-12 w-96 mx-auto mb-4" />
-          <Skeleton className="h-6 w-64 mx-auto" />
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
-          <Card className="bg-white/10 backdrop-blur-md border-white/20">
-            <CardHeader>
-              <Skeleton className="h-8 w-48" />
-              <Skeleton className="h-4 w-full" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-64 w-full" />
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-white/10 backdrop-blur-md border-white/20">
-            <CardHeader>
-              <Skeleton className="h-8 w-48" />
-              <Skeleton className="h-4 w-full" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-64 w-full" />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
-  )
+interface BookingData {
+  date: string
+  time: string
 }
 
 export default function MeetAndGreetPage() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-yellow-400 to-pink-600 bg-clip-text text-transparent mb-4">
-            Meet & Greet with Erigga
-          </h1>
-          <p className="text-xl text-white/80 max-w-2xl mx-auto">
-            Book an exclusive virtual meet and greet session with Erigga. Connect, chat, and create unforgettable memories!
+  const { user } = useAuth()
+  const { toast } = useToast()
+  const supabase = createClient()
+
+  const [currentStep, setCurrentStep] = useState<"booking" | "payment" | "confirmation" | "call">("booking")
+  const [bookingData, setBookingData] = useState<BookingData>({ date: "", time: "" })
+  const [isLoading, setIsLoading] = useState(false)
+  const [callRoom, setCallRoom] = useState<string | null>(null)
+
+  // Generate available time slots
+  const timeSlots = [
+    "10:00 AM",
+    "11:00 AM",
+    "12:00 PM",
+    "1:00 PM",
+    "2:00 PM",
+    "3:00 PM",
+    "4:00 PM",
+    "5:00 PM",
+    "6:00 PM",
+    "7:00 PM",
+  ]
+
+  // Get next 30 days for date selection
+  const getAvailableDates = () => {
+    const dates = []
+    const today = new Date()
+    for (let i = 1; i <= 30; i++) {
+      const date = new Date(today)
+      date.setDate(today.getDate() + i)
+      dates.push(date.toISOString().split("T")[0])
+    }
+    return dates
+  }
+
+  const handleBegin = async () => {
+    if (!bookingData.date || !bookingData.time) {
+      toast({
+        title: "Please select date and time",
+        description: "Both date and time are required to proceed.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsLoading(true)
+    setCurrentStep("payment")
+
+    // Simulate payment processing
+    setTimeout(() => {
+      setIsLoading(false)
+      setCurrentStep("confirmation")
+      // Generate unique room ID
+      setCallRoom(`erigga-meetgreet-${Date.now()}`)
+    }, 2000)
+  }
+
+  const handleJoinCall = () => {
+    setCurrentStep("call")
+    // In a real implementation, this would integrate with Daily.co
+    toast({
+      title: "Joining call...",
+      description: "Connecting you to the video call room.",
+    })
+  }
+
+  const BookingForm = () => (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md mx-auto">
+      <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white">
+        <CardContent className="p-8">
+          <h2 className="text-2xl font-bold text-center mb-8 text-blue-100">Book Your Session</h2>
+
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium mb-3 text-blue-200">Select Date</label>
+              <select
+                value={bookingData.date}
+                onChange={(e) => setBookingData((prev) => ({ ...prev, date: e.target.value }))}
+                className="w-full p-3 rounded-lg bg-white/10 border border-white/20 text-white focus:border-blue-400 focus:outline-none"
+              >
+                <option value="" className="text-gray-800">
+                  Choose a date
+                </option>
+                {getAvailableDates().map((date) => (
+                  <option key={date} value={date} className="text-gray-800">
+                    {new Date(date).toLocaleDateString("en-US", {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-3 text-blue-200">Select Time</label>
+              <select
+                value={bookingData.time}
+                onChange={(e) => setBookingData((prev) => ({ ...prev, time: e.target.value }))}
+                className="w-full p-3 rounded-lg bg-white/10 border border-white/20 text-white focus:border-blue-400 focus:outline-none"
+              >
+                <option value="" className="text-gray-800">
+                  Choose a time
+                </option>
+                {timeSlots.map((time) => (
+                  <option key={time} value={time} className="text-gray-800">
+                    {time}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <Button
+              onClick={handleBegin}
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold py-3 rounded-lg transition-all duration-300 transform hover:scale-105"
+            >
+              {isLoading ? (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+                  className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                />
+              ) : (
+                <>
+                  <Calendar className="w-5 h-5 mr-2" />
+                  Begin
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+
+  const PaymentScreen = () => (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="w-full max-w-md mx-auto"
+    >
+      <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white">
+        <CardContent className="p-8 text-center">
+          <h2 className="text-2xl font-bold mb-6 text-blue-100">Processing Payment</h2>
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+            className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full mx-auto mb-4"
+          />
+          <p className="text-blue-200">Connecting to Paystack...</p>
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+
+  const ConfirmationScreen = () => (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md mx-auto">
+      <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white">
+        <CardContent className="p-8 text-center">
+          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: "spring" }}>
+            <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
+          </motion.div>
+
+          <h2 className="text-2xl font-bold mb-4 text-blue-100">Booking Confirmed!</h2>
+
+          <div className="bg-white/5 rounded-lg p-4 mb-6">
+            <p className="text-blue-200 mb-2">Your session is scheduled for:</p>
+            <p className="font-semibold text-lg">
+              {new Date(bookingData.date).toLocaleDateString("en-US", {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+              })}{" "}
+              at {bookingData.time}
+            </p>
+          </div>
+
+          <div className="text-sm text-blue-200 mb-6 space-y-2">
+            <p>• Ensure you have a stable internet connection</p>
+            <p>• Test your camera and microphone beforehand</p>
+            <p>• Join the call 5 minutes early</p>
+            <p>• Be respectful and enjoy the experience</p>
+          </div>
+
+          <motion.div
+            animate={{
+              boxShadow: [
+                "0 0 20px rgba(59, 130, 246, 0.5)",
+                "0 0 40px rgba(59, 130, 246, 0.8)",
+                "0 0 20px rgba(59, 130, 246, 0.5)",
+              ],
+            }}
+            transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
+          >
+            <Button
+              onClick={handleJoinCall}
+              className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-3 rounded-lg transition-all duration-300"
+            >
+              <Video className="w-5 h-5 mr-2" />
+              Join Call
+            </Button>
+          </motion.div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+
+  const CallScreen = () => (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="w-full h-full flex items-center justify-center"
+    >
+      <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white w-full max-w-4xl h-96">
+        <CardContent className="p-8 h-full flex flex-col items-center justify-center">
+          <Video className="w-24 h-24 text-blue-400 mb-4" />
+          <h2 className="text-2xl font-bold mb-4 text-blue-100">Video Call Room</h2>
+          <p className="text-blue-200 mb-4">Room ID: {callRoom}</p>
+          <p className="text-sm text-blue-300 text-center">
+            In a real implementation, this would embed the Daily.co video call interface.
           </p>
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
-          {/* 3D Scene Card */}
-          <Card className="bg-white/10 backdrop-blur-md border-white/20 hover:bg-white/15 transition-all duration-300">
-            <CardHeader>
-              <CardTitle className="text-white text-2xl">Virtual Phone Booth</CardTitle>
-              <CardDescription className="text-white/70">
-                Experience the future of fan interaction in our immersive 3D environment
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="relative h-64 w-full rounded-lg overflow-hidden">
-                <Suspense fallback={
-                  <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 animate-pulse rounded-lg flex items-center justify-center text-white">
-                    Loading 3D Scene...
-                  </div>
-                }>
-                  <Scene3D />
-                </Suspense>
-              </div>
-            </CardContent>
-          </Card>
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
 
-          {/* Booking Form Card */}
-          <Card className="bg-white/10 backdrop-blur-md border-white/20">
-            <CardHeader>
-              <CardTitle className="text-white text-2xl">Book Your Session</CardTitle>
-              <CardDescription className="text-white/70">
-                Select your preferred time slot and payment method
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Suspense fallback={
-                <div className="space-y-4">
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-10 w-32" />
-                </div>
-              }>
-                <BookingModal />
-              </Suspense>
-            </CardContent>
-          </Card>
+  return (
+    <AuthGuard>
+      <div className="min-h-screen w-full relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-200 via-blue-300 to-white">
+          {/* Desert background with animated particles */}
+          <div className="absolute inset-0 opacity-20">
+            {[...Array(20)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-2 h-2 bg-white rounded-full"
+                animate={{
+                  x: [0, Math.random() * 100, 0],
+                  y: [0, Math.random() * 100, 0],
+                  opacity: [0.3, 0.8, 0.3],
+                }}
+                transition={{
+                  duration: Math.random() * 10 + 10,
+                  repeat: Number.POSITIVE_INFINITY,
+                  ease: "linear",
+                }}
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                }}
+              />
+            ))}
+          </div>
         </div>
 
-        {/* Features Section */}
-        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-          {[
-            {
-              title: "HD Video Call",
-              description: "Crystal clear video quality for the best experience",
-              icon: "🎥"
-            },
-            {
-              title: "Personal Chat",
-              description: "One-on-one conversation with Erigga himself",
-              icon: "💬"
-            },
-            {
-              title: "Photo Opportunity",
-              description: "Take screenshots during your session to keep forever",
-              icon: "📸"
-            }
-          ].map((feature, index) => (
-            <Card key={index} className="bg-white/5 backdrop-blur-sm border-white/10 text-center">
-              <CardContent className="pt-6">
-                <div className="text-4xl mb-4">{feature.icon}</div>
-                <h3 className="text-white text-lg font-semibold mb-2">{feature.title}</h3>
-                <p className="text-white/70 text-sm">{feature.description}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {/* Phone booth container */}
+        <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 1, ease: "easeOut" }}
+            className="relative"
+          >
+            {/* Phone booth structure */}
+            <div className="relative bg-gradient-to-b from-blue-100/30 to-blue-200/30 backdrop-blur-sm rounded-3xl p-8 border-4 border-white/30 shadow-2xl min-h-[600px] flex items-center justify-center">
+              {/* Booth frame decoration */}
+              <div className="absolute inset-0 rounded-3xl border-2 border-white/20 m-2"></div>
 
-        {/* Pricing Info */}
-        <div className="mt-16 text-center">
-          <Card className="bg-gradient-to-r from-yellow-500/20 to-pink-500/20 backdrop-blur-md border-yellow-500/30 max-w-md mx-auto">
-            <CardContent className="pt-6">
-              <div className="text-yellow-400 text-3xl font-bold mb-2">₦5,000</div>
-              <div className="text-white/80 text-sm mb-4">5-minute session</div>
-              <div className="text-yellow-300 text-xs">
-                * Payment via Paystack or Erigga Coins
-              </div>
-            </CardContent>
-          </Card>
+              {/* Content based on current step */}
+              <AnimatePresence mode="wait">
+                {currentStep === "booking" && <BookingForm key="booking" />}
+                {currentStep === "payment" && <PaymentScreen key="payment" />}
+                {currentStep === "confirmation" && <ConfirmationScreen key="confirmation" />}
+                {currentStep === "call" && <CallScreen key="call" />}
+              </AnimatePresence>
+            </div>
+
+            {/* Booth base glow effect */}
+            <motion.div
+              animate={{
+                opacity: [0.5, 0.8, 0.5],
+                scale: [1, 1.05, 1],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Number.POSITIVE_INFINITY,
+                ease: "easeInOut",
+              }}
+              className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-32 h-8 bg-blue-400/30 rounded-full blur-xl"
+            />
+          </motion.div>
         </div>
       </div>
-    </div>
+    </AuthGuard>
   )
 }

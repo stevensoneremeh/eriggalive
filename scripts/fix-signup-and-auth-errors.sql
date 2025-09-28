@@ -1,4 +1,3 @@
-
 -- Complete fix for signup and authentication errors
 -- Run this script to fix all database-related signup issues
 

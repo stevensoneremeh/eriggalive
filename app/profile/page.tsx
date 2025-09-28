@@ -121,26 +121,6 @@ export default function ProfilePage() {
     const file = event.target.files?.[0]
     if (!file || !profile) return
 
-    // Validate file size before uploading (2MB limit)
-    if (file.size > 2 * 1024 * 1024) {
-      toast({
-        title: "Error",
-        description: 'File too large. Please choose an image smaller than 2MB',
-        variant: "destructive",
-      })
-      return
-    }
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast({
-        title: "Error",
-        description: 'Please select a valid image file',
-        variant: "destructive",
-      })
-      return
-    }
-
     setIsUploadingAvatar(true)
     try {
       const formData = new FormData()
@@ -151,49 +131,17 @@ export default function ProfilePage() {
         body: formData,
       })
 
-      if (!response.ok) {
-        if (response.status === 413) {
-          toast({
-            title: "Error",
-            description: 'File too large. Please choose a smaller image (max 2MB)',
-            variant: "destructive",
-          })
-          return
-        }
-
-        // Try to parse error message from response
-        try {
-          const errorResult = await response.json()
-          toast({
-            title: "Error",
-            description: errorResult.error || 'Upload failed',
-            variant: "destructive",
-          })
-        } catch {
-          toast({
-            title: "Error",
-            description: 'Upload failed - please try a smaller image',
-            variant: "destructive",
-          })
-        }
-        return
-      }
-
       const result = await response.json()
 
-      if (result.success) {
-        await refreshProfile()
-        toast({
-          title: "Success!",
-          description: result.message || "Profile picture updated successfully.",
-        })
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || 'Failed to upload image',
-          variant: "destructive",
-        })
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to upload image")
       }
+
+      await refreshProfile()
+      toast({
+        title: "Success!",
+        description: "Profile picture updated successfully.",
+      })
     } catch (error: any) {
       console.error("Avatar upload error:", error)
       toast({
@@ -208,10 +156,13 @@ export default function ProfilePage() {
 
   const getTierColor = (tier: string) => {
     switch (tier?.toLowerCase()) {
+      case "free":
       case "erigga_citizen":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+      case "pro":
       case "erigga_indigen":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+      case "ent":
       case "enterprise":
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
       default:
@@ -221,10 +172,13 @@ export default function ProfilePage() {
 
   const getTierProgress = (tier: string) => {
     switch (tier?.toLowerCase()) {
+      case "free":
       case "erigga_citizen":
         return 33
+      case "pro":
       case "erigga_indigen":
         return 66
+      case "ent":
       case "enterprise":
         return 100
       default:
@@ -234,12 +188,15 @@ export default function ProfilePage() {
 
   const getTierDisplayName = (tier: string) => {
     switch (tier?.toLowerCase()) {
+      case "free":
       case "erigga_citizen":
         return "Erigga Citizen"
+      case "pro":
       case "erigga_indigen":
         return "Erigga Indigen"
+      case "ent":
       case "enterprise":
-        return "Enterprise"
+        return "E"
       default:
         return "Erigga Citizen"
     }
@@ -301,26 +258,11 @@ export default function ProfilePage() {
                   <Badge variant={profile?.profile_image_url || profile?.avatar_url ? "default" : "secondary"}>
                     Photo {profile?.profile_image_url || profile?.avatar_url ? "✓" : "✗"}
                   </Badge>
-                  <Badge variant={profile?.bio ? "default" : "secondary"}>
-                    Bio {profile?.bio ? "✓" : "✗"}
-                  </Badge>
-                  <Badge variant={profile?.location ? "default" : "secondary"}>
-                    Location {profile?.location ? "✓" : "✗"}
+                  <Badge variant={profile?.bio ? "default" : "secondary"}>Bio {profile?.bio ? "✓" : "✗"}</Badge>
+                  <Badge variant={profile?.date_of_birth ? "default" : "secondary"}>
+                    Birthday {profile?.date_of_birth ? "✓" : "✗"}
                   </Badge>
                 </div>
-                {getProfileCompleteness() < 100 && (
-                  <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-                      Complete Your Profile
-                    </h4>
-                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
-                      A complete profile helps you unlock exclusive features and connect better with the community.
-                    </p>
-                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                      Edit Profile
-                    </Button>
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -333,8 +275,8 @@ export default function ProfilePage() {
                 <div className="relative">
                   <Avatar className="h-32 w-32 ring-4 ring-primary/10">
                     <AvatarImage
-                      src={profile?.profile_image_url || profile?.avatar_url || user?.user_metadata?.avatar_url || "/placeholder-user.jpg"}
-                      alt={profile?.username || "Profile"}
+                      src={profile?.profile_image_url || profile?.avatar_url || "/placeholder-user.jpg"}
+                      alt={profile?.username}
                     />
                     <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold text-3xl">
                       {profile?.full_name?.charAt(0) || profile?.username?.charAt(0) || "U"}
@@ -772,48 +714,48 @@ export default function ProfilePage() {
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">Progress to next tier</span>
                           <span className="text-sm text-gray-500">
-                            {getTierProgress(profile?.tier || "erigga_citizen")}%
+                            {getTierProgress(profile?.tier || "grassroot")}%
                           </span>
                         </div>
-                        <Progress value={getTierProgress(profile?.tier || "erigga_citizen")} className="h-3" />
+                        <Progress value={getTierProgress(profile?.tier || "grassroot")} className="h-3" />
                       </div>
 
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                           <div
                             className={`w-4 h-4 rounded-full mx-auto mb-2 ${
-                              getTierProgress(profile?.tier || "erigga_citizen") >= 25 ? "bg-green-500" : "bg-gray-300"
+                              getTierProgress(profile?.tier || "grassroot") >= 25 ? "bg-green-500" : "bg-gray-300"
                             }`}
                           />
-                          <p className="text-sm font-medium">Erigga Citizen</p>
+                          <p className="text-sm font-medium">Grassroot</p>
                           <p className="text-xs text-gray-500">Entry Level</p>
                         </div>
                         <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                           <div
                             className={`w-4 h-4 rounded-full mx-auto mb-2 ${
-                              getTierProgress(profile?.tier || "erigga_citizen") >= 50 ? "bg-purple-500" : "bg-gray-300"
+                              getTierProgress(profile?.tier || "grassroot") >= 50 ? "bg-purple-500" : "bg-gray-300"
                             }`}
                           />
-                          <p className="text-sm font-medium">Erigga Indigen</p>
+                          <p className="text-sm font-medium">Pioneer</p>
                           <p className="text-xs text-gray-500">Active Member</p>
                         </div>
                         <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                           <div
                             className={`w-4 h-4 rounded-full mx-auto mb-2 ${
-                              getTierProgress(profile?.tier || "erigga_citizen") >= 75 ? "bg-blue-500" : "bg-gray-300"
+                              getTierProgress(profile?.tier || "grassroot") >= 75 ? "bg-blue-500" : "bg-gray-300"
                             }`}
                           />
-                          <p className="text-sm font-medium">Enterprise</p>
-                          <p className="text-xs text-gray-500">Premium</p>
+                          <p className="text-sm font-medium">Elder</p>
+                          <p className="text-xs text-gray-500">Respected</p>
                         </div>
                         <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                           <div
                             className={`w-4 h-4 rounded-full mx-auto mb-2 ${
-                              getTierProgress(profile?.tier || "erigga_citizen") >= 100 ? "bg-yellow-500" : "bg-gray-300"
+                              getTierProgress(profile?.tier || "grassroot") >= 100 ? "bg-yellow-500" : "bg-gray-300"
                             }`}
                           />
-                          <p className="text-sm font-medium">Elite</p>
-                          <p className="text-xs text-gray-500">Exclusive</p>
+                          <p className="text-sm font-medium">Blood Brotherhood</p>
+                          <p className="text-xs text-gray-500">Elite</p>
                         </div>
                       </div>
                     </div>

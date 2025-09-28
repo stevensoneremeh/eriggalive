@@ -171,21 +171,6 @@ export function ProfileEditForm() {
               <Badge variant={profile?.profile_image_url ? "default" : "secondary"}>
                 Photo {profile?.profile_image_url ? "✓" : "✗"}
               </Badge>
-              <Badge variant={profile?.bio ? "default" : "secondary"}>
-                Bio {profile?.bio ? "✓" : "✗"}
-              </Badge>
-              <Badge variant={profile?.location ? "default" : "secondary"}>
-                Location {profile?.location ? "✓" : "✗"}
-              </Badge>
-            </div>
-            {profile?.profile_completeness && profile.profile_completeness < 100 && (
-              <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  Complete your profile to unlock exclusive features and increase your visibility in the community.
-                </p>
-              </div>
-            )}
-              </Badge>
               <Badge variant={profile?.bio ? "default" : "secondary"}>Bio {profile?.bio ? "✓" : "✗"}</Badge>
               <Badge variant={profile?.date_of_birth ? "default" : "secondary"}>
                 Birthday {profile?.date_of_birth ? "✓" : "✗"}
@@ -207,7 +192,7 @@ export function ProfileEditForm() {
         <CardContent>
           <div className="flex items-center gap-4">
             <Avatar className="h-20 w-20">
-              <AvatarImage src={profile?.profile_image_url || profile?.avatar_url || undefined} alt={profile?.username || undefined} />
+              <AvatarImage src={profile?.profile_image_url || profile?.avatar_url} alt={profile?.username} />
               <AvatarFallback className="text-lg">
                 {profile?.full_name?.charAt(0) || profile?.username?.charAt(0) || "U"}
               </AvatarFallback>

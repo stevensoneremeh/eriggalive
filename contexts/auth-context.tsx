@@ -20,7 +20,7 @@ interface AuthContextType {
   signUp: (
     email: string,
     password: string,
-    userData: { username: string; full_name: string; tier?: string; payment_reference?: string; custom_amount?: string },
+    userData: { username: string; full_name: string; tier?: string; payment_reference?: string },
   ) => Promise<{ error: any }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error: any }>
@@ -55,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (userId: string): Promise<UserProfile | null> => {
       try {
         if (!supabase || supabaseError) {
+          console.warn("Supabase client not available, using offline mode")
           return null
         }
 
@@ -62,41 +63,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return profileCache[userId]
         }
 
-        // Reduce timeout and add abort controller
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 3000)
+        // Add timeout wrapper for database requests
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
+        })
 
-        const { data, error } = await supabase
-          .from("users")
-          .select("*")
-          .eq("auth_user_id", userId)
-          .abortSignal(controller.signal)
-          .maybeSingle()
+        const fetchPromise = supabase.from("users").select("*").eq("auth_user_id", userId).maybeSingle()
 
-        clearTimeout(timeoutId)
+        const { data, error } = await Promise.race([fetchPromise, timeoutPromise])
 
         if (error) {
-          // Only log once to reduce console spam
-          if (!error.message.includes("aborted")) {
-            console.warn("Profile fetch failed:", error.message)
-          }
+          console.warn("Profile fetch failed, continuing without profile:", error.message)
           return null
         }
 
         if (data) {
-          // Fix avatar URL handling
-          const profileData = {
-            ...data,
-            avatar_url: data.profile_image_url || data.avatar_url || null,
-            tier: data.tier || 'erigga_citizen'
-          }
-          setProfileCache((prev) => ({ ...prev, [userId]: profileData }))
-          return profileData
+          setProfileCache((prev) => ({ ...prev, [userId]: data }))
         }
 
         return data
       } catch (error: any) {
-        // Reduce console spam for network issues
+        if (error.message.includes("timeout") || error.message.includes("connect") || error.message.includes("503")) {
+          console.warn("Network issue detected, running in offline mode:", error.message)
+        } else {
+          console.warn("Profile fetch error, continuing gracefully:", error.message)
+        }
         return null
       }
     },
@@ -118,12 +109,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshSession = useCallback(async () => {
     try {
       if (!supabase || supabaseError) {
+        console.warn("Cannot refresh session: Running in offline mode")
         return
       }
 
-      const { data: { session }, error } = await supabase.auth.getSession()
+      // Add timeout for session refresh
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("Session refresh timeout")), 3000)
+      })
+
+      const refreshPromise = supabase.auth.refreshSession()
+      const { data: { session }, error } = await Promise.race([refreshPromise, timeoutPromise])
 
       if (error) {
+        console.warn("Session refresh failed, maintaining current state:", error.message)
         return
       }
 
@@ -137,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null)
       }
     } catch (error: any) {
-      // Silent fail to reduce console spam
+      console.error("Error in refreshSession:", error.message)
     }
   }, [supabase, fetchProfile, supabaseError])
 
@@ -237,8 +236,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           refreshSession()
         }
       },
-      10 * 60 * 1000,
-    ) // Refresh every 10 minutes to reduce network calls
+      4 * 60 * 1000,
+    ) // Refresh every 4 minutes
 
     return () => {
       mounted = false
@@ -288,7 +287,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         setLoading(true)
-
+        
         // Validate required fields
         if (!email || !password || !userData.username || !userData.full_name) {
           setLoading(false)
@@ -302,7 +301,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             data: {
               username: userData.username,
               full_name: userData.full_name,
-              tier: userData.tier || "erigga_citizen",
+              tier: userData.tier || "FREE",
               payment_reference: userData.payment_reference,
               custom_amount: userData.custom_amount,
             },

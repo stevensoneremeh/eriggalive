@@ -36,6 +36,7 @@ import {
   Moon,
   Monitor,
   Users,
+  Gamepad2,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useTheme } from "@/contexts/theme-context"
@@ -47,6 +48,7 @@ const navigationItems = [
   { name: "Home", href: "/", icon: Home },
   { name: "Community", href: "/community", icon: Users },
   { name: "Media", href: "/missions", icon: Target },
+  { name: "Games", href: "/games", icon: Gamepad2 },
   { name: "Radio", href: "/radio", icon: Radio },
   { name: "Events", href: "/events", icon: Calendar },
   { name: "Vault", href: "/vault", icon: Music },
@@ -94,6 +96,7 @@ export function UnifiedNavigation() {
         { name: "Home", href: "/", icon: Home },
         { name: "Community", href: "/community", icon: Users },
         { name: "Media", href: "/missions", icon: Target },
+        { name: "Games", href: "/games", icon: Gamepad2 },
         { name: "Radio", href: "/radio", icon: Radio },
         { name: "Events", href: "/events", icon: Calendar },
         { name: "Vault", href: "/vault", icon: Music },
@@ -106,6 +109,7 @@ export function UnifiedNavigation() {
         { name: "Home", href: "/", icon: Home },
         { name: "Community", href: "/community", icon: Users },
         { name: "Media", href: "/missions", icon: Target },
+        { name: "Games", href: "/games", icon: Gamepad2 },
         { name: "Radio", href: "/radio", icon: Radio },
         { name: "Events", href: "/events", icon: Calendar },
         { name: "Vault", href: "/vault", icon: Music },
@@ -215,6 +219,7 @@ export function UnifiedNavigation() {
                             (profile as any)?.profile_image_url ||
                             (profile as any)?.avatar_url ||
                             "/placeholder-user.jpg" ||
+                            "/placeholder.svg" ||
                             "/placeholder.svg"
                           }
                           alt={(profile as any)?.username || "User"}
@@ -306,6 +311,7 @@ export function UnifiedNavigation() {
                             (profile as any)?.profile_image_url ||
                             (profile as any)?.avatar_url ||
                             "/placeholder-user.jpg" ||
+                            "/placeholder.svg" ||
                             "/placeholder.svg"
                           }
                           alt={(profile as any)?.username || "User"}

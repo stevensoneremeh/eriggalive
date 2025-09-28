@@ -37,7 +37,6 @@ import {
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { formatDistanceToNow } from "date-fns"
-import { EmojiPicker } from "@/components/ui/emoji-picker"
 
 interface Category {
   id: number
@@ -93,7 +92,7 @@ interface Post {
 }
 
 export default function CommunityPage() {
-  const { user, profile, refreshProfile } = useAuth()
+  const { user } = useAuth()
   const { toast } = useToast()
   const [posts, setPosts] = useState<Post[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -108,24 +107,7 @@ export default function CommunityPage() {
   const [loadingComments, setLoadingComments] = useState<Set<number>>(new Set())
   const [newComment, setNewComment] = useState<{ [postId: number]: string }>({})
   const [submittingComment, setSubmittingComment] = useState<Set<number>>(new Set())
-  const [postViewCounts, setPostViewCounts] = useState<{[key: number]: number}>({})
-
-  // Add emoji to post content
-  const addEmojiToPost = (emoji: string) => {
-    setNewPost(prev => ({
-      ...prev,
-      content: prev.content + emoji
-    }))
-  }
-
-  // Add emoji to comment
-  const addEmojiToComment = (postId: number, emoji: string) => {
-    setNewComment(prev => ({
-      ...prev,
-      [postId]: (prev[postId] || '') + emoji
-    }))
-  }
-
+  
   // Create post form
   const [newPost, setNewPost] = useState({
     title: "",
@@ -141,11 +123,11 @@ export default function CommunityPage() {
   const loadData = async () => {
     try {
       setLoading(true)
-
+      
       // Load categories
       const categoriesResponse = await fetch("/api/community/categories")
       const categoriesData = await categoriesResponse.json()
-
+      
       if (categoriesData.success) {
         setCategories(categoriesData.categories)
       }
@@ -153,18 +135,9 @@ export default function CommunityPage() {
       // Load posts
       const postsResponse = await fetch("/api/community/posts")
       const postsData = await postsResponse.json()
-
+      
       if (postsData.success) {
         setPosts(postsData.posts)
-
-        // Initialize stable view counts for each post
-        const viewCounts: {[key: number]: number} = {}
-        postsData.posts.forEach((post: Post) => {
-          // Generate stable view count based on post ID and creation date
-          const seed = post.id + new Date(post.created_at).getTime()
-          viewCounts[post.id] = Math.floor((seed * 0.001) % 1000) + 50
-        })
-        setPostViewCounts(viewCounts)
       }
     } catch (error) {
       console.error("Error loading community data:", error)
@@ -197,24 +170,9 @@ export default function CommunityPage() {
       return
     }
 
-    // Ensure profile exists before creating post
-    if (!profile) {
-      toast({
-        title: "Setting up your profile...",
-        description: "Please wait while we prepare your account"
-      })
-
-      try {
-        // Try to refresh profile first
-        await refreshProfile?.()
-      } catch (error) {
-        console.error("Profile refresh failed:", error)
-      }
-    }
-
     try {
       setCreatePostLoading(true)
-
+      
       const hashtags = newPost.hashtags
         .split(',')
         .map(tag => tag.trim())
@@ -239,7 +197,7 @@ export default function CommunityPage() {
         setPosts(prevPosts => [data.post, ...prevPosts])
         setNewPost({ title: "", content: "", category_id: 1, hashtags: "" })
         setIsCreatePostOpen(false)
-
+        
         toast({
           title: "Success!",
           description: "Your post has been created successfully"
@@ -282,7 +240,7 @@ export default function CommunityPage() {
               ? { 
                   ...post, 
                   user_voted: data.voted, 
-                  vote_count: data.voteCount // Use the count from backend, not calculated
+                  vote_count: data.voted ? post.vote_count + 1 : Math.max(0, post.vote_count - 1)
                 }
               : post
           )
@@ -295,13 +253,13 @@ export default function CommunityPage() {
 
   const loadComments = async (postId: number) => {
     if (loadingComments.has(postId)) return
-
+    
     setLoadingComments(prev => new Set([...prev, postId]))
-
+    
     try {
       const response = await fetch(`/api/community/posts/${postId}/comments`)
       const data = await response.json()
-
+      
       if (data.success) {
         setComments(prev => ({
           ...prev,
@@ -372,7 +330,7 @@ export default function CommunityPage() {
           ...prev,
           [postId]: [data.comment, ...(prev[postId] || [])]
         }))
-
+        
         setNewComment(prev => ({
           ...prev,
           [postId]: ""
@@ -434,7 +392,7 @@ export default function CommunityPage() {
               ? { 
                   ...comment, 
                   user_liked: data.liked, 
-                  like_count: data.likeCount // Use the count from backend, not calculated
+                  like_count: data.liked ? comment.like_count + 1 : Math.max(0, comment.like_count - 1)
                 }
               : comment
           ) || []
@@ -635,7 +593,7 @@ export default function CommunityPage() {
                       </SelectContent>
                     </Select>
                   </div>
-
+                  
                   <div>
                     <Label htmlFor="title">Title (Optional)</Label>
                     <Input
@@ -649,18 +607,13 @@ export default function CommunityPage() {
 
                   <div>
                     <Label htmlFor="content">Content *</Label>
-                    <div className="relative">
-                      <Textarea
-                        id="content"
-                        placeholder="What's on your mind?"
-                        value={newPost.content}
-                        onChange={(e) => setNewPost({...newPost, content: e.target.value})}
-                        className="bg-gray-700 border-gray-600 text-white min-h-[100px] pr-10"
-                      />
-                      <div className="absolute bottom-2 right-2">
-                        <EmojiPicker onEmojiSelect={addEmojiToPost} disabled={createPostLoading} />
-                      </div>
-                    </div>
+                    <Textarea
+                      id="content"
+                      placeholder="What's on your mind?"
+                      value={newPost.content}
+                      onChange={(e) => setNewPost({...newPost, content: e.target.value})}
+                      className="bg-gray-700 border-gray-600 text-white min-h-[100px]"
+                    />
                   </div>
 
                   <div>
@@ -815,12 +768,12 @@ export default function CommunityPage() {
                           </div>
                         </div>
                       </CardHeader>
-
+                      
                       <CardContent className="space-y-4">
                         {post.title && (
                           <h3 className="text-xl font-semibold text-white">{post.title}</h3>
                         )}
-
+                        
                         <p className="text-gray-300 whitespace-pre-wrap">{post.content}</p>
 
                         {post.media_url && (
@@ -884,7 +837,7 @@ export default function CommunityPage() {
 
                           <div className="flex items-center text-sm text-gray-500">
                             <Eye className="h-4 w-4 mr-1" />
-                            <span>{postViewCounts[post.id] || 50} views</span>
+                            <span>{Math.floor(Math.random() * 1000) + 50} views</span>
                           </div>
                         </div>
 
@@ -907,23 +860,15 @@ export default function CommunityPage() {
                                     </AvatarFallback>
                                   </Avatar>
                                   <div className="flex-1 space-y-2">
-                                    <div className="relative">
-                                      <Textarea
-                                        placeholder="Write a comment..."
-                                        value={newComment[post.id] || ""}
-                                        onChange={(e) => setNewComment(prev => ({
-                                          ...prev,
-                                          [post.id]: e.target.value
-                                        }))}
-                                        className="bg-gray-700 border-gray-600 text-white min-h-[80px] resize-none pr-10"
-                                      />
-                                      <div className="absolute bottom-2 right-2">
-                                        <EmojiPicker 
-                                          onEmojiSelect={(emoji) => addEmojiToComment(post.id, emoji)} 
-                                          disabled={submittingComment.has(post.id)} 
-                                        />
-                                      </div>
-                                    </div>
+                                    <Textarea
+                                      placeholder="Write a comment..."
+                                      value={newComment[post.id] || ""}
+                                      onChange={(e) => setNewComment(prev => ({
+                                        ...prev,
+                                        [post.id]: e.target.value
+                                      }))}
+                                      className="bg-gray-700 border-gray-600 text-white min-h-[80px] resize-none"
+                                    />
                                     <div className="flex justify-end">
                                       <Button
                                         size="sm"
@@ -979,7 +924,7 @@ export default function CommunityPage() {
                                           </div>
                                           <p className="text-gray-300 text-sm">{comment.content}</p>
                                         </div>
-
+                                        
                                         <div className="flex items-center space-x-4 mt-2">
                                           <Button
                                             variant="ghost"
@@ -994,7 +939,7 @@ export default function CommunityPage() {
                                             <Heart className={`h-3 w-3 ${comment.user_liked ? 'fill-current' : ''}`} />
                                             <span>{comment.like_count}</span>
                                           </Button>
-
+                                          
                                           <Button
                                             variant="ghost"
                                             size="sm"

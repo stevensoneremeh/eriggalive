@@ -10,34 +10,7 @@ interface UserTierBadgeProps {
 }
 
 export function UserTierBadge({ tier, size = "md", showLabel = true, className = "" }: UserTierBadgeProps) {
-  const tierConfig = {
-  erigga_citizen: {
-    label: "Erigga Citizen",
-    color: "bg-gray-100 text-gray-800 border-gray-200",
-    darkColor: "dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700",
-    icon: "🌱"
-  },
-  erigga_indigen: {
-    label: "Erigga Indigen",
-    color: "bg-blue-100 text-blue-800 border-blue-200",
-    darkColor: "dark:bg-blue-900 dark:text-blue-200 dark:border-blue-800",
-    icon: "🚀"
-  },
-  enterprise: {
-    label: "Enterprise",
-    color: "bg-purple-100 text-purple-800 border-purple-200",
-    darkColor: "dark:bg-purple-900 dark:text-purple-200 dark:border-purple-800",
-    icon: "👑"
-  },
-  elder: {
-    label: "Enterprise",
-    color: "bg-purple-100 text-purple-800 border-purple-200",
-    darkColor: "dark:bg-purple-900 dark:text-purple-200 dark:border-purple-800",
-    icon: "👑"
-  },
-}
-
-  const config = tierConfig[tier as keyof typeof tierConfig] || tierConfig.erigga_citizen
+  const tierInfo = getTierDisplayInfo(tier)
 
   const getBadgeVariant = (color: string) => {
     switch (color) {
@@ -74,9 +47,9 @@ export function UserTierBadge({ tier, size = "md", showLabel = true, className =
     ? "bg-gradient-to-r from-yellow-400/30 to-amber-500/30 text-yellow-600 border-yellow-500 shadow-lg shadow-yellow-400/25 hover:shadow-yellow-400/40 hover:from-yellow-400/40 hover:to-amber-500/40 font-bold"
     : ""
 
-  const enterpriseTextStyle = isEnterprise && config.label === "E" ? "font-black text-xl tracking-wider" : ""
+  const enterpriseTextStyle = isEnterprise && tierInfo.label === "E" ? "font-black text-xl tracking-wider" : ""
 
-  const IconComponent = config.icon
+  const IconComponent = tierInfo.icon
 
   return (
     <TooltipProvider>
@@ -84,14 +57,14 @@ export function UserTierBadge({ tier, size = "md", showLabel = true, className =
         <TooltipTrigger asChild>
           <Badge
             variant="outline"
-            className={`${getBadgeVariant(config.color)} ${className} ${sizeClasses[size]} font-medium transition-all duration-300 ${isEnterprise ? "animate-pulse" : ""}`}
+            className={`${getBadgeVariant(tierInfo.color)} ${className} ${sizeClasses[size]} font-medium transition-all duration-300 ${isEnterprise ? "animate-pulse" : ""}`}
           >
             <IconComponent className={`${iconSizes[size]} ${showLabel ? "mr-1" : ""}`} />
-            {showLabel && <span className={enterpriseTextStyle}>{config.label}</span>}
+            {showLabel && <span className={enterpriseTextStyle}>{tierInfo.label}</span>}
           </Badge>
         </TooltipTrigger>
         <TooltipContent>
-          <p>{config.tooltip}</p>
+          <p>{tierInfo.tooltip}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

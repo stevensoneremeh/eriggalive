@@ -185,9 +185,6 @@ export default function WithdrawalSuccessPage() {
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     Funds will arrive in your account within 1-3 business days.
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                    You will receive email notifications about the status of your withdrawal.
-                  </p>
                 </div>
               </div>
             </div>
