@@ -18,47 +18,32 @@ DO $$
 DECLARE
   v_migrated_count integer := 0;
 BEGIN
-  -- Update users table
+  -- Update users table to migrate legacy tiers
   UPDATE public.users
   SET 
     tier = 'erigga_citizen',
     subscription_tier = 'erigga_citizen',
     updated_at = now()
-  WHERE tier = 'grassroot' 
-     OR tier = 'pioneer'
-     OR tier = 'elder'
-     OR tier = 'blood'
-     OR tier = 'blood_brotherhood';
+  WHERE tier IN ('grassroot', 'pioneer', 'elder', 'blood', 'blood_brotherhood');
   
   GET DIAGNOSTICS v_migrated_count = ROW_COUNT;
   
-  RAISE NOTICE '✅ Migrated % users from legacy tiers to erigga_citizen', v_migrated_count;
+  RAISE NOTICE 'Migrated % users from legacy tiers to erigga_citizen', v_migrated_count;
 END $$;
 
 -- =====================================================
 -- STEP 2: Update tier enum (drop and recreate)
 -- =====================================================
 
--- First, check what columns use the tier enum
 DO $$
-DECLARE
-  v_has_enum boolean;
 BEGIN
-  SELECT EXISTS (
-    SELECT 1 FROM pg_type WHERE typname = 'user_tier'
-  ) INTO v_has_enum;
+  -- Convert tier columns to text temporarily
+  ALTER TABLE public.users 
+    ALTER COLUMN tier TYPE text,
+    ALTER COLUMN subscription_tier TYPE text;
   
-  IF v_has_enum THEN
-    -- Convert tier columns to text temporarily
-    ALTER TABLE public.users 
-      ALTER COLUMN tier TYPE text,
-      ALTER COLUMN subscription_tier TYPE text;
-    
-    -- Drop the old enum
-    DROP TYPE IF EXISTS user_tier CASCADE;
-    
-    RAISE NOTICE '✅ Removed old user_tier enum';
-  END IF;
+  -- Drop the old enum
+  DROP TYPE IF EXISTS user_tier CASCADE;
   
   -- Create new enum with only 3 tiers
   CREATE TYPE user_tier AS ENUM (
@@ -72,7 +57,7 @@ BEGIN
     ALTER COLUMN tier TYPE user_tier USING tier::user_tier,
     ALTER COLUMN subscription_tier TYPE user_tier USING subscription_tier::user_tier;
   
-  RAISE NOTICE '✅ Created new user_tier enum with 3 tiers';
+  RAISE NOTICE 'Created new user_tier enum with 3 tiers';
 END $$;
 
 -- =====================================================
@@ -91,10 +76,10 @@ BEGIN
   LIMIT 1;
   
   IF v_auth_user_id IS NULL THEN
-    RAISE NOTICE '⚠️  User info@eriggalive.com not found in auth.users';
-    RAISE NOTICE '⚠️  Please sign up first, then run this script again';
+    RAISE NOTICE 'User info@eriggalive.com not found in auth.users';
+    RAISE NOTICE 'Please sign up first, then run this script again';
   ELSE
-    RAISE NOTICE '✅ Found auth user: %', v_auth_user_id;
+    RAISE NOTICE 'Found auth user: %', v_auth_user_id;
     
     -- Check if user exists in users table
     SELECT id INTO v_user_id
@@ -134,7 +119,7 @@ BEGIN
         100000
       );
       
-      RAISE NOTICE '✅ Created admin user profile';
+      RAISE NOTICE 'Created admin user profile';
     ELSE
       -- Update existing user
       UPDATE public.users
@@ -153,7 +138,7 @@ BEGIN
         updated_at = now()
       WHERE id = v_user_id;
       
-      RAISE NOTICE '✅ Updated user to admin';
+      RAISE NOTICE 'Updated user to admin';
     END IF;
   END IF;
 END $$;
@@ -205,17 +190,13 @@ CREATE POLICY "Public profiles are viewable by everyone"
   ON public.users FOR SELECT
   USING (is_profile_public = true);
 
-RAISE NOTICE '✅ RLS policies configured';
-
 -- =====================================================
--- STEP 5: Verification
+-- STEP 5: Verification Query
 -- =====================================================
 
 -- Check tier distribution
 SELECT 
-  '====== TIER DISTRIBUTION ======' as section;
-
-SELECT 
+  '====== TIER DISTRIBUTION ======' as info,
   tier,
   COUNT(*) as user_count
 FROM public.users
@@ -224,9 +205,7 @@ ORDER BY tier;
 
 -- Check admin user
 SELECT 
-  '====== ADMIN USER ======' as section;
-
-SELECT 
+  '====== ADMIN USER ======' as info,
   email,
   username,
   role,
@@ -238,16 +217,5 @@ SELECT
   level
 FROM public.users
 WHERE email = 'info@eriggalive.com';
-
--- Final status
-SELECT 
-  CASE 
-    WHEN EXISTS (
-      SELECT 1 FROM public.users 
-      WHERE email = 'info@eriggalive.com' 
-      AND role = 'admin'
-    ) THEN '✅✅✅ SUCCESS: Grassroot removed & Admin access configured ✅✅✅'
-    ELSE '❌ Setup incomplete - check errors above'
-  END as final_status;
 
 COMMIT;
