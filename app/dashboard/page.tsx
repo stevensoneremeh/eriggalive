@@ -265,44 +265,44 @@ export default function DashboardPage() {
   }
 
   const getTierColor = (tier: string) => {
-    switch (tier) {
-      case "grassroot":
-        return "bg-gradient-to-r from-green-400 to-emerald-500 text-white"
-      case "pioneer":
-        return "bg-gradient-to-r from-purple-400 to-indigo-500 text-white"
-      case "elder":
-        return "bg-gradient-to-r from-orange-400 to-red-500 text-white"
-      case "blood_brotherhood":
-        return "bg-gradient-to-r from-yellow-400 to-orange-500 text-white"
+    const normalizedTier = (tier || "erigga_citizen").toLowerCase()
+    switch (normalizedTier) {
       case "erigga_citizen":
         return "bg-gradient-to-r from-blue-400 to-purple-500 text-white"
       case "erigga_indigen":
         return "bg-gradient-to-r from-orange-400 to-red-500 text-white"
-      case "erigga_elder":
+      case "enterprise":
         return "bg-gradient-to-r from-yellow-400 to-orange-500 text-white"
       default:
-        return "bg-gradient-to-r from-gray-400 to-gray-500 text-white"
+        return "bg-gradient-to-r from-blue-400 to-purple-500 text-white"
     }
   }
 
   const getTierProgress = (tier: string) => {
-    switch (tier) {
-      case "grassroot":
-        return 25
-      case "pioneer":
-        return 50
-      case "elder":
-        return 75
-      case "blood_brotherhood":
-        return 100
+    const normalizedTier = (tier || "erigga_citizen").toLowerCase()
+    switch (normalizedTier) {
       case "erigga_citizen":
         return 33
       case "erigga_indigen":
         return 66
-      case "erigga_elder":
+      case "enterprise":
         return 100
       default:
-        return 0
+        return 33
+    }
+  }
+  
+  const getTierDisplayName = (tier: string) => {
+    const normalizedTier = (tier || "erigga_citizen").toLowerCase()
+    switch (normalizedTier) {
+      case "erigga_citizen":
+        return "Erigga Citizen"
+      case "erigga_indigen":
+        return "Erigga Indigen"
+      case "enterprise":
+        return "Enterprise"
+      default:
+        return "Erigga Citizen"
     }
   }
 
@@ -426,9 +426,9 @@ export default function DashboardPage() {
                 </div>
                 <div className="mt-4 sm:mt-0">
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Badge className={`px-4 py-2 text-sm font-semibold ${getTierColor(profile?.tier || "grassroot")}`}>
+                    <Badge className={`px-4 py-2 text-sm font-semibold ${getTierColor(profile?.tier || "erigga_citizen")}`}>
                       <Crown className="w-4 h-4 mr-2" />
-                      {profile?.tier?.replace("_", " ").toUpperCase() || "GRASSROOT"}
+                      {getTierDisplayName(profile?.tier || "erigga_citizen")}
                     </Badge>
                   </motion.div>
                 </div>
@@ -567,18 +567,18 @@ export default function DashboardPage() {
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-white">
-                            {profile?.tier?.replace("_", " ").toUpperCase() || "GRASSROOT"} Member
+                            {getTierDisplayName(profile?.tier || "erigga_citizen")} Member
                           </span>
                           <span className="text-sm text-gray-300">
-                            {getTierProgress(profile?.tier || "grassroot")}% Complete
+                            {getTierProgress(profile?.tier || "erigga_citizen")}% Complete
                           </span>
                         </div>
                         <div className="relative">
-                          <Progress value={getTierProgress(profile?.tier || "grassroot")} className="h-3 bg-white/10" />
+                          <Progress value={getTierProgress(profile?.tier || "erigga_citizen")} className="h-3 bg-white/10" />
                           <motion.div
                             className="absolute top-0 left-0 h-3 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"
                             initial={{ width: 0 }}
-                            animate={{ width: `${getTierProgress(profile?.tier || "grassroot")}%` }}
+                            animate={{ width: `${getTierProgress(profile?.tier || "erigga_citizen")}%` }}
                             transition={{ duration: 1, delay: 0.5 }}
                           />
                         </div>
@@ -586,12 +586,12 @@ export default function DashboardPage() {
                           {[
                             { name: "Erigga Citizen", progress: 33 },
                             { name: "Erigga Indigen", progress: 66 },
-                            { name: "E", progress: 100 }
+                            { name: "Enterprise", progress: 100 }
                           ].map((tier, index) => (
                             <div key={tier.name} className="text-center">
                               <motion.div
                                 className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                                  getTierProgress(profile?.tier || "free") >= tier.progress
+                                  getTierProgress(profile?.tier || "erigga_citizen") >= tier.progress
                                     ? "bg-gradient-to-r from-purple-500 to-blue-500"
                                     : "bg-white/20"
                                 }`}

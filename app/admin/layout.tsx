@@ -60,135 +60,90 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [debugInfo, setDebugInfo] = useState<any>(null)
 
   useEffect(() => {
+    let mounted = true
+    
     async function checkAdminAccess() {
       try {
-        console.log("[Admin Layout] Starting admin access check...")
-
-        // Check if user is authenticated first
+        // Wait for auth to initialize
         if (!user) {
-          console.log("[Admin Layout] No user found in context")
-          setHasAccess(false)
-          // Don't redirect immediately - wait a bit for auth to initialize
-          const timer = setTimeout(() => {
-            if (!user) {
-              router.push("/login?redirect=" + encodeURIComponent(pathname || "/admin"))
-            }
-          }, 1000)
-          return () => clearTimeout(timer)
+          setHasAccess(null)
+          return
         }
 
         const userEmail = user.email || ""
-        console.log("[Admin Layout] User email:", userEmail)
 
         // Special case: Always allow info@eriggalive.com
         if (userEmail === "info@eriggalive.com") {
-          console.log("[Admin Layout] ✅ Special access granted to info@eriggalive.com")
-          setHasAccess(true)
-          setDebugInfo({ method: "special_email", email: userEmail })
-          setError(null)
+          if (mounted) {
+            setHasAccess(true)
+            setDebugInfo({ method: "special_email", email: userEmail })
+            setError(null)
+          }
           return
         }
 
         // Check profile from context first
         if (profile) {
-          console.log("[Admin Layout] Profile from context:", {
-            role: profile.role,
-            tier: profile.tier,
-            email: profile.email,
-          })
-
           // Allow admin or super_admin role
-          if (profile.role === "admin" || profile.role === "super_admin") {
-            console.log("[Admin Layout] ✅ Access granted via profile context")
-            setHasAccess(true)
-            setDebugInfo({ method: "profile_context", role: profile.role })
-            setError(null)
-            return
-          }
-
-          // Enterprise tier users can access admin
-          if (profile.tier === "enterprise") {
-            console.log("[Admin Layout] ✅ Access granted via enterprise tier")
-            setHasAccess(true)
-            setDebugInfo({ method: "tier_access", tier: profile.tier })
-            setError(null)
+          if (profile.role === "admin" || profile.role === "super_admin" || profile.tier === "enterprise") {
+            if (mounted) {
+              setHasAccess(true)
+              setDebugInfo({ method: "profile_context", role: profile.role, tier: profile.tier })
+              setError(null)
+            }
             return
           }
         }
 
-        // Fallback: Direct database check (with timeout)
-        console.log("[Admin Layout] Checking database for admin role...")
-        
-        const dbCheckPromise = supabase
+        // Fallback: Direct database check
+        const { data: userData, error: userError } = await supabase
           .from("users")
           .select("role, tier, email, is_active")
           .eq("auth_user_id", user.id)
           .single()
 
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Database check timeout")), 5000)
-        )
-
-        const { data: userData, error: userError } = await Promise.race([
-          dbCheckPromise,
-          timeoutPromise
-        ]).catch((err) => ({ data: null, error: err }))
+        if (!mounted) return
 
         if (userError) {
           console.error("[Admin Layout] Database error:", userError)
-          // If we have a profile from context, use that instead of failing
-          if (profile) {
-            console.log("[Admin Layout] Using profile from context due to database error")
-            const hasContextAccess = 
-              profile.role === "admin" || 
-              profile.role === "super_admin" ||
-              profile.tier === "enterprise"
-            
-            setHasAccess(hasContextAccess)
-            if (!hasContextAccess) {
-              setError("You do not have admin privileges")
-            } else {
-              setError(null)
-              setDebugInfo({ method: "profile_fallback", role: profile.role, tier: profile.tier })
-            }
-            return
-          }
-          
-          setError(`Database error: ${userError.message}`)
+          setError("Unable to verify admin privileges")
           setHasAccess(false)
           return
         }
 
         if (userData) {
-          console.log("[Admin Layout] Database user data:", userData)
-
           const hasDbAccess = 
             userData.role === "admin" || 
             userData.role === "super_admin" ||
             userData.tier === "enterprise"
 
           if (hasDbAccess) {
-            console.log("[Admin Layout] ✅ Access granted via database")
             setHasAccess(true)
             setDebugInfo({ method: "database", role: userData.role, tier: userData.tier })
             setError(null)
-            return
+          } else {
+            setError("You do not have admin privileges")
+            setHasAccess(false)
           }
+        } else {
+          setError("User profile not found")
+          setHasAccess(false)
         }
-
-        // No admin access found
-        console.log("[Admin Layout] ❌ Access denied - not an admin")
-        setError("You do not have admin privileges")
-        setHasAccess(false)
       } catch (err: any) {
-        console.error("[Admin Layout] Unexpected error:", err)
-        setError(`Unexpected error: ${err.message}`)
-        setHasAccess(false)
+        if (mounted) {
+          console.error("[Admin Layout] Unexpected error:", err)
+          setError(`Unexpected error: ${err.message}`)
+          setHasAccess(false)
+        }
       }
     }
 
     checkAdminAccess()
-  }, [user, profile, supabase, router, pathname])
+    
+    return () => {
+      mounted = false
+    }
+  }, [user, profile, supabase])
 
   useEffect(() => {
     setIsMobileMenuOpen(false)
