@@ -31,12 +31,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   // Handle authentication redirect
   useEffect(() => {
     if (isInitialized && !isAuthenticated && !isLoading) {
-      // If user is not authenticated after initialization, redirect to login
       const timer = setTimeout(() => {
         if (navigationManager) {
           navigationManager.handleAuthRequiredNavigation(window.location.pathname)
         }
-      }, 3000) // Give 3 seconds for any pending auth operations
+      }, 3000)
 
       return () => clearTimeout(timer)
     }
@@ -46,7 +45,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     setRetryCount((prev) => prev + 1)
     setShowRetry(false)
 
-    // Attempt to refresh the page or re-initialize auth
     if (typeof window !== "undefined") {
       window.location.reload()
     }
@@ -91,7 +89,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             {showRetry && (
               <div className="flex flex-col space-y-2">
                 <p className="text-sm text-muted-foreground">Taking longer than expected?</p>
-                <Button onClick={handleRetry} variant="outline" className="w-full" disabled={retryCount >= 3}>
+                <Button
+                  onClick={handleRetry}
+                  variant="outline"
+                  className="w-full bg-transparent"
+                  disabled={retryCount >= 3}
+                >
                   <RefreshCw className="mr-2 h-4 w-4" />
                   {retryCount >= 3 ? "Max retries reached" : "Retry"}
                 </Button>

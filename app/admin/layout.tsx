@@ -1,4 +1,5 @@
 "use client"
+
 import { useEffect, useState } from "react"
 import type React from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
@@ -22,10 +23,12 @@ import {
   Wrench,
   Palette,
   TrendingUp,
+  AlertTriangle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent } from "@/components/ui/card"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 const adminNavItems = [
   { name: "Overview", href: "/admin", icon: Home },
@@ -43,116 +46,107 @@ const adminNavItems = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClientComponentClient()
-  const { signOut } = useAuth()
+  const { user, profile, signOut } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
-  const [ok, setOk] = useState<boolean | null>(null)
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [userEmail, setUserEmail] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
 
   useEffect(() => {
-    async function checkAccess() {
+    async function checkAdminAccess() {
       try {
-        console.log("[Admin] Checking admin access...")
+        console.log("[Admin Layout] Starting admin access check...")
 
-        // Get current session
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession()
-
-        if (sessionError) {
-          console.error("[Admin] Session error:", sessionError)
-          setError("Session error: " + sessionError.message)
-          setOk(false)
-          return
-        }
-
-        if (!session) {
-          console.log("[Admin] No session found, redirecting to login")
-          setOk(false)
+        // Check if user is authenticated first
+        if (!user) {
+          console.log("[Admin Layout] No user found in context, redirecting to login")
+          setHasAccess(false)
           router.push("/login?redirect=/admin")
           return
         }
 
-        const userEmail = session.user.email || ""
-        setUserEmail(userEmail)
-        console.log("[Admin] User email:", userEmail)
+        const userEmail = user.email || ""
+        console.log("[Admin Layout] User email:", userEmail)
 
         // Special case: Always allow info@eriggalive.com
         if (userEmail === "info@eriggalive.com") {
-          console.log("[Admin] ✅ Granting access to info@eriggalive.com")
-          setOk(true)
+          console.log("[Admin Layout] ✅ Special access granted to info@eriggalive.com")
+          setHasAccess(true)
+          setDebugInfo({ method: "special_email", email: userEmail })
           return
         }
 
-        // Check users table
+        // Check profile from context
+        if (profile) {
+          console.log("[Admin Layout] Profile from context:", {
+            role: profile.role,
+            tier: profile.tier,
+            email: profile.email,
+          })
+
+          if (profile.role === "admin" || profile.role === "super_admin") {
+            console.log("[Admin Layout] ✅ Access granted via profile context")
+            setHasAccess(true)
+            setDebugInfo({ method: "profile_context", role: profile.role })
+            return
+          }
+        }
+
+        // Fallback: Direct database check
+        console.log("[Admin Layout] Checking database for admin role...")
         const { data: userData, error: userError } = await supabase
           .from("users")
-          .select("role, tier, is_active")
-          .eq("auth_user_id", session.user.id)
+          .select("role, tier, email, is_active")
+          .eq("auth_user_id", user.id)
           .single()
 
         if (userError) {
-          console.error("[Admin] User lookup error:", userError)
-          // Try profiles table as fallback
-          const { data: profileData, error: profileError } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", session.user.id)
-            .single()
-
-          if (profileError) {
-            console.error("[Admin] Profile lookup error:", profileError)
-            setError("Access denied: User not found")
-            setOk(false)
-            return
-          }
-
-          if (profileData?.role === "admin") {
-            console.log("[Admin] ✅ Access granted via profiles table")
-            setOk(true)
-            return
-          }
+          console.error("[Admin Layout] Database error:", userError)
+          setError(`Database error: ${userError.message}`)
+          setHasAccess(false)
+          return
         }
 
         if (userData) {
-          console.log("[Admin] User data:", userData)
+          console.log("[Admin Layout] Database user data:", userData)
 
           if (userData.role === "admin" || userData.role === "super_admin") {
-            console.log("[Admin] ✅ Access granted - Role:", userData.role)
-            setOk(true)
+            console.log("[Admin Layout] ✅ Access granted via database")
+            setHasAccess(true)
+            setDebugInfo({ method: "database", role: userData.role })
             return
           }
         }
 
-        console.log("[Admin] ❌ Access denied - Not an admin")
-        setError("Access denied: Admin privileges required")
-        setOk(false)
+        // No admin access found
+        console.log("[Admin Layout] ❌ Access denied - not an admin")
+        setError("You do not have admin privileges")
+        setHasAccess(false)
       } catch (err: any) {
-        console.error("[Admin] Unexpected error:", err)
-        setError("An unexpected error occurred: " + err.message)
-        setOk(false)
+        console.error("[Admin Layout] Unexpected error:", err)
+        setError(`Unexpected error: ${err.message}`)
+        setHasAccess(false)
       }
     }
 
-    checkAccess()
-  }, [supabase, router])
+    checkAdminAccess()
+  }, [user, profile, supabase, router])
 
   useEffect(() => {
     setIsMobileMenuOpen(false)
   }, [pathname])
 
   // Loading state
-  if (ok === null) {
+  if (hasAccess === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
         <Card className="w-96">
           <CardContent className="flex flex-col items-center justify-center p-8 space-y-4">
             <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-brand-teal"></div>
             <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Verifying admin access...</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{userEmail || "Checking credentials"}</p>
+            {user?.email && <p className="text-sm text-gray-500 dark:text-gray-400">{user.email}</p>}
           </CardContent>
         </Card>
       </div>
@@ -160,7 +154,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   // Access denied state
-  if (ok === false) {
+  if (hasAccess === false) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 p-4">
         <Card className="w-full max-w-md">
@@ -168,35 +162,49 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Shield className="h-16 w-16 text-red-500 mx-auto" />
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Access Denied</h1>
             <p className="text-gray-600 dark:text-gray-300">You don't have permission to access the admin panel.</p>
-            {userEmail && (
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Logged in as: <span className="font-semibold">{userEmail}</span>
-              </p>
-            )}
-            {error && (
-              <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 text-red-700 dark:text-red-400 px-4 py-3 rounded relative">
-                <p className="text-sm">{error}</p>
+
+            {user?.email && (
+              <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Logged in as: <span className="font-semibold text-gray-900 dark:text-white">{user.email}</span>
+                </p>
               </div>
             )}
-            <div className="flex gap-2 justify-center pt-4">
-              <Button asChild variant="outline">
-                <Link href="/">Return Home</Link>
-              </Button>
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            {debugInfo && (
+              <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg text-left">
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                  Debug: {JSON.stringify(debugInfo, null, 2)}
+                </p>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2 pt-4">
               <Button asChild>
                 <Link href="/dashboard">Go to Dashboard</Link>
               </Button>
+              <Button asChild variant="outline">
+                <Link href="/">Return Home</Link>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  signOut()
+                  router.push("/login")
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                Sign out and try different account
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                signOut()
-                router.push("/login")
-              }}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              Sign out and try different account
-            </Button>
           </CardContent>
         </Card>
       </div>
@@ -212,7 +220,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div className="p-4 sm:p-6 border-b">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -230,14 +237,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </Button>
           )}
         </div>
-        {userEmail && (
+        {user?.email && (
           <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
-            Logged in as: <span className="font-semibold text-brand-teal">{userEmail}</span>
+            <span className="font-semibold text-brand-teal">{user.email}</span>
           </div>
         )}
       </div>
 
-      {/* Navigation */}
       <ScrollArea className="flex-1 px-3 sm:px-4">
         <nav className="py-4 space-y-2">
           {adminNavItems.map((item) => {
@@ -249,14 +255,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex items-center space-x-3 px-3 py-3 rounded-lg transition-all duration-200 group",
+                  "flex items-center space-x-3 px-3 py-3 rounded-lg transition-all duration-200",
                   active
                     ? "bg-brand-teal text-white shadow-md"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white",
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800",
                 )}
                 onClick={() => isMobile && setIsMobileMenuOpen(false)}
               >
-                <Icon className={cn("h-5 w-5 transition-colors", active && "text-white")} />
+                <Icon className="h-5 w-5" />
                 <span className="font-medium">{item.name}</span>
               </Link>
             )
@@ -264,11 +270,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
       </ScrollArea>
 
-      {/* Footer */}
       <div className="p-4 border-t">
         <Button
           variant="ghost"
-          className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+          className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
           onClick={() => {
             signOut()
             if (isMobile) setIsMobileMenuOpen(false)
@@ -285,18 +290,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="flex h-screen overflow-hidden">
-        {/* Desktop Sidebar */}
-        <aside className="hidden lg:flex w-64 xl:w-72 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-sm">
+        <aside className="hidden lg:flex w-64 xl:w-72 bg-white dark:bg-gray-800 border-r shadow-sm">
           <SidebarContent />
         </aside>
 
-        {/* Mobile Sidebar */}
         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
           <SheetTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="fixed top-4 left-4 z-50 lg:hidden bg-white dark:bg-gray-800 shadow-md border"
+              className="fixed top-4 left-4 z-50 lg:hidden bg-white dark:bg-gray-800 shadow-md"
             >
               <Menu className="h-5 w-5" />
             </Button>
@@ -306,7 +309,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </SheetContent>
         </Sheet>
 
-        {/* Main Content */}
         <main className="flex-1 overflow-y-auto">
           <div className="p-4 sm:p-6 lg:p-8 pt-16 lg:pt-6">{children}</div>
         </main>
