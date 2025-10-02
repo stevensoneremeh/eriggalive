@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Crown, Users, Star } from "lucide-react"
+import { getTierDisplayInfo } from "@/hooks/useMembership"
 import { cn } from "@/lib/utils"
 
 interface UserTierBadgeProps {
@@ -12,60 +12,21 @@ interface UserTierBadgeProps {
   className?: string
 }
 
-function getTierDisplayInfo(tier: string) {
-  const normalizedTier = tier?.toLowerCase() || "erigga_citizen"
-
-  switch (normalizedTier) {
-    case "erigga_citizen":
-    case "citizen":
-    case "free":
-      return {
-        label: "Erigga Citizen",
-        shortLabel: "Citizen",
-        color: "green",
-        icon: Users,
-        tooltip: "Erigga Citizen - Community Member",
-        badgeClasses:
-          "bg-green-100 text-green-800 border-green-200 hover:bg-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800",
-      }
-    case "erigga_indigen":
-    case "indigen":
-    case "pro":
-      return {
-        label: "Erigga Indigen",
-        shortLabel: "Indigen",
-        color: "blue",
-        icon: Star,
-        tooltip: "Erigga Indigen - Premium Member",
-        badgeClasses:
-          "bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800",
-      }
-    case "enterprise":
-    case "ent":
-      return {
-        label: "Enterprise",
-        shortLabel: "Enterprise",
-        color: "yellow",
-        icon: Crown,
-        tooltip: "Enterprise - VIP Member",
-        badgeClasses:
-          "bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800",
-      }
-    default:
-      return {
-        label: "Erigga Citizen",
-        shortLabel: "Citizen",
-        color: "green",
-        icon: Users,
-        tooltip: "Erigga Citizen - Community Member",
-        badgeClasses:
-          "bg-green-100 text-green-800 border-green-200 hover:bg-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800",
-      }
-  }
-}
-
 export function UserTierBadge({ tier, size = "md", showLabel = true, className = "" }: UserTierBadgeProps) {
   const tierInfo = getTierDisplayInfo(tier)
+
+  const getBadgeClasses = (color: string) => {
+    switch (color) {
+      case "green":
+        return "bg-green-100 text-green-800 border-green-200 hover:bg-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800"
+      case "blue":
+        return "bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800"
+      case "yellow":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-800"
+    }
+  }
 
   const sizeClasses = {
     xxs: "text-[10px] py-0 px-1 h-4",
@@ -92,16 +53,14 @@ export function UserTierBadge({ tier, size = "md", showLabel = true, className =
           <Badge
             variant="outline"
             className={cn(
-              tierInfo.badgeClasses,
+              getBadgeClasses(tierInfo.color),
               sizeClasses[size],
               "font-medium transition-all duration-300 inline-flex items-center gap-1",
               className,
             )}
           >
             <IconComponent className={cn(iconSizes[size], "shrink-0")} />
-            {showLabel && (
-              <span className="truncate">{size === "xxs" || size === "xs" ? tierInfo.shortLabel : tierInfo.label}</span>
-            )}
+            {showLabel && <span className="truncate">{tierInfo.label}</span>}
           </Badge>
         </TooltipTrigger>
         <TooltipContent>

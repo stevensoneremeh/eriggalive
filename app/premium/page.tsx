@@ -1,307 +1,220 @@
 "use client"
 
 import { useState } from "react"
-import { motion } from "framer-motion"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { AnimatedTierCards } from "@/components/tier-system/animated-tier-cards"
-import { TierComparisonTable } from "@/components/tier-system/tier-comparison-table"
 import { useAuth } from "@/contexts/auth-context"
-import { useToast } from "@/components/ui/use-toast"
-import { Zap, CreditCard, Globe, Shield } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Crown, Star, Users, Check, Zap, Shield, Sparkles } from "lucide-react"
+import { getTierDisplayInfo, getAllTiers } from "@/hooks/useMembership"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 export default function PremiumPage() {
-  const { profile } = useAuth()
-  const { toast } = useToast()
-  const [selectedTier, setSelectedTier] = useState<string | null>(null)
-  const [billingInterval, setBillingInterval] = useState<string>("monthly")
-  const [customAmount, setCustomAmount] = useState<string>("")
-  const [isProcessing, setIsProcessing] = useState(false)
+  const { user, profile } = useAuth()
+  const router = useRouter()
+  const [loading, setLoading] = useState<string | null>(null)
+  const allTiers = getAllTiers()
+  const currentTierInfo = getTierDisplayInfo(profile?.tier || "erigga_citizen")
 
-  const tierPrices = {
-    pro: {
-      monthly: 8000,
-      quarterly: 21600, // 10% discount
-      annual: 76800, // 20% discount
-    },
-    enterprise: {
-      monthly: 25000,
-      quarterly: 67500, // 10% discount
-      annual: 240000, // 20% discount (minimum for custom)
-    },
-  }
+  const handleUpgrade = async (tier: string, price: number) => {
+    if (!user) {
+      router.push("/login")
+      return
+    }
 
-  const handleTierUpgrade = (tierId: string) => {
-    setSelectedTier(tierId)
-  }
+    if (price === 0) {
+      toast.info("You are already on the free tier!")
+      return
+    }
 
-  const validateCustomAmount = (amount: string): boolean => {
-    const numAmount = Number.parseInt(amount)
-    return numAmount >= 150000 // Minimum 150,000 annually for Enterprise
-  }
-
-  const handlePaymentWithPage = async () => {
-    if (!selectedTier || !profile?.email) return
-
-    setIsProcessing(true)
-
+    setLoading(tier)
     try {
-      let amount: number
-
-      if (selectedTier === "enterprise" && customAmount) {
-        const customAmountNum = Number.parseInt(customAmount)
-        if (!validateCustomAmount(customAmount)) {
-          toast({
-            title: "Invalid Amount",
-            description: "Enterprise tier requires minimum ₦150,000 annually",
-            variant: "destructive",
-          })
-          setIsProcessing(false)
-          return
-        }
-        amount = customAmountNum
-      } else {
-        amount = tierPrices[selectedTier as keyof typeof tierPrices][billingInterval as keyof typeof tierPrices.pro]
-      }
-
-      // Initialize payment with Paystack
       const response = await fetch("/api/membership/payment/initialize", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email: profile.email,
-          amount: amount * 100, // Convert to kobo
-          tier: selectedTier,
-          billing_interval: selectedTier === "enterprise" && customAmount ? "custom" : billingInterval,
-          custom_amount: selectedTier === "enterprise" && customAmount ? Number.parseInt(customAmount) : null,
-          callback_url: `${window.location.origin}/premium/success`,
-          metadata: {
-            user_id: profile.id,
-            tier: selectedTier,
-            billing_interval: billingInterval,
-            upgrade_type: "membership_subscription",
-          },
+          tier,
+          amount: price * 100,
         }),
       })
 
       const data = await response.json()
 
-      if (data.success && data.authorization_url) {
-        // Redirect to Paystack payment page
+      if (data.authorization_url) {
         window.location.href = data.authorization_url
       } else {
-        throw new Error(data.message || "Payment initialization failed")
+        toast.error("Failed to initialize payment")
       }
     } catch (error) {
-      toast({
-        title: "Payment Failed",
-        description: error instanceof Error ? error.message : "Please try again",
-        variant: "destructive",
-      })
+      console.error("Error upgrading tier:", error)
+      toast.error("Failed to process upgrade")
     } finally {
-      setIsProcessing(false)
+      setLoading(null)
+    }
+  }
+
+  const getTierIcon = (color: string) => {
+    switch (color) {
+      case "green":
+        return <Users className="w-12 h-12 text-green-600" />
+      case "blue":
+        return <Star className="w-12 h-12 text-blue-600" />
+      case "yellow":
+        return <Crown className="w-12 h-12 text-yellow-600" />
+      default:
+        return <Users className="w-12 h-12 text-gray-600" />
+    }
+  }
+
+  const getTierGradient = (color: string) => {
+    switch (color) {
+      case "green":
+        return "from-green-500 to-emerald-600"
+      case "blue":
+        return "from-blue-500 to-indigo-600"
+      case "yellow":
+        return "from-yellow-500 to-amber-600"
+      default:
+        return "from-gray-500 to-gray-600"
     }
   }
 
   return (
-    <div className="min-h-screen py-8 px-4">
-      <div className="container mx-auto max-w-7xl">
-        {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
-          <h1 className="font-street text-4xl md:text-6xl text-gradient mb-4">JOIN THE CIRCLE</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Get closer to the culture. Unlock exclusive content, early access, and VIP experiences.
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center justify-center p-2 bg-primary/10 rounded-full mb-4">
+            <Sparkles className="w-6 h-6 text-primary" />
+          </div>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Choose Your Membership Tier</h1>
+          <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            Join the Erigga Live community and unlock exclusive content, events, and experiences
           </p>
-        </motion.div>
+          {profile && (
+            <div className="mt-6 flex items-center justify-center gap-2">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Current tier:</span>
+              <Badge className={`bg-${currentTierInfo.color}-100 text-${currentTierInfo.color}-800`}>
+                {currentTierInfo.label}
+              </Badge>
+            </div>
+          )}
+        </div>
 
-        {/* Animated Tier Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="mb-16"
-        >
-          <AnimatedTierCards onUpgrade={handleTierUpgrade} />
-        </motion.div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+          {allTiers.map((tier) => {
+            const isCurrentTier =
+              profile?.tier ===
+              Object.keys({ erigga_citizen: 0, erigga_indigen: 1, enterprise: 2 }).find(
+                (key) => getTierDisplayInfo(key).label === tier.label,
+              )
+            const isUpgrade = tier.level > currentTierInfo.level
 
-        {selectedTier && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-            <Card className="max-w-2xl mx-auto">
-              <CardContent className="p-6">
-                <h3 className="text-2xl font-bold mb-6 text-center">
-                  Complete Your {selectedTier === "pro" ? "Pro" : "Enterprise"} Upgrade
-                </h3>
-
-                {selectedTier === "enterprise" ? (
-                  <div className="space-y-6">
-                    <div>
-                      <Label className="text-base font-medium">Payment Option</Label>
-                      <div className="grid grid-cols-2 gap-4 mt-2">
-                        <Button
-                          variant={customAmount ? "outline" : "default"}
-                          onClick={() => setCustomAmount("")}
-                          className="h-12"
-                        >
-                          Standard Pricing
-                        </Button>
-                        <Button
-                          variant={customAmount ? "default" : "outline"}
-                          onClick={() => setCustomAmount("150000")}
-                          className="h-12"
-                        >
-                          Custom Amount
-                        </Button>
-                      </div>
-                    </div>
-
-                    {customAmount ? (
-                      <div>
-                        <Label htmlFor="custom-amount" className="text-base font-medium">
-                          Custom Annual Amount (Minimum ₦150,000)
-                        </Label>
-                        <Input
-                          id="custom-amount"
-                          type="number"
-                          min="150000"
-                          value={customAmount}
-                          onChange={(e) => setCustomAmount(e.target.value)}
-                          placeholder="Enter amount (minimum 150,000)"
-                          className="mt-2 h-12 text-lg"
-                        />
-                        {customAmount && !validateCustomAmount(customAmount) && (
-                          <p className="text-red-500 text-sm mt-1">Minimum amount is ₦150,000 for Enterprise tier</p>
-                        )}
-                      </div>
-                    ) : (
-                      <div>
-                        <Label className="text-base font-medium">Billing Interval</Label>
-                        <div className="grid grid-cols-3 gap-4 mt-2">
-                          {Object.entries(tierPrices.enterprise).map(([interval, price]) => (
-                            <Button
-                              key={interval}
-                              variant={billingInterval === interval ? "default" : "outline"}
-                              onClick={() => setBillingInterval(interval)}
-                              className="h-16 flex flex-col"
-                            >
-                              <span className="capitalize font-medium">{interval}</span>
-                              <span className="text-sm">₦{price.toLocaleString()}</span>
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <Label className="text-base font-medium">Billing Interval</Label>
-                    <div className="grid grid-cols-3 gap-4 mt-2">
-                      {Object.entries(tierPrices.pro).map(([interval, price]) => (
-                        <Button
-                          key={interval}
-                          variant={billingInterval === interval ? "default" : "outline"}
-                          onClick={() => setBillingInterval(interval)}
-                          className="h-16 flex flex-col"
-                        >
-                          <span className="capitalize font-medium">{interval}</span>
-                          <span className="text-sm">₦{price.toLocaleString()}</span>
-                        </Button>
-                      ))}
-                    </div>
+            return (
+              <Card
+                key={tier.label}
+                className={`relative overflow-hidden ${
+                  isCurrentTier
+                    ? "border-2 border-primary shadow-xl"
+                    : tier.level === 2
+                      ? "border-2 border-yellow-400 shadow-xl"
+                      : ""
+                }`}
+              >
+                {isCurrentTier && (
+                  <div className="absolute top-0 right-0 bg-primary text-white px-3 py-1 text-xs font-semibold rounded-bl-lg">
+                    Current Plan
                   </div>
                 )}
+                {tier.level === 2 && (
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-400" />
+                )}
 
-                <div className="mt-6 p-4 bg-muted rounded-lg">
-                  <div className="flex justify-between items-center mb-2">
-                    <span>Total Amount:</span>
-                    <span className="text-2xl font-bold">
-                      ₦
-                      {(selectedTier === "enterprise" && customAmount
-                        ? Number.parseInt(customAmount) || 0
-                        : tierPrices[selectedTier as keyof typeof tierPrices][
-                            billingInterval as keyof typeof tierPrices.pro
-                          ]
-                      ).toLocaleString()}
+                <CardHeader className="text-center pb-8">
+                  <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-gradient-to-br flex items-center justify-center">
+                    <div
+                      className={`w-14 h-14 rounded-full bg-gradient-to-br ${getTierGradient(tier.color)} flex items-center justify-center`}
+                    >
+                      {getTierIcon(tier.color)}
+                    </div>
+                  </div>
+                  <CardTitle className="text-2xl">{tier.label}</CardTitle>
+                  <CardDescription className="mt-2">{tier.tooltip}</CardDescription>
+                  <div className="mt-4">
+                    <span className="text-4xl font-bold text-gray-900 dark:text-white">
+                      {tier.price === 0 ? "Free" : `₦${tier.price.toLocaleString()}`}
                     </span>
+                    {tier.price > 0 && <span className="text-gray-600 dark:text-gray-400">/month</span>}
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    Includes {selectedTier === "pro" ? "1,000" : "12,000"} bonus coins monthly
-                  </div>
-                </div>
+                </CardHeader>
 
-                <Button
-                  onClick={handlePaymentWithPage}
-                  disabled={
-                    isProcessing ||
-                    (selectedTier === "enterprise" && customAmount && !validateCustomAmount(customAmount))
-                  }
-                  className="w-full h-12 text-lg font-semibold mt-6"
-                >
-                  {isProcessing ? "Processing..." : "Proceed to Payment"}
-                  <CreditCard className="ml-2 h-5 w-5" />
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {/* Tier Comparison Table */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="mb-12"
-        >
-          <TierComparisonTable />
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
-          <div className="grid md:grid-cols-2 gap-8">
-            <Card className="bg-gradient-to-r from-orange-500/10 to-purple-500/10 border-orange-500/20">
-              <CardContent className="p-8 text-center">
-                <Zap className="h-12 w-12 text-orange-500 mx-auto mb-4" />
-                <h3 className="text-2xl font-bold mb-4">Secure Payment with Paystack</h3>
-                <p className="text-muted-foreground mb-6">
-                  All payments are processed securely through Paystack. Cancel anytime. Your subscription helps support
-                  Erigga and the community.
-                </p>
-                <div className="flex flex-wrap justify-center gap-4 text-sm text-muted-foreground">
-                  <span>• Secure Payment</span>
-                  <span>• Cancel Anytime</span>
-                  <span>• Instant Access</span>
-                  <span>• 24/7 Support</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-r from-blue-500/10 to-green-500/10 border-blue-500/20">
-              <CardContent className="p-8 text-center">
-                <Shield className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-                <h3 className="text-2xl font-bold mb-4">Payment Options</h3>
-                <div className="space-y-3 text-left">
-                  <div className="flex items-center gap-3">
-                    <Globe className="h-5 w-5 text-green-500" />
-                    <span>Redirect to secure Paystack page</span>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    {tier.features.map((feature, idx) => (
+                      <div key={idx} className="flex items-start gap-2">
+                        <Check className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{feature}</span>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <CreditCard className="h-5 w-5 text-blue-500" />
-                    <span>All major cards accepted</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Zap className="h-5 w-5 text-orange-500" />
-                    <span>Instant membership activation</span>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground mt-4">
-                  No webhook setup required - payments verified automatically
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </motion.div>
+
+                  <Button
+                    className="w-full mt-6"
+                    variant={isCurrentTier ? "outline" : tier.level === 2 ? "default" : "secondary"}
+                    disabled={isCurrentTier || loading === tier.label}
+                    onClick={() =>
+                      handleUpgrade(
+                        Object.keys({ erigga_citizen: 0, erigga_indigen: 1, enterprise: 2 }).find(
+                          (key) => getTierDisplayInfo(key).label === tier.label,
+                        ) || "erigga_citizen",
+                        tier.price,
+                      )
+                    }
+                  >
+                    {loading === tier.label ? (
+                      <span className="flex items-center gap-2">
+                        <span className="animate-spin">⏳</span>
+                        Processing...
+                      </span>
+                    ) : isCurrentTier ? (
+                      "Current Plan"
+                    ) : isUpgrade ? (
+                      <>
+                        <Zap className="w-4 h-4 mr-2" />
+                        Upgrade Now
+                      </>
+                    ) : (
+                      "Choose Plan"
+                    )}
+                  </Button>
+
+                  {tier.level === 2 && (
+                    <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                      <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
+                        <Shield className="w-4 h-4" />
+                        <span className="text-xs font-semibold">VIP Access Guaranteed</span>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+
+        <Card className="bg-gradient-to-r from-purple-500 to-blue-600 text-white">
+          <CardContent className="p-8 text-center">
+            <h3 className="text-2xl font-bold mb-4">Not sure which tier is right for you?</h3>
+            <p className="mb-6 opacity-90">
+              Start with Erigga Citizen for free and upgrade anytime to unlock more features
+            </p>
+            <Button variant="secondary" size="lg" onClick={() => router.push("/about")}>
+              Learn More About Membership
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

@@ -1,6 +1,5 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
-// Only 3 tiers now: erigga_citizen, erigga_indigen, enterprise
 export type UserTier = "erigga_citizen" | "erigga_indigen" | "enterprise"
 export type UserRole = "user" | "moderator" | "admin" | "super_admin"
 export type SubscriptionStatus = "active" | "canceled" | "past_due" | "incomplete" | "trialing"
@@ -24,7 +23,7 @@ export interface User {
   avatar_url: string | null
   profile_image_url: string | null
   tier: UserTier
-  subscription_tier: string
+  subscription_tier: UserTier
   role: UserRole
   level: number
   points: number
@@ -162,7 +161,7 @@ export interface Database {
           full_name?: string | null
           email: string
           tier?: UserTier
-          subscription_tier?: string
+          subscription_tier?: UserTier
           coins?: number
           coins_balance?: number
           level?: number
@@ -185,7 +184,7 @@ export interface Database {
           full_name?: string | null
           email?: string
           tier?: UserTier
-          subscription_tier?: string
+          subscription_tier?: UserTier
           coins?: number
           coins_balance?: number
           level?: number
