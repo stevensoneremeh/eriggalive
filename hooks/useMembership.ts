@@ -1,139 +1,160 @@
-"use client"
+import { Crown, Users, Star } from "lucide-react"
 
-import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import type { Database } from "@/types/database"
+export type TierLevel = "erigga_citizen" | "erigga_indigen" | "enterprise"
 
-export type MembershipTier = "erigga_citizen" | "erigga_indigen" | "enterprise"
-
-export interface MembershipInfo {
-  tier: MembershipTier
-  displayName: string
-  description: string
+export interface TierInfo {
+  label: string
+  color: string
+  level: number
+  icon: typeof Crown
+  tooltip: string
   price: number
   features: string[]
-  color: string
-  icon: string
-  isActive: boolean
-  expiresAt?: string
 }
 
-const TIER_INFO: Record<MembershipTier, Omit<MembershipInfo, "isActive" | "expiresAt" | "tier">> = {
+const TIER_MAP: Record<string, TierInfo> = {
+  // Primary tiers
   erigga_citizen: {
-    displayName: "Erigga Citizen",
-    description: "Basic membership with access to community features",
+    label: "Erigga Citizen",
+    color: "green",
+    level: 0,
+    icon: Users,
+    tooltip: "Erigga Citizen - Community Member",
     price: 0,
-    features: ["Access to community forum", "Basic profile customization", "Limited event access", "Standard support"],
-    color: "bg-gray-500",
-    icon: "👤",
+    features: ["Access to community forums", "Basic profile customization", "Limited event access", "Standard support"],
   },
   erigga_indigen: {
-    displayName: "Erigga Indigen",
-    description: "Premium membership with exclusive content and perks",
+    label: "Erigga Indigen",
+    color: "blue",
+    level: 1,
+    icon: Star,
+    tooltip: "Erigga Indigen - Premium Member",
     price: 5000,
     features: [
       "All Citizen features",
       "Exclusive content access",
       "Priority event tickets",
       "Custom profile badge",
-      "Monthly rewards",
+      "Monthly coin rewards",
       "Priority support",
     ],
-    color: "bg-brand-teal",
-    icon: "⭐",
   },
   enterprise: {
-    displayName: "Enterprise",
-    description: "Ultimate membership with all features and VIP access",
+    label: "Enterprise",
+    color: "yellow",
+    level: 2,
+    icon: Crown,
+    tooltip: "Enterprise - VIP Member",
     price: 15000,
     features: [
       "All Indigen features",
       "VIP event access",
       "Meet & greet opportunities",
-      "Exclusive merchandise",
-      "Direct artist contact",
-      "Lifetime badge",
+      "Exclusive merchandise discounts",
+      "Direct artist engagement",
+      "Lifetime achievement badge",
       "24/7 VIP support",
     ],
-    color: "bg-brand-lime",
-    icon: "👑",
+  },
+  // API mappings
+  FREE: {
+    label: "Erigga Citizen",
+    color: "green",
+    level: 0,
+    icon: Users,
+    tooltip: "Erigga Citizen - Community Member",
+    price: 0,
+    features: [],
+  },
+  free: {
+    label: "Erigga Citizen",
+    color: "green",
+    level: 0,
+    icon: Users,
+    tooltip: "Erigga Citizen - Community Member",
+    price: 0,
+    features: [],
+  },
+  PRO: {
+    label: "Erigga Indigen",
+    color: "blue",
+    level: 1,
+    icon: Star,
+    tooltip: "Erigga Indigen - Premium Member",
+    price: 5000,
+    features: [],
+  },
+  pro: {
+    label: "Erigga Indigen",
+    color: "blue",
+    level: 1,
+    icon: Star,
+    tooltip: "Erigga Indigen - Premium Member",
+    price: 5000,
+    features: [],
+  },
+  ENT: {
+    label: "Enterprise",
+    color: "yellow",
+    level: 2,
+    icon: Crown,
+    tooltip: "Enterprise - VIP Member",
+    price: 15000,
+    features: [],
+  },
+  ent: {
+    label: "Enterprise",
+    color: "yellow",
+    level: 2,
+    icon: Crown,
+    tooltip: "Enterprise - VIP Member",
+    price: 15000,
+    features: [],
   },
 }
 
-export function useMembership(userId?: string) {
-  const supabase = createClientComponentClient<Database>()
-  const [membership, setMembership] = useState<MembershipInfo | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export function getTierDisplayInfo(tier: string): TierInfo {
+  const normalizedTier = tier?.toLowerCase() || "erigga_citizen"
+  return TIER_MAP[normalizedTier] || TIER_MAP.erigga_citizen
+}
 
-  useEffect(() => {
-    async function fetchMembership() {
-      if (!userId) {
-        setLoading(false)
-        return
-      }
+export function hasTierAccess(userTier: string, requiredTier: string): boolean {
+  const userInfo = getTierDisplayInfo(userTier)
+  const requiredInfo = getTierDisplayInfo(requiredTier)
+  return userInfo.level >= requiredInfo.level
+}
 
-      try {
-        setLoading(true)
-        setError(null)
+export function mapLegacyTierToNew(oldTier: string): TierLevel {
+  const normalized = oldTier?.toLowerCase() || "erigga_citizen"
 
-        const { data: user, error: userError } = await supabase
-          .from("users")
-          .select("tier, subscription_expires_at")
-          .eq("id", userId)
-          .single()
-
-        if (userError) {
-          throw userError
-        }
-
-        if (!user) {
-          setMembership(null)
-          return
-        }
-
-        const tier = user.tier as MembershipTier
-        const tierInfo = TIER_INFO[tier]
-        const expiresAt = user.subscription_expires_at
-
-        const isActive = !expiresAt || new Date(expiresAt) > new Date()
-
-        setMembership({
-          tier,
-          ...tierInfo,
-          isActive,
-          expiresAt: expiresAt || undefined,
-        })
-      } catch (err: any) {
-        console.error("Error fetching membership:", err)
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchMembership()
-  }, [userId, supabase])
-
-  const getTierInfo = (tier: MembershipTier): MembershipInfo => {
-    return {
-      tier,
-      ...TIER_INFO[tier],
-      isActive: true,
-    }
+  // Map any legacy or alternate names to the 3 main tiers
+  const legacyMapping: Record<string, TierLevel> = {
+    free: "erigga_citizen",
+    citizen: "erigga_citizen",
+    pro: "erigga_indigen",
+    indigen: "erigga_indigen",
+    ent: "enterprise",
+    enterprise: "enterprise",
+    erigga_citizen: "erigga_citizen",
+    erigga_indigen: "erigga_indigen",
   }
 
-  const canAccessFeature = (feature: string): boolean => {
-    if (!membership) return false
-    return membership.features.includes(feature)
-  }
+  return legacyMapping[normalized] || "erigga_citizen"
+}
 
-  return {
-    membership,
-    loading,
-    error,
-    getTierInfo,
-    canAccessFeature,
-    allTiers: Object.keys(TIER_INFO) as MembershipTier[],
+export function getAllTiers(): TierInfo[] {
+  return [TIER_MAP.erigga_citizen, TIER_MAP.erigga_indigen, TIER_MAP.enterprise]
+}
+
+export function getTierByLevel(level: number): TierInfo {
+  switch (level) {
+    case 0:
+      return TIER_MAP.erigga_citizen
+    case 1:
+      return TIER_MAP.erigga_indigen
+    case 2:
+      return TIER_MAP.enterprise
+    default:
+      return TIER_MAP.erigga_citizen
   }
 }

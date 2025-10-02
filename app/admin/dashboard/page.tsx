@@ -22,26 +22,12 @@ export default function DashboardPage() {
     )
   }
 
-  // Helper function to map legacy tiers to new standardized tiers
-  const mapTierToStandard = (tier: string): string => {
-    const normalizedTier = tier?.toLowerCase().replace(/[_\s]/g, "") || "free"
-    const tierMapping: Record<string, string> = {
-      grassroot: "free",
-      grassroots: "free",
-      pioneer: "pro",
-      elder: "pro",
-      bloodbrotherhood: "enterprise",
-      blood: "enterprise",
-    }
-    return tierMapping[normalizedTier] || normalizedTier
-  }
-
   const getTierColor = (tier: string) => {
-    const mappedTier = mapTierToStandard(tier)
-    switch (mappedTier) {
-      case "free":
+    const normalizedTier = tier?.toLowerCase() || "erigga_citizen"
+    switch (normalizedTier) {
+      case "erigga_citizen":
         return "bg-green-100 text-green-800 border-green-200"
-      case "pro":
+      case "erigga_indigen":
         return "bg-blue-100 text-blue-800 border-blue-200"
       case "enterprise":
         return "bg-yellow-100 text-yellow-800 border-yellow-200"
@@ -51,11 +37,11 @@ export default function DashboardPage() {
   }
 
   const getTierProgress = (tier: string) => {
-    const mappedTier = mapTierToStandard(tier)
-    switch (mappedTier) {
-      case "free":
+    const normalizedTier = tier?.toLowerCase() || "erigga_citizen"
+    switch (normalizedTier) {
+      case "erigga_citizen":
         return 33
-      case "pro":
+      case "erigga_indigen":
         return 66
       case "enterprise":
         return 100
@@ -65,16 +51,16 @@ export default function DashboardPage() {
   }
 
   const getTierDisplayName = (tier: string) => {
-    const mappedTier = mapTierToStandard(tier)
-    switch (mappedTier) {
-      case "free":
-        return "ERIGGA CITIZEN"
-      case "pro":
-        return "ERIGGA INDIGEN"
+    const normalizedTier = tier?.toLowerCase() || "erigga_citizen"
+    switch (normalizedTier) {
+      case "erigga_citizen":
+        return "Erigga Citizen"
+      case "erigga_indigen":
+        return "Erigga Indigen"
       case "enterprise":
-        return "E"
+        return "Enterprise"
       default:
-        return "ERIGGA CITIZEN"
+        return "Erigga Citizen"
     }
   }
 
@@ -94,9 +80,9 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div className="mt-4 sm:mt-0">
-                <Badge className={`px-3 py-1 ${getTierColor(profile?.subscription_tier || "free")}`}>
+                <Badge className={`px-3 py-1 ${getTierColor(profile?.tier || "erigga_citizen")}`}>
                   <Crown className="w-4 h-4 mr-1" />
-                  {getTierDisplayName(profile?.subscription_tier || "free")}
+                  {getTierDisplayName(profile?.tier || "erigga_citizen")}
                 </Badge>
               </div>
             </div>
@@ -181,18 +167,18 @@ export default function DashboardPage() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">
-                        {getTierDisplayName(profile?.subscription_tier || "free")} Member
+                        {getTierDisplayName(profile?.tier || "erigga_citizen")} Member
                       </span>
                       <span className="text-sm text-gray-500">
-                        {getTierProgress(profile?.subscription_tier || "free")}% Complete
+                        {getTierProgress(profile?.tier || "erigga_citizen")}% Complete
                       </span>
                     </div>
-                    <Progress value={getTierProgress(profile?.subscription_tier || "free")} className="h-2" />
+                    <Progress value={getTierProgress(profile?.tier || "erigga_citizen")} className="h-2" />
                     <div className="grid grid-cols-3 gap-2 text-xs">
                       <div className="text-center">
                         <div
                           className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.subscription_tier || "free") >= 33 ? "bg-green-500" : "bg-gray-300"
+                            getTierProgress(profile?.tier || "erigga_citizen") >= 33 ? "bg-green-500" : "bg-gray-300"
                           }`}
                         />
                         <span>Erigga Citizen</span>
@@ -200,7 +186,7 @@ export default function DashboardPage() {
                       <div className="text-center">
                         <div
                           className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.subscription_tier || "free") >= 66 ? "bg-blue-500" : "bg-gray-300"
+                            getTierProgress(profile?.tier || "erigga_citizen") >= 66 ? "bg-blue-500" : "bg-gray-300"
                           }`}
                         />
                         <span>Erigga Indigen</span>
@@ -208,12 +194,10 @@ export default function DashboardPage() {
                       <div className="text-center">
                         <div
                           className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.subscription_tier || "free") >= 100
-                              ? "bg-yellow-500"
-                              : "bg-gray-300"
+                            getTierProgress(profile?.tier || "erigga_citizen") >= 100 ? "bg-yellow-500" : "bg-gray-300"
                           }`}
                         />
-                        <span className="font-bold">E</span>
+                        <span>Enterprise</span>
                       </div>
                     </div>
                   </div>
@@ -250,9 +234,9 @@ export default function DashboardPage() {
                       </Link>
                     </Button>
                     <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/meet-greet">
+                      <Link href="/events">
                         <Calendar className="w-6 h-6 mb-2" />
-                        <span className="text-sm">Meet & Greet</span>
+                        <span className="text-sm">Events</span>
                       </Link>
                     </Button>
                     <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
