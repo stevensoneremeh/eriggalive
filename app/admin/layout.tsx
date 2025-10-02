@@ -24,6 +24,8 @@ import {
   Palette,
   TrendingUp,
   AlertTriangle,
+  Video,
+  Phone,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
@@ -38,6 +40,9 @@ const adminNavItems = [
   { name: "Events", href: "/admin/events", icon: Calendar },
   { name: "Transactions", href: "/admin/transactions", icon: CreditCard },
   { name: "Withdrawals", href: "/admin/withdrawals", icon: CreditCard },
+  { name: "Live Streaming", href: "/admin/live", icon: Video },
+  { name: "Video Calls", href: "/admin/video-calls", icon: Phone },
+  { name: "Vault Management", href: "/admin/vault-management", icon: Shield },
   { name: "Media", href: "/admin/media", icon: ImageIcon },
   { name: "Upload", href: "/admin/upload", icon: Upload },
   { name: "Branding", href: "/admin/branding", icon: Palette },
