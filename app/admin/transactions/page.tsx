@@ -29,8 +29,21 @@ export default function TransactionsPage() {
     setLoading(true)
     try {
       const { data, error } = await supabase
-        .from("transactions")
-        .select("*")
+        .from("coin_transactions")
+        .select(`
+          id,
+          user_id,
+          amount,
+          transaction_type,
+          status,
+          description,
+          reference,
+          created_at,
+          users!coin_transactions_user_id_fkey (
+            username,
+            email
+          )
+        `)
         .order("created_at", { ascending: false })
         .limit(100)
 
@@ -40,7 +53,18 @@ export default function TransactionsPage() {
         return
       }
 
-      setTransactions(data || [])
+      // Transform data to match expected interface
+      const transformedData = (data || []).map((tx: any) => ({
+        id: tx.id,
+        reference: tx.reference || tx.id,
+        amount: tx.amount,
+        status: tx.status,
+        created_at: tx.created_at,
+        user: tx.users?.[0] || { username: 'Unknown', email: 'Unknown' },
+        raw: tx
+      }))
+
+      setTransactions(transformedData)
     } catch (error) {
       console.error("Error loading transactions:", error)
       toast.error("Failed to load transactions")

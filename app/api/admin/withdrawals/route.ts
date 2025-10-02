@@ -61,12 +61,13 @@ export async function GET(request: NextRequest) {
       .from("withdrawals")
       .select(`
         *,
-        users!inner (
+        users!withdrawals_user_id_fkey (
+          id,
           username,
           email,
           tier
         ),
-        bank_accounts!inner (
+        bank_accounts!withdrawals_bank_account_id_fkey (
           account_number,
           bank_name,
           account_name

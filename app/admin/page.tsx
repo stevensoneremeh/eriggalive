@@ -40,35 +40,42 @@ export default function AdminOverviewPage() {
       try {
         setLoading(true)
 
-        // Fetch total users
-        const { count: totalUsers } = await supabase.from("users").select("*", { count: "exact", head: true })
+        // Fetch from API endpoint
+        const response = await fetch("/api/admin/dashboard-stats")
+        if (!response.ok) {
+          throw new Error("Failed to fetch stats")
+        }
 
-        // Fetch active users (logged in within last 7 days)
-        const sevenDaysAgo = new Date()
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-        const { count: activeUsers } = await supabase
-          .from("users")
-          .select("*", { count: "exact", head: true })
-          .gte("last_seen_at", sevenDaysAgo.toISOString())
+        const data = await response.json()
+        if (data.success) {
+          const apiStats = data.stats
 
-        // Fetch new users today
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        const { count: newUsersToday } = await supabase
-          .from("users")
-          .select("*", { count: "exact", head: true })
-          .gte("created_at", today.toISOString())
+          // Fetch additional local stats
+          const sevenDaysAgo = new Date()
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+          const { count: activeUsers } = await supabase
+            .from("users")
+            .select("*", { count: "exact", head: true })
+            .gte("last_seen_at", sevenDaysAgo.toISOString())
 
-        setStats({
-          totalUsers: totalUsers || 0,
-          totalRevenue: 0, // You can calculate this from transactions
-          totalOrders: 0, // You can calculate this from orders
-          totalEvents: 0, // You can fetch from events table
-          activeUsers: activeUsers || 0,
-          newUsersToday: newUsersToday || 0,
-          revenueToday: 0,
-          ordersToday: 0,
-        })
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          const { count: newUsersToday } = await supabase
+            .from("users")
+            .select("*", { count: "exact", head: true })
+            .gte("created_at", today.toISOString())
+
+          setStats({
+            totalUsers: apiStats.totalUsers,
+            totalRevenue: apiStats.totalRevenue,
+            totalOrders: apiStats.totalTransactions,
+            totalEvents: apiStats.totalEvents,
+            activeUsers: activeUsers || 0,
+            newUsersToday: newUsersToday || 0,
+            revenueToday: 0,
+            ordersToday: 0,
+          })
+        }
       } catch (error) {
         console.error("Error fetching admin stats:", error)
       } finally {

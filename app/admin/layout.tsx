@@ -86,10 +86,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             email: profile.email,
           })
 
+          // Allow admin or super_admin role
           if (profile.role === "admin" || profile.role === "super_admin") {
             console.log("[Admin Layout] ✅ Access granted via profile context")
             setHasAccess(true)
             setDebugInfo({ method: "profile_context", role: profile.role })
+            return
+          }
+
+          // Also check if user is blood tier (alternative admin access)
+          if (profile.tier === "blood" || profile.tier === "blood_brotherhood") {
+            console.log("[Admin Layout] ✅ Access granted via blood tier")
+            setHasAccess(true)
+            setDebugInfo({ method: "tier_access", tier: profile.tier })
             return
           }
         }

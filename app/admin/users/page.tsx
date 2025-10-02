@@ -37,7 +37,20 @@ export default function UsersPage() {
     try {
       const { data, error } = await supabase
         .from("users")
-        .select("*")
+        .select(`
+          id,
+          auth_user_id,
+          username,
+          full_name,
+          email,
+          avatar_url,
+          tier,
+          role,
+          coins,
+          is_verified,
+          created_at,
+          last_seen_at
+        `)
         .order("created_at", { ascending: false })
         .limit(100)
 

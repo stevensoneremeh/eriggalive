@@ -32,10 +32,23 @@ export default function AdminEventsPage() {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const { data, error } = await supabase.from("events").select("*").order("event_date", { ascending: false })
+        const { data, error } = await supabase
+          .from("events")
+          .select(`
+            *,
+            tickets:tickets(count)
+          `)
+          .order("event_date", { ascending: false })
 
         if (error) throw error
-        setEvents(data || [])
+        
+        // Transform data to include ticket count as current_attendance
+        const transformedEvents = (data || []).map((event: any) => ({
+          ...event,
+          current_attendance: event.tickets?.[0]?.count || 0
+        }))
+        
+        setEvents(transformedEvents)
       } catch (error) {
         console.error("Error fetching events:", error)
       } finally {
