@@ -6,31 +6,49 @@ EriggaLive is a comprehensive fan platform for the Nigerian artist Erigga, built
 
 ## Recent Changes
 
-### October 2, 2025 - Complete Admin Dashboard MVP
-- **Database Schema**: Created comprehensive database tables for admin management
-  - `homepage` - Manage homepage content sections (hero, featured, announcements)
-  - `merch` - Full product catalog with pricing, stock, categories
-  - `media` - Media library for images, audio, and videos
+### October 2, 2025 - Enhanced Admin Dashboard & Live Features
+- **Database Schema**: Created comprehensive database tables
+  - `homepage` - Content sections (hero, featured, announcements)
+  - `merch` - Product catalog with pricing, stock, categories
+  - `media` - Media library for images, audio, videos
   - `radio` - Radio stream management with schedules
   - `videos` - Chronicles and Vault video content
   - `tiers` - Subscription tier configuration
-- **API Routes**: Built complete CRUD API endpoints
-  - `/api/admin/products` - Merch management with full CRUD
-  - `/api/admin/homepage` - Homepage content management
-  - `/api/admin/radio-streams` - Radio stream configuration
-  - All routes protected with `info@eriggalive.com` authorization
-- **Admin Pages**: Created fully functional admin dashboard
-  - Homepage Management - Content sections with types (hero, featured, etc.)
-  - Merch Management - Complete product CRUD with inline editing
-  - Radio Management - Live stream configuration
-  - Videos Management - Chronicles & Vault content
-  - Tiers Management - Subscription tier display
-- **Authorization**: Email-based access control for `info@eriggalive.com`
-  - Server-side protection via API routes
-  - Client-side guard in admin layout
-  - Row Level Security (RLS) policies in database
-- **Navigation**: Updated admin sidebar with new management pages
-- **Status**: MVP admin dashboard fully operational and ready for use
+  - `live_streams` - Mux audio/video streaming with playback IDs
+  - `vault_items` - Tier-restricted exclusive content
+  - `meet_greet_bookings` - Daily.co video call bookings with Paystack payment
+  - `homepage_media` - Hero section media (images/videos)
+- **API Routes**: Complete CRUD endpoints with authorization
+  - `/api/admin/products` - Merch management
+  - `/api/admin/homepage` - Homepage content
+  - `/api/admin/radio-streams` - Radio configuration
+  - `/api/admin/users-management` - User tier and role management
+  - `/api/admin/vault-items` - Vault content with tier access
+  - `/api/admin/live-streams` - Mux streaming management
+  - `/api/admin/homepage-media` - Hero section media
+  - `/api/meet-greet/book` - Paystack payment integration
+  - `/api/meet-greet/verify-payment` - Daily.co room creation
+- **Admin Features**:
+  - User Management - Update user tiers, roles, and status
+  - Vault Management - Content with tier-based access control
+  - Live Streaming (Mux) - Create audio/video streams with stream keys
+  - Homepage Media - Manage hero section photos and videos
+  - Merch, Radio, Videos, Tiers - Full CRUD operations
+- **Live Streaming (Mux)**:
+  - Admin creates streams with Mux API integration
+  - Automatic stream key and playback ID generation
+  - Radio page displays active Mux streams
+  - Support for both audio and video streams
+- **Meet & Greet**:
+  - Paystack payment integration (₦50,000 default)
+  - Daily.co video call room creation on payment
+  - Booking management with status tracking
+  - Direct video call links for confirmed bookings
+- **Authorization**: Email-based control for `info@eriggalive.com`
+  - Server-side API protection
+  - Client-side admin guard
+  - RLS policies for all admin tables
+- **Status**: Full admin dashboard with live streaming and booking features operational
 
 ### September 12, 2025 - Replit Environment Setup
 - **Initial Import**: Successfully imported GitHub project and configured for Replit environment

@@ -205,15 +205,28 @@ export default function RadioPage() {
         setDailyQuote(quote.text)
       }
 
-      // Load live broadcast status
-      const { data: broadcast } = await supabase.from("live_broadcasts").select("*").eq("status", "live").single()
+      // Load Mux live streams
+      const { data: liveStream } = await supabase
+        .from("live_streams")
+        .select("*")
+        .eq("status", "active")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single()
 
-      if (broadcast) {
+      if (liveStream) {
         setIsLive(true)
-        setLiveTitle(broadcast.title)
+        setLiveTitle(liveStream.title)
+        
+        // If there's a Mux playback ID, update audio source
+        if (liveStream.mux_playback_id && audioRef.current) {
+          audioRef.current.src = `https://stream.mux.com/${liveStream.mux_playback_id}.m3u8`
+          audioRef.current.load()
+        }
       }
 
-      // Load next scheduled show
+      // Load next scheduled show (legacy support)
       const { data: nextBroadcast } = await supabase
         .from("live_broadcasts")
         .select("*")

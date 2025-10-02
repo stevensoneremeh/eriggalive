@@ -39,8 +39,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 const adminNavItems = [
   { name: "Overview", href: "/admin", icon: Home },
   { name: "Dashboard", href: "/admin/dashboard", icon: TrendingUp },
-  { name: "Homepage", href: "/admin/homepage-content", icon: FileText },
+  { name: "User Management", href: "/admin/users-management", icon: Users },
+  { name: "Homepage Media", href: "/admin/homepage-media", icon: FileText },
+  { name: "Homepage Content", href: "/admin/homepage-content", icon: FileText },
   { name: "Merch", href: "/admin/merch", icon: ShoppingBag },
+  { name: "Live Streams (Mux)", href: "/admin/live-streams", icon: RadioIcon },
+  { name: "Vault Items", href: "/admin/vault-items", icon: Shield },
   { name: "Radio", href: "/admin/radio-management", icon: RadioIcon },
   { name: "Chronicles & Vault", href: "/admin/videos-management", icon: Video },
   { name: "Tiers", href: "/admin/tiers-management", icon: Trophy },
