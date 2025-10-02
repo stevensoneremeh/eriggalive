@@ -61,10 +61,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         // Check if user is authenticated first
         if (!user) {
-          console.log("[Admin Layout] No user found in context, redirecting to login")
+          console.log("[Admin Layout] No user found in context")
           setHasAccess(false)
-          router.push("/login?redirect=/admin")
-          return
+          // Don't redirect immediately - wait a bit for auth to initialize
+          const timer = setTimeout(() => {
+            if (!user) {
+              router.push("/login?redirect=" + encodeURIComponent(pathname || "/admin"))
+            }
+          }, 1000)
+          return () => clearTimeout(timer)
         }
 
         const userEmail = user.email || ""
@@ -75,10 +80,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           console.log("[Admin Layout] ✅ Special access granted to info@eriggalive.com")
           setHasAccess(true)
           setDebugInfo({ method: "special_email", email: userEmail })
+          setError(null)
           return
         }
 
-        // Check profile from context
+        // Check profile from context first
         if (profile) {
           console.log("[Admin Layout] Profile from context:", {
             role: profile.role,
@@ -91,6 +97,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             console.log("[Admin Layout] ✅ Access granted via profile context")
             setHasAccess(true)
             setDebugInfo({ method: "profile_context", role: profile.role })
+            setError(null)
             return
           }
 
@@ -99,20 +106,50 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             console.log("[Admin Layout] ✅ Access granted via blood tier")
             setHasAccess(true)
             setDebugInfo({ method: "tier_access", tier: profile.tier })
+            setError(null)
             return
           }
         }
 
-        // Fallback: Direct database check
+        // Fallback: Direct database check (with timeout)
         console.log("[Admin Layout] Checking database for admin role...")
-        const { data: userData, error: userError } = await supabase
+        
+        const dbCheckPromise = supabase
           .from("users")
           .select("role, tier, email, is_active")
           .eq("auth_user_id", user.id)
           .single()
 
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Database check timeout")), 5000)
+        )
+
+        const { data: userData, error: userError } = await Promise.race([
+          dbCheckPromise,
+          timeoutPromise
+        ]).catch((err) => ({ data: null, error: err }))
+
         if (userError) {
           console.error("[Admin Layout] Database error:", userError)
+          // If we have a profile from context, use that instead of failing
+          if (profile) {
+            console.log("[Admin Layout] Using profile from context due to database error")
+            const hasContextAccess = 
+              profile.role === "admin" || 
+              profile.role === "super_admin" ||
+              profile.tier === "blood" || 
+              profile.tier === "blood_brotherhood"
+            
+            setHasAccess(hasContextAccess)
+            if (!hasContextAccess) {
+              setError("You do not have admin privileges")
+            } else {
+              setError(null)
+              setDebugInfo({ method: "profile_fallback", role: profile.role, tier: profile.tier })
+            }
+            return
+          }
+          
           setError(`Database error: ${userError.message}`)
           setHasAccess(false)
           return
@@ -121,10 +158,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (userData) {
           console.log("[Admin Layout] Database user data:", userData)
 
-          if (userData.role === "admin" || userData.role === "super_admin") {
+          const hasDbAccess = 
+            userData.role === "admin" || 
+            userData.role === "super_admin" ||
+            userData.tier === "blood" || 
+            userData.tier === "blood_brotherhood"
+
+          if (hasDbAccess) {
             console.log("[Admin Layout] ✅ Access granted via database")
             setHasAccess(true)
-            setDebugInfo({ method: "database", role: userData.role })
+            setDebugInfo({ method: "database", role: userData.role, tier: userData.tier })
+            setError(null)
             return
           }
         }
@@ -141,7 +185,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
 
     checkAdminAccess()
-  }, [user, profile, supabase, router])
+  }, [user, profile, supabase, router, pathname])
 
   useEffect(() => {
     setIsMobileMenuOpen(false)
