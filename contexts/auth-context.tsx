@@ -151,9 +151,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
 
       if (session?.user && !supabaseError) {
-        fetchProfile(session.user.id).then((profileData) => {
-          setProfile(profileData)
-        })
+        const profileData = await fetchProfile(session.user.id)
+        setProfile(profileData)
 
         if (event === "SIGNED_IN" && initialized) {
           const urlParams = new URLSearchParams(window.location.search)

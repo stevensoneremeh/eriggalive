@@ -69,8 +69,7 @@ export async function updateSession(request: NextRequest) {
       if (
         profile?.role === "admin" ||
         profile?.role === "super_admin" ||
-        profile?.tier === "blood" ||
-        profile?.tier === "blood_brotherhood"
+        profile?.tier === "enterprise"
       ) {
         return supabaseResponse
       }

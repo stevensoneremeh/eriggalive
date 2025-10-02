@@ -742,19 +742,19 @@ export default function ProfilePage() {
                         <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                           <div
                             className={`w-4 h-4 rounded-full mx-auto mb-2 ${
-                              getTierProgress(profile?.tier || "grassroot") >= 75 ? "bg-blue-500" : "bg-gray-300"
+                              getTierProgress(profile?.tier || "erigga_citizen") >= 75 ? "bg-blue-500" : "bg-gray-300"
                             }`}
                           />
-                          <p className="text-sm font-medium">Elder</p>
+                          <p className="text-sm font-medium">Erigga Indigen</p>
                           <p className="text-xs text-gray-500">Respected</p>
                         </div>
                         <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                           <div
                             className={`w-4 h-4 rounded-full mx-auto mb-2 ${
-                              getTierProgress(profile?.tier || "grassroot") >= 100 ? "bg-yellow-500" : "bg-gray-300"
+                              getTierProgress(profile?.tier || "erigga_citizen") >= 100 ? "bg-yellow-500" : "bg-gray-300"
                             }`}
                           />
-                          <p className="text-sm font-medium">Blood Brotherhood</p>
+                          <p className="text-sm font-medium">Enterprise</p>
                           <p className="text-xs text-gray-500">Elite</p>
                         </div>
                       </div>

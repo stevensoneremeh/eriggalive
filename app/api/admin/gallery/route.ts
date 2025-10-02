@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     // Get user profile to check admin privileges
     const { data: profile } = await supabase.from("users").select("tier, role").eq("auth_user_id", user.id).single()
 
-    if (!profile || (profile.tier === "grassroot" && profile.role !== "admin")) {
+    if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
       return NextResponse.json({ error: "Insufficient privileges" }, { status: 403 })
     }
 

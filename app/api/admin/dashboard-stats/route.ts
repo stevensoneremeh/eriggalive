@@ -25,10 +25,10 @@ export async function GET() {
       .single()
 
     const isAdmin =
+      user.email === "info@eriggalive.com" ||
       profile?.role === "admin" ||
       profile?.role === "super_admin" ||
-      profile?.tier === "blood" ||
-      profile?.tier === "blood_brotherhood"
+      profile?.tier === "enterprise"
 
     if (!isAdmin) {
       return NextResponse.json({ error: "Insufficient privileges" }, { status: 403 })

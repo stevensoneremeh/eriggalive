@@ -106,9 +106,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             return
           }
 
-          // Also check if user is blood tier (alternative admin access)
-          if (profile.tier === "blood" || profile.tier === "blood_brotherhood") {
-            console.log("[Admin Layout] ✅ Access granted via blood tier")
+          // Enterprise tier users can access admin
+          if (profile.tier === "enterprise") {
+            console.log("[Admin Layout] ✅ Access granted via enterprise tier")
             setHasAccess(true)
             setDebugInfo({ method: "tier_access", tier: profile.tier })
             setError(null)
@@ -142,8 +142,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             const hasContextAccess = 
               profile.role === "admin" || 
               profile.role === "super_admin" ||
-              profile.tier === "blood" || 
-              profile.tier === "blood_brotherhood"
+              profile.tier === "enterprise"
             
             setHasAccess(hasContextAccess)
             if (!hasContextAccess) {
@@ -166,8 +165,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           const hasDbAccess = 
             userData.role === "admin" || 
             userData.role === "super_admin" ||
-            userData.tier === "blood" || 
-            userData.tier === "blood_brotherhood"
+            userData.tier === "enterprise"
 
           if (hasDbAccess) {
             console.log("[Admin Layout] ✅ Access granted via database")
