@@ -26,6 +26,10 @@ import {
   AlertTriangle,
   Video,
   Phone,
+  ShoppingBag,
+  FileText,
+  Radio as RadioIcon,
+  Trophy,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
@@ -35,6 +39,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 const adminNavItems = [
   { name: "Overview", href: "/admin", icon: Home },
   { name: "Dashboard", href: "/admin/dashboard", icon: TrendingUp },
+  { name: "Homepage", href: "/admin/homepage-content", icon: FileText },
+  { name: "Merch", href: "/admin/merch", icon: ShoppingBag },
+  { name: "Radio", href: "/admin/radio-management", icon: RadioIcon },
+  { name: "Chronicles & Vault", href: "/admin/videos-management", icon: Video },
+  { name: "Tiers", href: "/admin/tiers-management", icon: Trophy },
   { name: "Scanner", href: "/admin/scanner", icon: Scan },
   { name: "Users", href: "/admin/users", icon: Users },
   { name: "Events", href: "/admin/events", icon: Calendar },
