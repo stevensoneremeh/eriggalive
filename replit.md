@@ -6,12 +6,38 @@ EriggaLive is a comprehensive fan platform for the Nigerian artist Erigga, built
 
 ## Recent Changes
 
+### October 2, 2025 - Complete Admin Dashboard MVP
+- **Database Schema**: Created comprehensive database tables for admin management
+  - `homepage` - Manage homepage content sections (hero, featured, announcements)
+  - `merch` - Full product catalog with pricing, stock, categories
+  - `media` - Media library for images, audio, and videos
+  - `radio` - Radio stream management with schedules
+  - `videos` - Chronicles and Vault video content
+  - `tiers` - Subscription tier configuration
+- **API Routes**: Built complete CRUD API endpoints
+  - `/api/admin/products` - Merch management with full CRUD
+  - `/api/admin/homepage` - Homepage content management
+  - `/api/admin/radio-streams` - Radio stream configuration
+  - All routes protected with `info@eriggalive.com` authorization
+- **Admin Pages**: Created fully functional admin dashboard
+  - Homepage Management - Content sections with types (hero, featured, etc.)
+  - Merch Management - Complete product CRUD with inline editing
+  - Radio Management - Live stream configuration
+  - Videos Management - Chronicles & Vault content
+  - Tiers Management - Subscription tier display
+- **Authorization**: Email-based access control for `info@eriggalive.com`
+  - Server-side protection via API routes
+  - Client-side guard in admin layout
+  - Row Level Security (RLS) policies in database
+- **Navigation**: Updated admin sidebar with new management pages
+- **Status**: MVP admin dashboard fully operational and ready for use
+
 ### September 12, 2025 - Replit Environment Setup
 - **Initial Import**: Successfully imported GitHub project and configured for Replit environment
 - **Dependencies**: Installed all Node.js dependencies using pnpm (preferred package manager)
 - **Frontend Configuration**: Set up Next.js development server on port 5000 with proper host binding (0.0.0.0)
 - **Environment Variables**: Created .env.local with development defaults and Replit domain configuration
-- **Deployment Setup**: Configured autoscale deployment with pnpm build/start commands
+- **Deployment Setup**: Configured autoscale deployment with npm build/start commands
 - **Graceful Fallbacks**: Application handles missing Supabase environment variables gracefully with mock clients
 - **Status**: Application is running successfully and ready for use
 
@@ -68,8 +94,10 @@ Preferred communication style: Simple, everyday language.
 ### Database Design
 - **Primary Database**: Supabase (PostgreSQL) with custom schema
 - **Core Tables**: Users, community posts/comments, categories, transactions, media uploads
+- **Admin Tables**: Homepage content, merch products, media library, radio streams, videos, subscription tiers
 - **Real-time Features**: Supabase real-time subscriptions for live updates
 - **File Storage**: Supabase Storage for media files with organized bucket structure
+- **Security**: Row Level Security (RLS) policies restrict write access to info@eriggalive.com for admin tables
 
 ### Payment & Economy System
 - **Payment Gateway**: Paystack integration for Nigerian payments
