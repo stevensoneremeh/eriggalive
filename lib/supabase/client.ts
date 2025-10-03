@@ -67,8 +67,8 @@ function createMockClient() {
     // Disable realtime for mock client to prevent WebSocket errors
     channel: () => ({
       on: () => ({
-        subscribe: () => ({ 
-          unsubscribe: () => {} 
+        subscribe: () => ({
+          unsubscribe: () => {}
         }),
       }),
     }),

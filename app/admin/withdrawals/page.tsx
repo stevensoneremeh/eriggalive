@@ -387,10 +387,10 @@ export default function AdminWithdrawalsPage() {
                                     <Eye className="h-4 w-4" />
                                   </Button>
                                 </DialogTrigger>
-                                <DialogContent className="max-w-2xl">
+                                <DialogContent className="max-w-2xl" aria-describedby="withdrawal-dialog-description">
                                   <DialogHeader>
                                     <DialogTitle>Withdrawal Request Details</DialogTitle>
-                                    <DialogDescription>Review and manage this withdrawal request</DialogDescription>
+                                    <DialogDescription id="withdrawal-dialog-description">Review and manage this withdrawal request</DialogDescription>
                                   </DialogHeader>
                                   {selectedWithdrawal && (
                                     <div className="space-y-6">

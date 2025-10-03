@@ -75,10 +75,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     let mounted = true
     let checkComplete = false
-    
+
     async function checkAdminAccess() {
       if (checkComplete) return
-      
+
       try {
         // Wait for auth to initialize
         if (!user) {
@@ -130,8 +130,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
 
         if (userData) {
-          const hasDbAccess = 
-            userData.role === "admin" || 
+          const hasDbAccess =
+            userData.role === "admin" ||
             userData.role === "super_admin" ||
             userData.tier === "enterprise"
 
@@ -157,7 +157,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
 
     checkAdminAccess()
-    
+
     return () => {
       mounted = false
     }
@@ -273,7 +273,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )}
       </div>
 
-      <ScrollArea className="flex-1 px-3 sm:px-4">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-4">
         <nav className="py-4 space-y-2">
           {adminNavItems.map((item) => {
             const Icon = item.icon
@@ -284,9 +284,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex items-center space-x-3 px-3 py-3 rounded-lg transition-all duration-200",
+                  "flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all",
                   active
-                    ? "bg-brand-teal text-white shadow-md"
+                    ? "bg-brand-teal text-white shadow-sm"
                     : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800",
                 )}
                 onClick={() => isMobile && setIsMobileMenuOpen(false)}
@@ -297,7 +297,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             )
           })}
         </nav>
-      </ScrollArea>
+      </div>
 
       <div className="p-4 border-t">
         <Button
