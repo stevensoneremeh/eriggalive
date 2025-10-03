@@ -32,7 +32,8 @@ export default function AdminVideoCallsPage() {
 
   useEffect(() => {
     loadCalls()
-    setupRealtimeSubscription()
+    const cleanup = setupRealtimeSubscription()
+    return cleanup
   }, [])
 
   const loadCalls = async () => {
@@ -60,13 +61,20 @@ export default function AdminVideoCallsPage() {
 
   const setupRealtimeSubscription = () => {
     const channel = supabase
-      .channel("video-calls")
-      .on("postgres_changes", { event: "*", schema: "public", table: "meet_greet_bookings" }, () => {
+      .channel("video-calls-admin")
+      .on("postgres_changes", { 
+        event: "*", 
+        schema: "public", 
+        table: "meet_greet_bookings" 
+      }, (payload) => {
+        console.log("Realtime update:", payload)
         loadCalls()
       })
       .subscribe()
 
-    return () => supabase.removeChannel(channel)
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }
 
   const startCall = async (callId: string) => {
@@ -243,9 +251,16 @@ export default function AdminVideoCallsPage() {
                       {call.duration} minutes
                     </div>
                   </div>
+                  {call.notes && (
+                    <div className="mt-2 text-sm text-muted-foreground bg-muted p-2 rounded">
+                      <strong>Notes:</strong> {call.notes}
+                    </div>
+                  )}
                   {call.daily_room_url && (
                     <div className="mt-2">
-                      <Badge variant="outline">Room Created</Badge>
+                      <Badge variant="outline" className="bg-green-100 text-green-800">
+                        Room Active: {call.daily_room_name}
+                      </Badge>
                     </div>
                   )}
                 </div>
