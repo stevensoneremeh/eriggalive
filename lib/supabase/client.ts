@@ -1,18 +1,7 @@
 import { createBrowserClient } from "@supabase/ssr"
 import type { Database } from "@/types/database"
 
-// Check if we're in a browser environment
-const isBrowser = typeof window !== "undefined"
-
-// Singleton client instance
-let client: ReturnType<typeof createBrowserClient<Database>> | undefined
-
 export function createClient() {
-  // Return existing client if it exists (singleton pattern)
-  if (client) {
-    return client
-  }
-
   // Validate environment variables
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -24,7 +13,7 @@ export function createClient() {
   }
 
   try {
-    client = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+    return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -41,8 +30,6 @@ export function createClient() {
         },
       },
     })
-
-    return client
   } catch (error) {
     console.error("Failed to create Supabase client:", error)
     return createMockClient()
@@ -97,13 +84,4 @@ export function createClientComponentClient() {
 export function createBrowserSupabaseClient() {
   console.warn("createBrowserSupabaseClient is deprecated. Use createClient() from @/lib/supabase/client instead.")
   return createClient()
-}
-
-// Export singleton getter
-export function getSupabaseClient() {
-  return createClient()
-}
-
-export function resetClientInstance() {
-  client = undefined
 }

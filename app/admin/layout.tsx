@@ -74,8 +74,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     let mounted = true
+    let checkComplete = false
     
     async function checkAdminAccess() {
+      if (checkComplete) return
+      
       try {
         // Wait for auth to initialize
         if (!user) {
@@ -91,6 +94,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             setHasAccess(true)
             setDebugInfo({ method: "special_email", email: userEmail })
             setError(null)
+            checkComplete = true
           }
           return
         }
@@ -103,6 +107,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               setHasAccess(true)
               setDebugInfo({ method: "profile_context", role: profile.role, tier: profile.tier })
               setError(null)
+              checkComplete = true
             }
             return
           }

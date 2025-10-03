@@ -55,7 +55,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (userId: string): Promise<UserProfile | null> => {
       try {
         if (!supabase || supabaseError) {
-          console.warn("Supabase client not available, using offline mode")
           return null
         }
 
@@ -65,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Add timeout wrapper for database requests
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
+          setTimeout(() => reject(new Error("Profile fetch timeout")), 3000)
         })
 
         const fetchPromise = supabase.from("users").select("*").eq("auth_user_id", userId).maybeSingle()
@@ -73,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data, error } = await Promise.race([fetchPromise, timeoutPromise])
 
         if (error) {
-          console.warn("Profile fetch failed, continuing without profile:", error.message)
+          // Don't log errors repeatedly to avoid console spam
           return null
         }
 
@@ -83,11 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return data
       } catch (error: any) {
-        if (error.message.includes("timeout") || error.message.includes("connect") || error.message.includes("503")) {
-          console.warn("Network issue detected, running in offline mode:", error.message)
-        } else {
-          console.warn("Profile fetch error, continuing gracefully:", error.message)
-        }
+        // Silent failure to prevent console spam
         return null
       }
     },
