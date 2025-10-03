@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS public.admin_actions (
     target_id TEXT NOT NULL,
     details JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
+
     -- Add indexes for performance
     CONSTRAINT admin_actions_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES public.users(id) ON DELETE CASCADE
 );
@@ -22,25 +22,28 @@ CREATE INDEX IF NOT EXISTS idx_admin_actions_target ON public.admin_actions(targ
 ALTER TABLE public.admin_actions ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies
+DROP POLICY IF EXISTS "Admin actions are viewable by admins only" ON public.admin_actions;
 CREATE POLICY "Admin actions are viewable by admins only"
     ON public.admin_actions FOR SELECT
     USING (
         EXISTS (
             SELECT 1 FROM public.users 
             WHERE users.auth_user_id = auth.uid() 
-            AND (users.role = 'admin' OR users.tier = 'blood_brotherhood')
+            AND (users.role = 'admin' OR users.role = 'super_admin' OR users.tier = 'enterprise')
         )
+        OR auth.jwt() ->> 'email' = 'info@eriggalive.com'
     );
 
-CREATE POLICY "Admin actions can be inserted by admins only"
+DROP POLICY IF EXISTS "Admins can insert admin actions" ON public.admin_actions;
+CREATE POLICY "Admins can insert admin actions"
     ON public.admin_actions FOR INSERT
     WITH CHECK (
         EXISTS (
             SELECT 1 FROM public.users 
             WHERE users.auth_user_id = auth.uid() 
-            AND (users.role = 'admin' OR users.tier = 'blood_brotherhood')
-            AND users.id = admin_id
+            AND (users.role = 'admin' OR users.role = 'super_admin' OR users.tier = 'enterprise')
         )
+        OR auth.jwt() ->> 'email' = 'info@eriggalive.com'
     );
 
 -- Add columns to withdrawals table for admin processing
