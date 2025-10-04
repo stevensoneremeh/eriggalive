@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
@@ -8,7 +7,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const metric = searchParams.get('metric') || 'all'
-    
+
     const supabase = await createClient()
 
     // Verify admin access
@@ -47,7 +46,7 @@ export async function GET(request: Request) {
           .select("*", { count: "exact", head: true })
         data.totalUsers = userCount || 0
         break
-        
+
       case 'active':
         const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
         const { count: activeCount } = await supabase
@@ -56,7 +55,7 @@ export async function GET(request: Request) {
           .gte("last_seen_at", oneDayAgo)
         data.activeUsers = activeCount || 0
         break
-        
+
       case 'revenue':
         const { data: transactions } = await supabase
           .from("coin_transactions")
@@ -66,20 +65,18 @@ export async function GET(request: Request) {
           .limit(1000)
         data.totalRevenue = transactions?.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0) || 0
         break
-        
+
       default:
         // Return basic counts only for 'all'
-        const [users, transactions, events] = await Promise.all([
+        const [users, transactionCount, events] = await Promise.all([
           supabase.from("users").select("*", { count: "exact", head: true }),
           supabase.from("coin_transactions").select("*", { count: "exact", head: true }),
           supabase.from("events").select("*", { count: "exact", head: true }),
         ])
-        
-        data = {
-          totalUsers: users.count || 0,
-          totalTransactions: transactions.count || 0,
-          totalEvents: events.count || 0,
-        }
+
+        data.totalUsers = users.count || 0
+        data.totalTransactions = transactionCount.count || 0
+        data.totalEvents = events.count || 0
     }
 
     return NextResponse.json({
