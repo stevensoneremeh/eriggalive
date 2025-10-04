@@ -56,7 +56,7 @@ export default function AdminLivePage() {
   const setupRealtimeSubscription = () => {
     const channel = supabase
       .channel("live-streams")
-      .on("postgres_changes", { event: "*", schema: "public", table: "live_streams" }, (payload) => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "live_streams" }, (payload: any) => {
         if (payload.eventType === "INSERT") {
           setStreams((prev) => [payload.new as LiveStream, ...prev])
         } else if (payload.eventType === "UPDATE") {

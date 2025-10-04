@@ -105,11 +105,11 @@ export default function AdminScannerPage() {
 
         const stats = {
           total_scans: data?.length || 0,
-          valid_scans: data?.filter((s) => s.scan_result === "valid").length || 0,
-          invalid_scans: data?.filter((s) => s.scan_result === "invalid").length || 0,
-          already_used: data?.filter((s) => s.scan_result === "already_used").length || 0,
-          wrong_event: data?.filter((s) => s.scan_result === "wrong_event").length || 0,
-          expired: data?.filter((s) => s.scan_result === "expired").length || 0,
+          valid_scans: data?.filter((s: any) => s.scan_result === "valid").length || 0,
+          invalid_scans: data?.filter((s: any) => s.scan_result === "invalid").length || 0,
+          already_used: data?.filter((s: any) => s.scan_result === "already_used").length || 0,
+          wrong_event: data?.filter((s: any) => s.scan_result === "wrong_event").length || 0,
+          expired: data?.filter((s: any) => s.scan_result === "expired").length || 0,
         }
 
         setScanStats(stats)

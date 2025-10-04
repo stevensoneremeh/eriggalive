@@ -58,7 +58,7 @@ export default function MediaPage() {
         return
       }
 
-      setMediaFiles(data || [])
+      setMediaFiles((data || []) as unknown as MediaFile[])
     } catch (error) {
       console.error("Load error:", error)
       toast.error("Failed to load media files")

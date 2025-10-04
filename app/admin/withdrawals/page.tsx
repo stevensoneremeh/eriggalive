@@ -71,7 +71,7 @@ export default function AdminWithdrawalsPage() {
   const [processingAction, setProcessingAction] = useState<string | null>(null)
 
   // Check admin access
-  const hasAdminAccess = profile?.role === "admin" || profile?.tier === "blood_brotherhood"
+  const hasAdminAccess = profile?.role === "admin"
 
   const fetchWithdrawals = async () => {
     try {

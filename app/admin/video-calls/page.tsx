@@ -21,6 +21,7 @@ interface VideoCall {
   daily_room_url?: string
   daily_room_name?: string
   duration: number
+  notes?: string
   created_at: string
 }
 
@@ -66,7 +67,7 @@ export default function AdminVideoCallsPage() {
         event: "*", 
         schema: "public", 
         table: "meet_greet_bookings" 
-      }, (payload) => {
+      }, (payload: any) => {
         console.log("Realtime update:", payload)
         loadCalls()
       })
