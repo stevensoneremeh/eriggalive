@@ -73,6 +73,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Title, event date, and venue are required" }, { status: 400 })
     }
 
+    const parsedMaxAttendees = parseInt(max_attendees)
+    const parsedTicketPriceNaira = parseFloat(ticket_price_naira)
+    const parsedTicketPriceCoins = parseFloat(ticket_price_coins)
+    const parsedVipPriceNaira = parseFloat(vip_price_naira)
+
     const { data: event, error } = await supabase
       .from("events")
       .insert([
@@ -82,12 +87,12 @@ export async function POST(request: NextRequest) {
           event_date,
           venue,
           city: city || null,
-          max_attendees: parseInt(max_attendees) || 0,
+          max_attendees: isNaN(parsedMaxAttendees) || max_attendees === "" ? 0 : parsedMaxAttendees,
           current_attendance: 0,
-          ticket_price_naira: parseFloat(ticket_price_naira) || 0,
-          ticket_price_coins: parseFloat(ticket_price_coins) || 0,
-          vip_price_naira: parseFloat(vip_price_naira) || 0,
-          original_price_naira: parseFloat(ticket_price_naira) || 0,
+          ticket_price_naira: isNaN(parsedTicketPriceNaira) || ticket_price_naira === "" ? 0 : parsedTicketPriceNaira,
+          ticket_price_coins: isNaN(parsedTicketPriceCoins) || ticket_price_coins === "" ? 0 : parsedTicketPriceCoins,
+          vip_price_naira: isNaN(parsedVipPriceNaira) || vip_price_naira === "" ? 0 : parsedVipPriceNaira,
+          original_price_naira: isNaN(parsedTicketPriceNaira) || ticket_price_naira === "" ? 0 : parsedTicketPriceNaira,
           image_url: image_url || null,
           status: status || "draft",
           contact: contact || null,

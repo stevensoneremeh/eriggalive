@@ -41,10 +41,22 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if (event_date !== undefined) updateData.event_date = event_date
     if (venue !== undefined) updateData.venue = venue
     if (city !== undefined) updateData.city = city
-    if (max_attendees !== undefined) updateData.max_attendees = parseInt(max_attendees)
-    if (ticket_price_naira !== undefined) updateData.ticket_price_naira = parseFloat(ticket_price_naira)
-    if (ticket_price_coins !== undefined) updateData.ticket_price_coins = parseFloat(ticket_price_coins)
-    if (vip_price_naira !== undefined) updateData.vip_price_naira = parseFloat(vip_price_naira)
+    if (max_attendees !== undefined) {
+      const parsed = parseInt(max_attendees)
+      updateData.max_attendees = isNaN(parsed) || max_attendees === "" ? 0 : parsed
+    }
+    if (ticket_price_naira !== undefined) {
+      const parsed = parseFloat(ticket_price_naira)
+      updateData.ticket_price_naira = isNaN(parsed) || ticket_price_naira === "" ? 0 : parsed
+    }
+    if (ticket_price_coins !== undefined) {
+      const parsed = parseFloat(ticket_price_coins)
+      updateData.ticket_price_coins = isNaN(parsed) || ticket_price_coins === "" ? 0 : parsed
+    }
+    if (vip_price_naira !== undefined) {
+      const parsed = parseFloat(vip_price_naira)
+      updateData.vip_price_naira = isNaN(parsed) || vip_price_naira === "" ? 0 : parsed
+    }
     if (image_url !== undefined) updateData.image_url = image_url
     if (status !== undefined) {
       updateData.status = status
