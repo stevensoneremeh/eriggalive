@@ -74,15 +74,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     let mounted = true
-    let checkComplete = false
 
     async function checkAdminAccess() {
-      if (checkComplete) return
-
       try {
         // Wait for auth to initialize
         if (!user) {
-          setHasAccess(null)
+          if (mounted) setHasAccess(null)
           return
         }
 
@@ -94,7 +91,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             setHasAccess(true)
             setDebugInfo({ method: "special_email", email: userEmail })
             setError(null)
-            checkComplete = true
           }
           return
         }
@@ -107,45 +103,56 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               setHasAccess(true)
               setDebugInfo({ method: "profile_context", role: profile.role, tier: profile.tier })
               setError(null)
-              checkComplete = true
             }
             return
           }
         }
 
-        // Fallback: Direct database check
-        const { data: userData, error: userError } = await supabase
-          .from("users")
-          .select("role, tier, email, is_active")
-          .eq("auth_user_id", user.id)
-          .single()
+        // Fallback: Direct database check (only if profile check failed)
+        try {
+          const { data: userData, error: userError } = await supabase
+            .from("users")
+            .select("role, tier, email, is_active")
+            .eq("auth_user_id", user.id)
+            .single()
 
-        if (!mounted) return
+          if (!mounted) return
 
-        if (userError) {
-          console.error("[Admin Layout] Database error:", userError)
-          setError("Unable to verify admin privileges")
-          setHasAccess(false)
-          return
-        }
+          if (userError) {
+            console.error("[Admin Layout] Database error:", userError)
+            setError("Unable to verify admin privileges")
+            setHasAccess(false)
+            return
+          }
 
-        if (userData) {
-          const hasDbAccess =
-            userData.role === "admin" ||
-            userData.role === "super_admin" ||
-            userData.tier === "enterprise"
+          if (userData) {
+            const hasDbAccess =
+              userData.role === "admin" ||
+              userData.role === "super_admin" ||
+              userData.tier === "enterprise"
 
-          if (hasDbAccess) {
-            setHasAccess(true)
-            setDebugInfo({ method: "database", role: userData.role, tier: userData.tier })
-            setError(null)
+            if (mounted) {
+              if (hasDbAccess) {
+                setHasAccess(true)
+                setDebugInfo({ method: "database", role: userData.role, tier: userData.tier })
+                setError(null)
+              } else {
+                setError("You do not have admin privileges")
+                setHasAccess(false)
+              }
+            }
           } else {
-            setError("You do not have admin privileges")
+            if (mounted) {
+              setError("User profile not found")
+              setHasAccess(false)
+            }
+          }
+        } catch (err) {
+          if (mounted) {
+            console.error("[Admin Layout] Unexpected error:", err)
+            setError("Failed to verify admin access")
             setHasAccess(false)
           }
-        } else {
-          setError("User profile not found")
-          setHasAccess(false)
         }
       } catch (err: any) {
         if (mounted) {

@@ -224,14 +224,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription = authSubscription
     }
 
+    // Set up session refresh interval (every 10 minutes instead of 50)
     const refreshInterval = setInterval(
-      () => {
-        if (user && supabase && !supabaseError) {
-          refreshSession()
+      async () => {
+        try {
+          const { data, error } = await supabase.auth.refreshSession()
+
+          if (error) {
+            console.error('[Auth] Session refresh error:', error)
+          } else if (data.session) {
+            setSession(data.session)
+            setUser(data.session.user)
+          }
+        } catch (err) {
+          console.error('[Auth] Session refresh failed:', err)
         }
       },
-      4 * 60 * 1000,
-    ) // Refresh every 4 minutes
+      10 * 60 * 1000, // 10 minutes
+    )
 
     return () => {
       mounted = false
@@ -281,7 +291,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         setLoading(true)
-        
+
         // Validate required fields
         if (!email || !password || !userData.username || !userData.full_name) {
           setLoading(false)

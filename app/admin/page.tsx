@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -36,15 +36,18 @@ export default function AdminOverviewPage() {
   })
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const fetchStats = async (showToast = false) => {
+  const fetchStats = useCallback(async (showToast = false) => {
     try {
       setRefreshing(true)
+      setError(null)
 
       const response = await fetch("/api/admin/dashboard-stats", {
         cache: "no-store",
       })
-      
+
       if (!response.ok) {
         throw new Error(`Failed to fetch dashboard stats: ${response.statusText}`)
       }
@@ -62,6 +65,7 @@ export default function AdminOverviewPage() {
 
         if (activeUsersError) {
           console.error("Error fetching active users:", activeUsersError)
+          // Optionally set an error state for this specific metric
         }
 
         const today = new Date()
@@ -73,6 +77,7 @@ export default function AdminOverviewPage() {
 
         if (newUsersError) {
           console.error("Error fetching new users:", newUsersError)
+          // Optionally set an error state for this specific metric
         }
 
         setStats({
@@ -82,30 +87,40 @@ export default function AdminOverviewPage() {
           totalEvents: apiStats.totalEvents,
           activeUsers: activeUsers || 0,
           newUsersToday: newUsersToday || 0,
-          revenueToday: 0,
-          ordersToday: 0,
+          revenueToday: apiStats.revenueToday || 0, // Assuming apiStats has these
+          ordersToday: apiStats.ordersToday || 0,   // Assuming apiStats has these
         })
+
+        setLastUpdated(new Date())
 
         if (showToast) {
           toast.success("Dashboard refreshed successfully")
         }
+      } else {
+        throw new Error(data.error || 'Failed to fetch stats from API')
       }
     } catch (error) {
       console.error("Error fetching admin stats:", error)
+      setError(error instanceof Error ? error.message : 'Failed to load dashboard stats. Please try again.')
       toast.error("Failed to load dashboard stats. Please try again.")
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }
+  }, [supabase]) // Include supabase in dependencies if it can change, though unlikely here
 
   useEffect(() => {
     if (user) {
       fetchStats()
-    }
-  }, [user])
 
-  if (loading) {
+      // Auto-refresh every 60 seconds (not continuous polling)
+      const interval = setInterval(fetchStats, 60000)
+
+      return () => clearInterval(interval)
+    }
+  }, [user, fetchStats]) // fetchStats is stable due to useCallback
+
+  if (loading && !error) { // Show loading indicator only if there's no error yet
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-teal"></div>
@@ -121,6 +136,11 @@ export default function AdminOverviewPage() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Overview</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
             Welcome to the Erigga Live admin dashboard. Monitor and manage your platform.
+            {lastUpdated && (
+              <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                (Last updated: {lastUpdated.toLocaleTimeString()})
+              </span>
+            )}
           </p>
         </div>
         <Button
@@ -134,6 +154,22 @@ export default function AdminOverviewPage() {
         </Button>
       </div>
 
+      {error && (
+        <Card className="border-red-200 bg-red-50 dark:border-red-700 dark:bg-red-800/50">
+          <CardContent className="pt-6">
+            <p className="text-red-600 dark:text-red-400 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              {error}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
@@ -144,7 +180,7 @@ export default function AdminOverviewPage() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalUsers.toLocaleString()}</div>
             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              <span className="text-green-600">+{stats.newUsersToday}</span> today
+              <span className="text-green-600">+{stats.newUsersToday.toLocaleString()}</span> today
             </p>
           </CardContent>
         </Card>
