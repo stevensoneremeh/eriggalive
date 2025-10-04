@@ -3,12 +3,12 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
 export const dynamic = "force-dynamic"
-export const revalidate = 30 // Cache for 30 seconds
+export const revalidate = 120 // Cache for 2 minutes
 
 // In-memory cache to prevent excessive requests
 let cachedStats: any = null
 let cacheTimestamp: number = 0
-const CACHE_DURATION = 30000 // 30 seconds
+const CACHE_DURATION = 120000 // 2 minutes (increased to reduce load)
 
 export async function GET() {
   try {
@@ -81,20 +81,48 @@ export async function GET() {
 
     const pendingAmount = pendingWithdrawals?.reduce((sum: number, w: any) => sum + (w.amount_naira || 0), 0) || 0
 
-    // Get active users count (last 24 hours)
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    // Get active users count (last 7 days to reduce load)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     const { count: activeUsersCount } = await supabase
       .from("users")
       .select("*", { count: "exact", head: true })
-      .gte("last_seen_at", oneDayAgo)
+      .gte("last_seen_at", sevenDaysAgo)
+
+    // Get new users today
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const { count: newUsersToday } = await supabase
+      .from("users")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", today.toISOString())
+
+    // Get today's revenue
+    const { data: todayRevenue } = await supabase
+      .from("coin_transactions")
+      .select("amount")
+      .eq("transaction_type", "purchase")
+      .eq("status", "completed")
+      .gte("created_at", today.toISOString())
+      .limit(500)
+
+    const revenueToday = todayRevenue?.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0) || 0
+
+    // Get today's orders
+    const { count: ordersToday } = await supabase
+      .from("coin_transactions")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", today.toISOString())
 
     const stats = {
       totalUsers: usersCount.count || 0,
       activeUsers: activeUsersCount || 0,
+      newUsersToday: newUsersToday || 0,
       totalTransactions: transactionsCount.count || 0,
       totalEvents: eventsCount.count || 0,
       totalWithdrawals: withdrawalsCount.count || 0,
       totalRevenue,
+      revenueToday,
+      ordersToday: ordersToday || 0,
       pendingWithdrawalAmount: pendingAmount,
       lastUpdated: now,
     }

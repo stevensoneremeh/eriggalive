@@ -280,7 +280,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 sm:px-4">
+      <ScrollArea className="flex-1 px-3 sm:px-4">
         <nav className="py-4 space-y-2">
           {adminNavItems.map((item) => {
             const Icon = item.icon
@@ -304,7 +304,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             )
           })}
         </nav>
-      </div>
+      </ScrollArea>
 
       <div className="p-4 border-t">
         <Button

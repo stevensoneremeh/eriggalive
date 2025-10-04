@@ -56,39 +56,15 @@ export default function AdminOverviewPage() {
       if (data.success) {
         const apiStats = data.stats
 
-        const sevenDaysAgo = new Date()
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-        const { count: activeUsers, error: activeUsersError } = await supabase
-          .from("users")
-          .select("*", { count: "exact", head: true })
-          .gte("last_seen_at", sevenDaysAgo.toISOString())
-
-        if (activeUsersError) {
-          console.error("Error fetching active users:", activeUsersError)
-          // Optionally set an error state for this specific metric
-        }
-
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        const { count: newUsersToday, error: newUsersError } = await supabase
-          .from("users")
-          .select("*", { count: "exact", head: true })
-          .gte("created_at", today.toISOString())
-
-        if (newUsersError) {
-          console.error("Error fetching new users:", newUsersError)
-          // Optionally set an error state for this specific metric
-        }
-
         setStats({
           totalUsers: apiStats.totalUsers,
           totalRevenue: apiStats.totalRevenue,
           totalOrders: apiStats.totalTransactions,
           totalEvents: apiStats.totalEvents,
-          activeUsers: activeUsers || 0,
-          newUsersToday: newUsersToday || 0,
-          revenueToday: apiStats.revenueToday || 0, // Assuming apiStats has these
-          ordersToday: apiStats.ordersToday || 0,   // Assuming apiStats has these
+          activeUsers: apiStats.activeUsers || 0,
+          newUsersToday: apiStats.newUsersToday || 0,
+          revenueToday: apiStats.revenueToday || 0,
+          ordersToday: apiStats.ordersToday || 0,
         })
 
         setLastUpdated(new Date())
@@ -113,12 +89,12 @@ export default function AdminOverviewPage() {
     if (user) {
       fetchStats()
 
-      // Auto-refresh every 60 seconds (not continuous polling)
-      const interval = setInterval(fetchStats, 60000)
+      // Auto-refresh every 5 minutes instead of 1 minute to reduce load
+      const interval = setInterval(() => fetchStats(false), 300000)
 
       return () => clearInterval(interval)
     }
-  }, [user, fetchStats]) // fetchStats is stable due to useCallback
+  }, [user, fetchStats])
 
   if (loading && !error) { // Show loading indicator only if there's no error yet
     return (
