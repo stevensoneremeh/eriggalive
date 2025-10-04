@@ -73,7 +73,7 @@ export default function DashboardPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  Welcome back, {profile?.display_name || user?.email}!
+                  Welcome back, {profile?.full_name || user?.email}!
                 </h1>
                 <p className="text-gray-600 dark:text-gray-300 mt-1">
                   Here's what's happening in your Erigga Live community
@@ -266,10 +266,10 @@ export default function DashboardPage() {
                 <CardContent className="space-y-4">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                      {profile?.display_name?.charAt(0) || user?.email?.charAt(0) || "U"}
+                      {profile?.full_name?.charAt(0) || user?.email?.charAt(0) || "U"}
                     </div>
                     <div>
-                      <p className="font-medium">{profile?.display_name || "User"}</p>
+                      <p className="font-medium">{profile?.full_name || "User"}</p>
                       <p className="text-sm text-gray-500">@{profile?.username || "username"}</p>
                     </div>
                   </div>

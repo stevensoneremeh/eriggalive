@@ -49,7 +49,7 @@ export async function GET() {
       .eq("transaction_type", "purchase")
       .eq("status", "completed")
 
-    const totalRevenue = completedTransactions?.reduce((sum, tx) => sum + tx.amount, 0) || 0
+    const totalRevenue = completedTransactions?.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0) || 0
 
     // Get pending withdrawals
     const { data: pendingWithdrawals } = await supabase
@@ -57,7 +57,7 @@ export async function GET() {
       .select("amount_naira")
       .eq("status", "pending")
 
-    const pendingAmount = pendingWithdrawals?.reduce((sum, w) => sum + (w.amount_naira || 0), 0) || 0
+    const pendingAmount = pendingWithdrawals?.reduce((sum: number, w: any) => sum + (w.amount_naira || 0), 0) || 0
 
     return NextResponse.json({
       success: true,

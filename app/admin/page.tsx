@@ -5,9 +5,10 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Users, DollarSign, ShoppingCart, Calendar, Activity, Eye } from "lucide-react"
+import { Users, DollarSign, ShoppingCart, Calendar, Activity, Eye, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
+import { toast } from "sonner"
 
 interface AdminStats {
   totalUsers: number
@@ -34,59 +35,75 @@ export default function AdminOverviewPage() {
     ordersToday: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const fetchStats = async (showToast = false) => {
+    try {
+      setRefreshing(true)
+
+      const response = await fetch("/api/admin/dashboard-stats", {
+        cache: "no-store",
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch dashboard stats: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        const apiStats = data.stats
+
+        const sevenDaysAgo = new Date()
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+        const { count: activeUsers, error: activeUsersError } = await supabase
+          .from("users")
+          .select("*", { count: "exact", head: true })
+          .gte("last_seen_at", sevenDaysAgo.toISOString())
+
+        if (activeUsersError) {
+          console.error("Error fetching active users:", activeUsersError)
+        }
+
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const { count: newUsersToday, error: newUsersError } = await supabase
+          .from("users")
+          .select("*", { count: "exact", head: true })
+          .gte("created_at", today.toISOString())
+
+        if (newUsersError) {
+          console.error("Error fetching new users:", newUsersError)
+        }
+
+        setStats({
+          totalUsers: apiStats.totalUsers,
+          totalRevenue: apiStats.totalRevenue,
+          totalOrders: apiStats.totalTransactions,
+          totalEvents: apiStats.totalEvents,
+          activeUsers: activeUsers || 0,
+          newUsersToday: newUsersToday || 0,
+          revenueToday: 0,
+          ordersToday: 0,
+        })
+
+        if (showToast) {
+          toast.success("Dashboard refreshed successfully")
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching admin stats:", error)
+      toast.error("Failed to load dashboard stats. Please try again.")
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }
 
   useEffect(() => {
-    async function fetchStats() {
-      try {
-        setLoading(true)
-
-        // Fetch from API endpoint
-        const response = await fetch("/api/admin/dashboard-stats")
-        if (!response.ok) {
-          throw new Error("Failed to fetch stats")
-        }
-
-        const data = await response.json()
-        if (data.success) {
-          const apiStats = data.stats
-
-          // Fetch additional local stats
-          const sevenDaysAgo = new Date()
-          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-          const { count: activeUsers } = await supabase
-            .from("users")
-            .select("*", { count: "exact", head: true })
-            .gte("last_seen_at", sevenDaysAgo.toISOString())
-
-          const today = new Date()
-          today.setHours(0, 0, 0, 0)
-          const { count: newUsersToday } = await supabase
-            .from("users")
-            .select("*", { count: "exact", head: true })
-            .gte("created_at", today.toISOString())
-
-          setStats({
-            totalUsers: apiStats.totalUsers,
-            totalRevenue: apiStats.totalRevenue,
-            totalOrders: apiStats.totalTransactions,
-            totalEvents: apiStats.totalEvents,
-            activeUsers: activeUsers || 0,
-            newUsersToday: newUsersToday || 0,
-            revenueToday: 0,
-            ordersToday: 0,
-          })
-        }
-      } catch (error) {
-        console.error("Error fetching admin stats:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     if (user) {
       fetchStats()
     }
-  }, [user, supabase])
+  }, [user])
 
   if (loading) {
     return (
@@ -99,11 +116,22 @@ export default function AdminOverviewPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Overview</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Welcome to the Erigga Live admin dashboard. Monitor and manage your platform.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Overview</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Welcome to the Erigga Live admin dashboard. Monitor and manage your platform.
+          </p>
+        </div>
+        <Button
+          onClick={() => fetchStats(true)}
+          disabled={refreshing}
+          variant="outline"
+          className="bg-transparent"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Stats Grid */}

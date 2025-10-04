@@ -6,6 +6,14 @@ EriggaLive is a comprehensive fan platform for the Nigerian artist Erigga, built
 
 ## Recent Changes
 
+### October 4, 2025 - Critical Admin Dashboard Fix
+- **Fixed infinite request loop**: The admin dashboard was making hundreds of requests per second due to `supabase` being in the useEffect dependency array
+- **Added proper error handling**: Dashboard now gracefully handles failed API requests with user-friendly error messages
+- **Added manual refresh button**: Users can now manually refresh dashboard stats instead of automatic polling
+- **Fixed type errors**: Corrected `display_name` references to use `full_name` from the User type
+- **Improved performance**: Dashboard only fetches data once on mount instead of continuously
+- **Result**: Eliminated 503 errors and ERR_INSUFFICIENT_RESOURCES errors, dashboard now loads efficiently
+
 ### October 2, 2025 - Enhanced Admin Dashboard & Live Features
 - **Database Schema**: Created comprehensive database tables
   - `homepage` - Content sections (hero, featured, announcements)
