@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 
 export async function GET() {
@@ -36,6 +37,31 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
     return NextResponse.json({ stream: data }, { status: 201 })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user || user.email !== "info@eriggalive.com") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get("id")
+
+    if (!id) {
+      return NextResponse.json({ error: "ID is required" }, { status: 400 })
+    }
+
+    const { error } = await supabase.from("radio").delete().eq("id", id)
+
+    if (error) throw error
+    return new NextResponse(null, { status: 204 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
