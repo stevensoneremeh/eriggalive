@@ -1,4 +1,6 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { createServerClient } from "@supabase/ssr"
+import { cookies } from "next/headers"
 
 // Check if we're in a browser environment
 const isBrowser = typeof window !== "undefined"
