@@ -40,6 +40,7 @@ const adminNavItems = [
   { name: "Overview", href: "/admin", icon: Home },
   { name: "Dashboard", href: "/admin/dashboard", icon: TrendingUp },
   { name: "User Management", href: "/admin/users-management", icon: Users },
+  { name: "Content Manager", href: "/admin/content-manager", icon: FileText },
   { name: "Homepage Media", href: "/admin/homepage-media", icon: FileText },
   { name: "Homepage Content", href: "/admin/homepage-content", icon: FileText },
   { name: "Merch", href: "/admin/merch", icon: ShoppingBag },
