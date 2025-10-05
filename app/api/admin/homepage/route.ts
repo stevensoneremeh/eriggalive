@@ -1,20 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
-
-// Assume createClient is defined elsewhere and correctly initializes Supabase
-// For example:
-// import { createClient } from '@/utils/supabase/server';
-
-// Placeholder for createClient if it's not explicitly provided in the context
-async function createClient() {
-  // In a real scenario, this would import and initialize your Supabase client
-  // For demonstration, we'll mock its behavior if it's not available.
-  // If createRouteHandlerClient is still intended to be used, this mock might be incorrect.
-  // Based on the change, it seems createClient is the intended replacement.
-  const supabase = createRouteHandlerClient({ cookies });
-  return supabase;
-}
+import { createClient } from "@/lib/supabase/server"
 
 
 export async function GET() {
