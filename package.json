@@ -1,8 +1,6 @@
-{
-<<<<<<< HEAD
-  "name": "eriggalive",
->>>>>>> new
-  "version": "0.1.0",
+  {
+    "name": "erigga-fan-platform", // Choose the desired name
+    "version": "0.1.0",
   "private": true,
   "scripts": {
     "build": "next build",
