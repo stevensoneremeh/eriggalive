@@ -13,7 +13,6 @@
     "@hookform/resolvers": "latest",
     "@jest/globals": "latest",
     "@mux/mux-player-react": "^3.6.1",
-    "@next/font": "13.4.19",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "latest",
     "@radix-ui/react-aspect-ratio": "latest",
