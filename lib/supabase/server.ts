@@ -1,4 +1,4 @@
-import { createServerClient } from "@supabase/ssr"
+import { createServerClient as createSupabaseServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import type { Database } from "@/types/database"
 
@@ -64,7 +64,7 @@ export async function createClient() {
     } as any
   }
 
-  return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
+  return createSupabaseServerClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll()
@@ -89,7 +89,7 @@ export async function createAdminClient() {
     throw new Error("Missing Supabase admin environment variables")
   }
 
-  return createServerClient<Database>(supabaseUrl, supabaseServiceKey, {
+  return createSupabaseServerClient<Database>(supabaseUrl, supabaseServiceKey, {
     cookies: {
       getAll() {
         return []
@@ -105,4 +105,7 @@ export async function createAdminClient() {
   })
 }
 
-// Legacy exports removed - use createClient() or createAdminClient() instead
+// Legacy exports - aliases for backward compatibility
+export const createServerSupabaseClient = createClient
+export const createAdminSupabaseClient = createAdminClient
+// Note: createServerClient is from @supabase/ssr, not aliased here to avoid conflicts
