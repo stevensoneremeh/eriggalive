@@ -12,20 +12,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
+import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { Plus, Pencil, Trash2, FileText, Image, Video, Globe } from "lucide-react"
+import { Plus, Pencil, Trash2, FileText, Image, Video, Globe, Upload, Eye, EyeOff, Save, X } from "lucide-react"
 
 const PAGES = [
-  { value: "homepage", label: "Homepage" },
-  { value: "about", label: "About" },
-  { value: "events", label: "Events" },
-  { value: "merch", label: "Merchandise" },
-  { value: "vault", label: "Media Vault" },
-  { value: "radio", label: "Radio" },
-  { value: "community", label: "Community" },
-  { value: "chronicles", label: "Chronicles" },
-  { value: "coins", label: "Coins" },
-  { value: "premium", label: "Premium" },
+  { value: "homepage", label: "Homepage", icon: "🏠" },
+  { value: "about", label: "About", icon: "ℹ️" },
+  { value: "events", label: "Events", icon: "🎫" },
+  { value: "merch", label: "Merchandise", icon: "🛍️" },
+  { value: "vault", label: "Media Vault", icon: "🎵" },
+  { value: "radio", label: "Radio", icon: "📻" },
+  { value: "community", label: "Community", icon: "👥" },
+  { value: "chronicles", label: "Chronicles", icon: "📖" },
+  { value: "coins", label: "Coins", icon: "🪙" },
+  { value: "premium", label: "Premium", icon: "👑" },
+  { value: "dashboard", label: "Dashboard", icon: "📊" },
+  { value: "profile", label: "Profile", icon: "👤" },
+  { value: "wallet", label: "Wallet", icon: "💰" },
+  { value: "tickets", label: "Tickets", icon: "🎟️" },
 ]
 
 const SECTION_TYPES = [
@@ -64,6 +69,8 @@ export default function ContentManagerPage() {
     custom_css: "",
     metadata: {},
   })
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [previewMode, setPreviewMode] = useState(false)
 
   useEffect(() => {
     fetchPages()
@@ -176,6 +183,39 @@ export default function ContentManagerPage() {
     })
   }
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size must be less than 5MB")
+      return
+    }
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      toast.error("Please upload an image file")
+      return
+    }
+
+    setUploadingImage(true)
+    try {
+      // For now, use a placeholder URL or implement actual upload to Supabase storage
+      // You can integrate with your existing media upload system
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setFormData({ ...formData, image_url: reader.result as string })
+        toast.success("Image loaded successfully")
+      }
+      reader.readAsDataURL(file)
+    } catch (error) {
+      toast.error("Failed to upload image")
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -190,10 +230,11 @@ export default function ContentManagerPage() {
       </div>
 
       <Tabs value={selectedPage} onValueChange={setSelectedPage}>
-        <TabsList className="grid grid-cols-5 lg:grid-cols-10 gap-2">
+        <TabsList className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
           {PAGES.map((page) => (
-            <TabsTrigger key={page.value} value={page.value}>
-              {page.label}
+            <TabsTrigger key={page.value} value={page.value} className="flex items-center gap-2">
+              <span>{page.icon}</span>
+              <span className="hidden sm:inline">{page.label}</span>
             </TabsTrigger>
           ))}
         </TabsList>
@@ -259,92 +300,264 @@ export default function ContentManagerPage() {
       </Tabs>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingContent ? "Edit" : "Add"} Content Section</DialogTitle>
+            <DialogTitle className="flex items-center justify-between">
+              <span>{editingContent ? "Edit" : "Add"} Content Section</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPreviewMode(!previewMode)}
+              >
+                {previewMode ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                {previewMode ? "Edit Mode" : "Preview"}
+              </Button>
+            </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Page</Label>
-                <Select value={formData.page_name} onValueChange={(value) => setFormData({ ...formData, page_name: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {PAGES.map((page) => (
-                      <SelectItem key={page.value} value={page.value}>{page.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label>Section Type</Label>
-                <Select value={formData.section_type} onValueChange={(value) => setFormData({ ...formData, section_type: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {SECTION_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          
+          {previewMode ? (
+            <div className="py-4 border rounded-lg p-6 bg-muted/50">
+              <div className="space-y-4">
+                {formData.image_url && (
+                  <img src={formData.image_url} alt="Preview" className="w-full h-48 object-cover rounded-lg" />
+                )}
+                {formData.title && <h2 className="text-2xl font-bold">{formData.title}</h2>}
+                {formData.subtitle && <h3 className="text-xl text-muted-foreground">{formData.subtitle}</h3>}
+                {formData.content_text && <p className="whitespace-pre-wrap">{formData.content_text}</p>}
+                {formData.button_text && (
+                  <Button>{formData.button_text}</Button>
+                )}
               </div>
             </div>
+          ) : (
+            <Tabs defaultValue="content" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="content">Content</TabsTrigger>
+                <TabsTrigger value="media">Media</TabsTrigger>
+                <TabsTrigger value="settings">Settings</TabsTrigger>
+              </TabsList>
 
-            <div className="grid gap-2">
-              <Label>Title</Label>
-              <Input value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required />
-            </div>
+              <TabsContent value="content" className="space-y-4 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Page *</Label>
+                    <Select value={formData.page_name} onValueChange={(value) => setFormData({ ...formData, page_name: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {PAGES.map((page) => (
+                          <SelectItem key={page.value} value={page.value}>
+                            <span className="flex items-center gap-2">
+                              <span>{page.icon}</span>
+                              {page.label}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Section Type *</Label>
+                    <Select value={formData.section_type} onValueChange={(value) => setFormData({ ...formData, section_type: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {SECTION_TYPES.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
-            <div className="grid gap-2">
-              <Label>Subtitle</Label>
-              <Input value={formData.subtitle} onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })} />
-            </div>
+                <div className="grid gap-2">
+                  <Label>Page Title (Optional)</Label>
+                  <Input 
+                    value={formData.page_title} 
+                    onChange={(e) => setFormData({ ...formData, page_title: e.target.value })} 
+                    placeholder="e.g., Welcome to Erigga Live"
+                  />
+                </div>
 
-            <div className="grid gap-2">
-              <Label>Content Text</Label>
-              <Textarea value={formData.content_text} onChange={(e) => setFormData({ ...formData, content_text: e.target.value })} rows={4} />
-            </div>
+                <div className="grid gap-2">
+                  <Label>Section Title *</Label>
+                  <Input 
+                    value={formData.title} 
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })} 
+                    placeholder="e.g., Latest Music"
+                    required 
+                  />
+                </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Image URL</Label>
-                <Input value={formData.image_url} onChange={(e) => setFormData({ ...formData, image_url: e.target.value })} />
-              </div>
-              <div className="grid gap-2">
-                <Label>Video URL</Label>
-                <Input value={formData.video_url} onChange={(e) => setFormData({ ...formData, video_url: e.target.value })} />
-              </div>
-            </div>
+                <div className="grid gap-2">
+                  <Label>Subtitle</Label>
+                  <Input 
+                    value={formData.subtitle} 
+                    onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })} 
+                    placeholder="e.g., Stream exclusive tracks"
+                  />
+                </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Button Text</Label>
-                <Input value={formData.button_text} onChange={(e) => setFormData({ ...formData, button_text: e.target.value })} />
-              </div>
-              <div className="grid gap-2">
-                <Label>Button Link</Label>
-                <Input value={formData.button_link} onChange={(e) => setFormData({ ...formData, button_link: e.target.value })} />
-              </div>
-            </div>
+                <div className="grid gap-2">
+                  <Label>Content Text</Label>
+                  <Textarea 
+                    value={formData.content_text} 
+                    onChange={(e) => setFormData({ ...formData, content_text: e.target.value })} 
+                    rows={6}
+                    placeholder="Enter the main content for this section..."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {formData.content_text.length} characters
+                  </p>
+                </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Display Order</Label>
-                <Input type="number" value={formData.section_order} onChange={(e) => setFormData({ ...formData, section_order: parseInt(e.target.value) })} />
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch checked={formData.is_active} onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
-                <Label>Active</Label>
-              </div>
-            </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Button Text</Label>
+                    <Input 
+                      value={formData.button_text} 
+                      onChange={(e) => setFormData({ ...formData, button_text: e.target.value })} 
+                      placeholder="e.g., Learn More"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Button Link</Label>
+                    <Input 
+                      value={formData.button_link} 
+                      onChange={(e) => setFormData({ ...formData, button_link: e.target.value })} 
+                      placeholder="/premium"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
 
-            <div className="grid gap-2">
-              <Label>Custom CSS (optional)</Label>
-              <Textarea value={formData.custom_css} onChange={(e) => setFormData({ ...formData, custom_css: e.target.value })} rows={3} placeholder=".custom-class { color: red; }" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSubmit}>{editingContent ? "Update" : "Add"}</Button>
+              <TabsContent value="media" className="space-y-4 mt-4">
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label>Image Upload</Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={uploadingImage}
+                        className="flex-1"
+                      />
+                      <Button 
+                        variant="outline" 
+                        disabled={uploadingImage}
+                        onClick={() => {
+                          const input = document.querySelector('input[type="file"]') as HTMLInputElement
+                          input?.click()
+                        }}
+                      >
+                        <Upload className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Or enter image URL below (max 5MB)
+                    </p>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Image URL</Label>
+                    <Input 
+                      value={formData.image_url} 
+                      onChange={(e) => setFormData({ ...formData, image_url: e.target.value })} 
+                      placeholder="https://example.com/image.jpg"
+                    />
+                    {formData.image_url && (
+                      <div className="mt-2 border rounded-lg overflow-hidden">
+                        <img 
+                          src={formData.image_url} 
+                          alt="Preview" 
+                          className="w-full h-48 object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = '/placeholder.svg'
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Video URL (YouTube, Vimeo, etc.)</Label>
+                    <Input 
+                      value={formData.video_url} 
+                      onChange={(e) => setFormData({ ...formData, video_url: e.target.value })} 
+                      placeholder="https://youtube.com/watch?v=..."
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="settings" className="space-y-4 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Display Order</Label>
+                    <Input 
+                      type="number" 
+                      value={formData.section_order} 
+                      onChange={(e) => setFormData({ ...formData, section_order: parseInt(e.target.value) || 0 })} 
+                      min="0"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Lower numbers appear first
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2 pt-6">
+                    <Switch 
+                      checked={formData.is_active} 
+                      onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} 
+                      id="active-switch"
+                    />
+                    <Label htmlFor="active-switch" className="cursor-pointer">
+                      {formData.is_active ? "Active" : "Inactive"}
+                    </Label>
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Custom CSS (Advanced)</Label>
+                  <Textarea 
+                    value={formData.custom_css} 
+                    onChange={(e) => setFormData({ ...formData, custom_css: e.target.value })} 
+                    rows={6}
+                    placeholder=".custom-section { background: linear-gradient(...); }"
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Add custom CSS to style this section uniquely
+                  </p>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Metadata (JSON)</Label>
+                  <Textarea 
+                    value={JSON.stringify(formData.metadata, null, 2)} 
+                    onChange={(e) => {
+                      try {
+                        setFormData({ ...formData, metadata: JSON.parse(e.target.value) })
+                      } catch (err) {
+                        // Invalid JSON, don't update
+                      }
+                    }}
+                    rows={4}
+                    placeholder='{ "key": "value" }'
+                    className="font-mono text-sm"
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              <X className="h-4 w-4 mr-2" />
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit}>
+              <Save className="h-4 w-4 mr-2" />
+              {editingContent ? "Update" : "Add"} Content
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
