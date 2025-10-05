@@ -1,18 +1,22 @@
 import { NextResponse } from "next/server"
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase/server"
 
 export async function GET() {
-  const supabase = createRouteHandlerClient({ cookies })
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  if (!user) {
-    return NextResponse.json({ balance: 0 })
+    if (!user) {
+      return NextResponse.json({ balance: 0 })
+    }
+
+    const { data } = await supabase.from("wallet").select("balance").eq("user_id", user.id).single()
+
+    return NextResponse.json({ balance: data?.balance ?? 0 })
+  } catch (error) {
+    console.error("Error fetching wallet balance:", error)
+    return NextResponse.json({ balance: 0 }, { status: 500 })
   }
-
-  const { data } = await supabase.from("wallet").select("balance").eq("user_id", user.id).single()
-
-  return NextResponse.json({ balance: data?.balance ?? 0 })
 }
