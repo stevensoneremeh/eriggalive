@@ -1,46 +1,35 @@
-'use client'
+"use client"
 
-import { useEffect, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Progress } from '@/components/ui/progress'
-import { 
-  Users, 
-  TrendingUp, 
-  DollarSign, 
-  Calendar,
-  BarChart3,
-  Settings,
-  Crown,
-  Star,
-  Activity,
-  ShoppingBag
-} from 'lucide-react'
-import { AuthGuard } from '@/components/auth-guard'
+import { useEffect, useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Building2, Users, TrendingUp, DollarSign, Calendar, Package } from "lucide-react"
+import { AuthGuard } from "@/components/auth-guard"
 
-export default function EnterpriseDashboard() {
-  const [mounted, setMounted] = useState(false)
+export default function EnterpriseDashboardPage() {
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    activeUsers: 0,
+    growthRate: 0,
+    pendingOrders: 0,
+  })
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    // Fetch enterprise stats
+    const fetchStats = async () => {
+      // TODO: Implement API call
+      setStats({
+        totalRevenue: 125000,
+        activeUsers: 1250,
+        growthRate: 23.5,
+        pendingOrders: 45,
+      })
+    }
 
-  if (!mounted) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
+    fetchStats()
+  }, [])
 
   return (
     <AuthGuard>
@@ -49,206 +38,116 @@ export default function EnterpriseDashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Enterprise Dashboard</h1>
-            <p className="text-muted-foreground">
-              Advanced analytics and management tools for enterprise users
-            </p>
+            <p className="text-muted-foreground">Manage your organization's performance and analytics</p>
           </div>
-          <Badge variant="secondary" className="text-amber-600 border-amber-200">
-            <Crown className="h-4 w-4 mr-1" />
-            Enterprise Tier
+          <Badge variant="secondary" className="text-sm">
+            <Building2 className="w-4 h-4 mr-2" />
+            Enterprise Plan
           </Badge>
         </div>
 
-        {/* Key Metrics */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        {/* Stats Grid */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">45,231</div>
-              <p className="text-xs text-muted-foreground">
-                +20.1% from last month
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">₦12.5M</div>
-              <p className="text-xs text-muted-foreground">
-                +15.3% from last month
-              </p>
+              <div className="text-2xl font-bold">₦{stats.totalRevenue.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">+20.1% from last month</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
-              <Activity className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">12,234</div>
-              <p className="text-xs text-muted-foreground">
-                +7.8% from last hour
-              </p>
+              <div className="text-2xl font-bold">{stats.activeUsers.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">+180 from last month</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
-              <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Growth Rate</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">8,456</div>
-              <p className="text-xs text-muted-foreground">
-                +12.5% from last month
-              </p>
+              <div className="text-2xl font-bold">{stats.growthRate}%</div>
+              <p className="text-xs text-muted-foreground">+2.5% from last month</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.pendingOrders}</div>
+              <p className="text-xs text-muted-foreground">-12 from yesterday</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Tabs Section */}
-        <Tabs defaultValue="analytics" className="space-y-4">
+        {/* Main Content */}
+        <Tabs defaultValue="overview" className="space-y-4">
           <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
+            <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="analytics" className="space-y-4">
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Platform Performance</CardTitle>
-                  <CardDescription>
-                    Overall platform metrics and KPIs
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>User Engagement</span>
-                      <span>78%</span>
-                    </div>
-                    <Progress value={78} />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Content Quality</span>
-                      <span>92%</span>
-                    </div>
-                    <Progress value={92} />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>System Health</span>
-                      <span>95%</span>
-                    </div>
-                    <Progress value={95} />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Revenue Breakdown</CardTitle>
-                  <CardDescription>
-                    Revenue sources and distribution
-                  </CardDescription>
-                </Header>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Memberships</span>
-                      <span>₦5.2M</span>
-                    </div>
-                    <Progress value={41} />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Events</span>
-                      <span>₦4.8M</span>
-                    </div>
-                    <Progress value={38} />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Merchandise</span>
-                      <span>₦2.5M</span>
-                    </div>
-                    <Progress value={20} />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="users" className="space-y-4">
+          <TabsContent value="overview" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>User Distribution</CardTitle>
-                <CardDescription>
-                  Breakdown by tier and activity
-                </CardDescription>
+                <CardTitle>Recent Activity</CardTitle>
+                <CardDescription>Your organization's latest activities and updates</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Crown className="h-4 w-4 text-amber-500" />
-                      <span className="text-sm font-medium">Enterprise Users</span>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">New user registration</p>
+                      <p className="text-xs text-muted-foreground">2 hours ago</p>
                     </div>
-                    <div className="text-sm text-muted-foreground">1,234</div>
+                    <Button variant="outline" size="sm">View</Button>
                   </div>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Star className="h-4 w-4 text-blue-500" />
-                      <span className="text-sm font-medium">Erigga Indigen</span>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">Order completed</p>
+                      <p className="text-xs text-muted-foreground">4 hours ago</p>
                     </div>
-                    <div className="text-sm text-muted-foreground">8,456</div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-green-500" />
-                      <span className="text-sm font-medium">Erigga Citizen</span>
-                    </div>
-                    <div className="text-sm text-muted-foreground">35,541</div>
+                    <Button variant="outline" size="sm">View</Button>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="settings" className="space-y-4">
+          <TabsContent value="analytics" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Enterprise Settings</CardTitle>
-                <CardDescription>
-                  Manage your enterprise configuration
-                </CardDescription>
+                <CardTitle>Analytics Dashboard</CardTitle>
+                <CardDescription>Detailed insights and performance metrics</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <Button className="w-full" variant="outline">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Configure Settings
-                  </Button>
-                  <Button className="w-full" variant="outline">
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    Export Analytics
-                  </Button>
-                  <Button className="w-full" variant="outline">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Schedule Reports
-                  </Button>
-                </div>
+                <p className="text-sm text-muted-foreground">Analytics content coming soon...</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="reports" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Custom Reports</CardTitle>
+                <CardDescription>Generate and download custom reports</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">Reports feature coming soon...</p>
               </CardContent>
             </Card>
           </TabsContent>
