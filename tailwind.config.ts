@@ -3,6 +3,7 @@ import type { Config } from "tailwindcss"
 const config: Config = {
   darkMode: ["class"],
   content: [
+<<<<<<< HEAD
     "./pages/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
     "./app/**/*.{ts,tsx}",
@@ -25,6 +26,26 @@ const config: Config = {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+=======
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+>>>>>>> new
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -33,10 +54,13 @@ const config: Config = {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
         },
+<<<<<<< HEAD
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
         },
+=======
+>>>>>>> new
         muted: {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
@@ -45,6 +69,7 @@ const config: Config = {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
+<<<<<<< HEAD
         popover: {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
@@ -87,6 +112,39 @@ const config: Config = {
         blood: {
           primary: "hsl(var(--blood-primary))",
           secondary: "hsl(var(--blood-secondary))",
+=======
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        chart: {
+          "1": "hsl(var(--chart-1))",
+          "2": "hsl(var(--chart-2))",
+          "3": "hsl(var(--chart-3))",
+          "4": "hsl(var(--chart-4))",
+          "5": "hsl(var(--chart-5))",
+        },
+        brand: {
+          lime: "#C4FF0D",
+          "lime-dark": "#A3D60B",
+          "lime-light": "#D7FF5C",
+          teal: "#002B23",
+          "teal-light": "#004D3D",
+          "teal-dark": "#001A14",
+        },
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar-background))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          primary: "hsl(var(--sidebar-primary))",
+          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
+          accent: "hsl(var(--sidebar-accent))",
+          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
+          border: "hsl(var(--sidebar-border))",
+          ring: "hsl(var(--sidebar-ring))",
+>>>>>>> new
         },
       },
       borderRadius: {
@@ -96,6 +154,7 @@ const config: Config = {
       },
       keyframes: {
         "accordion-down": {
+<<<<<<< HEAD
           from: { height: "0" },
           to: { height: "var(--radix-accordion-content-height)" },
         },
@@ -127,12 +186,28 @@ const config: Config = {
           "50%": {
             boxShadow: "0 0 0 4px rgba(255, 0, 0, 0.05)",
             borderColor: "rgba(255, 0, 0, 0.2)",
+=======
+          from: {
+            height: "0",
+          },
+          to: {
+            height: "var(--radix-accordion-content-height)",
+          },
+        },
+        "accordion-up": {
+          from: {
+            height: "var(--radix-accordion-content-height)",
+          },
+          to: {
+            height: "0",
+>>>>>>> new
           },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+<<<<<<< HEAD
         "fade-in": "fade-in 0.5s ease-out",
         "slide-in": "slide-in 0.3s ease-out",
         glow: "glow 2s ease-in-out infinite",
@@ -146,10 +221,16 @@ const config: Config = {
       backgroundImage: {
         "harkonnen-gradient": "linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(20, 20, 20, 0.8) 100%)",
         "brand-gradient": "linear-gradient(135deg, rgba(212, 237, 58, 0.1) 0%, rgba(0, 77, 64, 0.05) 100%)",
+=======
+>>>>>>> new
       },
     },
   },
   plugins: [require("tailwindcss-animate")],
+<<<<<<< HEAD
 } satisfies Config
+=======
+}
+>>>>>>> new
 
 export default config

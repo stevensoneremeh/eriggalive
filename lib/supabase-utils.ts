@@ -41,6 +41,7 @@ const createMockClient = () => {
       select: (columns?: string) => ({
         eq: (column: string, value: any) => ({
           single: () => {
+<<<<<<< HEAD
             if (table === "users" && column === "auth_user_id") {
               return Promise.resolve({
                 data: {
@@ -49,6 +50,16 @@ const createMockClient = () => {
                   username: "mockuser",
                   tier: "grassroot",
                   coins_balance: 500,
+=======
+            if (table === "user_profiles" && column === "user_id") {
+              return Promise.resolve({
+                data: {
+                  id: 1,
+                  user_id: value,
+                  username: "mockuser",
+                  tier: "grassroot",
+                  coins: 500,
+>>>>>>> new
                 },
                 error: null,
               })
@@ -92,6 +103,7 @@ export const createMockServerClient = () => {
       select: (query?: string) => ({
         eq: (column: string, value: any) => ({
           single: () => {
+<<<<<<< HEAD
             if (table === "users" && column === "auth_user_id") {
               return Promise.resolve({
                 data: {
@@ -100,6 +112,16 @@ export const createMockServerClient = () => {
                   username: "mockuser",
                   tier: "grassroot",
                   coins_balance: 500,
+=======
+            if (table === "user_profiles" && column === "user_id") {
+              return Promise.resolve({
+                data: {
+                  id: 1,
+                  user_id: value,
+                  username: "mockuser",
+                  tier: "grassroot",
+                  coins: 500,
+>>>>>>> new
                 },
                 error: null,
               })

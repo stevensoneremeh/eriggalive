@@ -23,6 +23,7 @@ export default function DashboardPage() {
   }
 
   const getTierColor = (tier: string) => {
+<<<<<<< HEAD
     switch (tier) {
       case "grassroot":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
@@ -34,10 +35,23 @@ export default function DashboardPage() {
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+=======
+    const normalizedTier = tier?.toLowerCase() || "erigga_citizen"
+    switch (normalizedTier) {
+      case "erigga_citizen":
+        return "bg-green-100 text-green-800 border-green-200"
+      case "erigga_indigen":
+        return "bg-blue-100 text-blue-800 border-blue-200"
+      case "enterprise":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      default:
+        return "bg-green-100 text-green-800 border-green-200"
+>>>>>>> new
     }
   }
 
   const getTierProgress = (tier: string) => {
+<<<<<<< HEAD
     switch (tier) {
       case "grassroot":
         return 25
@@ -49,6 +63,32 @@ export default function DashboardPage() {
         return 100
       default:
         return 0
+=======
+    const normalizedTier = tier?.toLowerCase() || "erigga_citizen"
+    switch (normalizedTier) {
+      case "erigga_citizen":
+        return 33
+      case "erigga_indigen":
+        return 66
+      case "enterprise":
+        return 100
+      default:
+        return 33
+    }
+  }
+
+  const getTierDisplayName = (tier: string) => {
+    const normalizedTier = tier?.toLowerCase() || "erigga_citizen"
+    switch (normalizedTier) {
+      case "erigga_citizen":
+        return "Erigga Citizen"
+      case "erigga_indigen":
+        return "Erigga Indigen"
+      case "enterprise":
+        return "Enterprise"
+      default:
+        return "Erigga Citizen"
+>>>>>>> new
     }
   }
 
@@ -61,16 +101,26 @@ export default function DashboardPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+<<<<<<< HEAD
                   Welcome back, {profile?.display_name || user?.email}!
+=======
+                  Welcome back, {profile?.full_name || user?.email}!
+>>>>>>> new
                 </h1>
                 <p className="text-gray-600 dark:text-gray-300 mt-1">
                   Here's what's happening in your Erigga Live community
                 </p>
               </div>
               <div className="mt-4 sm:mt-0">
+<<<<<<< HEAD
                 <Badge className={`px-3 py-1 ${getTierColor(profile?.subscription_tier || "grassroot")}`}>
                   <Crown className="w-4 h-4 mr-1" />
                   {profile?.subscription_tier?.replace("_", " ").toUpperCase() || "GRASSROOT"}
+=======
+                <Badge className={`px-3 py-1 ${getTierColor(profile?.tier || "erigga_citizen")}`}>
+                  <Crown className="w-4 h-4 mr-1" />
+                  {getTierDisplayName(profile?.tier || "erigga_citizen")}
+>>>>>>> new
                 </Badge>
               </div>
             </div>
@@ -155,6 +205,7 @@ export default function DashboardPage() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">
+<<<<<<< HEAD
                         {profile?.subscription_tier?.replace("_", " ").toUpperCase() || "GRASSROOT"} Member
                       </span>
                       <span className="text-sm text-gray-500">
@@ -172,20 +223,45 @@ export default function DashboardPage() {
                           }`}
                         />
                         <span>Grassroot</span>
+=======
+                        {getTierDisplayName(profile?.tier || "erigga_citizen")} Member
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        {getTierProgress(profile?.tier || "erigga_citizen")}% Complete
+                      </span>
+                    </div>
+                    <Progress value={getTierProgress(profile?.tier || "erigga_citizen")} className="h-2" />
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div className="text-center">
+                        <div
+                          className={`w-3 h-3 rounded-full mx-auto mb-1 ${
+                            getTierProgress(profile?.tier || "erigga_citizen") >= 33 ? "bg-green-500" : "bg-gray-300"
+                          }`}
+                        />
+                        <span>Erigga Citizen</span>
+>>>>>>> new
                       </div>
                       <div className="text-center">
                         <div
                           className={`w-3 h-3 rounded-full mx-auto mb-1 ${
+<<<<<<< HEAD
                             getTierProgress(profile?.subscription_tier || "grassroot") >= 50
                               ? "bg-purple-500"
                               : "bg-gray-300"
                           }`}
                         />
                         <span>Pioneer</span>
+=======
+                            getTierProgress(profile?.tier || "erigga_citizen") >= 66 ? "bg-blue-500" : "bg-gray-300"
+                          }`}
+                        />
+                        <span>Erigga Indigen</span>
+>>>>>>> new
                       </div>
                       <div className="text-center">
                         <div
                           className={`w-3 h-3 rounded-full mx-auto mb-1 ${
+<<<<<<< HEAD
                             getTierProgress(profile?.subscription_tier || "grassroot") >= 75
                               ? "bg-blue-500"
                               : "bg-gray-300"
@@ -202,6 +278,12 @@ export default function DashboardPage() {
                           }`}
                         />
                         <span>Blood Brotherhood</span>
+=======
+                            getTierProgress(profile?.tier || "erigga_citizen") >= 100 ? "bg-yellow-500" : "bg-gray-300"
+                          }`}
+                        />
+                        <span>Enterprise</span>
+>>>>>>> new
                       </div>
                     </div>
                   </div>
@@ -238,9 +320,15 @@ export default function DashboardPage() {
                       </Link>
                     </Button>
                     <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
+<<<<<<< HEAD
                       <Link href="/meet-greet">
                         <Calendar className="w-6 h-6 mb-2" />
                         <span className="text-sm">Meet & Greet</span>
+=======
+                      <Link href="/events">
+                        <Calendar className="w-6 h-6 mb-2" />
+                        <span className="text-sm">Events</span>
+>>>>>>> new
                       </Link>
                     </Button>
                     <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
@@ -270,10 +358,17 @@ export default function DashboardPage() {
                 <CardContent className="space-y-4">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
+<<<<<<< HEAD
                       {profile?.display_name?.charAt(0) || user?.email?.charAt(0) || "U"}
                     </div>
                     <div>
                       <p className="font-medium">{profile?.display_name || "User"}</p>
+=======
+                      {profile?.full_name?.charAt(0) || user?.email?.charAt(0) || "U"}
+                    </div>
+                    <div>
+                      <p className="font-medium">{profile?.full_name || "User"}</p>
+>>>>>>> new
                       <p className="text-sm text-gray-500">@{profile?.username || "username"}</p>
                     </div>
                   </div>

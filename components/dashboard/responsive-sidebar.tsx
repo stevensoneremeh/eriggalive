@@ -37,6 +37,10 @@ import { DynamicLogo } from "@/components/dynamic-logo"
 import { CoinBalance } from "@/components/coin-balance"
 import { UserTierBadge } from "@/components/user-tier-badge"
 import { cn } from "@/lib/utils"
+<<<<<<< HEAD
+=======
+import { useMediaQuery } from "@/hooks/use-media-query"
+>>>>>>> new
 
 interface SidebarItem {
   name: string
@@ -49,7 +53,11 @@ interface SidebarItem {
 
 // Updated sidebarItems: "Coins" item is removed.
 const sidebarItems: SidebarItem[] = [
+<<<<<<< HEAD
 {
+=======
+  {
+>>>>>>> new
     name: "Home",
     href: "/",
     icon: Home, // Main dashboard uses Home icon
@@ -137,6 +145,10 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
   const pathname = usePathname()
   const { user, profile, signOut } = useAuth()
   const { theme, setTheme, resolvedTheme } = useTheme()
+<<<<<<< HEAD
+=======
+  const isMobile = useMediaQuery("(max-width: 768px)")
+>>>>>>> new
 
   // Screen size detection with debouncing
   const updateScreenSize = useCallback(() => {
@@ -363,14 +375,22 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
         <div className={cn("flex items-center p-4 border-b", isCollapsed && "justify-center px-2")}>
           {!isCollapsed ? (
             <Link href="/" className="flex items-center space-x-2">
+<<<<<<< HEAD
               <DynamicLogo width={isMobile ? 120 : 100} height={isMobile ? 32 : 28} />
+=======
+              <DynamicLogo responsive={false} width={isMobile ? 120 : 100} height={isMobile ? 32 : 28} />
+>>>>>>> new
             </Link>
           ) : (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Link href="/">
+<<<<<<< HEAD
                     <DynamicLogo width={32} height={32} />
+=======
+                    <DynamicLogo responsive={false} width={32} height={32} />
+>>>>>>> new
                   </Link>
                 </TooltipTrigger>
                 <TooltipContent side="right">Erigga Live</TooltipContent>
@@ -436,7 +456,11 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
         <div className={cn("p-4 border-t", isCollapsed && "px-2")}>
           {!isCollapsed ? (
             <div className="space-y-2">
+<<<<<<< HEAD
               <Button variant="outline" size="sm" className="w-full justify-start" asChild>
+=======
+              <Button variant="outline" size="sm" className="w-full justify-start bg-transparent" asChild>
+>>>>>>> new
                 <Link href="/profile">
                   {" "}
                   {/* Assuming /profile exists or will be created */}

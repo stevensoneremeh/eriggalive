@@ -3,7 +3,11 @@ CREATE TABLE IF NOT EXISTS public.users (
     id bigint primary key generated always as identity,
     auth_user_id uuid unique not null references auth.users(id) on delete cascade,
     username text unique not null check (length(username) >= 3 and length(username) <= 30),
+<<<<<<< HEAD
     full_name text,
+=======
+    full_name text not null check (length(full_name) >= 2),
+>>>>>>> new
     email text unique not null,
     avatar_url text,
     cover_image_url text,
@@ -29,7 +33,11 @@ CREATE TABLE IF NOT EXISTS public.users (
     referral_code text unique,
     referred_by bigint references public.users(id),
     subscription_expires_at timestamp with time zone,
+<<<<<<< HEAD
     email_verified boolean default true,
+=======
+    email_verified boolean default false,
+>>>>>>> new
     phone_verified boolean default false,
     two_factor_enabled boolean default false,
     two_factor_secret text,

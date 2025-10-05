@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 -- Create meet_greet_bookings table
 CREATE TABLE IF NOT EXISTS public.meet_greet_bookings (
     id bigint primary key generated always as identity,
@@ -8,6 +9,22 @@ CREATE TABLE IF NOT EXISTS public.meet_greet_bookings (
     payment_reference text unique not null,
     payment_status text not null default 'pending' check (payment_status in ('pending', 'completed', 'failed', 'refunded')),
     status text not null default 'pending' check (status in ('pending', 'confirmed', 'completed', 'cancelled')),
+=======
+-- Create meet_greet_bookings table with Daily.co integration
+CREATE TABLE IF NOT EXISTS public.meet_greet_bookings (
+    id bigint primary key generated always as identity,
+    user_id bigint not null references public.users(id) on delete cascade,
+    scheduled_at timestamp with time zone not null,
+    duration integer not null default 30,
+    amount integer not null check (amount > 0),
+    payment_reference text unique not null,
+    payment_status text not null default 'pending' check (payment_status in ('pending', 'completed', 'failed', 'refunded')),
+    status text not null default 'pending' check (status in ('pending', 'scheduled', 'in_progress', 'completed', 'cancelled')),
+    daily_room_url text,
+    daily_room_name text,
+    started_at timestamp with time zone,
+    ended_at timestamp with time zone,
+>>>>>>> new
     notes text,
     metadata jsonb default '{}',
     created_at timestamp with time zone default now(),

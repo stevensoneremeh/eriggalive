@@ -1,5 +1,6 @@
 "use client"
 
+<<<<<<< HEAD
 import { useState, useRef, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import { Play, Pause, Volume2, VolumeX, X, Radio } from "lucide-react"
@@ -312,4 +313,10 @@ export default function EriggaRadio() {
       </div>
     </>
   )
+=======
+// This component is now only used within the radio page itself
+export default function EriggaRadio() {
+  // Component is now empty - radio functionality moved to dedicated radio page
+  return null
+>>>>>>> new
 }

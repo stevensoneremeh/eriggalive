@@ -1,4 +1,5 @@
 "use client"
+<<<<<<< HEAD
 import { requireAuth, getAuthenticatedUser } from "@/lib/auth-guard"
 import { VaultClient } from "./vault-client"
 
@@ -43,3 +44,11 @@ export default async function VaultPage() {
 }
 
 // The rest of the code remains the same as it is not needed in the server component
+=======
+
+import { EnhancedVaultPage } from "@/components/vault/enhanced-vault-page"
+
+export default function VaultPage() {
+  return <EnhancedVaultPage />
+}
+>>>>>>> new

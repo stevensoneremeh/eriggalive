@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { Crown, Star, Shield, Droplet } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -47,15 +48,64 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
   }
 
   const iconSizes = {
+=======
+"use client"
+
+import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { getTierDisplayInfo } from "@/hooks/useMembership"
+import { cn } from "@/lib/utils"
+
+interface UserTierBadgeProps {
+  tier: string
+  size?: "sm" | "md" | "lg" | "xs" | "xxs"
+  showLabel?: boolean
+  className?: string
+}
+
+export function UserTierBadge({ tier, size = "md", showLabel = true, className = "" }: UserTierBadgeProps) {
+  const tierInfo = getTierDisplayInfo(tier)
+
+  const getBadgeClasses = (color: string) => {
+    switch (color) {
+      case "green":
+        return "bg-green-100 text-green-800 border-green-200 hover:bg-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800"
+      case "blue":
+        return "bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800"
+      case "yellow":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-800"
+    }
+  }
+
+  const sizeClasses = {
+    xxs: "text-[10px] py-0 px-1 h-4",
+    xs: "text-xs py-0.5 px-1.5 h-5",
+    sm: "text-xs py-0.5 px-2 h-6",
+    md: "text-sm py-1 px-3 h-7",
+    lg: "text-base py-1.5 px-4 h-8",
+  }
+
+  const iconSizes = {
+    xxs: "h-2 w-2",
+    xs: "h-2.5 w-2.5",
+>>>>>>> new
     sm: "h-3 w-3",
     md: "h-4 w-4",
     lg: "h-5 w-5",
   }
 
+<<<<<<< HEAD
+=======
+  const IconComponent = tierInfo.icon
+
+>>>>>>> new
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
+<<<<<<< HEAD
           <Badge variant="outline" className={`${tierData.color} ${sizeClasses[size]} font-medium`}>
             <IconComponent className={`${iconSizes[size]} ${showLabel ? "mr-1" : ""}`} />
             {showLabel && tierData.label}
@@ -63,8 +113,30 @@ export function UserTierBadge({ tier, size = "md", showLabel = true }: UserTierB
         </TooltipTrigger>
         <TooltipContent>
           <p>{tierData.tooltip}</p>
+=======
+          <Badge
+            variant="outline"
+            className={cn(
+              getBadgeClasses(tierInfo.color),
+              sizeClasses[size],
+              "font-medium transition-all duration-300 inline-flex items-center gap-1",
+              className,
+            )}
+          >
+            <IconComponent className={cn(iconSizes[size], "shrink-0")} />
+            {showLabel && <span className="truncate">{tierInfo.label}</span>}
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{tierInfo.tooltip}</p>
+>>>>>>> new
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   )
 }
+<<<<<<< HEAD
+=======
+
+export default UserTierBadge
+>>>>>>> new

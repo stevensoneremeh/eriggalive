@@ -1,9 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server"
+<<<<<<< HEAD
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const supabase = createServerSupabaseClient()
+=======
+import { createClient } from "@/lib/supabase/server"
+
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const supabase = createClient()
+>>>>>>> new
     const userId = params.id
 
     // Get user by internal ID

@@ -2,10 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+<<<<<<< HEAD
 body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+=======
+>>>>>>> new
 @layer utilities {
   .text-balance {
     text-wrap: balance;
@@ -14,6 +17,7 @@ body {
 
 @layer base {
   :root {
+<<<<<<< HEAD
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
@@ -81,6 +85,77 @@ body {
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+=======
+    /* Updated color tokens for premium glassmorphism design */
+    --background: 0 0% 100%;
+    --foreground: 215 25% 27%; /* Dark slate for better readability */
+    --card: 0 0% 100% / 0.8; /* Glassmorphism card background */
+    --card-foreground: 215 20% 25%;
+    --popover: 0 0% 100% / 0.9;
+    --popover-foreground: 215 20% 25%;
+    --primary: 188 100% 20%; /* Cyan-800 primary color */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 32 95% 44%; /* Amber-600 accent color */
+    --secondary-foreground: 0 0% 98%;
+    --muted: 188 100% 97%; /* Light cyan muted */
+    --muted-foreground: 215 25% 27%;
+    --accent: 32 95% 44%; /* Amber accent */
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 13% 91%;
+    --input: 0 0% 100%;
+    --ring: 188 100% 20% / 0.5; /* Primary with opacity for focus rings */
+    --chart-1: 32 95% 44%; /* Amber */
+    --chart-2: 16 100% 50%; /* Orange */
+    --chart-3: 188 100% 20%; /* Cyan */
+    --chart-4: 215 25% 27%; /* Dark slate */
+    --chart-5: 188 100% 97%; /* Light cyan */
+    --radius: 0.75rem; /* Increased radius for modern look */
+    --sidebar-background: 0 0% 98% / 0.8;
+    --sidebar-foreground: 215 25% 27%;
+    --sidebar-primary: 188 100% 20%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 32 95% 44%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 188 100% 20% / 0.5;
+  }
+  .dark {
+    /* Updated dark mode to use black background matching logo */
+    --background: 0 0% 0%; /* Pure black to match logo background */
+    --foreground: 0 0% 98%;
+    --card: 0 0% 0% / 0.8;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 0% / 0.9;
+    --popover-foreground: 0 0% 98%;
+    --primary: 188 100% 20%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 32 95% 44%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 10%; /* Dark muted to complement black */
+    --muted-foreground: 215 20% 65%;
+    --accent: 32 95% 44%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 15%; /* Dark border */
+    --input: 0 0% 10%;
+    --ring: 188 100% 20% / 0.5;
+    --chart-1: 32 95% 44%;
+    --chart-2: 16 100% 50%;
+    --chart-3: 188 100% 20%;
+    --chart-4: 215 20% 65%;
+    --chart-5: 0 0% 10%;
+    --sidebar-background: 0 0% 0% / 0.8; /* Black sidebar background */
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 188 100% 20%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 32 95% 44%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 188 100% 20% / 0.5;
+>>>>>>> new
   }
 }
 
@@ -93,6 +168,7 @@ body {
   }
 }
 
+<<<<<<< HEAD
 /* Success page animations */
 @keyframes slideInUp {
   from {
@@ -169,6 +245,89 @@ body {
 }
 
 /* Erigga Radio Animations */
+=======
+/* Added premium design utility classes */
+@layer components {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-lg border border-white/20 shadow-xl;
+  }
+
+  .noise-texture {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  }
+
+  .gradient-mesh {
+    background: radial-gradient(circle at 20% 50%, hsl(var(--primary)) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, hsl(var(--accent)) 0%, transparent 50%),
+      radial-gradient(circle at 40% 80%, hsl(var(--secondary)) 0%, transparent 50%);
+  }
+
+  .equalizer-bar {
+    animation: equalizer 1.5s ease-in-out infinite alternate;
+  }
+
+  .pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  /* 3D Flip Animation for Merch Cards */
+  .flip-card {
+    perspective: 1000px;
+  }
+
+  .flip-card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    transition: transform 0.8s;
+    transform-style: preserve-3d;
+  }
+
+  .flip-card.flipped .flip-card-inner {
+    transform: rotateY(180deg);
+  }
+
+  .flip-card-front,
+  .flip-card-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+
+  .flip-card-back {
+    transform: rotateY(180deg);
+  }
+}
+
+/* Added premium animations */
+@keyframes equalizer {
+  0% {
+    height: 8px;
+    opacity: 0.5;
+  }
+  100% {
+    height: 24px;
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 5px hsl(var(--accent)), 0 0 10px hsl(var(--accent)), 0 0 15px hsl(var(--accent));
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 10px hsl(var(--accent)), 0 0 20px hsl(var(--accent)), 0 0 30px hsl(var(--accent));
+    opacity: 0.8;
+  }
+}
+
+/* Marquee animation for radio lyrics */
+>>>>>>> new
 @keyframes marquee {
   0% {
     transform: translateX(100%);
@@ -182,6 +341,7 @@ body {
   animation: marquee 15s linear infinite;
 }
 
+<<<<<<< HEAD
 /* Radio pulse animation */
 @keyframes radio-pulse {
   0%,
@@ -212,4 +372,94 @@ body {
 
 .animate-audio-bar {
   animation: audio-bar 1s ease-in-out infinite;
+=======
+/* Mobile navigation hiding for community page */
+@media (max-width: 768px) {
+  .community-scrolling-down nav[role="banner"],
+  .community-scrolling-down header[role="banner"] {
+    transform: translateY(-100%);
+    transition: transform 0.3s ease-in-out;
+  }
+
+  /* Ensure main navigation is hidden when community is scrolling */
+  body.community-scrolling-down .main-navigation {
+    transform: translateY(-100%);
+    transition: transform 0.3s ease-in-out;
+  }
+
+  /* Safe area support for fixed input */
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Enhanced touch targets for mobile */
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Enhanced mobile responsiveness for merch */
+  .merch-grid {
+    grid-template-columns: repeat(1, 1fr);
+    gap: 1rem;
+  }
+
+  .merch-card {
+    max-width: 100%;
+  }
+
+  .flip-card-inner {
+    transition: transform 0.6s; /* Faster animation on mobile */
+  }
+
+  /* Better touch targets for mobile */
+  .merch-button {
+    min-height: 44px;
+    padding: 12px 16px;
+  }
+
+  /* Improved dialog sizing on mobile */
+  .merch-dialog {
+    max-width: 95vw;
+    max-height: 90vh;
+  }
+
+  /* Enhanced cart display on mobile */
+  .cart-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .cart-item-image {
+    width: 60px;
+    height: 60px;
+  }
+
+  .cart-controls {
+    align-self: flex-end;
+  }
+}
+
+/* Improved checkout form on mobile */
+@media (max-width: 640px) {
+  .checkout-form .grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .checkout-form .grid-cols-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-method-card {
+    padding: 1rem;
+  }
+}
+
+/* Smooth transitions for navigation visibility */
+nav[role="banner"],
+header[role="banner"],
+.main-navigation {
+  transition: transform 0.3s ease-in-out;
+>>>>>>> new
 }

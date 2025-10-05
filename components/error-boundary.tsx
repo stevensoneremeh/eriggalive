@@ -1,5 +1,6 @@
 "use client"
 
+<<<<<<< HEAD
 import React from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,10 +23,42 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("Error caught by boundary:", error, errorInfo)
+=======
+import { Component, type ErrorInfo, type ReactNode } from "react"
+import { Button } from "@/components/ui/button"
+import { RefreshCw } from "lucide-react"
+
+interface Props {
+  children: ReactNode
+  fallback?: ReactNode
+}
+
+interface State {
+  hasError: boolean
+  error: Error | null
+}
+
+export class ErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props)
+    this.state = {
+      hasError: false,
+      error: null,
+    }
+  }
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Uncaught error:", error, errorInfo)
+>>>>>>> new
   }
 
   render() {
     if (this.state.hasError) {
+<<<<<<< HEAD
       return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
           <Card className="w-full max-w-md">
@@ -46,6 +79,30 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
               </Button>
             </CardContent>
           </Card>
+=======
+      if (this.props.fallback) {
+        return this.props.fallback
+      }
+
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center p-8 max-w-md">
+            <h2 className="text-2xl font-bold mb-4">Something went wrong</h2>
+            <p className="text-muted-foreground mb-6">
+              We're sorry, but there was an error loading this page. Please try refreshing.
+            </p>
+            <Button
+              onClick={() => {
+                this.setState({ hasError: false, error: null })
+                window.location.reload()
+              }}
+              className="bg-orange-500 hover:bg-orange-600 text-black"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh Page
+            </Button>
+          </div>
+>>>>>>> new
         </div>
       )
     }
@@ -53,3 +110,8 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
     return this.props.children
   }
 }
+<<<<<<< HEAD
+=======
+
+export default ErrorBoundary
+>>>>>>> new

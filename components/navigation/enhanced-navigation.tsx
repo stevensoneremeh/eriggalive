@@ -47,14 +47,21 @@ import { cn } from "@/lib/utils"
 
 const NAVIGATION_ITEMS = [
   { href: "/", label: "Home", icon: Home },
+<<<<<<< HEAD
   { href: "/community", label: "Community", icon: Users },
+=======
+>>>>>>> new
   { href: "/chronicles", label: "Chronicles", icon: BookOpen },
   { href: "/vault", label: "Vault", icon: Vault },
   { href: "/tickets", label: "Tickets", icon: Ticket },
   { href: "/premium", label: "Premium", icon: Crown },
   { href: "/merch", label: "Merch", icon: ShoppingBag },
   { href: "/coins", label: "Coins", icon: Coins },
+<<<<<<< HEAD
    { href: "/about", label: "about", icon: Coins },
+=======
+  { href: "/about", label: "About", icon: Coins },
+>>>>>>> new
 ]
 
 export function EnhancedNavigation() {
@@ -323,7 +330,11 @@ export function EnhancedNavigation() {
                   ) : (
                     <>
                       <Link href="/login" onClick={() => setIsOpen(false)}>
+<<<<<<< HEAD
                         <Button variant="outline" className="mb-2 w-full">
+=======
+                        <Button variant="outline" className="mb-2 w-full bg-transparent">
+>>>>>>> new
                           Sign In
                         </Button>
                       </Link>

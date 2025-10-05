@@ -9,7 +9,10 @@ export const ROUTES = {
   LOGIN: "/login",
   SIGNUP: "/signup",
   DASHBOARD: "/dashboard",
+<<<<<<< HEAD
   COMMUNITY: "/community",
+=======
+>>>>>>> new
   VAULT: "/vault",
   TICKETS: "/tickets",
   PREMIUM: "/premium",
@@ -21,17 +24,46 @@ export const ROUTES = {
 // Define protected routes that require authentication
 export const PROTECTED_ROUTES = [
   ROUTES.DASHBOARD,
+<<<<<<< HEAD
   ROUTES.COMMUNITY,
+=======
+>>>>>>> new
   ROUTES.VAULT,
   ROUTES.TICKETS,
   ROUTES.PREMIUM,
   ROUTES.MERCH,
   ROUTES.COINS,
   ROUTES.ADMIN,
+<<<<<<< HEAD
 ]
 
 // Define public routes that don't require authentication
 export const PUBLIC_ROUTES = [ROUTES.HOME, ROUTES.LOGIN, ROUTES.SIGNUP]
+=======
+  "/chronicles",
+  "/settings",
+  "/mission",
+  "/meet-and-greet",
+  "/profile",
+  "/rooms",
+  "/chat",
+]
+
+// Define public routes that don't require authentication
+export const PUBLIC_ROUTES = [
+  ROUTES.HOME, 
+  ROUTES.LOGIN, 
+  ROUTES.SIGNUP,
+  "/forgot-password",
+  "/reset-password",
+  "/signup/success",
+  "/terms",
+  "/privacy",
+  "/about",
+  "/auth/callback",
+  "/auth/auth-code-error",
+]
+>>>>>>> new
 
 // Define auth routes that authenticated users shouldn't access
 export const AUTH_ROUTES = [ROUTES.LOGIN, ROUTES.SIGNUP]
@@ -106,7 +138,11 @@ export class NavigationManager {
     // 2. Stored redirect path from cookies/localStorage
     // 3. Default dashboard
 
+<<<<<<< HEAD
     let targetPath = ROUTES.DASHBOARD
+=======
+    let targetPath: string = ROUTES.DASHBOARD
+>>>>>>> new
 
     // Check for intended path from URL
     if (intendedPath && this.isValidRedirectPath(intendedPath)) {
@@ -115,7 +151,11 @@ export class NavigationManager {
       // Check for stored redirect path
       const storedPath = this.getStoredRedirectPath()
       if (storedPath && this.isValidRedirectPath(storedPath)) {
+<<<<<<< HEAD
         targetPath = storedPath
+=======
+        targetPath = storedPath as string
+>>>>>>> new
       }
     }
 
@@ -203,6 +243,14 @@ export class NavigationManager {
   isAuthRoute(path: string = this.currentPath): boolean {
     return AUTH_ROUTES.some((route) => path === route || path.startsWith(`${route}/`))
   }
+<<<<<<< HEAD
+=======
+
+  // Check if current path is public
+  isPublicRoute(path: string = this.currentPath): boolean {
+    return PUBLIC_ROUTES.some((route) => path === route || path.startsWith(`${route}/`))
+  }
+>>>>>>> new
 }
 
 // Hook to use navigation manager
@@ -241,3 +289,19 @@ export function getRedirectPath(searchParams?: URLSearchParams): string {
 
   return ROUTES.DASHBOARD
 }
+<<<<<<< HEAD
+=======
+
+// Utility function to clear redirect paths
+export function clearRedirectPaths() {
+  if (typeof window === "undefined") return
+
+  try {
+    localStorage.removeItem("erigga_redirect_path")
+    sessionStorage.removeItem("erigga_redirect_path")
+    document.cookie = "erigga_redirect_path=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+  } catch (error) {
+    console.warn("Failed to clear redirect paths:", error)
+  }
+}
+>>>>>>> new

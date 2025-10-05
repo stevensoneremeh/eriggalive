@@ -66,7 +66,11 @@ export default function AdminUploadPage() {
   const { profile } = useAuth()
 
   // Check if user has admin privileges
+<<<<<<< HEAD
   if (!profile || profile.tier === "street_rep") {
+=======
+  if (!profile) {
+>>>>>>> new
     return (
       <div className="min-h-screen py-8 px-4">
         <div className="container mx-auto max-w-4xl text-center">

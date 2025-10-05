@@ -7,6 +7,20 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+<<<<<<< HEAD
+=======
+  // Enable development server for all hostnames in Replit environment
+  webpack: (config, { dev }) => {
+    if (dev) {
+      config.watchOptions = {
+        poll: 1000,
+        aggregateTimeout: 300,
+      }
+    }
+    return config
+  },
+  // Configuration for Replit proxy environment
+>>>>>>> new
   images: {
     domains: [
       'localhost',
@@ -19,9 +33,27 @@ const nextConfig = {
         protocol: 'https',
         hostname: '**.supabase.co',
       },
+<<<<<<< HEAD
     ],
     unoptimized: true,
   },
+=======
+      {
+        protocol: 'https',
+        hostname: '**.replit.dev',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.repl.co',
+      },
+    ],
+    unoptimized: true,
+  },
+  // Enable allowedHosts for Replit proxy environment
+  async rewrites() {
+    return []
+  },
+>>>>>>> new
   async headers() {
     return [
       {
