@@ -38,6 +38,6 @@ export function createUnifiedClient() {
   }
 }
 
-// Legacy compatibility exports
-export { createBrowserClient as createClient }
-export { createServerClient }
+// Re-export the correct clients
+export { createClient as createBrowserClient } from "@/lib/supabase/client"
+export { createClient as createServerClient } from "@/lib/supabase/server"

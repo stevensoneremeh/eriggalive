@@ -76,12 +76,4 @@ function createMockClient() {
   } as any
 }
 
-export function createClientComponentClient() {
-  console.warn("createClientComponentClient is deprecated. Use createClient() from @/lib/supabase/client instead.")
-  return createClient()
-}
-
-export function createBrowserSupabaseClient() {
-  console.warn("createBrowserSupabaseClient is deprecated. Use createClient() from @/lib/supabase/client instead.")
-  return createClient()
-}
+// Legacy exports removed - use createClient() instead
