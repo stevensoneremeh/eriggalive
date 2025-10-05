@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { toast } from "sonner"
-import { Plus, Radio, PlayCircle, StopCircle, Copy } from "lucide-react"
+import { Plus, Radio, PlayCircle, StopCircle, Video, Trash2 } from "lucide-react"
 
 export default function LiveStreamsPage() {
   const [streams, setStreams] = useState([])
@@ -19,7 +19,9 @@ export default function LiveStreamsPage() {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    stream_type: "audio",
+    video_url: "",
+    stream_type: "video",
+    thumbnail_url: "",
   })
 
   useEffect(() => {
@@ -39,6 +41,15 @@ export default function LiveStreamsPage() {
   }
 
   const handleCreate = async () => {
+    if (!formData.title.trim()) {
+      toast.error("Please enter a title")
+      return
+    }
+    if (!formData.video_url.trim()) {
+      toast.error("Please enter a video URL")
+      return
+    }
+
     try {
       const response = await fetch("/api/admin/live-streams", {
         method: "POST",
@@ -46,9 +57,9 @@ export default function LiveStreamsPage() {
         body: JSON.stringify(formData),
       })
       if (!response.ok) throw new Error("Failed to create")
-      toast.success("Stream created")
+      toast.success("Live stream created successfully")
       setIsDialogOpen(false)
-      setFormData({ title: "", description: "", stream_type: "audio" })
+      setFormData({ title: "", description: "", video_url: "", stream_type: "video", thumbnail_url: "" })
       fetchStreams()
     } catch (error) {
       toast.error("Failed to create stream")
@@ -77,17 +88,29 @@ export default function LiveStreamsPage() {
     }
   }
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
-    toast.success("Copied to clipboard")
+  const deleteStream = async (streamId: string) => {
+    if (!confirm("Are you sure you want to delete this stream?")) return
+    
+    try {
+      const response = await fetch("/api/admin/live-streams", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: streamId }),
+      })
+      if (!response.ok) throw new Error("Failed to delete")
+      toast.success("Stream deleted successfully")
+      fetchStreams()
+    } catch (error) {
+      toast.error("Failed to delete stream")
+    }
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Live Streams (Mux)</h1>
-          <p className="text-muted-foreground">Manage audio and video live streams</p>
+          <h1 className="text-3xl font-bold tracking-tight">Live Video Streams</h1>
+          <p className="text-muted-foreground">Manage video live streams for the radio page</p>
         </div>
         <Button onClick={() => setIsDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
@@ -98,16 +121,18 @@ export default function LiveStreamsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
-            <Radio className="mr-2 h-5 w-5" />
+            <Video className="mr-2 h-5 w-5" />
             Active Streams
           </CardTitle>
-          <CardDescription>Manage Mux live streaming for audio and video</CardDescription>
+          <CardDescription>Manage live video streaming with direct video URLs</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="text-center py-8">Loading...</div>
           ) : streams.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No streams created</div>
+            <div className="text-center py-8 text-muted-foreground">
+              No streams created yet. Create your first stream to get started.
+            </div>
           ) : (
             <Table>
               <TableHeader>
@@ -115,8 +140,7 @@ export default function LiveStreamsPage() {
                   <TableHead>Title</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Stream Key</TableHead>
-                  <TableHead>Playback ID</TableHead>
+                  <TableHead>Video URL</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -124,7 +148,7 @@ export default function LiveStreamsPage() {
                 {streams.map((stream: any) => (
                   <TableRow key={stream.id}>
                     <TableCell className="font-medium">{stream.title}</TableCell>
-                    <TableCell className="capitalize">{stream.stream_type}</TableCell>
+                    <TableCell className="capitalize">{stream.stream_type || "video"}</TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
                         stream.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
@@ -133,41 +157,33 @@ export default function LiveStreamsPage() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      {stream.mux_stream_key ? (
-                        <div className="flex items-center gap-2">
-                          <code className="text-xs">{stream.mux_stream_key.substring(0, 20)}...</code>
-                          <Button variant="ghost" size="sm" onClick={() => copyToClipboard(stream.mux_stream_key)}>
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                        </div>
+                      {stream.video_url ? (
+                        <code className="text-xs">{stream.video_url.substring(0, 40)}...</code>
                       ) : (
-                        <span className="text-muted-foreground text-xs">Not configured</span>
+                        <span className="text-muted-foreground text-xs">No URL</span>
                       )}
                     </TableCell>
                     <TableCell>
-                      {stream.mux_playback_id ? (
-                        <div className="flex items-center gap-2">
-                          <code className="text-xs">{stream.mux_playback_id}</code>
-                          <Button variant="ghost" size="sm" onClick={() => copyToClipboard(stream.mux_playback_id)}>
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">Not configured</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant={stream.status === "active" ? "destructive" : "default"}
-                        size="sm"
-                        onClick={() => toggleStream(stream)}
-                      >
-                        {stream.status === "active" ? (
-                          <><StopCircle className="mr-2 h-4 w-4" />Stop</>
-                        ) : (
-                          <><PlayCircle className="mr-2 h-4 w-4" />Start</>
-                        )}
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant={stream.status === "active" ? "destructive" : "default"}
+                          size="sm"
+                          onClick={() => toggleStream(stream)}
+                        >
+                          {stream.status === "active" ? (
+                            <><StopCircle className="mr-2 h-4 w-4" />Stop</>
+                          ) : (
+                            <><PlayCircle className="mr-2 h-4 w-4" />Start</>
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteStream(stream.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -177,15 +193,14 @@ export default function LiveStreamsPage() {
         </CardContent>
       </Card>
 
-      {!process.env.NEXT_PUBLIC_MUX_CONFIGURED && (
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardContent className="pt-6">
-            <p className="text-sm text-yellow-800">
-              <strong>Note:</strong> Mux credentials not configured. Add MUX_TOKEN_ID and MUX_TOKEN_SECRET to environment variables to enable full streaming features.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      <Card className="border-blue-200 bg-blue-50/50">
+        <CardContent className="pt-6">
+          <p className="text-sm text-blue-800">
+            <strong>How it works:</strong> Create a stream with a video URL (mp4, webm, or m3u8), then start it to make it live. 
+            The video will appear on the radio page and in a mini player on other pages.
+          </p>
+        </CardContent>
+      </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
@@ -194,20 +209,50 @@ export default function LiveStreamsPage() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label>Title</Label>
-              <Input value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required />
+              <Label>Title *</Label>
+              <Input 
+                value={formData.title} 
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })} 
+                placeholder="e.g., Erigga Live Session"
+                required 
+              />
             </div>
             <div className="grid gap-2">
               <Label>Description</Label>
-              <Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} />
+              <Textarea 
+                value={formData.description} 
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
+                placeholder="Brief description of the stream..."
+                rows={3} 
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Video URL *</Label>
+              <Input 
+                value={formData.video_url} 
+                onChange={(e) => setFormData({ ...formData, video_url: e.target.value })} 
+                placeholder="https://example.com/video.mp4 or .m3u8"
+                required 
+              />
+              <p className="text-xs text-muted-foreground">
+                Supports: MP4, WebM, M3U8 (HLS streams)
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label>Thumbnail URL (optional)</Label>
+              <Input 
+                value={formData.thumbnail_url} 
+                onChange={(e) => setFormData({ ...formData, thumbnail_url: e.target.value })} 
+                placeholder="https://example.com/thumbnail.jpg"
+              />
             </div>
             <div className="grid gap-2">
               <Label>Stream Type</Label>
               <Select value={formData.stream_type} onValueChange={(value) => setFormData({ ...formData, stream_type: value })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="audio">Audio Only</SelectItem>
                   <SelectItem value="video">Video</SelectItem>
+                  <SelectItem value="audio">Audio Only</SelectItem>
                 </SelectContent>
               </Select>
             </div>
