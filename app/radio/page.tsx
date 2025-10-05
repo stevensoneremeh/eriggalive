@@ -36,6 +36,8 @@ import { createClient } from "@/lib/supabase/client"
 import { AnimatedRadioCharacter } from "@/components/radio/animated-radio-character"
 import { useTheme } from "next-themes"
 import { ShoutOutDisplay } from "@/components/shout-out-display"
+import { LiveStreamPlayer } from "@/components/radio/live-stream-player"
+import { useLiveStream } from "@/contexts/live-stream-context"
 
 interface Track {
   id: string
@@ -428,11 +430,25 @@ export default function RadioPage() {
     )
   }
 
+  const { currentStream } = useLiveStream()
+
   return (
     <div className="min-h-screen bg-background">
       <ShoutOutDisplay position="top" />
 
       <div className="container mx-auto px-4 py-8">
+        {/* Live Stream Video Player */}
+        {currentStream && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="mb-8"
+          >
+            <LiveStreamPlayer />
+          </motion.div>
+        )}
+
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Main Player */}
           <div className="lg:col-span-2">
