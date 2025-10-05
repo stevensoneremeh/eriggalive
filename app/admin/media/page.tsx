@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -35,7 +35,7 @@ interface MediaFile {
 }
 
 export default function MediaPage() {
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const [files, setFiles] = useState<File[]>([])
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
   const [loading, setLoading] = useState(false)

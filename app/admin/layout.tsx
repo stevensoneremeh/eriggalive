@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import type React from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -63,7 +63,7 @@ const adminNavItems = [
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const { user, profile, signOut } = useAuth()
   const router = useRouter()
   const pathname = usePathname()

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -23,7 +23,7 @@ interface AdminStats {
 
 export default function AdminOverviewPage() {
   const { user } = useAuth()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     totalRevenue: 0,

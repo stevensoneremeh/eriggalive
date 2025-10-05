@@ -1,9 +1,9 @@
 "use client"
 import { useRef, useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase/client"
 
 export default function BrandingPage() {
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const [hex, setHex] = useState<string>("")
   const [loading, setLoading] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
