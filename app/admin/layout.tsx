@@ -30,6 +30,7 @@ import {
   FileText,
   Radio as RadioIcon,
   Trophy,
+  BarChart3,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
@@ -41,8 +42,9 @@ const adminNavItems = [
   { name: "Dashboard", href: "/admin/dashboard", icon: TrendingUp },
   { name: "User Management", href: "/admin/users-management", icon: Users },
   { name: "Content Manager", href: "/admin/content-manager", icon: FileText },
-  { name: "Homepage Media", href: "/admin/homepage-media", icon: FileText },
-  { name: "Homepage Content", href: "/admin/homepage-content", icon: FileText },
+  { name: "Content Overview", href: "/admin/content-overview", icon: BarChart3 },
+  { name: "Content Importer", href: "/admin/content-importer", icon: Upload },
+  { name: "Homepage Content", href: "/admin/homepage-content", icon: Home },
   { name: "Merch", href: "/admin/merch", icon: ShoppingBag },
   { name: "Live Streams (Mux)", href: "/admin/live-streams", icon: RadioIcon },
   { name: "Vault Items", href: "/admin/vault-items", icon: Shield },

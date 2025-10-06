@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -12,8 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { toast } from "sonner"
-import { Plus, Pencil, Trash2, FileText, Image, Video, Globe, Upload, Eye, EyeOff, Save, X } from "lucide-react"
+import { Plus, Pencil, Trash2, FileText, Image, Video, Globe, Upload, Eye, EyeOff, Save, X, Copy, Loader2 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 const PAGES = [
   { value: "homepage", label: "Homepage", icon: "🏠" },
@@ -41,16 +44,19 @@ const SECTION_TYPES = [
   { value: "cta", label: "Call to Action" },
   { value: "testimonials", label: "Testimonials" },
   { value: "faq", label: "FAQ" },
+  { value: "stats", label: "Statistics" },
+  { value: "features", label: "Features" },
   { value: "custom", label: "Custom Section" },
 ]
 
 export default function ContentManagerPage() {
-  const [pages, setPages] = useState([])
-  const [content, setContent] = useState([])
+  const [content, setContent] = useState<any[]>([])
   const [selectedPage, setSelectedPage] = useState("homepage")
   const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingContent, setEditingContent] = useState<any>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [previewMode, setPreviewMode] = useState(false)
 
   const [formData, setFormData] = useState({
     page_name: "homepage",
@@ -68,28 +74,10 @@ export default function ContentManagerPage() {
     custom_css: "",
     metadata: {},
   })
-  const [uploadingImage, setUploadingImage] = useState(false)
-  const [previewMode, setPreviewMode] = useState(false)
 
   useEffect(() => {
-    fetchPages()
-  }, [])
-
-  useEffect(() => {
-    if (selectedPage) {
-      fetchContent(selectedPage)
-    }
+    fetchContent(selectedPage)
   }, [selectedPage])
-
-  const fetchPages = async () => {
-    try {
-      const response = await fetch("/api/admin/content")
-      const data = await response.json()
-      setPages(data.pages || [])
-    } catch (error) {
-      toast.error("Failed to load pages")
-    }
-  }
 
   const fetchContent = async (page: string) => {
     setLoading(true)
@@ -141,6 +129,26 @@ export default function ContentManagerPage() {
     }
   }
 
+  const handleDuplicate = (item: any) => {
+    setFormData({
+      page_name: item.page_name,
+      page_title: item.page_title + " (Copy)",
+      section_type: item.section_type,
+      title: item.title + " (Copy)",
+      subtitle: item.subtitle || "",
+      content_text: item.content_text || "",
+      image_url: item.image_url || "",
+      video_url: item.video_url || "",
+      button_text: item.button_text || "",
+      button_link: item.button_link || "",
+      section_order: (item.section_order || 0) + 1,
+      is_active: false,
+      custom_css: item.custom_css || "",
+      metadata: item.metadata || {},
+    })
+    setIsDialogOpen(true)
+  }
+
   const openEditDialog = (item: any) => {
     setEditingContent(item)
     setFormData({
@@ -186,13 +194,11 @@ export default function ContentManagerPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("Image size must be less than 5MB")
       return
     }
 
-    // Check file type
     if (!file.type.startsWith('image/')) {
       toast.error("Please upload an image file")
       return
@@ -200,7 +206,7 @@ export default function ContentManagerPage() {
 
     setUploadingImage(true)
     try {
-      // Upload to Supabase Storage
+      const supabase = createClient()
       const fileExt = file.name.split('.').pop()
       const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`
       const filePath = `content/${fileName}`
@@ -210,7 +216,6 @@ export default function ContentManagerPage() {
         .upload(filePath, file)
 
       if (uploadError) {
-        // Fallback to base64 if storage fails
         const reader = new FileReader()
         reader.onloadend = () => {
           setFormData({ ...formData, image_url: reader.result as string })
@@ -220,7 +225,6 @@ export default function ContentManagerPage() {
         return
       }
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('media')
         .getPublicUrl(filePath)
@@ -248,14 +252,16 @@ export default function ContentManagerPage() {
       </div>
 
       <Tabs value={selectedPage} onValueChange={setSelectedPage}>
-        <TabsList className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-          {PAGES.map((page) => (
-            <TabsTrigger key={page.value} value={page.value} className="flex items-center gap-2">
-              <span>{page.icon}</span>
-              <span className="hidden sm:inline">{page.label}</span>
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <ScrollArea className="w-full">
+          <TabsList className="inline-flex w-max min-w-full">
+            {PAGES.map((page) => (
+              <TabsTrigger key={page.value} value={page.value} className="flex items-center gap-2">
+                <span>{page.icon}</span>
+                <span>{page.label}</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </ScrollArea>
 
         {PAGES.map((page) => (
           <TabsContent key={page.value} value={page.value}>
@@ -269,47 +275,60 @@ export default function ContentManagerPage() {
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <div className="text-center py-8">Loading...</div>
+                  <div className="text-center py-8 flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading...
+                  </div>
                 ) : content.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     No content added for this page yet
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Order</TableHead>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Section Type</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {content.map((item: any) => (
-                        <TableRow key={item.id}>
-                          <TableCell>{item.section_order}</TableCell>
-                          <TableCell className="font-medium">{item.title}</TableCell>
-                          <TableCell className="capitalize">{item.section_type}</TableCell>
-                          <TableCell>
-                            <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                              item.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
-                            }`}>
-                              {item.is_active ? "Active" : "Inactive"}
-                            </span>
-                          </TableCell>
-                          <TableCell className="space-x-2">
-                            <Button variant="ghost" size="sm" onClick={() => openEditDialog(item)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleDelete(item.id)}>
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </TableCell>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-16">Order</TableHead>
+                          <TableHead>Title</TableHead>
+                          <TableHead>Section Type</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {content.map((item: any) => (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-medium">{item.section_order}</TableCell>
+                            <TableCell>
+                              <div className="font-medium">{item.title}</div>
+                              {item.subtitle && <div className="text-sm text-muted-foreground">{item.subtitle}</div>}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="capitalize">{item.section_type}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={item.is_active ? "default" : "secondary"}>
+                                {item.is_active ? "Active" : "Inactive"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => handleDuplicate(item)}>
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => openEditDialog(item)}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => handleDelete(item.id)}>
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -464,16 +483,7 @@ export default function ContentManagerPage() {
                         disabled={uploadingImage}
                         className="flex-1"
                       />
-                      <Button
-                        variant="outline"
-                        disabled={uploadingImage}
-                        onClick={() => {
-                          const input = document.querySelector('input[type="file"]') as HTMLInputElement
-                          input?.click()
-                        }}
-                      >
-                        <Upload className="h-4 w-4" />
-                      </Button>
+                      {uploadingImage && <Loader2 className="h-4 w-4 animate-spin" />}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Or enter image URL below (max 5MB)
@@ -481,15 +491,12 @@ export default function ContentManagerPage() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label>Image URL (Supabase, Vercel Blob, or any public URL)</Label>
+                    <Label>Image URL</Label>
                     <Input
                       value={formData.image_url}
                       onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                      placeholder="https://your-blob-url.vercel-storage.com/image.jpg"
+                      placeholder="https://your-image-url.com/image.jpg"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Supports: Vercel Blob, Supabase Storage, or any public image URL
-                    </p>
                     {formData.image_url && (
                       <div className="mt-2 border rounded-lg overflow-hidden bg-muted/50">
                         <img
