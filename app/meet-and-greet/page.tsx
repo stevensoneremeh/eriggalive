@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -10,11 +11,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar, Video, CheckCircle, Loader2, Phone, Clock } from "lucide-react"
+import { Calendar, Video, CheckCircle, Loader2, Clock, DollarSign } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
-
-const MEET_GREET_PRICE = parseFloat(process.env.NEXT_PUBLIC_MEETGREET_PRICE || "50000")
 
 export default function MeetAndGreetPage() {
   const { user, profile } = useAuth()
@@ -26,6 +25,7 @@ export default function MeetAndGreetPage() {
     duration: "30",
     user_name: "",
     notes: "",
+    custom_amount: "",
   })
   const [booking, setBooking] = useState<any>(null)
   const [roomUrl, setRoomUrl] = useState("")
@@ -36,9 +36,9 @@ export default function MeetAndGreetPage() {
   ]
 
   const durationOptions = [
-    { value: "15", label: "15 minutes - ₦25,000" },
-    { value: "30", label: "30 minutes - ₦50,000" },
-    { value: "60", label: "60 minutes - ₦100,000" },
+    { value: "15", label: "15 minutes" },
+    { value: "30", label: "30 minutes" },
+    { value: "60", label: "60 minutes" },
   ]
 
   const getAvailableDates = () => {
@@ -52,17 +52,7 @@ export default function MeetAndGreetPage() {
     return dates
   }
 
-  const getPriceForDuration = (duration: string) => {
-    const prices: { [key: string]: number } = {
-      "15": 25000,
-      "30": 50000,
-      "60": 100000,
-    }
-    return prices[duration] || 50000
-  }
-
   useEffect(() => {
-    // Check for existing bookings
     if (user && profile) {
       checkExistingBookings()
     }
@@ -73,7 +63,7 @@ export default function MeetAndGreetPage() {
       .from("meet_greet_bookings")
       .select("*")
       .eq("user_id", profile?.id)
-      .eq("status", "scheduled")
+      .in("status", ["scheduled", "in_progress"])
       .order("scheduled_at", { ascending: false })
       .limit(1)
       .single()
@@ -88,18 +78,24 @@ export default function MeetAndGreetPage() {
   }
 
   const handleBooking = async () => {
-    if (!formData.scheduled_at || !formData.user_name || !user || !profile) {
+    if (!formData.scheduled_at || !formData.user_name || !formData.custom_amount || !user || !profile) {
       toast.error("Please fill in all required fields")
       return
     }
 
+    const amount = parseFloat(formData.custom_amount)
+    if (isNaN(amount) || amount < 1000) {
+      toast.error("Please enter a valid amount (minimum ₦1,000)")
+      return
+    }
+
     setIsLoading(true)
+    setCurrentStep("payment")
+
     try {
       const [date, time] = formData.scheduled_at.split('T')
       const scheduledDateTime = new Date(`${date}T${time}:00`)
-      const amount = getPriceForDuration(formData.duration)
       
-      // Initialize Paystack payment
       const paystackKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
       if (!paystackKey) {
         throw new Error("Payment system not configured")
@@ -112,9 +108,11 @@ export default function MeetAndGreetPage() {
         .from("meet_greet_bookings")
         .insert({
           user_id: profile.id,
+          user_email: user.email,
+          user_name: formData.user_name,
           scheduled_at: scheduledDateTime.toISOString(),
           duration: parseInt(formData.duration),
-          amount: amount,
+          payment_amount: amount,
           payment_reference: reference,
           payment_status: "pending",
           status: "pending",
@@ -141,32 +139,57 @@ export default function MeetAndGreetPage() {
             booking_id: bookingData.id,
             user_id: profile.id,
             duration: formData.duration,
+            custom_fields: [
+              {
+                display_name: "User Name",
+                variable_name: "user_name",
+                value: formData.user_name
+              },
+              {
+                display_name: "Session Duration",
+                variable_name: "duration",
+                value: `${formData.duration} minutes`
+              }
+            ]
           },
           callback: async (response: any) => {
-            // Update booking as paid
-            const { error } = await supabase
-              .from("meet_greet_bookings")
-              .update({
-                payment_status: "completed",
-                status: "scheduled",
-              })
-              .eq("id", bookingData.id)
+            // Verify payment
+            const verifyResponse = await fetch(`/api/meet-greet/verify-payment`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ reference: response.reference })
+            })
 
-            if (!error) {
-              setBooking(bookingData)
+            const verifyData = await verifyResponse.json()
+
+            if (verifyData.verified) {
+              setBooking(verifyData.booking)
               setCurrentStep("confirmation")
               toast.success("Booking confirmed! Admin will start the call at scheduled time.")
+            } else {
+              toast.error("Payment verification failed")
+              setCurrentStep("booking")
             }
+            setIsLoading(false)
           },
           onClose: () => {
             setIsLoading(false)
+            setCurrentStep("booking")
+            toast.error("Payment cancelled")
           },
         })
         handler.openIframe()
       }
+
+      script.onerror = () => {
+        setIsLoading(false)
+        setCurrentStep("booking")
+        toast.error("Failed to load payment system")
+      }
     } catch (error: any) {
       toast.error(error.message || "Failed to create booking")
       setIsLoading(false)
+      setCurrentStep("booking")
     }
   }
 
@@ -174,7 +197,7 @@ export default function MeetAndGreetPage() {
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md mx-auto">
       <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white">
         <CardContent className="p-8">
-          <h2 className="text-2xl font-bold text-center mb-2 text-blue-100">Book Video Call with Erigga</h2>
+          <h2 className="text-2xl font-bold text-center mb-2 text-blue-100">Video Call with Erigga</h2>
           
           <div className="space-y-4 mt-6">
             <div>
@@ -241,6 +264,23 @@ export default function MeetAndGreetPage() {
             </div>
 
             <div>
+              <Label className="text-blue-200 flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                How much is a video call with Erigga worth to you?
+              </Label>
+              <Input
+                type="number"
+                min="1000"
+                step="100"
+                value={formData.custom_amount}
+                onChange={(e) => setFormData({ ...formData, custom_amount: e.target.value })}
+                className="bg-white/10 border-white/20 text-white"
+                placeholder="Enter amount (min ₦1,000)"
+              />
+              <p className="text-xs text-blue-200 mt-1">Minimum: ₦1,000 • Suggested: ₦25,000 - ₦100,000</p>
+            </div>
+
+            <div>
               <Label className="text-blue-200">Notes (Optional)</Label>
               <Textarea
                 value={formData.notes}
@@ -260,11 +300,11 @@ export default function MeetAndGreetPage() {
 
             <Button
               onClick={handleBooking}
-              disabled={isLoading || !formData.scheduled_at || !formData.user_name}
+              disabled={isLoading || !formData.scheduled_at || !formData.user_name || !formData.custom_amount}
               className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
             >
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Video className="mr-2 h-4 w-4" />}
-              Book for ₦{getPriceForDuration(formData.duration).toLocaleString()}
+              {isLoading ? "Processing..." : "Proceed to Payment"}
             </Button>
           </div>
         </CardContent>
@@ -273,11 +313,9 @@ export default function MeetAndGreetPage() {
   )
 
   const ConfirmationScreen = () => {
-    const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null)
-
     useEffect(() => {
       if (booking) {
-        // Poll for room URL updates
+        // Poll for room URL updates every 5 seconds
         const interval = setInterval(async () => {
           const { data } = await supabase
             .from("meet_greet_bookings")
@@ -293,7 +331,6 @@ export default function MeetAndGreetPage() {
           }
         }, 5000)
 
-        setPollInterval(interval)
         return () => clearInterval(interval)
       }
     }, [booking])
@@ -320,6 +357,7 @@ export default function MeetAndGreetPage() {
                 })}
               </p>
               <p className="text-sm text-blue-300 mt-2">Duration: {booking?.duration} minutes</p>
+              <p className="text-sm text-green-300 mt-1">Amount Paid: ₦{booking?.payment_amount?.toLocaleString()}</p>
             </div>
 
             {!roomUrl && (
@@ -395,6 +433,12 @@ export default function MeetAndGreetPage() {
 
               <AnimatePresence mode="wait">
                 {currentStep === "booking" && <BookingForm key="booking" />}
+                {currentStep === "payment" && (
+                  <motion.div key="payment" className="text-center">
+                    <Loader2 className="w-16 h-16 animate-spin mx-auto mb-4 text-blue-500" />
+                    <p className="text-white">Processing payment...</p>
+                  </motion.div>
+                )}
                 {currentStep === "confirmation" && <ConfirmationScreen key="confirmation" />}
               </AnimatePresence>
             </div>

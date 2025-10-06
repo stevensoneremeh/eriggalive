@@ -200,14 +200,33 @@ export default function ContentManagerPage() {
 
     setUploadingImage(true)
     try {
-      // For now, use a placeholder URL or implement actual upload to Supabase storage
-      // You can integrate with your existing media upload system
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setFormData({ ...formData, image_url: reader.result as string })
-        toast.success("Image loaded successfully")
+      // Upload to Supabase Storage
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`
+      const filePath = `content/${fileName}`
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(filePath, file)
+
+      if (uploadError) {
+        // Fallback to base64 if storage fails
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setFormData({ ...formData, image_url: reader.result as string })
+          toast.success("Image loaded (base64)")
+        }
+        reader.readAsDataURL(file)
+        return
       }
-      reader.readAsDataURL(file)
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('media')
+        .getPublicUrl(filePath)
+
+      setFormData({ ...formData, image_url: publicUrl })
+      toast.success("Image uploaded successfully")
     } catch (error) {
       toast.error("Failed to upload image")
     } finally {
@@ -462,20 +481,24 @@ export default function ContentManagerPage() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label>Image URL</Label>
+                    <Label>Image URL (Supabase, Vercel Blob, or any public URL)</Label>
                     <Input
                       value={formData.image_url}
                       onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                      placeholder="https://example.com/image.jpg"
+                      placeholder="https://your-blob-url.vercel-storage.com/image.jpg"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Supports: Vercel Blob, Supabase Storage, or any public image URL
+                    </p>
                     {formData.image_url && (
-                      <div className="mt-2 border rounded-lg overflow-hidden">
+                      <div className="mt-2 border rounded-lg overflow-hidden bg-muted/50">
                         <img
                           src={formData.image_url}
                           alt="Preview"
                           className="w-full h-48 object-cover"
                           onError={(e) => {
                             e.currentTarget.src = '/placeholder.svg'
+                            toast.error("Failed to load image from URL")
                           }}
                         />
                       </div>
