@@ -281,8 +281,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )}
       </div>
 
-      <ScrollArea className="flex-1 overflow-y-auto">
-        <nav className="py-4 px-3 sm:px-4 space-y-1">
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="py-4 px-3 sm:px-4 space-y-1">
           {adminNavItems.map((item) => {
             const Icon = item.icon
             const active = isActive(item.href)
@@ -304,7 +304,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </Link>
             )
           })}
-        </nav>
+        </div>
       </ScrollArea>
 
       <div className="p-4 border-t shrink-0">
