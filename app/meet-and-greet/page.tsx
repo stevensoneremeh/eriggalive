@@ -271,13 +271,13 @@ export default function MeetAndGreetPage() {
               <Input
                 type="number"
                 min="1000"
-                step="100"
+                step="1000"
                 value={formData.custom_amount}
                 onChange={(e) => setFormData({ ...formData, custom_amount: e.target.value })}
-                className="bg-white/10 border-white/20 text-white"
-                placeholder="Enter amount (min ₦1,000)"
+                className="bg-white/10 border-white/20 text-white text-lg font-semibold"
+                placeholder="Name your price (min ₦1,000)"
               />
-              <p className="text-xs text-blue-200 mt-1">Minimum: ₦1,000 • Suggested: ₦25,000 - ₦100,000</p>
+              <p className="text-xs text-blue-200 mt-1">💡 Popular range: ₦25,000 - ₦100,000</p>
             </div>
 
             <div>

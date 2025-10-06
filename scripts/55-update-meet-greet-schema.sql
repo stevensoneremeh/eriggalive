@@ -1,4 +1,3 @@
-
 -- Migration: Update meet_greet_bookings for Daily.co integration
 -- This safely updates the existing table structure
 
@@ -70,3 +69,43 @@ WHERE daily_room_name IS NOT NULL;
 -- Grant permissions
 GRANT SELECT, INSERT, UPDATE ON public.meet_greet_bookings TO authenticated;
 GRANT SELECT ON public.meet_greet_bookings TO anon;
+
+-- Fix meet_greet_bookings RLS policies
+DROP POLICY IF EXISTS "Users can view their own bookings" ON meet_greet_bookings;
+DROP POLICY IF EXISTS "Users can insert their own bookings" ON meet_greet_bookings;
+DROP POLICY IF EXISTS "Admin can view all bookings" ON meet_greet_bookings;
+DROP POLICY IF EXISTS "Admin can update all bookings" ON meet_greet_bookings;
+
+-- Recreate policies with proper conditions
+CREATE POLICY "Users can view their own bookings"
+  ON meet_greet_bookings
+  FOR SELECT
+  USING (
+    auth.uid() IS NOT NULL AND (
+      user_id::text = auth.uid()::text OR
+      EXISTS (
+        SELECT 1 FROM users 
+        WHERE id::text = auth.uid()::text 
+        AND email = 'info@eriggalive.com'
+      )
+    )
+  );
+
+CREATE POLICY "Users can insert their own bookings"
+  ON meet_greet_bookings
+  FOR INSERT
+  WITH CHECK (
+    auth.uid() IS NOT NULL AND
+    user_id::text = auth.uid()::text
+  );
+
+CREATE POLICY "Admin can update all bookings"
+  ON meet_greet_bookings
+  FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM users 
+      WHERE id::text = auth.uid()::text 
+      AND email = 'info@eriggalive.com'
+    )
+  );
