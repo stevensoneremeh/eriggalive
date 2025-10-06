@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -9,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
@@ -52,7 +51,7 @@ export default function ContentManagerPage() {
   const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingContent, setEditingContent] = useState<any>(null)
-  
+
   const [formData, setFormData] = useState({
     page_name: "homepage",
     page_title: "",
@@ -116,9 +115,9 @@ export default function ContentManagerPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       })
-      
+
       if (!response.ok) throw new Error("Failed to save")
-      
+
       toast.success(editingContent ? "Content updated" : "Content added")
       setIsDialogOpen(false)
       resetForm()
@@ -130,11 +129,11 @@ export default function ContentManagerPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this content?")) return
-    
+
     try {
       const response = await fetch(`/api/admin/content?id=${id}`, { method: "DELETE" })
       if (!response.ok) throw new Error("Failed to delete")
-      
+
       toast.success("Content deleted")
       fetchContent(selectedPage)
     } catch (error) {
@@ -302,8 +301,15 @@ export default function ContentManagerPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>{editingContent ? "Edit" : "Add"} Content Section</span>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle>
+                  {editingContent ? "Edit" : "Add"} Content Section
+                </DialogTitle>
+                <DialogDescription>
+                  {editingContent ? "Update the content section details below." : "Create a new content section for your page."}
+                </DialogDescription>
+              </div>
               <Button
                 variant="outline"
                 size="sm"
@@ -312,9 +318,9 @@ export default function ContentManagerPage() {
                 {previewMode ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
                 {previewMode ? "Edit Mode" : "Preview"}
               </Button>
-            </DialogTitle>
+            </div>
           </DialogHeader>
-          
+
           {previewMode ? (
             <div className="py-4 border rounded-lg p-6 bg-muted/50">
               <div className="space-y-4">
@@ -370,37 +376,37 @@ export default function ContentManagerPage() {
 
                 <div className="grid gap-2">
                   <Label>Page Title (Optional)</Label>
-                  <Input 
-                    value={formData.page_title} 
-                    onChange={(e) => setFormData({ ...formData, page_title: e.target.value })} 
+                  <Input
+                    value={formData.page_title}
+                    onChange={(e) => setFormData({ ...formData, page_title: e.target.value })}
                     placeholder="e.g., Welcome to Erigga Live"
                   />
                 </div>
 
                 <div className="grid gap-2">
                   <Label>Section Title *</Label>
-                  <Input 
-                    value={formData.title} 
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })} 
+                  <Input
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     placeholder="e.g., Latest Music"
-                    required 
+                    required
                   />
                 </div>
 
                 <div className="grid gap-2">
                   <Label>Subtitle</Label>
-                  <Input 
-                    value={formData.subtitle} 
-                    onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })} 
+                  <Input
+                    value={formData.subtitle}
+                    onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
                     placeholder="e.g., Stream exclusive tracks"
                   />
                 </div>
 
                 <div className="grid gap-2">
                   <Label>Content Text</Label>
-                  <Textarea 
-                    value={formData.content_text} 
-                    onChange={(e) => setFormData({ ...formData, content_text: e.target.value })} 
+                  <Textarea
+                    value={formData.content_text}
+                    onChange={(e) => setFormData({ ...formData, content_text: e.target.value })}
                     rows={6}
                     placeholder="Enter the main content for this section..."
                   />
@@ -412,17 +418,17 @@ export default function ContentManagerPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label>Button Text</Label>
-                    <Input 
-                      value={formData.button_text} 
-                      onChange={(e) => setFormData({ ...formData, button_text: e.target.value })} 
+                    <Input
+                      value={formData.button_text}
+                      onChange={(e) => setFormData({ ...formData, button_text: e.target.value })}
                       placeholder="e.g., Learn More"
                     />
                   </div>
                   <div className="grid gap-2">
                     <Label>Button Link</Label>
-                    <Input 
-                      value={formData.button_link} 
-                      onChange={(e) => setFormData({ ...formData, button_link: e.target.value })} 
+                    <Input
+                      value={formData.button_link}
+                      onChange={(e) => setFormData({ ...formData, button_link: e.target.value })}
                       placeholder="/premium"
                     />
                   </div>
@@ -434,15 +440,15 @@ export default function ContentManagerPage() {
                   <div className="grid gap-2">
                     <Label>Image Upload</Label>
                     <div className="flex gap-2">
-                      <Input 
-                        type="file" 
+                      <Input
+                        type="file"
                         accept="image/*"
                         onChange={handleImageUpload}
                         disabled={uploadingImage}
                         className="flex-1"
                       />
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         disabled={uploadingImage}
                         onClick={() => {
                           const input = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -459,16 +465,16 @@ export default function ContentManagerPage() {
 
                   <div className="grid gap-2">
                     <Label>Image URL</Label>
-                    <Input 
-                      value={formData.image_url} 
-                      onChange={(e) => setFormData({ ...formData, image_url: e.target.value })} 
+                    <Input
+                      value={formData.image_url}
+                      onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
                       placeholder="https://example.com/image.jpg"
                     />
                     {formData.image_url && (
                       <div className="mt-2 border rounded-lg overflow-hidden">
-                        <img 
-                          src={formData.image_url} 
-                          alt="Preview" 
+                        <img
+                          src={formData.image_url}
+                          alt="Preview"
                           className="w-full h-48 object-cover"
                           onError={(e) => {
                             e.currentTarget.src = '/placeholder.svg'
@@ -480,9 +486,9 @@ export default function ContentManagerPage() {
 
                   <div className="grid gap-2">
                     <Label>Video URL (YouTube, Vimeo, etc.)</Label>
-                    <Input 
-                      value={formData.video_url} 
-                      onChange={(e) => setFormData({ ...formData, video_url: e.target.value })} 
+                    <Input
+                      value={formData.video_url}
+                      onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
                       placeholder="https://youtube.com/watch?v=..."
                     />
                   </div>
@@ -493,10 +499,10 @@ export default function ContentManagerPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label>Display Order</Label>
-                    <Input 
-                      type="number" 
-                      value={formData.section_order} 
-                      onChange={(e) => setFormData({ ...formData, section_order: parseInt(e.target.value) || 0 })} 
+                    <Input
+                      type="number"
+                      value={formData.section_order}
+                      onChange={(e) => setFormData({ ...formData, section_order: parseInt(e.target.value) || 0 })}
                       min="0"
                     />
                     <p className="text-xs text-muted-foreground">
@@ -504,9 +510,9 @@ export default function ContentManagerPage() {
                     </p>
                   </div>
                   <div className="flex items-center space-x-2 pt-6">
-                    <Switch 
-                      checked={formData.is_active} 
-                      onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} 
+                    <Switch
+                      checked={formData.is_active}
+                      onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
                       id="active-switch"
                     />
                     <Label htmlFor="active-switch" className="cursor-pointer">
@@ -517,9 +523,9 @@ export default function ContentManagerPage() {
 
                 <div className="grid gap-2">
                   <Label>Custom CSS (Advanced)</Label>
-                  <Textarea 
-                    value={formData.custom_css} 
-                    onChange={(e) => setFormData({ ...formData, custom_css: e.target.value })} 
+                  <Textarea
+                    value={formData.custom_css}
+                    onChange={(e) => setFormData({ ...formData, custom_css: e.target.value })}
                     rows={6}
                     placeholder=".custom-section { background: linear-gradient(...); }"
                     className="font-mono text-sm"
@@ -531,8 +537,8 @@ export default function ContentManagerPage() {
 
                 <div className="grid gap-2">
                   <Label>Metadata (JSON)</Label>
-                  <Textarea 
-                    value={JSON.stringify(formData.metadata, null, 2)} 
+                  <Textarea
+                    value={JSON.stringify(formData.metadata, null, 2)}
                     onChange={(e) => {
                       try {
                         setFormData({ ...formData, metadata: JSON.parse(e.target.value) })
