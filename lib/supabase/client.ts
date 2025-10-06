@@ -1,6 +1,8 @@
 import { createBrowserClient } from "@supabase/ssr"
 import type { Database } from "@/types/database"
 
+let client: ReturnType<typeof createBrowserClient> | null = null
+
 export function createClient() {
   // Validate environment variables
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -12,8 +14,13 @@ export function createClient() {
     return createMockClient()
   }
 
+  // Use singleton pattern for Supabase client
+  if (client) {
+    return client
+  }
+
   try {
-    return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+    client = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -30,6 +37,7 @@ export function createClient() {
         },
       },
     })
+    return client
   } catch (error) {
     console.error("Failed to create Supabase client:", error)
     return createMockClient()

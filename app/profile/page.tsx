@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { AuthGuard } from "@/components/auth-guard"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -211,6 +211,32 @@ export default function ProfilePage() {
     if (completeness >= 60) return "text-yellow-600"
     return "text-red-600"
   }
+
+  // Debounced fetch for profile data to prevent request storms
+  const loadUserProfile = async () => {
+    try {
+      // This is a placeholder, assuming refreshProfile() fetches necessary data
+      // or you might have another fetch call here.
+      // For now, we rely on refreshProfile() to update the auth context.
+      await refreshProfile();
+    } catch (error) {
+      console.error("Failed to load user profile:", error);
+      toast({
+        title: "Error loading profile",
+        description: "Could not fetch your profile data. Please try again later.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadUserProfile()
+    }, 100)
+
+    return () => clearTimeout(timeoutId)
+  }, [])
+
 
   return (
     <AuthGuard>

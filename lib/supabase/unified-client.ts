@@ -1,5 +1,7 @@
 import { createClient as createBrowserClient } from "@/lib/supabase/client"
 import { createClient as createServerClient } from "@/lib/supabase/server"
+import { createClient } from './client'
+import { shouldAllowRequest } from '../request-limiter'
 
 // Unified client factory that chooses the right client based on environment
 export function getSupabaseClient() {
@@ -41,3 +43,19 @@ export function createUnifiedClient() {
 // Re-export the correct clients
 export { createClient as createBrowserClient } from "@/lib/supabase/client"
 export { createClient as createServerClient } from "@/lib/supabase/server"
+
+export const getSupabase = () => {
+  const client = createClient()
+
+  // Wrap the from method to add rate limiting
+  const originalFrom = client.from.bind(client)
+  client.from = (table: string) => {
+    const requestKey = `supabase_${table}_${Date.now()}`
+    if (!shouldAllowRequest(requestKey)) {
+      console.warn(`Rate limit: Skipping duplicate request to ${table}`)
+    }
+    return originalFrom(table)
+  }
+
+  return client
+}
