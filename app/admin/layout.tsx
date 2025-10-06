@@ -96,10 +96,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           return
         }
 
-        // Check profile from context first
+        // Check profile from context first (optimized check)
         if (profile) {
           // Allow admin or super_admin role
-          if (profile.role === "admin" || profile.role === "super_admin" || profile.tier === "enterprise") {
+          const hasPermission = profile.role === "admin" || profile.role === "super_admin" || profile.tier === "enterprise"
+          if (hasPermission) {
             if (mounted) {
               setHasAccess(true)
               setDebugInfo({ method: "profile_context", role: profile.role, tier: profile.tier })
@@ -256,7 +257,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex flex-col h-full w-full overflow-hidden">
       <div className="p-4 sm:p-6 border-b shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -281,8 +282,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )}
       </div>
 
-      <ScrollArea className="flex-1 min-h-0">
-        <div className="py-4 px-3 sm:px-4 space-y-1">
+      <ScrollArea className="flex-1 px-3 sm:px-4">
+        <nav className="py-4 space-y-1 pb-6">
           {adminNavItems.map((item) => {
             const Icon = item.icon
             const active = isActive(item.href)
@@ -291,8 +292,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link
                 key={item.name}
                 href={item.href}
+                prefetch={true}
                 className={cn(
-                  "flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all w-full",
+                  "flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors w-full",
                   active
                     ? "bg-brand-teal text-white shadow-sm"
                     : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800",
@@ -304,7 +306,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </Link>
             )
           })}
-        </div>
+        </nav>
       </ScrollArea>
 
       <div className="p-4 border-t shrink-0">
@@ -327,7 +329,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="flex h-screen overflow-hidden">
-        <aside className="hidden lg:flex w-64 xl:w-72 bg-white dark:bg-gray-800 border-r shadow-sm">
+        <aside className="hidden lg:flex flex-col w-64 xl:w-72 bg-white dark:bg-gray-800 border-r shadow-sm overflow-hidden">
           <SidebarContent />
         </aside>
 
