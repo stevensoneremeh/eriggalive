@@ -301,25 +301,23 @@ export default function ContentManagerPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <DialogTitle>
-                  {editingContent ? "Edit" : "Add"} Content Section
-                </DialogTitle>
-                <DialogDescription>
-                  {editingContent ? "Update the content section details below." : "Create a new content section for your page."}
-                </DialogDescription>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPreviewMode(!previewMode)}
-              >
-                {previewMode ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-                {previewMode ? "Edit Mode" : "Preview"}
-              </Button>
-            </div>
+            <DialogTitle>
+              {editingContent ? "Edit" : "Add"} Content Section
+            </DialogTitle>
+            <DialogDescription>
+              {editingContent ? "Update the content section details below." : "Create a new content section for your page."}
+            </DialogDescription>
           </DialogHeader>
+          <div className="flex items-center justify-end -mt-4 mb-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPreviewMode(!previewMode)}
+            >
+              {previewMode ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+              {previewMode ? "Edit Mode" : "Preview"}
+            </Button>
+          </div>
 
           {previewMode ? (
             <div className="py-4 border rounded-lg p-6 bg-muted/50">
