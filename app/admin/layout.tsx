@@ -38,31 +38,41 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 const adminNavItems = [
-  { name: "Overview", href: "/admin", icon: Home },
-  { name: "Dashboard", href: "/admin/dashboard", icon: TrendingUp },
-  { name: "User Management", href: "/admin/users-management", icon: Users },
-  { name: "Content Manager", href: "/admin/content-manager", icon: FileText },
-  { name: "Content Overview", href: "/admin/content-overview", icon: BarChart3 },
-  { name: "Content Importer", href: "/admin/content-importer", icon: Upload },
-  { name: "Homepage Content", href: "/admin/homepage-content", icon: Home },
-  { name: "Merch", href: "/admin/merch", icon: ShoppingBag },
-  { name: "Live Streams (Mux)", href: "/admin/live-streams", icon: RadioIcon },
-  { name: "Vault Items", href: "/admin/vault-items", icon: Shield },
-  { name: "Radio", href: "/admin/radio-management", icon: RadioIcon },
-  { name: "Chronicles & Vault", href: "/admin/videos-management", icon: Video },
-  { name: "Tiers", href: "/admin/tiers-management", icon: Trophy },
-  { name: "Scanner", href: "/admin/scanner", icon: Scan },
-  { name: "Users", href: "/admin/users", icon: Users },
-  { name: "Events", href: "/admin/events", icon: Calendar },
-  { name: "Transactions", href: "/admin/transactions", icon: CreditCard },
-  { name: "Withdrawals", href: "/admin/withdrawals", icon: CreditCard },
-  { name: "Live Streaming", href: "/admin/live", icon: Video },
-  { name: "Video Calls", href: "/admin/video-calls", icon: Phone },
-  { name: "Vault Management", href: "/admin/vault-management", icon: Shield },
-  { name: "Media", href: "/admin/media", icon: ImageIcon },
-  { name: "Upload", href: "/admin/upload", icon: Upload },
-  { name: "Branding", href: "/admin/branding", icon: Palette },
-  { name: "Health", href: "/admin/health", icon: Wrench },
+  { name: "Dashboard", href: "/admin/dashboard", icon: TrendingUp, section: "Overview" },
+  { name: "Stats & Analytics", href: "/admin", icon: BarChart3, section: "Overview" },
+  { name: "System Health", href: "/admin/health", icon: Wrench, section: "Overview" },
+  
+  { name: "Users", href: "/admin/users-management", icon: Users, section: "User Management" },
+  { name: "Transactions", href: "/admin/transactions", icon: CreditCard, section: "User Management" },
+  { name: "Withdrawals", href: "/admin/withdrawals", icon: CreditCard, section: "User Management" },
+  { name: "Membership Tiers", href: "/admin/tiers-management", icon: Trophy, section: "User Management" },
+  
+  { name: "Homepage", href: "/admin/homepage-content", icon: Home, section: "Content" },
+  { name: "Content Manager", href: "/admin/content-manager", icon: FileText, section: "Content" },
+  { name: "Content Importer", href: "/admin/content-importer", icon: Upload, section: "Content" },
+  { name: "Events", href: "/admin/events", icon: Calendar, section: "Content" },
+  { name: "Merch", href: "/admin/merch", icon: ShoppingBag, section: "Content" },
+  
+  { name: "Vault Items", href: "/admin/vault-items", icon: Shield, section: "Media" },
+  { name: "Chronicles & Videos", href: "/admin/videos-management", icon: Video, section: "Media" },
+  { name: "Media Library", href: "/admin/media", icon: ImageIcon, section: "Media" },
+  { name: "Media Upload", href: "/admin/upload", icon: Upload, section: "Media" },
+  
+  { name: "Live Streams", href: "/admin/live-streams", icon: RadioIcon, section: "Live Features" },
+  { name: "Radio Management", href: "/admin/radio-management", icon: RadioIcon, section: "Live Features" },
+  { name: "Video Calls", href: "/admin/video-calls", icon: Phone, section: "Live Features" },
+  
+  { name: "Ticket Scanner", href: "/admin/scanner", icon: Scan, section: "Tools" },
+  { name: "Branding", href: "/admin/branding", icon: Palette, section: "Tools" },
+]
+
+const navSections = [
+  { title: "Overview", items: adminNavItems.filter(item => item.section === "Overview") },
+  { title: "User Management", items: adminNavItems.filter(item => item.section === "User Management") },
+  { title: "Content", items: adminNavItems.filter(item => item.section === "Content") },
+  { title: "Media", items: adminNavItems.filter(item => item.section === "Media") },
+  { title: "Live Features", items: adminNavItems.filter(item => item.section === "Live Features") },
+  { title: "Tools", items: adminNavItems.filter(item => item.section === "Tools") },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -285,29 +295,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
 
       <ScrollArea className="flex-1 px-3 sm:px-4">
-        <nav className="py-4 space-y-1 pb-6">
-          {adminNavItems.map((item) => {
-            const Icon = item.icon
-            const active = isActive(item.href)
+        <nav className="py-4 space-y-6 pb-6">
+          {navSections.map((section) => (
+            <div key={section.title} className="space-y-1">
+              <h3 className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                {section.title}
+              </h3>
+              {section.items.map((item) => {
+                const Icon = item.icon
+                const active = isActive(item.href)
 
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                prefetch={true}
-                className={cn(
-                  "flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors w-full",
-                  active
-                    ? "bg-brand-teal text-white shadow-sm"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800",
-                )}
-                onClick={() => isMobile && setIsMobileMenuOpen(false)}
-              >
-                <Icon className="h-5 w-5 shrink-0" />
-                <span className="font-medium text-sm">{item.name}</span>
-              </Link>
-            )
-          })}
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    prefetch={true}
+                    className={cn(
+                      "flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-200 w-full",
+                      active
+                        ? "bg-brand-teal text-white shadow-sm transform scale-[1.02]"
+                        : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:transform hover:scale-[1.01]",
+                    )}
+                    onClick={() => isMobile && setIsMobileMenuOpen(false)}
+                  >
+                    <Icon className="h-5 w-5 shrink-0" />
+                    <span className="font-medium text-sm truncate">{item.name}</span>
+                  </Link>
+                )
+              })}
+            </div>
+          ))}
         </nav>
       </ScrollArea>
 
