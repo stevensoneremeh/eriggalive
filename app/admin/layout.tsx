@@ -41,27 +41,27 @@ const adminNavItems = [
   { name: "Dashboard", href: "/admin/dashboard", icon: TrendingUp, section: "Overview" },
   { name: "Stats & Analytics", href: "/admin", icon: BarChart3, section: "Overview" },
   { name: "System Health", href: "/admin/health", icon: Wrench, section: "Overview" },
-  
+
   { name: "Users", href: "/admin/users-management", icon: Users, section: "User Management" },
   { name: "Transactions", href: "/admin/transactions", icon: CreditCard, section: "User Management" },
   { name: "Withdrawals", href: "/admin/withdrawals", icon: CreditCard, section: "User Management" },
   { name: "Membership Tiers", href: "/admin/tiers-management", icon: Trophy, section: "User Management" },
-  
+
   { name: "Homepage", href: "/admin/homepage-content", icon: Home, section: "Content" },
   { name: "Content Manager", href: "/admin/content-manager", icon: FileText, section: "Content" },
   { name: "Content Importer", href: "/admin/content-importer", icon: Upload, section: "Content" },
   { name: "Events", href: "/admin/events", icon: Calendar, section: "Content" },
   { name: "Merch", href: "/admin/merch", icon: ShoppingBag, section: "Content" },
-  
+
   { name: "Vault Items", href: "/admin/vault-items", icon: Shield, section: "Media" },
   { name: "Chronicles & Videos", href: "/admin/videos-management", icon: Video, section: "Media" },
   { name: "Media Library", href: "/admin/media", icon: ImageIcon, section: "Media" },
   { name: "Media Upload", href: "/admin/upload", icon: Upload, section: "Media" },
-  
+
   { name: "Live Streams", href: "/admin/live-streams", icon: RadioIcon, section: "Live Features" },
   { name: "Radio Management", href: "/admin/radio-management", icon: RadioIcon, section: "Live Features" },
   { name: "Video Calls", href: "/admin/video-calls", icon: Phone, section: "Live Features" },
-  
+
   { name: "Ticket Scanner", href: "/admin/scanner", icon: Scan, section: "Tools" },
   { name: "Branding", href: "/admin/branding", icon: Palette, section: "Tools" },
 ]
