@@ -1,18 +1,17 @@
-
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { db } from "@/lib/db/client"
+import { sql } from "drizzle-orm"
 
 export const dynamic = "force-dynamic"
-export const revalidate = 120 // Cache for 2 minutes
+export const revalidate = 120
 
-// In-memory cache to prevent excessive requests
 let cachedStats: any = null
 let cacheTimestamp: number = 0
-const CACHE_DURATION = 120000 // 2 minutes (increased to reduce load)
+const CACHE_DURATION = 120000
 
 export async function GET() {
   try {
-    // Return cached data if available and fresh
     const now = Date.now()
     if (cachedStats && (now - cacheTimestamp) < CACHE_DURATION) {
       return NextResponse.json({
@@ -28,7 +27,6 @@ export async function GET() {
 
     const supabase = await createClient()
 
-    // Verify admin access
     const {
       data: { user },
       error: authError,
@@ -38,11 +36,10 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role, tier")
-      .eq("auth_user_id", user.id)
-      .single()
+    const profileResult = await db.execute(sql`
+      SELECT role, tier FROM users WHERE auth_user_id = ${user.id} LIMIT 1
+    `)
+    const profile = (profileResult as any[])[0]
 
     const isAdmin =
       user.email === "info@eriggalive.com" ||
@@ -54,80 +51,45 @@ export async function GET() {
       return NextResponse.json({ error: "Insufficient privileges" }, { status: 403 })
     }
 
-    // Fetch statistics with optimized queries (count only, no data)
-    const [usersCount, transactionsCount, eventsCount, withdrawalsCount] = await Promise.all([
-      supabase.from("users").select("*", { count: "exact", head: true }),
-      supabase.from("coin_transactions").select("*", { count: "exact", head: true }),
-      supabase.from("events").select("*", { count: "exact", head: true }),
-      supabase.from("withdrawals").select("*", { count: "exact", head: true }),
-    ])
-
-    // Calculate revenue (use aggregation if available)
-    const { data: revenueData } = await supabase
-      .from("coin_transactions")
-      .select("amount")
-      .eq("transaction_type", "purchase")
-      .eq("status", "completed")
-      .limit(1000) // Limit to prevent excessive data transfer
-
-    const totalRevenue = revenueData?.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0) || 0
-
-    // Get pending withdrawals
-    const { data: pendingWithdrawals } = await supabase
-      .from("withdrawals")
-      .select("amount_naira")
-      .eq("status", "pending")
-      .limit(1000)
-
-    const pendingAmount = pendingWithdrawals?.reduce((sum: number, w: any) => sum + (w.amount_naira || 0), 0) || 0
-
-    // Get active users count (last 7 days to reduce load)
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    const { count: activeUsersCount } = await supabase
-      .from("users")
-      .select("*", { count: "exact", head: true })
-      .gte("last_seen_at", sevenDaysAgo)
-
-    // Get new users today
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const { count: newUsersToday } = await supabase
-      .from("users")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", today.toISOString())
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
-    // Get today's revenue
-    const { data: todayRevenue } = await supabase
-      .from("coin_transactions")
-      .select("amount")
-      .eq("transaction_type", "purchase")
-      .eq("status", "completed")
-      .gte("created_at", today.toISOString())
-      .limit(500)
+    const statsResult = await db.execute(sql`
+      SELECT 
+        (SELECT COUNT(*) FROM users) as total_users,
+        (SELECT COUNT(*) FROM users WHERE last_seen_at >= ${sevenDaysAgo.toISOString()}) as active_users,
+        (SELECT COUNT(*) FROM users WHERE created_at >= ${today.toISOString()}) as new_users_today,
+        (SELECT COUNT(*) FROM coin_transactions) as total_transactions,
+        (SELECT COUNT(*) FROM events) as total_events,
+        (SELECT COUNT(*) FROM withdrawals) as total_withdrawals,
+        (SELECT COALESCE(SUM(amount), 0) FROM coin_transactions 
+         WHERE transaction_type = 'purchase' AND status = 'completed') as total_revenue,
+        (SELECT COALESCE(SUM(amount), 0) FROM coin_transactions 
+         WHERE transaction_type = 'purchase' AND status = 'completed' 
+         AND created_at >= ${today.toISOString()}) as revenue_today,
+        (SELECT COUNT(*) FROM coin_transactions 
+         WHERE created_at >= ${today.toISOString()}) as orders_today,
+        (SELECT COALESCE(SUM(amount_naira), 0) FROM withdrawals 
+         WHERE status = 'pending') as pending_withdrawal_amount
+    `)
 
-    const revenueToday = todayRevenue?.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0) || 0
-
-    // Get today's orders
-    const { count: ordersToday } = await supabase
-      .from("coin_transactions")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", today.toISOString())
+    const result = (statsResult as any[])[0]
 
     const stats = {
-      totalUsers: usersCount.count || 0,
-      activeUsers: activeUsersCount || 0,
-      newUsersToday: newUsersToday || 0,
-      totalTransactions: transactionsCount.count || 0,
-      totalEvents: eventsCount.count || 0,
-      totalWithdrawals: withdrawalsCount.count || 0,
-      totalRevenue,
-      revenueToday,
-      ordersToday: ordersToday || 0,
-      pendingWithdrawalAmount: pendingAmount,
+      totalUsers: Number(result.total_users) || 0,
+      activeUsers: Number(result.active_users) || 0,
+      newUsersToday: Number(result.new_users_today) || 0,
+      totalTransactions: Number(result.total_transactions) || 0,
+      totalEvents: Number(result.total_events) || 0,
+      totalWithdrawals: Number(result.total_withdrawals) || 0,
+      totalRevenue: Number(result.total_revenue) || 0,
+      revenueToday: Number(result.revenue_today) || 0,
+      ordersToday: Number(result.orders_today) || 0,
+      pendingWithdrawalAmount: Number(result.pending_withdrawal_amount) || 0,
       lastUpdated: now,
     }
 
-    // Update cache
     cachedStats = stats
     cacheTimestamp = now
 
