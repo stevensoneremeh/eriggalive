@@ -38,10 +38,10 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-in fade-in duration-300">
         <h1 className="text-3xl font-bold">Dashboard Overview</h1>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(6)].map((_, i) => (
+          {[...Array(4)].map((_, i) => (
             <Card key={i}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <Skeleton className="h-4 w-24" />

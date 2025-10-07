@@ -48,6 +48,7 @@ const adminNavItems = [
   { name: "Membership Tiers", href: "/admin/tiers-management", icon: Trophy, section: "User Management" },
 
   { name: "Homepage", href: "/admin/homepage-content", icon: Home, section: "Content" },
+  { name: "User Content Manager", href: "/admin/user-content-manager", icon: FileText, section: "Content" },
   { name: "Content Manager", href: "/admin/content-manager", icon: FileText, section: "Content" },
   { name: "Content Importer", href: "/admin/content-importer", icon: Upload, section: "Content" },
   { name: "Events", href: "/admin/events", icon: Calendar, section: "Content" },
