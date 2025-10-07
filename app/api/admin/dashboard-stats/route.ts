@@ -3,8 +3,8 @@ import { createClient } from "@/lib/supabase/server"
 import { db } from "@/lib/db/client"
 import { sql } from "drizzle-orm"
 
-export const dynamic = "force-dynamic"
-export const revalidate = 120
+export const dynamic = 'force-dynamic'
+export const revalidate = 60 // Cache for 60 seconds
 
 let cachedStats: any = null
 let cacheTimestamp: number = 0

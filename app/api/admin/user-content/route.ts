@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db/client'
+import { sql } from 'drizzle-orm'
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     switch (type) {
       case 'homepage':
-        content = await db.execute(`
+        content = await db.execute(sql`
           SELECT id, title, content, media_type, media_url, display_order, is_active
           FROM homepage_content
           ORDER BY display_order ASC
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
         break
 
       case 'media':
-        content = await db.execute(`
+        content = await db.execute(sql`
           SELECT id, title, description, media_type, media_url, thumbnail_url, created_at
           FROM media_vault
           WHERE is_public = true
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
         break
 
       case 'events':
-        content = await db.execute(`
+        content = await db.execute(sql`
           SELECT id, title, description, event_date, location, ticket_price, max_attendees
           FROM events
           WHERE event_date >= NOW()
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
         break
 
       case 'merchandise':
-        content = await db.execute(`
+        content = await db.execute(sql`
           SELECT id, name, description, price, stock_quantity, image_url
           FROM products
           WHERE is_active = true
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
         break
 
       default:
-        content = await db.execute(`
+        content = await db.execute(sql`
           SELECT 'homepage' as content_type, COUNT(*) as count FROM homepage_content
           UNION ALL
           SELECT 'media' as content_type, COUNT(*) as count FROM media_vault
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
         `)
     }
 
-    return NextResponse.json(content)
+    return NextResponse.json(Array.isArray(content) ? content : [])
   } catch (error) {
     console.error('Error fetching user content:', error)
     return NextResponse.json(
@@ -77,46 +78,46 @@ export async function PUT(request: NextRequest) {
 
     switch (type) {
       case 'homepage':
-        result = await db.execute(`
+        result = await db.execute(sql`
           UPDATE homepage_content
-          SET title = $1, content = $2, media_url = $3, is_active = $4, updated_at = NOW()
-          WHERE id = $5
+          SET title = ${data.title}, content = ${data.content}, media_url = ${data.media_url}, is_active = ${data.is_active}, updated_at = NOW()
+          WHERE id = ${id}
           RETURNING *
-        `, [data.title, data.content, data.media_url, data.is_active, id])
+        `)
         break
 
       case 'media':
-        result = await db.execute(`
+        result = await db.execute(sql`
           UPDATE media_vault
-          SET title = $1, description = $2, is_public = $3, updated_at = NOW()
-          WHERE id = $4
+          SET title = ${data.title}, description = ${data.description}, is_public = ${data.is_public}, updated_at = NOW()
+          WHERE id = ${id}
           RETURNING *
-        `, [data.title, data.description, data.is_public, id])
+        `)
         break
 
       case 'events':
-        result = await db.execute(`
+        result = await db.execute(sql`
           UPDATE events
-          SET title = $1, description = $2, ticket_price = $3, max_attendees = $4
-          WHERE id = $5
+          SET title = ${data.title}, description = ${data.description}, ticket_price = ${data.ticket_price}, max_attendees = ${data.max_attendees}
+          WHERE id = ${id}
           RETURNING *
-        `, [data.title, data.description, data.ticket_price, data.max_attendees, id])
+        `)
         break
 
       case 'merchandise':
-        result = await db.execute(`
+        result = await db.execute(sql`
           UPDATE products
-          SET name = $1, description = $2, price = $3, stock_quantity = $4
-          WHERE id = $5
+          SET name = ${data.name}, description = ${data.description}, price = ${data.price}, stock_quantity = ${data.stock_quantity}
+          WHERE id = ${id}
           RETURNING *
-        `, [data.name, data.description, data.price, data.stock_quantity, id])
+        `)
         break
 
       default:
         return NextResponse.json({ error: 'Invalid content type' }, { status: 400 })
     }
 
-    return NextResponse.json(result[0])
+    return NextResponse.json(Array.isArray(result) && result.length > 0 ? result[0] : {})
   } catch (error) {
     console.error('Error updating content:', error)
     return NextResponse.json(
