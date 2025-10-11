@@ -1,0 +1,141 @@
+7018-feea29d23d7e41a6.js:1 ReferenceError: createClientComponentClient is not defined
+    at b (page-3bd2d63639f89836.js:1:587)
+    at rE (4a29d24f-6838729f6bf1a901.js:1:40345)
+    at iZ (4a29d24f-6838729f6bf1a901.js:1:117030)
+    at ia (4a29d24f-6838729f6bf1a901.js:1:95166)
+    at 4a29d24f-6838729f6bf1a901.js:1:94988
+    at il (4a29d24f-6838729f6bf1a901.js:1:94995)
+    at nb (4a29d24f-6838729f6bf1a901.js:1:26776)
+    at 4a29d24f-6838729f6bf1a901.js:1:108301
+    at is (4a29d24f-6838729f6bf1a901.js:1:108309)
+    at o1 (4a29d24f-6838729f6bf1a901.js:1:93001)
+push.65514.window.console.error @ 7018-feea29d23d7e41a6.js:1
+l_ @ 4a29d24f-6838729f6bf1a901.js:1
+a.componentDidCatch.n.callback @ 4a29d24f-6838729f6bf1a901.js:1
+nB @ 4a29d24f-6838729f6bf1a901.js:1
+nV @ 4a29d24f-6838729f6bf1a901.js:1
+aq @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+(anonymous) @ 4a29d24f-6838729f6bf1a901.js:1
+is @ 4a29d24f-6838729f6bf1a901.js:1
+nb @ 4a29d24f-6838729f6bf1a901.js:1
+(anonymous) @ 4a29d24f-6838729f6bf1a901.js:1
+is @ 4a29d24f-6838729f6bf1a901.js:1
+o1 @ 4a29d24f-6838729f6bf1a901.js:1
+oZ @ 4a29d24f-6838729f6bf1a901.js:1
+T @ 7018-feea29d23d7e41a6.js:1Understand this error
+7018-feea29d23d7e41a6.js:1 Uncaught error: ReferenceError: createClientComponentClient is not defined
+    at b (page-3bd2d63639f89836.js:1:587)
+    at rE (4a29d24f-6838729f6bf1a901.js:1:40345)
+    at iZ (4a29d24f-6838729f6bf1a901.js:1:117030)
+    at ia (4a29d24f-6838729f6bf1a901.js:1:95166)
+    at 4a29d24f-6838729f6bf1a901.js:1:94988
+    at il (4a29d24f-6838729f6bf1a901.js:1:94995)
+    at nb (4a29d24f-6838729f6bf1a901.js:1:26776)
+    at 4a29d24f-6838729f6bf1a901.js:1:108301
+    at is (4a29d24f-6838729f6bf1a901.js:1:108309)
+    at o1 (4a29d24f-6838729f6bf1a901.js:1:93001) {componentStack: '\n    at b (https://eriggalive.com/_next/static/chu…xt/static/chunks/7018-feea29d23d7e41a6.js:1:4897)'}
+push.65514.window.console.error @ 7018-feea29d23d7e41a6.js:1
+componentDidCatch @ layout-ae54e88060d8af4c.js:1
+a.componentDidCatch.n.callback @ 4a29d24f-6838729f6bf1a901.js:1
+nB @ 4a29d24f-6838729f6bf1a901.js:1
+nV @ 4a29d24f-6838729f6bf1a901.js:1
+aq @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+a9 @ 4a29d24f-6838729f6bf1a901.js:1
+aY @ 4a29d24f-6838729f6bf1a901.js:1
+(anonymous) @ 4a29d24f-6838729f6bf1a901.js:1
+is @ 4a29d24f-6838729f6bf1a901.js:1
+nb @ 4a29d24f-6838729f6bf1a901.js:1
+(anonymous) @ 4a29d24f-6838729f6bf1a901.js:1
+is @ 4a29d24f-6838729f6bf1a901.js:1
+o1 @ 4a29d24f-6838729f6bf1a901.js:1
+oZ @ 4a29d24f-6838729f6bf1a901.js:1
+T @ 7018-feea29d23d7e41a6.js:1Understand this error
+4221-3c8f6b78c0141478.js:25 WebSocket connection to 'wss://kmafzzvdleprqhkeztsp.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImttYWZ6enZkbGVwcnFoa2V6dHNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0NTkzNTIsImV4cCI6MjA3NDAzNTM1Mn0.Bk7OEsW2psONn-alPbz5TVuRujC83r4Gm0zc1jNi0z4&eventsPerSecond=2&vsn=1.0.0' failed: WebSocket is closed before the connection is established.
