@@ -43,6 +43,7 @@ const adminNavItems = [
   { name: "System Health", href: "/admin/health", icon: Wrench, section: "Overview" },
 
   { name: "Users", href: "/admin/users-management", icon: Users, section: "User Management" },
+  { name: "Wallet Control", href: "/admin/wallet-control", icon: CreditCard, section: "User Management" },
   { name: "Transactions", href: "/admin/transactions", icon: CreditCard, section: "User Management" },
   { name: "Withdrawals", href: "/admin/withdrawals", icon: CreditCard, section: "User Management" },
   { name: "Membership Tiers", href: "/admin/tiers-management", icon: Trophy, section: "User Management" },
