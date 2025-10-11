@@ -1,18 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { verifyAdminAccess } from '@/lib/utils/admin-auth'
 
 // Get user wallet details
 export async function GET(request: Request) {
   try {
+    // Verify admin access using established pattern
+    const { isAdmin, user, error } = await verifyAdminAccess()
+    if (!isAdmin || !user) {
+      return NextResponse.json({ error: error || 'Unauthorized' }, { status: 403 })
+    }
+
     const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
-
-    // Check admin access
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user || user.email !== 'info@eriggalive.com') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-    }
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })
@@ -66,15 +67,15 @@ export async function GET(request: Request) {
 // Credit or debit user wallet
 export async function POST(request: Request) {
   try {
+    // Verify admin access using established pattern
+    const { isAdmin, user, error } = await verifyAdminAccess()
+    if (!isAdmin || !user) {
+      return NextResponse.json({ error: error || 'Unauthorized' }, { status: 403 })
+    }
+
     const supabase = await createClient()
     const body = await request.json()
     const { userId, amount, type, description, reference } = body
-
-    // Check admin access
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user || user.email !== 'info@eriggalive.com') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-    }
 
     // Validate input
     if (!userId || !amount || !type || !description) {
@@ -153,8 +154,8 @@ export async function POST(request: Request) {
       console.warn('Failed to update users.coins:', coinsError)
     }
 
-    // Log admin action
-    await supabase
+    // Log admin action with error handling
+    const { error: auditError } = await supabase
       .from('admin_actions')
       .insert({
         admin_id: user.id,
@@ -165,10 +166,17 @@ export async function POST(request: Request) {
         metadata: { amount, type, newBalance, reference },
       })
 
+    if (auditError) {
+      console.error('Failed to log admin action:', auditError)
+      // Don't fail the request, but log the error
+      // The wallet adjustment has already succeeded
+    }
+
     return NextResponse.json({
       success: true,
       message: `Successfully ${type === 'credit' ? 'credited' : 'debited'} ${amount} coins`,
       newBalance,
+      auditLogged: !auditError,
     })
   } catch (error) {
     console.error('Wallet adjustment error:', error)

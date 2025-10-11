@@ -1,15 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { verifyAdminAccess } from '@/lib/utils/admin-auth'
 
 export async function GET() {
   try {
-    const supabase = await createClient()
-
-    // Check admin access
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user || user.email !== 'info@eriggalive.com') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    // Verify admin access using established pattern
+    const { isAdmin, error } = await verifyAdminAccess()
+    if (!isAdmin) {
+      return NextResponse.json({ error: error || 'Unauthorized' }, { status: 403 })
     }
+
+    const supabase = await createClient()
 
     // Use the optimized function that returns cached stats
     const { data: stats, error } = await supabase
@@ -42,13 +43,13 @@ export async function GET() {
 // Endpoint to manually refresh stats
 export async function POST() {
   try {
-    const supabase = await createClient()
-
-    // Check admin access
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user || user.email !== 'info@eriggalive.com') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    // Verify admin access using established pattern
+    const { isAdmin, error } = await verifyAdminAccess()
+    if (!isAdmin) {
+      return NextResponse.json({ error: error || 'Unauthorized' }, { status: 403 })
     }
+
+    const supabase = await createClient()
 
     // Manually refresh materialized views
     const { error } = await supabase.rpc('refresh_admin_stats')
