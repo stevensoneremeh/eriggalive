@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState } from "react"
@@ -92,7 +93,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     async function checkAdminAccess() {
       try {
-        // Wait for auth to initialize
         if (!user) {
           if (mounted) setHasAccess(null)
           return
@@ -110,9 +110,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           return
         }
 
-        // Check profile from context first (optimized check)
+        // Check profile from context first
         if (profile) {
-          // Allow admin or super_admin role
           const hasPermission = profile.role === "admin" || profile.role === "super_admin" || profile.tier === "enterprise"
           if (hasPermission) {
             if (mounted) {
@@ -124,7 +123,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           }
         }
 
-        // Fallback: Direct database check (only if profile check failed)
+        // Fallback: Direct database check
         try {
           const { data: userData, error: userError } = await supabase
             .from("users")
@@ -190,7 +189,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setIsMobileMenuOpen(false)
   }, [pathname])
 
-  // Loading state
   if (hasAccess === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
@@ -205,7 +203,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     )
   }
 
-  // Access denied state
   if (hasAccess === false) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 p-4">
@@ -228,14 +225,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
-            )}
-
-            {debugInfo && (
-              <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg text-left">
-                <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-                  Debug: {JSON.stringify(debugInfo, null, 2)}
-                </p>
-              </div>
             )}
 
             <div className="flex flex-col gap-2 pt-4">
@@ -271,7 +260,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
-    <div className="flex flex-col h-full w-full overflow-hidden">
+    <div className="flex flex-col h-full w-full">
       <div className="p-4 sm:p-6 border-b shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -296,8 +285,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )}
       </div>
 
-      <ScrollArea className="flex-1 px-3 sm:px-4">
-        <nav className="py-4 space-y-6 pb-6">
+      <ScrollArea className="flex-1">
+        <nav className="py-4 px-3 sm:px-4 space-y-6 pb-6">
           {navSections.map((section) => (
             <div key={section.title} className="space-y-1">
               <h3 className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
@@ -350,7 +339,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="flex h-screen overflow-hidden">
-        <aside className="hidden lg:flex flex-col w-64 xl:w-72 bg-white dark:bg-gray-800 border-r shadow-sm overflow-hidden">
+        <aside className="hidden lg:flex flex-col w-64 xl:w-72 bg-white dark:bg-gray-800 border-r shadow-sm">
           <SidebarContent />
         </aside>
 

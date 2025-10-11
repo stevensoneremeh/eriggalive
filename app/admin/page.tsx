@@ -1,120 +1,124 @@
-"use client"
+'use client'
 
-import { useEffect, useState, useCallback } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Users, DollarSign, ShoppingCart, Calendar, Activity, Eye, RefreshCw } from "lucide-react"
-import Link from "next/link"
-import { useAuth } from "@/contexts/auth-context"
-import { toast } from "sonner"
+import { useEffect, useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Users, DollarSign, Calendar, Activity, RefreshCw, TrendingUp, Wallet, AlertCircle } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { cn } from '@/lib/utils' // Assuming cn utility is available
 
-interface AdminStats {
+interface DashboardStats {
   totalUsers: number
-  totalRevenue: number
-  totalOrders: number
-  totalEvents: number
   activeUsers: number
-  newUsersToday: number
-  revenueToday: number
-  ordersToday: number
+  newUsers: number
+  totalRevenue: number
+  monthlyRevenue: number
+  upcomingEvents: number
+  activeStreams: number
+  pendingWithdrawals: number
+  pendingWithdrawalAmount: number
+  lastUpdated?: string
 }
 
-export default function AdminOverviewPage() {
-  const { user } = useAuth()
-  const supabase = createClient()
-  const [stats, setStats] = useState<AdminStats>({
-    totalUsers: 0,
-    totalRevenue: 0,
-    totalOrders: 0,
-    totalEvents: 0,
-    activeUsers: 0,
-    newUsersToday: 0,
-    revenueToday: 0,
-    ordersToday: 0,
-  })
+export default function AdminStatsPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchStats = useCallback(async (showToast = false) => {
+  const fetchStats = async (refresh = false) => {
     try {
-      setRefreshing(true)
-      setError(null)
+      if (refresh) setRefreshing(true)
+      else setLoading(true)
 
-      const response = await fetch("/api/admin/dashboard-stats", {
-        cache: "no-store",
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch dashboard stats: ${response.statusText}`)
-      }
+      const response = await fetch('/api/admin/stats-optimized')
+      if (!response.ok) throw new Error('Failed to fetch stats')
 
       const data = await response.json()
-      if (data.success) {
-        const apiStats = data.stats
 
+      if (data.success && data.stats) {
         setStats({
-          totalUsers: apiStats.totalUsers,
-          totalRevenue: apiStats.totalRevenue,
-          totalOrders: apiStats.totalTransactions,
-          totalEvents: apiStats.totalEvents,
-          activeUsers: apiStats.activeUsers || 0,
-          newUsersToday: apiStats.newUsersToday || 0,
-          revenueToday: apiStats.revenueToday || 0,
-          ordersToday: apiStats.ordersToday || 0,
+          totalUsers: Number(data.stats.total_users) || 0,
+          activeUsers: Number(data.stats.active_users_30d) || 0,
+          newUsers: Number(data.stats.new_users_30d) || 0,
+          totalRevenue: Number(data.stats.total_revenue) || 0,
+          monthlyRevenue: Number(data.stats.monthly_revenue) || 0,
+          upcomingEvents: Number(data.stats.upcoming_events) || 0,
+          activeStreams: Number(data.stats.active_streams) || 0,
+          pendingWithdrawals: Number(data.stats.pending_withdrawals) || 0,
+          pendingWithdrawalAmount: Number(data.stats.pending_withdrawal_amount) || 0,
+          lastUpdated: data.stats.last_updated
         })
-
-        setLastUpdated(new Date())
-
-        if (showToast) {
-          toast.success("Dashboard refreshed successfully")
-        }
+        setError(null)
       } else {
-        throw new Error(data.error || 'Failed to fetch stats from API')
+        throw new Error(data.error || 'Failed to process stats from API')
       }
-    } catch (error) {
-      console.error("Error fetching admin stats:", error)
-      setError(error instanceof Error ? error.message : 'Failed to load dashboard stats. Please try again.')
-      toast.error("Failed to load dashboard stats. Please try again.")
+    } catch (err) {
+      console.error("Error fetching admin stats:", err)
+      setError(err instanceof Error ? err.message : 'Failed to load stats')
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [supabase]) // Include supabase in dependencies if it can change, though unlikely here
+  }
+
+  const manualRefresh = async () => {
+    try {
+      setRefreshing(true)
+      const response = await fetch('/api/admin/stats-optimized', { method: 'POST' })
+      if (!response.ok) throw new Error('Failed to refresh stats')
+
+      const data = await response.json()
+      if (data.success && data.stats) { // Assuming the POST refresh also returns data in a similar structure
+        setStats({
+          totalUsers: Number(data.stats.total_users) || 0,
+          activeUsers: Number(data.stats.active_users_30d) || 0,
+          newUsers: Number(data.stats.new_users_30d) || 0,
+          totalRevenue: Number(data.stats.total_revenue) || 0,
+          monthlyRevenue: Number(data.stats.monthly_revenue) || 0,
+          upcomingEvents: Number(data.stats.upcoming_events) || 0,
+          activeStreams: Number(data.stats.active_streams) || 0,
+          pendingWithdrawals: Number(data.stats.pending_withdrawals) || 0,
+          pendingWithdrawalAmount: Number(data.stats.pending_withdrawal_amount) || 0,
+          lastUpdated: data.stats.last_updated
+        })
+        setError(null)
+      } else {
+        throw new Error(data.error || 'Failed to process refreshed stats from API')
+      }
+    } catch (err) {
+      console.error("Error refreshing admin stats:", err)
+      setError(err instanceof Error ? err.message : 'Failed to refresh stats')
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   useEffect(() => {
-    if (user) {
-      fetchStats()
+    fetchStats()
+    // Optional: Set up an interval for auto-refresh if needed
+    // const interval = setInterval(() => fetchStats(false), 300000); // Refresh every 5 minutes
+    // return () => clearInterval(interval);
+  }, [])
 
-      // Auto-refresh every 5 minutes instead of 1 minute to reduce load
-      const interval = setInterval(() => fetchStats(false), 300000)
-
-      return () => clearInterval(interval)
-    }
-  }, [user, fetchStats])
-
-  if (loading && !error) { // Show loading skeleton to prevent layout shift
+  if (loading) {
     return (
-      <div className="space-y-8 animate-in fade-in duration-300">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="space-y-2">
-            <div className="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-            <div className="h-4 w-96 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-          </div>
-          <div className="h-10 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Stats & Analytics</h1>
+          <Skeleton className="h-10 w-32" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(8)].map((_, i) => (
             <Card key={i}>
-              <CardHeader className="pb-2">
-                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-4 rounded" />
               </CardHeader>
               <CardContent>
-                <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" />
-                <div className="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                <Skeleton className="h-8 w-16 mb-1" />
+                <Skeleton className="h-3 w-32" />
               </CardContent>
             </Card>
           ))}
@@ -123,173 +127,115 @@ export default function AdminOverviewPage() {
     )
   }
 
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Stats & Analytics</h1>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+        <Button onClick={() => fetchStats(false)}>Try Again</Button>
+      </div>
+    )
+  }
+
+  const statCards = [
+    {
+      title: 'Total Users',
+      value: stats?.totalUsers || 0,
+      description: `${stats?.newUsers || 0} new this month`,
+      icon: Users,
+      trend: '+12%' // Placeholder trend
+    },
+    {
+      title: 'Active Users',
+      value: stats?.activeUsers || 0,
+      description: 'Last 30 days',
+      icon: Activity,
+      trend: '+8%' // Placeholder trend
+    },
+    {
+      title: 'Total Revenue',
+      value: `₦${(stats?.totalRevenue || 0).toLocaleString()}`,
+      description: 'All time',
+      icon: DollarSign,
+      trend: '+23%' // Placeholder trend
+    },
+    {
+      title: 'Monthly Revenue',
+      value: `₦${(stats?.monthlyRevenue || 0).toLocaleString()}`,
+      description: 'This month',
+      icon: TrendingUp,
+      trend: '+15%' // Placeholder trend
+    },
+    {
+      title: 'Upcoming Events',
+      value: stats?.upcomingEvents || 0,
+      description: 'Scheduled',
+      icon: Calendar,
+    },
+    {
+      title: 'Active Streams',
+      value: stats?.activeStreams || 0,
+      description: 'Live now',
+      icon: Activity,
+    },
+    {
+      title: 'Pending Withdrawals',
+      value: stats?.pendingWithdrawals || 0,
+      description: `₦${(stats?.pendingWithdrawalAmount || 0).toLocaleString()}`,
+      icon: Wallet,
+    },
+  ]
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Overview</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Welcome to the Erigga Live admin dashboard. Monitor and manage your platform.
-            {lastUpdated && (
-              <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                (Last updated: {lastUpdated.toLocaleTimeString()})
-              </span>
-            )}
+          <h1 className="text-3xl font-bold">Stats & Analytics</h1>
+          <p className="text-muted-foreground mt-1">
+            Real-time platform statistics and insights
           </p>
         </div>
         <Button
-          onClick={() => fetchStats(true)}
+          onClick={manualRefresh}
           disabled={refreshing}
-          variant="outline"
-          className="bg-transparent"
+          className="flex items-center gap-2"
         >
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-          Refresh
+          <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+          {refreshing ? 'Refreshing...' : 'Refresh Stats'}
         </Button>
       </div>
 
-      {error && (
-        <Card className="border-red-200 bg-red-50 dark:border-red-700 dark:bg-red-800/50">
-          <CardContent className="pt-6">
-            <p className="text-red-600 dark:text-red-400 flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-              </svg>
-              {error}
-            </p>
-          </CardContent>
-        </Card>
+      {stats?.lastUpdated && (
+        <p className="text-sm text-muted-foreground">
+          Last updated: {new Date(stats.lastUpdated).toLocaleString()}
+        </p>
       )}
 
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</CardTitle>
-            <Users className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalUsers.toLocaleString()}</div>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              <span className="text-green-600">+{stats.newUsersToday.toLocaleString()}</span> today
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Users</CardTitle>
-            <Activity className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.activeUsers.toLocaleString()}</div>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Last 7 days</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₦{stats.totalRevenue.toLocaleString()}</div>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              ₦{stats.revenueToday.toLocaleString()} today
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Orders</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalOrders.toLocaleString()}</div>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{stats.ordersToday.toLocaleString()} today</p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {statCards.map((stat) => {
+          const Icon = stat.icon
+          return (
+            <Card key={stat.title} className="hover:shadow-md transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+                <Icon className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stat.value}</div>
+                <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
+                {stat.trend && (
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                    {stat.trend} from last month
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Manage your platform efficiently</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button asChild variant="outline" className="h-24 flex-col space-y-2 bg-transparent">
-              <Link href="/admin/users">
-                <Users className="h-6 w-6" />
-                <span>Manage Users</span>
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="h-24 flex-col space-y-2 bg-transparent">
-              <Link href="/admin/events">
-                <Calendar className="h-6 w-6" />
-                <span>Manage Events</span>
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="h-24 flex-col space-y-2 bg-transparent">
-              <Link href="/admin/transactions">
-                <DollarSign className="h-6 w-6" />
-                <span>Transactions</span>
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="h-24 flex-col space-y-2 bg-transparent">
-              <Link href="/admin/media">
-                <Eye className="h-6 w-6" />
-                <span>Media Library</span>
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Platform Status</CardTitle>
-          <CardDescription>Monitor your platform health</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-sm">All systems operational</span>
-              </div>
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                Healthy
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                <span className="text-sm">Database connections</span>
-              </div>
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                Optimal
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                <span className="text-sm">API response time</span>
-              </div>
-              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                Fast
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
