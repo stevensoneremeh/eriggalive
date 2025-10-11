@@ -26,7 +26,7 @@ interface User {
 }
 
 export default function UsersPage() {
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")

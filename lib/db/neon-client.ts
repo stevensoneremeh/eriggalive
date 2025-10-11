@@ -1,7 +1,23 @@
 
 import { neon } from '@neondatabase/serverless'
 
-const sql = neon(process.env.NEON_DATABASE_URL || '')
+// Use Supabase database URL as fallback if Neon URL is not configured
+const getDatabaseUrl = () => {
+  const neonUrl = process.env.NEON_DATABASE_URL
+  const supabaseUrl = process.env.DATABASE_URL
+  
+  if (neonUrl && neonUrl.startsWith('postgresql://')) {
+    return neonUrl
+  }
+  
+  if (supabaseUrl && supabaseUrl.startsWith('postgresql://')) {
+    return supabaseUrl
+  }
+  
+  throw new Error('No valid database URL found. Please set NEON_DATABASE_URL or DATABASE_URL')
+}
+
+const sql = neon(getDatabaseUrl())
 
 export async function getNeonStats() {
   try {
