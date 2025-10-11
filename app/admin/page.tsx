@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Users, DollarSign, Calendar, Activity, RefreshCw, TrendingUp, Wallet, AlertCircle } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { cn } from '@/lib/utils' // Assuming cn utility is available
+import { cn } from '@/lib/utils'
 
 interface DashboardStats {
   totalUsers: number

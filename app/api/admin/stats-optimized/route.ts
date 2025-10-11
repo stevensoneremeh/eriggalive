@@ -1,7 +1,9 @@
 
-import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { verifyAdminAccess } from '@/lib/utils/admin-auth'
+import { getNeonStats } from '@/lib/db/neon-client'
+
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
@@ -11,28 +13,22 @@ export async function GET() {
       return NextResponse.json({ error: authError || 'Unauthorized' }, { status: 403 })
     }
 
-    const supabase = await createClient()
-
-    // Use the optimized function that returns cached stats
-    const { data: stats, error: statsError } = await supabase
-      .rpc('get_admin_dashboard_stats')
-      .single()
-
-    if (statsError) {
-      console.error('Error fetching stats:', statsError)
-      return NextResponse.json(
-        { error: 'Failed to fetch dashboard statistics' },
-        { status: 500 }
-      )
-    }
+    // Use Neon for analytics queries to reduce Supabase egress
+    const stats = await getNeonStats()
 
     return NextResponse.json({
       success: true,
-      stats: stats || {
-        total_users: 0,
-        total_revenue: 0,
-        total_transactions: 0,
-        active_users: 0
+      stats: {
+        total_users: stats.total_users,
+        active_users_30d: stats.active_users_30d,
+        new_users_30d: stats.new_users_30d,
+        total_revenue: stats.total_revenue,
+        monthly_revenue: stats.monthly_revenue,
+        upcoming_events: stats.upcoming_events,
+        active_streams: stats.active_streams,
+        pending_withdrawals: stats.pending_withdrawals,
+        pending_withdrawal_amount: stats.pending_withdrawal_amount,
+        last_updated: stats.last_updated
       },
       cached: true
     })
