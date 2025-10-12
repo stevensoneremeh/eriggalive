@@ -79,12 +79,25 @@ export default function DashboardPage() {
   }, [user, profile])
 
   const loadUserStats = async () => {
-    if (!profile) return
+    if (!profile || !user) return
 
     try {
       setLoadingStats(true)
 
-      // Only query tables that exist in the database
+      // Helper to safely get count from Supabase response
+      const safeCount = (result: { count: number | null; error: any }) => {
+        if (result.error) {
+          // Only log non-404 errors (PGRST116 = table not found)
+          if (result.error.code !== 'PGRST116') {
+            console.error("Query error:", result.error)
+            // Return 0 for actual errors, will show toast below
+          }
+          return 0
+        }
+        return result.count || 0
+      }
+
+      // Query only tables that exist in the database
       const [
         postsResult,
         commentsResult,
@@ -95,33 +108,29 @@ export default function DashboardPage() {
           .from("community_posts")
           .select("*", { count: "exact", head: true })
           .eq("user_id", profile.id)
-          .eq("is_deleted", false)
-          .then(res => res).catch(() => ({ count: 0 })),
+          .eq("is_deleted", false),
         supabase
           .from("community_comments")
           .select("*", { count: "exact", head: true })
           .eq("user_id", profile.id)
-          .eq("is_deleted", false)
-          .then(res => res).catch(() => ({ count: 0 })),
+          .eq("is_deleted", false),
         supabase.from("community_post_votes")
           .select("*", { count: "exact", head: true })
-          .eq("user_id", profile.id)
-          .then(res => res).catch(() => ({ count: 0 })),
+          .eq("user_id", profile.id),
         supabase.from("tickets")
           .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .then(res => res).catch(() => ({ count: 0 })),
+          .eq("user_id", user.id),
       ])
 
       setUserStats({
-        totalPosts: postsResult.count || 0,
-        totalComments: commentsResult.count || 0,
-        totalVotes: votesResult.count || 0,
-        totalTickets: ticketsResult.count || 0,
-        totalPurchases: 0, // Table doesn't exist yet
-        vaultViews: 0, // Table doesn't exist yet
-        followersCount: 0, // Table doesn't exist yet
-        followingCount: 0, // Table doesn't exist yet
+        totalPosts: safeCount(postsResult),
+        totalComments: safeCount(commentsResult),
+        totalVotes: safeCount(votesResult),
+        totalTickets: safeCount(ticketsResult),
+        totalPurchases: 0, // Feature not yet implemented
+        vaultViews: 0, // Feature not yet implemented
+        followersCount: 0, // Feature not yet implemented
+        followingCount: 0, // Feature not yet implemented
         reputationScore: profile.reputation_score || 0,
       })
     } catch (error) {
@@ -143,7 +152,7 @@ export default function DashboardPage() {
   }
 
   const loadRecentActivity = async () => {
-    if (!profile) return
+    if (!profile || !user) return
 
     try {
       const [recentPostsResult, recentCommentsResult, recentTicketsResult] = await Promise.all([
@@ -153,33 +162,38 @@ export default function DashboardPage() {
           .eq("user_id", profile.id)
           .eq("is_deleted", false)
           .order("created_at", { ascending: false })
-          .limit(3)
-          .then(res => res).catch(() => ({ data: [] })),
+          .limit(3),
         supabase
           .from("community_comments")
           .select("id, content, created_at")
           .eq("user_id", profile.id)
           .eq("is_deleted", false)
           .order("created_at", { ascending: false })
-          .limit(3)
-          .then(res => res).catch(() => ({ data: [] })),
+          .limit(3),
         supabase
           .from("tickets")
           .select("id, ticket_number, created_at, events(title)")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
-          .limit(2)
-          .then(res => res).catch(() => ({ data: [] })),
+          .limit(2),
       ])
 
-      const activities = []
+      interface ActivityItem {
+        type: string
+        content: string
+        timestamp: string
+        icon: typeof MessageCircle
+        color: string
+      }
+
+      const activities: ActivityItem[] = []
 
       // Add posts to activity
-      if (recentPostsResult.data) {
-        recentPostsResult.data.forEach((post) => {
+      if (recentPostsResult.data && !recentPostsResult.error) {
+        recentPostsResult.data.forEach(post => {
           activities.push({
             type: "post",
-            content: `Created post: ${post.content.substring(0, 50)}...`,
+            content: `Created post: ${post.content?.substring(0, 50) || 'No content'}...`,
             timestamp: post.created_at,
             icon: MessageCircle,
             color: "text-blue-500",
@@ -188,11 +202,11 @@ export default function DashboardPage() {
       }
 
       // Add comments to activity
-      if (recentCommentsResult.data) {
-        recentCommentsResult.data.forEach((comment) => {
+      if (recentCommentsResult.data && !recentCommentsResult.error) {
+        recentCommentsResult.data.forEach(comment => {
           activities.push({
             type: "comment",
-            content: `Commented: ${comment.content.substring(0, 50)}...`,
+            content: `Commented: ${comment.content?.substring(0, 50) || 'No content'}...`,
             timestamp: comment.created_at,
             icon: MessageCircle,
             color: "text-green-500",
@@ -201,11 +215,12 @@ export default function DashboardPage() {
       }
 
       // Add tickets to activity
-      if (recentTicketsResult.data) {
-        recentTicketsResult.data.forEach((ticket) => {
+      if (recentTicketsResult.data && !recentTicketsResult.error) {
+        recentTicketsResult.data.forEach(ticket => {
+          const ticketData = ticket as typeof ticket & { events?: { title?: string } }
           activities.push({
             type: "ticket",
-            content: `Got ticket for ${ticket.events?.title || "Event"}`,
+            content: `Got ticket for ${ticketData.events?.title || "Event"}`,
             timestamp: ticket.created_at,
             icon: Ticket,
             color: "text-purple-500",
