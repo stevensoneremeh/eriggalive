@@ -84,32 +84,33 @@ export default function DashboardPage() {
     try {
       setLoadingStats(true)
 
+      // Only query tables that exist in the database
       const [
         postsResult,
         commentsResult,
         votesResult,
         ticketsResult,
-        purchasesResult,
-        vaultViewsResult,
-        followersResult,
-        followingResult,
       ] = await Promise.all([
         supabase
           .from("community_posts")
           .select("*", { count: "exact", head: true })
           .eq("user_id", profile.id)
-          .eq("is_deleted", false),
+          .eq("is_deleted", false)
+          .then(res => res).catch(() => ({ count: 0 })),
         supabase
           .from("community_comments")
           .select("*", { count: "exact", head: true })
           .eq("user_id", profile.id)
-          .eq("is_deleted", false),
-        supabase.from("community_post_votes").select("*", { count: "exact", head: true }).eq("user_id", profile.id),
-        supabase.from("event_tickets").select("*", { count: "exact", head: true }).eq("user_id", user.id),
-        supabase.from("store_purchases").select("*", { count: "exact", head: true }).eq("user_id", user.id),
-        supabase.from("vault_views").select("*", { count: "exact", head: true }).eq("user_id", user.id),
-        supabase.from("user_follows").select("*", { count: "exact", head: true }).eq("following_id", profile.id),
-        supabase.from("user_follows").select("*", { count: "exact", head: true }).eq("follower_id", profile.id),
+          .eq("is_deleted", false)
+          .then(res => res).catch(() => ({ count: 0 })),
+        supabase.from("community_post_votes")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", profile.id)
+          .then(res => res).catch(() => ({ count: 0 })),
+        supabase.from("tickets")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .then(res => res).catch(() => ({ count: 0 })),
       ])
 
       setUserStats({
@@ -117,10 +118,10 @@ export default function DashboardPage() {
         totalComments: commentsResult.count || 0,
         totalVotes: votesResult.count || 0,
         totalTickets: ticketsResult.count || 0,
-        totalPurchases: purchasesResult.count || 0,
-        vaultViews: vaultViewsResult.count || 0,
-        followersCount: followersResult.count || 0,
-        followingCount: followingResult.count || 0,
+        totalPurchases: 0, // Table doesn't exist yet
+        vaultViews: 0, // Table doesn't exist yet
+        followersCount: 0, // Table doesn't exist yet
+        followingCount: 0, // Table doesn't exist yet
         reputationScore: profile.reputation_score || 0,
       })
     } catch (error) {
@@ -152,20 +153,23 @@ export default function DashboardPage() {
           .eq("user_id", profile.id)
           .eq("is_deleted", false)
           .order("created_at", { ascending: false })
-          .limit(3),
+          .limit(3)
+          .then(res => res).catch(() => ({ data: [] })),
         supabase
           .from("community_comments")
           .select("id, content, created_at")
           .eq("user_id", profile.id)
           .eq("is_deleted", false)
           .order("created_at", { ascending: false })
-          .limit(3),
+          .limit(3)
+          .then(res => res).catch(() => ({ data: [] })),
         supabase
-          .from("event_tickets")
+          .from("tickets")
           .select("id, ticket_number, created_at, events(title)")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
-          .limit(2),
+          .limit(2)
+          .then(res => res).catch(() => ({ data: [] })),
       ])
 
       const activities = []

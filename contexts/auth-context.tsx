@@ -42,14 +42,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const [supabaseError, setSupabaseError] = useState<string | null>(null)
 
-  let supabase: any
-  try {
-    supabase = createClient()
-  } catch (error: any) {
-    console.error("Failed to initialize Supabase client:", error)
-    setSupabaseError(error.message)
-    supabase = null
-  }
+  // Use singleton Supabase client to prevent multiple GoTrueClient instances
+  const supabase = createClient()
 
   const fetchProfile = useCallback(
     async (userId: string): Promise<UserProfile | null> => {
