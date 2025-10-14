@@ -17,10 +17,19 @@ const getDatabaseUrl = () => {
   throw new Error('No valid database URL found. Please set NEON_DATABASE_URL or DATABASE_URL')
 }
 
-const sql = neon(getDatabaseUrl())
+let sqlInstance: ReturnType<typeof neon> | null = null
+
+const getSql = () => {
+  if (!sqlInstance) {
+    sqlInstance = neon(getDatabaseUrl())
+  }
+  return sqlInstance
+}
 
 export async function getNeonStats() {
   try {
+    const sql = getSql()
+    
     const stats = await sql`
       SELECT 
         COUNT(*) as total_users,
