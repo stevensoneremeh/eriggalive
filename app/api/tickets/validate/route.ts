@@ -145,7 +145,37 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if ticket is already used
+    // Check if already admitted
+    if (ticket.admission_status === "admitted") {
+      // Log scan attempt
+      await supabase.from("scan_logs").insert({
+        ticket_id: ticket.id,
+        event_id: ticket.event_id,
+        scanned_by: user.id,
+        scan_result: "already_admitted",
+        scan_location: scanLocation,
+        device_info: { user_agent: request.headers.get("user-agent") },
+        ip_address: request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip"),
+      })
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Ticket holder has already been admitted",
+          result: "already_admitted",
+          ticket: {
+            ticket_number: ticket.ticket_number,
+            event_title: ticket.events?.title,
+            holder_name: ticket.profiles?.full_name,
+            admitted_at: ticket.admitted_at,
+            seating_assignment: ticket.seating_assignment,
+          },
+        },
+        { status: 400 },
+      )
+    }
+
+    // Check if ticket is already used (old system compatibility)
     if (ticket.status === "used") {
       // Log scan attempt
       await supabase.from("scan_logs").insert({
@@ -231,11 +261,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Valid ticket - mark as used
+    // Valid ticket - mark as admitted
     const { error: updateError } = await supabase
       .from("tickets")
       .update({
         status: "used",
+        admission_status: "admitted",
+        admitted_at: new Date().toISOString(),
+        admitted_by: user.id,
         used_at: new Date().toISOString(),
         checked_in_by: user.id,
         check_in_location: scanLocation,
@@ -269,7 +302,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       result: "valid",
-      message: "Ticket validated successfully",
+      message: "Ticket validated successfully - Admission granted",
       ticket: {
         id: ticket.id,
         ticket_number: ticket.ticket_number,
@@ -279,6 +312,11 @@ export async function POST(request: NextRequest) {
         venue: ticket.events?.venue,
         holder_name: ticket.profiles?.full_name,
         holder_email: ticket.profiles?.email,
+        seating_assignment: ticket.seating_assignment,
+        seating_priority: ticket.seating_priority,
+        price_paid: ticket.custom_amount || ticket.price_paid_naira,
+        admitted_at: new Date().toISOString(),
+        admitted_by: profile.full_name,
         checked_in_at: new Date().toISOString(),
         checked_in_by: profile.full_name,
       },
