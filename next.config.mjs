@@ -8,13 +8,40 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   // Enable development server for all hostnames in Replit environment
-  webpack: (config, { dev }) => {
+  webpack: (config, { dev, isServer }) => {
     if (dev) {
       config.watchOptions = {
         poll: 1000,
         aggregateTimeout: 300,
       }
     }
+    
+    // Memory optimization for build
+    if (!dev) {
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            default: false,
+            vendors: false,
+            commons: {
+              name: 'commons',
+              chunks: 'all',
+              minChunks: 2,
+            },
+          },
+        },
+      }
+      
+      // Reduce memory usage during build
+      config.performance = {
+        ...config.performance,
+        maxAssetSize: 500000,
+        maxEntrypointSize: 500000,
+      }
+    }
+    
     return config
   },
   // Configuration for Replit proxy environment
@@ -87,10 +114,14 @@ const nextConfig = {
     missingSuspenseWithCSRBailout: false,
     // Additional experimental flags to help with SSR issues
     serverComponentsExternalPackages: [],
-    optimizePackageImports: ['lucide-react'],
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
   // Force static generation for specific pages
   output: 'standalone',
+  // Enable SWC minification for faster builds with less memory
+  swcMinify: true,
+  // Optimize production builds
+  productionBrowserSourceMaps: false,
 };
 
 export default nextConfig;
