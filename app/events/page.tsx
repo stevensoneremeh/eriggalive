@@ -1,36 +1,42 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, MapPin, Users, Ticket, Star, Music, Phone, Loader2 } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Calendar, MapPin, Users, Ticket, Star, Music, Phone, Loader2, DollarSign } from "lucide-react"
 import Image from "next/image"
-import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 export default function EventsPage() {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [paymentType, setPaymentType] = useState<"fixed" | "custom">("fixed")
+  const [customAmount, setCustomAmount] = useState("")
 
-  const paystackTicketsEnabled = process.env.NEXT_PUBLIC_FEATURE_PAYSTACK_TICKETS === "true"
   const ticketFixedPrice = 20000
+  const minCustomAmount = 20000
 
   const event = {
     id: "erigga-intimate-session-2025",
-    title: "Erigga Live – 3rd September",
+    title: "Erigga Live – Intimate Session with THE G.O.A.T",
     description:
       "Intimate Session with THE GOAT - An exclusive evening with Nigeria's rap legend in an intimate setting",
     event_type: "concert",
-    venue: "Uncle Jaffi at The Playground",
+    venue: "Mandela Lounge, Benin City",
     address: "The Playground",
-    city: "Warri, Nigeria",
-    event_date: "2025-09-03T20:00:00",
+    city: "Benin City, Nigeria",
+    event_date: "2025-12-04T20:00:00",
     max_capacity: 200,
     current_attendance: 45,
     ticket_price_naira: ticketFixedPrice,
     ticket_price_coins: 10000,
     original_price_naira: 50000,
-    image_url: "/events/erigga-intimate-session.png",
+    image_url: "/events/erigga-intimate-session.jpg",
     status: "upcoming",
     is_featured: true,
     contact: "09035418185",
@@ -55,40 +61,67 @@ export default function EventsPage() {
     }).format(amount)
   }
 
-  const handleDirectCheckout = async () => {
-    if (!paystackTicketsEnabled) {
-      // Fallback to survey flow
-      window.location.href = `/events/survey?event=${event.id}`
-      return
-    }
-
+  const handlePayment = async () => {
     setLoading(true)
     try {
-      const response = await fetch("/api/tickets/checkout", {
+      const amount = paymentType === "custom" ? parseFloat(customAmount) : ticketFixedPrice
+
+      if (isNaN(amount) || amount < minCustomAmount) {
+        alert(`Minimum payment amount is ${formatCurrency(minCustomAmount)}`)
+        setLoading(false)
+        return
+      }
+
+      const response = await fetch("/api/events/payment/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           eventId: event.id,
-          surveyData: null, // Skip survey for direct checkout
-          amount: ticketFixedPrice,
+          amount,
+          isCustomAmount: paymentType === "custom",
         }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || "Checkout failed")
+        throw new Error(data.error || "Payment initiation failed")
       }
 
-      // Redirect to Paystack
-      window.location.href = data.authorization_url
+      if (data.success && data.authorization_url) {
+        window.location.href = data.authorization_url
+      } else {
+        throw new Error("Failed to get payment URL")
+      }
     } catch (error: any) {
-      console.error("Checkout error:", error)
-      alert(`Checkout failed: ${error.message}`)
+      console.error("Payment error:", error)
+      alert(`Payment failed: ${error.message}`)
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const success = urlParams.get("success")
+    const error = urlParams.get("error")
+
+    if (success === "payment_complete") {
+      alert("Payment successful! Check your dashboard for your ticket and QR code.")
+      router.push("/dashboard/events")
+    } else if (error) {
+      const errorMessages: Record<string, string> = {
+        missing_reference: "Payment reference is missing",
+        payment_not_found: "Payment record not found",
+        verification_failed: "Payment verification failed",
+        payment_failed: "Payment was not successful",
+        amount_mismatch: "Payment amount doesn't match",
+        ticket_creation_failed: "Failed to create ticket",
+        server_error: "Server error occurred",
+      }
+      alert(`Error: ${errorMessages[error] || "An error occurred"}`)
+    }
+  }, [router])
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
@@ -129,16 +162,6 @@ export default function EventsPage() {
           >
             An exclusive evening with Nigeria's rap legend in an intimate setting
           </motion.p>
-          {paystackTicketsEnabled && (
-            <motion.p
-              className="text-lg text-green-400 max-w-2xl mx-auto"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              🎫 Fixed ticket price: ₦{ticketFixedPrice.toLocaleString()}
-            </motion.p>
-          )}
         </div>
 
         <motion.div
@@ -150,17 +173,15 @@ export default function EventsPage() {
           <Card className="overflow-hidden bg-gradient-to-br from-gray-900 to-black border-2 border-red-500/30 shadow-2xl hover:shadow-red-500/20 transition-all duration-500 group">
             <div className="relative h-96 md:h-[500px] overflow-hidden">
               <Image
-                src={event.image_url || "/placeholder.svg"}
+                src={event.image_url}
                 alt={event.title}
                 fill
                 className="object-cover group-hover:scale-105 transition-transform duration-700"
               />
 
-              {/* Neon overlay effects */}
               <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
               <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 via-transparent to-orange-500/10" />
 
-              {/* Featured badge with neon effect */}
               <div className="absolute top-6 left-6">
                 <Badge className="bg-yellow-500 text-black font-bold px-4 py-2 text-sm shadow-lg shadow-yellow-500/50">
                   <Star className="h-4 w-4 mr-2" />
@@ -168,7 +189,6 @@ export default function EventsPage() {
                 </Badge>
               </div>
 
-              {/* Event type badge */}
               <div className="absolute top-6 right-6">
                 <Badge className="bg-red-600 text-white font-bold px-4 py-2 text-sm shadow-lg shadow-red-600/50">
                   <Music className="h-4 w-4 mr-2" />
@@ -176,10 +196,9 @@ export default function EventsPage() {
                 </Badge>
               </div>
 
-              {/* Event title overlay */}
               <div className="absolute bottom-6 left-6 right-6">
                 <h2
-                  className="text-4xl md:text-5xl font-black text-white mb-2"
+                  className="text-3xl md:text-4xl font-black text-white mb-2"
                   style={{
                     textShadow: "0 0 20px rgba(0, 0, 0, 0.8), 0 0 40px rgba(239, 68, 68, 0.5)",
                     fontFamily: "Impact, Arial Black, sans-serif",
@@ -239,23 +258,46 @@ export default function EventsPage() {
 
                 <div className="space-y-6">
                   <div className="bg-gradient-to-br from-red-500/10 to-orange-500/10 border border-red-500/30 rounded-xl p-6">
-                    <h3 className="text-2xl font-bold text-white mb-4">Ticket Price</h3>
-                    <div className="text-center">
-                      <div className="space-y-2">
-                        <div className="text-lg text-gray-400 line-through">
-                          {formatCurrency(event.original_price_naira)}
-                        </div>
-                        <div className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400">
-                          {formatCurrency(event.ticket_price_naira)}
-                        </div>
+                    <h3 className="text-2xl font-bold text-white mb-4">Select Payment Option</h3>
+                    
+                    <RadioGroup value={paymentType} onValueChange={(value) => setPaymentType(value as "fixed" | "custom")}>
+                      <div className="flex items-center space-x-2 mb-4 p-3 rounded-lg border border-gray-700 hover:border-red-500/50 transition-colors">
+                        <RadioGroupItem value="fixed" id="fixed" />
+                        <Label htmlFor="fixed" className="flex-1 cursor-pointer">
+                          <div className="text-white font-semibold">Fixed Price</div>
+                          <div className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400">
+                            {formatCurrency(ticketFixedPrice)}
+                          </div>
+                          <div className="text-sm text-gray-400 line-through">
+                            {formatCurrency(event.original_price_naira)}
+                          </div>
+                        </Label>
                       </div>
-                      <div className="text-lg text-yellow-400 font-semibold mt-2">
-                        OR {event.ticket_price_coins.toLocaleString()} Erigga Coins
+
+                      <div className="flex items-start space-x-2 p-3 rounded-lg border border-gray-700 hover:border-red-500/50 transition-colors">
+                        <RadioGroupItem value="custom" id="custom" className="mt-1" />
+                        <Label htmlFor="custom" className="flex-1 cursor-pointer">
+                          <div className="text-white font-semibold mb-2">Custom Amount (Priority Seating)</div>
+                          <div className="text-sm text-yellow-400 mb-2">
+                            💎 Higher payments get better seats!
+                          </div>
+                          <Input
+                            type="number"
+                            placeholder={`Min: ${formatCurrency(minCustomAmount)}`}
+                            value={customAmount}
+                            onChange={(e) => setCustomAmount(e.target.value)}
+                            disabled={paymentType !== "custom"}
+                            className="bg-gray-800 border-gray-600 text-white"
+                            min={minCustomAmount}
+                          />
+                          <div className="text-xs text-gray-400 mt-1">
+                            Minimum: {formatCurrency(minCustomAmount)}
+                          </div>
+                        </Label>
                       </div>
-                    </div>
+                    </RadioGroup>
                   </div>
 
-                  {/* Capacity indicator */}
                   <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
                     <div className="flex items-center justify-between text-sm text-gray-400 mb-2">
                       <span>Availability</span>
@@ -277,42 +319,29 @@ export default function EventsPage() {
               </div>
 
               <div className="text-center">
-                {paystackTicketsEnabled ? (
-                  <Button
-                    size="lg"
-                    className="bg-gradient-to-r from-red-600 via-orange-500 to-yellow-500 hover:from-red-700 hover:via-orange-600 hover:to-yellow-600 text-white font-black text-xl px-12 py-6 rounded-xl shadow-2xl hover:shadow-red-500/30 transition-all duration-300 transform hover:scale-105"
-                    onClick={handleDirectCheckout}
-                    disabled={loading}
-                    style={{
-                      boxShadow: "0 0 30px rgba(239, 68, 68, 0.5), 0 0 60px rgba(239, 68, 68, 0.2)",
-                    }}
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="h-6 w-6 mr-3 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <Ticket className="h-6 w-6 mr-3" />
-                        BUY TICKET - ₦{ticketFixedPrice.toLocaleString()}
-                      </>
-                    )}
-                  </Button>
-                ) : (
-                  <Link href={`/events/survey?event=${event.id}`}>
-                    <Button
-                      size="lg"
-                      className="bg-gradient-to-r from-red-600 via-orange-500 to-yellow-500 hover:from-red-700 hover:via-orange-600 hover:to-yellow-600 text-white font-black text-xl px-12 py-6 rounded-xl shadow-2xl hover:shadow-red-500/30 transition-all duration-300 transform hover:scale-105"
-                      style={{
-                        boxShadow: "0 0 30px rgba(239, 68, 68, 0.5), 0 0 60px rgba(239, 68, 68, 0.2)",
-                      }}
-                    >
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-red-600 via-orange-500 to-yellow-500 hover:from-red-700 hover:via-orange-600 hover:to-yellow-600 text-white font-black text-xl px-12 py-6 rounded-xl shadow-2xl hover:shadow-red-500/30 transition-all duration-300 transform hover:scale-105"
+                  onClick={handlePayment}
+                  disabled={loading || (paymentType === "custom" && (!customAmount || parseFloat(customAmount) < minCustomAmount))}
+                  style={{
+                    boxShadow: "0 0 30px rgba(239, 68, 68, 0.5), 0 0 60px rgba(239, 68, 68, 0.2)",
+                  }}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-6 w-6 mr-3 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
                       <Ticket className="h-6 w-6 mr-3" />
-                      BUY TICKET NOW
-                    </Button>
-                  </Link>
-                )}
+                      {paymentType === "custom" 
+                        ? `PAY ${customAmount ? formatCurrency(parseFloat(customAmount)) : "CUSTOM AMOUNT"}` 
+                        : `BUY TICKET - ${formatCurrency(ticketFixedPrice)}`}
+                    </>
+                  )}
+                </Button>
               </div>
             </CardContent>
           </Card>
