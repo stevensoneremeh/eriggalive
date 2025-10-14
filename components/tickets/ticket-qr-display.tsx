@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { QrCode, Download, Share2, Copy, Check } from "lucide-react"
+import { QrCode, Download, Share2, Copy, Check, DollarSign, MapPin, CheckCircle, XCircle, Clock } from "lucide-react"
 import { motion } from "framer-motion"
 
 interface TicketQRDisplayProps {
@@ -13,12 +13,22 @@ interface TicketQRDisplayProps {
     ticket_number: string
     qr_code: string
     qr_token: string
-    event_title: string
-    event_date: string
-    venue: string
+    event_title?: string
+    event_date?: string
+    venue?: string
     ticket_type: string
     status: string
     holder_name?: string
+    custom_amount?: number | null
+    price_paid_naira?: number
+    seating_assignment?: string | null
+    seating_priority?: number
+    admission_status?: string
+    events?: {
+      title: string
+      event_date: string
+      venue: string
+    }
   }
   showDetails?: boolean
 }
@@ -126,10 +136,10 @@ export function TicketQRDisplay({ ticket, showDetails = true }: TicketQRDisplayP
         <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4">
           <div className="flex justify-between items-start">
             <div>
-              <h3 className="font-bold text-lg">{ticket.event_title}</h3>
-              <p className="text-purple-100">{ticket.venue}</p>
+              <h3 className="font-bold text-lg">{ticket.event_title || ticket.events?.title}</h3>
+              <p className="text-purple-100">{ticket.venue || ticket.events?.venue}</p>
               <p className="text-sm text-purple-200">
-                {new Date(ticket.event_date).toLocaleDateString("en-NG", {
+                {new Date(ticket.event_date || ticket.events?.event_date || new Date()).toLocaleDateString("en-NG", {
                   weekday: "long",
                   year: "numeric",
                   month: "long",
@@ -148,7 +158,7 @@ export function TicketQRDisplay({ ticket, showDetails = true }: TicketQRDisplayP
 
         {/* Ticket Details */}
         {showDetails && (
-          <div className="p-4 border-b">
+          <div className="p-4 border-b space-y-3">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="font-medium text-gray-600">Ticket Number:</span>
@@ -161,6 +171,79 @@ export function TicketQRDisplay({ ticket, showDetails = true }: TicketQRDisplayP
                 </div>
               )}
             </div>
+            
+            {/* Payment Information */}
+            <div className="bg-blue-50 rounded-lg p-3">
+              <div className="font-medium text-blue-900 mb-2 flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Payment Details
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-gray-600">Amount Paid:</span>
+                  <p className="font-semibold text-blue-700">
+                    ₦{((ticket.custom_amount || ticket.price_paid_naira || 0) / 100).toLocaleString()}
+                  </p>
+                </div>
+                {ticket.custom_amount && (
+                  <div>
+                    <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-300">
+                      Priority Payment
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Seating Information */}
+            {ticket.seating_assignment && (
+              <div className="bg-purple-50 rounded-lg p-3">
+                <div className="font-medium text-purple-900 mb-2 flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Seating Assignment
+                </div>
+                <div className="space-y-1 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Section:</span>
+                    <p className="font-semibold text-purple-700">{ticket.seating_assignment}</p>
+                  </div>
+                  {ticket.seating_priority !== undefined && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Priority Level:</span>
+                      <Badge className={
+                        ticket.seating_priority >= 900 ? "bg-purple-600" :
+                        ticket.seating_priority >= 800 ? "bg-blue-600" :
+                        ticket.seating_priority >= 700 ? "bg-green-600" : "bg-gray-600"
+                      }>
+                        {ticket.seating_priority}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Admission Status */}
+            {ticket.admission_status && (
+              <div className={`rounded-lg p-3 ${
+                ticket.admission_status === "admitted" ? "bg-green-50" :
+                ticket.admission_status === "denied" ? "bg-red-50" : "bg-yellow-50"
+              }`}>
+                <div className="font-medium mb-2 flex items-center gap-2">
+                  {ticket.admission_status === "admitted" ? (
+                    <CheckCircle className="h-4 w-4 text-green-700" />
+                  ) : ticket.admission_status === "denied" ? (
+                    <XCircle className="h-4 w-4 text-red-700" />
+                  ) : (
+                    <Clock className="h-4 w-4 text-yellow-700" />
+                  )}
+                  Admission Status
+                </div>
+                <Badge className={getStatusColor(ticket.admission_status)}>
+                  {ticket.admission_status.toUpperCase()}
+                </Badge>
+              </div>
+            )}
           </div>
         )}
 
