@@ -39,7 +39,7 @@ export default function EventsPage() {
     image_url: "/events/erigga-intimate-session.jpg",
     status: "upcoming",
     is_featured: true,
-    contact: "09035418185",
+    contact: "09099090909",
   }
 
   const formatDate = (dateString: string) => {
