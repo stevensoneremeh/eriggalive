@@ -1,7 +1,9 @@
-
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db/client'
 import { sql } from 'drizzle-orm'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export async function GET(request: NextRequest) {
   try {

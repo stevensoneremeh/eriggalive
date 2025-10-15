@@ -1,23 +1,22 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
-import { useAuth } from "@/contexts/auth-context"
-import { AuthGuard } from "@/components/auth-guard"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Separator } from "@/components/ui/separator"
+import { useAuth } from "@/contexts/auth-context"
+import { toast } from "@/components/ui/use-toast"
+import { createClient } from "@/lib/supabase/client"
+import { AuthGuard } from "@/components/auth-guard"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { User, SettingsIcon, Bell, Shield, Save, Eye, EyeOff, Crown, Coins, Mail, Calendar, Lock } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
 
 export default function SettingsPage() {
   const { user, profile, refreshProfile } = useAuth()
@@ -25,6 +24,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false)
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
+
+  const supabase = createClient()
 
   // Profile form state
   const [profileForm, setProfileForm] = useState({
@@ -60,6 +61,14 @@ export default function SettingsPage() {
   })
 
   const handleProfileUpdate = async () => {
+    if (!profile?.id) {
+      toast({
+        title: "Error",
+        description: "User profile not found. Please try logging in again.",
+        variant: "destructive",
+      })
+      return
+    }
     setLoading(true)
     try {
       const { error } = await supabase
@@ -73,7 +82,7 @@ export default function SettingsPage() {
           phone: profileForm.phone,
           date_of_birth: profileForm.date_of_birth,
         })
-        .eq("id", profile?.id)
+        .eq("id", profile.id)
 
       if (error) throw error
 
@@ -94,6 +103,14 @@ export default function SettingsPage() {
   }
 
   const handlePasswordUpdate = async () => {
+    if (!profile?.id) {
+      toast({
+        title: "Error",
+        description: "User profile not found. Please try logging in again.",
+        variant: "destructive",
+      })
+      return
+    }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast({
         title: "Error",
@@ -142,9 +159,17 @@ export default function SettingsPage() {
   }
 
   const handleNotificationUpdate = async () => {
+    if (!profile?.id) {
+      toast({
+        title: "Error",
+        description: "User profile not found. Please try logging in again.",
+        variant: "destructive",
+      })
+      return
+    }
     setLoading(true)
     try {
-      const { error } = await supabase.from("users").update(notifications).eq("id", profile?.id)
+      const { error } = await supabase.from("users").update(notifications).eq("id", profile.id)
 
       if (error) throw error
 

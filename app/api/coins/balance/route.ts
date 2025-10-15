@@ -1,6 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
 
 export const dynamic = "force-dynamic"
+export const revalidate = 0
+
+// This route is intentionally minimal - add your implementation here
+export async function GET() {
+  return NextResponse.json({ error: "Not implemented" }, { status: 501 })
+}
 
 function verifyUser(request: NextRequest) {
   const authHeader = request.headers.get("authorization")

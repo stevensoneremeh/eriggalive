@@ -4,6 +4,12 @@ import { type NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
 export const dynamic = "force-dynamic"
+export const revalidate = 0
+
+// This route is intentionally minimal - add your implementation here
+export async function POST() {
+  return NextResponse.json({ error: "Not implemented" }, { status: 501 })
+}
 
 const updateProfileSchema = z.object({
   full_name: z.string().min(1).max(100).optional(),
