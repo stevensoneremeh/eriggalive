@@ -1,6 +1,9 @@
-
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+
+// Force dynamic rendering - uses cookies which requires runtime evaluation  
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
   try {
