@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
           venue,
           status
         ),
-        profiles (
+        users:user_id (
           id,
           full_name,
           email
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
           ticket: {
             ticket_number: ticket.ticket_number,
             event_title: ticket.events?.title,
-            holder_name: ticket.profiles?.full_name,
+            holder_name: ticket.users?.full_name,
           },
         },
         { status: 400 },
@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
           ticket: {
             ticket_number: ticket.ticket_number,
             event_title: ticket.events?.title,
-            holder_name: ticket.profiles?.full_name,
+            holder_name: ticket.users?.full_name,
             admitted_at: ticket.admitted_at,
             seating_assignment: ticket.seating_assignment,
           },
@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
           ticket: {
             ticket_number: ticket.ticket_number,
             event_title: ticket.events?.title,
-            holder_name: ticket.profiles?.full_name,
+            holder_name: ticket.users?.full_name,
             used_at: ticket.used_at,
           },
         },
@@ -225,7 +225,7 @@ export async function POST(request: NextRequest) {
           ticket: {
             ticket_number: ticket.ticket_number,
             event_title: ticket.events?.title,
-            holder_name: ticket.profiles?.full_name,
+            holder_name: ticket.users?.full_name,
             status: ticket.status,
           },
         },
@@ -254,7 +254,7 @@ export async function POST(request: NextRequest) {
           ticket: {
             ticket_number: ticket.ticket_number,
             event_title: ticket.events?.title,
-            holder_name: ticket.profiles?.full_name,
+            holder_name: ticket.users?.full_name,
           },
         },
         { status: 400 },
@@ -310,8 +310,8 @@ export async function POST(request: NextRequest) {
         event_title: ticket.events?.title,
         event_date: ticket.events?.event_date,
         venue: ticket.events?.venue,
-        holder_name: ticket.profiles?.full_name,
-        holder_email: ticket.profiles?.email,
+        holder_name: ticket.users?.full_name,
+        holder_email: ticket.users?.email,
         seating_assignment: ticket.seating_assignment,
         seating_priority: ticket.seating_priority,
         price_paid: ticket.custom_amount || ticket.price_paid_naira,

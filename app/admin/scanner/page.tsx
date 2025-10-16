@@ -62,6 +62,8 @@ interface TicketDetails {
   admitted_at: string | null
   admitted_by: string | null
   purchased_at: string
+  payment_method?: string
+  qr_token?: string
   user: {
     full_name: string
     email: string
@@ -128,7 +130,7 @@ export default function AdminScannerPage() {
         .from("tickets")
         .select(`
           *,
-          profiles:user_id (
+          users:user_id (
             full_name,
             email
           ),
@@ -143,9 +145,9 @@ export default function AdminScannerPage() {
 
       if (error) throw error
 
-      const ticketsData = (data || []).map(ticket => ({
+      const ticketsData = (data || []).map((ticket: any) => ({
         ...ticket,
-        user: ticket.profiles,
+        user: ticket.users,
         event: ticket.events
       }))
 
