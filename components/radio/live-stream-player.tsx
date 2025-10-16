@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { DialogTitle } from "@/components/ui/dialog"
 import { Play, Pause, Maximize, Volume2, VolumeX } from "lucide-react"
 import { Slider } from "@/components/ui/slider"
 import { useLiveStream } from "@/contexts/live-stream-context"

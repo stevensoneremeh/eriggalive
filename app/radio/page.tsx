@@ -208,7 +208,7 @@ export default function RadioPage() {
         setDailyQuote(quote.text)
       }
 
-      // Load Mux live streams
+      // Load Mux live streams - wrapped in try-catch for safety
       const fetchActiveStream = async () => {
         try {
           const { data, error } = await supabase
@@ -221,8 +221,13 @@ export default function RadioPage() {
             .maybeSingle()
 
           if (error) {
+            // Table might not exist yet, gracefully handle
+            if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
+              console.log("Live streams table not yet created - skipping")
+              setIsLive(false)
+              return
+            }
             console.error("Error fetching active stream:", error)
-            // Don't throw, just log and continue
             return
           }
 
@@ -241,14 +246,12 @@ export default function RadioPage() {
             setLiveTitle("")
           }
         } catch (error) {
-          console.error("Error fetching active stream:", error)
-          // Gracefully handle the error without breaking the page
+          console.log("Live streams feature not available yet")
+          setIsLive(false)
         }
       }
 
-      // Add a small delay to avoid immediate database load
-      const timer = setTimeout(fetchActiveStream, 500)
-      return () => clearTimeout(timer)
+      fetchActiveStream()
 
       // Load next scheduled show (legacy support)
       const { data: nextBroadcast } = await supabase
