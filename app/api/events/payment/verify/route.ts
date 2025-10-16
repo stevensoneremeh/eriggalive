@@ -76,25 +76,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${baseUrl}/events?error=unauthorized`)
     }
 
-    // Ensure profile exists
-    const { data: profile } = await supabase
+    // Ensure profile exists with upsert
+    const { error: profileUpsertError } = await supabase
       .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single()
+      .upsert({
+        id: user.id,
+        email: user.email,
+        username: user.email?.split('@')[0] || 'user',
+        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+        coins_balance: 0,
+        tier: 'free'
+      }, {
+        onConflict: 'id',
+        ignoreDuplicates: false
+      })
 
-    if (!profile) {
-      // Create profile if it doesn't exist
-      await supabase
-        .from("profiles")
-        .insert({
-          id: user.id,
-          email: user.email,
-          username: user.email?.split('@')[0] || 'user',
-          full_name: user.user_metadata?.full_name || '',
-          coins_balance: 0,
-          tier: 'free'
-        })
+    if (profileUpsertError) {
+      console.error("Profile upsert error:", profileUpsertError)
     }
 
     const verifyResponse = await fetch(

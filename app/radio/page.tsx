@@ -142,6 +142,7 @@ export default function RadioPage() {
   const [featuredShoutout, setFeaturedShoutout] = useState<string | null>(null)
   const [shoutoutQueue, setShoutoutQueue] = useState<string[]>([])
   const [nextShow, setNextShow] = useState<NextShow | null>(null)
+  const [activeStream, setActiveStream] = useState<any>(null) // State to hold the active stream data
 
   // Visual state
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
@@ -208,25 +209,46 @@ export default function RadioPage() {
       }
 
       // Load Mux live streams
-      const { data: liveStream } = await supabase
-        .from("live_streams")
-        .select("*")
-        .eq("status", "active")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single()
+      const fetchActiveStream = async () => {
+        try {
+          const { data, error } = await supabase
+            .from("live_streams")
+            .select("*")
+            .eq("status", "active")
+            .eq("is_active", true)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
 
-      if (liveStream) {
-        setIsLive(true)
-        setLiveTitle(liveStream.title)
-        
-        // If there's a Mux playback ID, update audio source
-        if (liveStream.mux_playback_id && audioRef.current) {
-          audioRef.current.src = `https://stream.mux.com/${liveStream.mux_playback_id}.m3u8`
-          audioRef.current.load()
+          if (error) {
+            console.error("Error fetching active stream:", error)
+            // Don't throw, just log and continue
+            return
+          }
+
+          if (data) {
+            setActiveStream(data)
+            setIsLive(true)
+            setLiveTitle(data.title)
+
+            // If there's a Mux playback ID, update audio source
+            if (data.mux_playback_id && audioRef.current) {
+              audioRef.current.src = `https://stream.mux.com/${data.mux_playback_id}.m3u8`
+              audioRef.current.load()
+            }
+          } else {
+            setIsLive(false)
+            setLiveTitle("")
+          }
+        } catch (error) {
+          console.error("Error fetching active stream:", error)
+          // Gracefully handle the error without breaking the page
         }
       }
+
+      // Add a small delay to avoid immediate database load
+      const timer = setTimeout(fetchActiveStream, 500)
+      return () => clearTimeout(timer)
 
       // Load next scheduled show (legacy support)
       const { data: nextBroadcast } = await supabase
@@ -438,14 +460,14 @@ export default function RadioPage() {
 
       <div className="container mx-auto px-4 py-8">
         {/* Live Stream Video Player */}
-        {currentStream && (
+        {activeStream && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
             className="mb-8"
           >
-            <LiveStreamPlayer />
+            <LiveStreamPlayer streamData={activeStream} />
           </motion.div>
         )}
 

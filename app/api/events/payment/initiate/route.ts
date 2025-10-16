@@ -22,31 +22,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
     }
 
-    // Ensure profile exists
+    if (!user.email) {
+      return NextResponse.json({ success: false, error: "User email is required" }, { status: 400 })
+    }
+
+    // Ensure profile exists with upsert
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("*")
-      .eq("id", user.id)
+      .upsert({
+        id: user.id,
+        email: user.email,
+        username: user.email?.split('@')[0] || 'user',
+        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+        coins_balance: 0,
+        tier: 'free'
+      }, {
+        onConflict: 'id',
+        ignoreDuplicates: false
+      })
+      .select()
       .single()
 
-    if (profileError || !profile) {
-      // Create profile if it doesn't exist
-      const { data: newProfile, error: createError } = await supabase
-        .from("profiles")
-        .insert({
-          id: user.id,
-          email: user.email,
-          username: user.email?.split('@')[0] || 'user',
-          full_name: user.user_metadata?.full_name || '',
-          coins_balance: 0,
-          tier: 'free'
-        })
-        .select()
-        .single()
-
-      if (createError) {
-        return NextResponse.json({ success: false, error: "Failed to create user profile" }, { status: 500 })
-      }
+    if (profileError) {
+      console.error("Profile error:", profileError)
+      return NextResponse.json({ success: false, error: "Failed to manage user profile" }, { status: 500 })
     }
 
     const body: PaymentInitiateRequest = await request.json()
@@ -139,42 +138,77 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    const paystackResponse = await fetch("https://api.paystack.co/transaction/initialize", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${paystackSecretKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(paystackPayload),
-    })
+    // Add timeout to Paystack request
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 25000) // 25 second timeout
 
-    const paystackData = await paystackResponse.json()
+    try {
+      const paystackResponse = await fetch("https://api.paystack.co/transaction/initialize", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${paystackSecretKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(paystackPayload),
+        signal: controller.signal,
+      })
 
-    if (!paystackResponse.ok || !paystackData.status) {
-      console.error("Paystack initialization failed:", paystackData)
+      clearTimeout(timeoutId)
 
-      await supabase
-        .from("event_payments")
-        .update({ status: "failed" })
-        .eq("paystack_reference", reference)
+      if (!paystackResponse.ok) {
+        const errorText = await paystackResponse.text()
+        console.error("Paystack HTTP error:", paystackResponse.status, errorText)
+        
+        await supabase
+          .from("event_payments")
+          .update({ status: "failed" })
+          .eq("paystack_reference", reference)
 
-      return NextResponse.json(
-        { success: false, error: "Payment initialization failed" },
-        { status: 500 }
-      )
+        return NextResponse.json(
+          { success: false, error: `Payment service error: ${paystackResponse.status}` },
+          { status: 500 }
+        )
+      }
+
+      const paystackData = await paystackResponse.json()
+
+      if (!paystackData.status) {
+        console.error("Paystack initialization failed:", paystackData)
+
+        await supabase
+          .from("event_payments")
+          .update({ status: "failed" })
+          .eq("paystack_reference", reference)
+
+        return NextResponse.json(
+          { success: false, error: paystackData.message || "Payment initialization failed" },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({
+        success: true,
+        authorization_url: paystackData.data.authorization_url,
+        access_code: paystackData.data.access_code,
+        reference,
+      })
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId)
+      
+      if (fetchError.name === 'AbortError') {
+        console.error("Paystack request timeout")
+        return NextResponse.json(
+          { success: false, error: "Payment service timeout. Please try again." },
+          { status: 504 }
+        )
+      }
+      throw fetchError
     }
 
-    return NextResponse.json({
-      success: true,
-      authorization_url: paystackData.data.authorization_url,
-      access_code: paystackData.data.access_code,
-      reference,
-    })
-
-  } catch (error) {
+  } catch (error: any) {
     console.error("Payment initiation error:", error)
     return NextResponse.json(
-      { success: false, error: "Internal server error" },
+      { success: false, error: error.message || "Internal server error" },
       { status: 500 }
     )
   }

@@ -72,6 +72,9 @@ export default function EventsPage() {
         return
       }
 
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
       const response = await fetch("/api/events/payment/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -80,22 +83,35 @@ export default function EventsPage() {
           amount,
           isCustomAmount: paymentType === "custom",
         }),
+        signal: controller.signal,
       })
 
-      const data = await response.json()
+      clearTimeout(timeoutId)
+
+      let data
+      try {
+        data = await response.json()
+      } catch (parseError) {
+        console.error("JSON parse error:", parseError)
+        throw new Error("Invalid response from server. Please try again.")
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || "Payment initiation failed")
+        throw new Error(data.error || `Server error: ${response.status}`)
       }
 
       if (data.success && data.authorization_url) {
         window.location.href = data.authorization_url
       } else {
-        throw new Error("Failed to get payment URL")
+        throw new Error(data.error || "Failed to get payment URL")
       }
     } catch (error: any) {
       console.error("Payment error:", error)
-      alert(`Payment failed: ${error.message}`)
+      if (error.name === 'AbortError') {
+        alert("Request timeout. Please check your connection and try again.")
+      } else {
+        alert(`Payment failed: ${error.message}`)
+      }
     } finally {
       setLoading(false)
     }
