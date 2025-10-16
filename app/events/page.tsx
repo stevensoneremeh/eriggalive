@@ -171,12 +171,12 @@ export default function EventsPage() {
           transition={{ delay: 0.6 }}
         >
           <Card className="overflow-hidden bg-gradient-to-br from-gray-900 to-black border-2 border-red-500/30 shadow-2xl hover:shadow-red-500/20 transition-all duration-500 group">
-            <div className="relative h-96 md:h-[500px] overflow-hidden">
+            <div className="relative w-full aspect-[16/9] md:aspect-[21/9] overflow-hidden">
               <Image
                 src={event.image_url}
                 alt={event.title}
                 fill
-                className="object-cover group-hover:scale-105 transition-transform duration-700"
+                className="object-contain group-hover:scale-105 transition-transform duration-700"
               />
 
               <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />

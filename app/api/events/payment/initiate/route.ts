@@ -13,30 +13,40 @@ interface PaymentInitiateRequest {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: "Authentication required" },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
+    // Ensure profile exists
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", user.id)
       .single()
 
-    if (!profile) {
-      return NextResponse.json(
-        { success: false, error: "User profile not found" },
-        { status: 404 }
-      )
+    if (profileError || !profile) {
+      // Create profile if it doesn't exist
+      const { data: newProfile, error: createError } = await supabase
+        .from("profiles")
+        .insert({
+          id: user.id,
+          email: user.email,
+          username: user.email?.split('@')[0] || 'user',
+          full_name: user.user_metadata?.full_name || '',
+          coins_balance: 0,
+          tier: 'free'
+        })
+        .select()
+        .single()
+
+      if (createError) {
+        return NextResponse.json({ success: false, error: "Failed to create user profile" }, { status: 500 })
+      }
     }
 
     const body: PaymentInitiateRequest = await request.json()
@@ -64,9 +74,9 @@ export async function POST(request: NextRequest) {
 
     if (isCustomAmount && event.min_custom_amount && amount < event.min_custom_amount) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: `Minimum amount is ₦${event.min_custom_amount.toLocaleString()}` 
+        {
+          success: false,
+          error: `Minimum amount is ₦${event.min_custom_amount.toLocaleString()}`
         },
         { status: 400 }
       )
@@ -142,7 +152,7 @@ export async function POST(request: NextRequest) {
 
     if (!paystackResponse.ok || !paystackData.status) {
       console.error("Paystack initialization failed:", paystackData)
-      
+
       await supabase
         .from("event_payments")
         .update({ status: "failed" })

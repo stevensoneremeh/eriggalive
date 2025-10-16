@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic"
 
 function generateQRCode(ticketId: string, eventId: string, userId: string, amount: number): { qrCode: string; qrToken: string } {
   const timestamp = Date.now()
-  
+
   const qrData = {
     ticket: ticketId,
     event: eventId,
@@ -14,15 +14,15 @@ function generateQRCode(ticketId: string, eventId: string, userId: string, amoun
     amount,
     timestamp,
   }
-  
+
   const qrString = JSON.stringify(qrData)
   const qrCode = Buffer.from(qrString).toString("base64")
-  
+
   const qrToken = crypto
     .createHmac("sha256", process.env.NEXTAUTH_SECRET || "erigga-live-secret-2025")
     .update(`${ticketId}${eventId}${userId}${timestamp}`)
     .digest("hex")
-  
+
   return { qrCode, qrToken }
 }
 
@@ -30,15 +30,16 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const reference = searchParams.get("reference")
-    
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+
     if (!reference) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/events?error=missing_reference`
+        `${baseUrl}/events?error=missing_reference`
       )
     }
 
     const supabase = await createClient()
-    
+
     const { data: payment, error: paymentError } = await supabase
       .from("event_payments")
       .select("*, events(*)")
@@ -48,21 +49,52 @@ export async function GET(request: NextRequest) {
     if (paymentError || !payment) {
       console.error("Payment not found:", paymentError)
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/events?error=payment_not_found`
+        `${baseUrl}/events?error=payment_not_found`
       )
     }
 
     if (payment.status === "paid") {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/events?success=already_processed`
+        `${baseUrl}/dashboard/events?success=already_processed`
       )
     }
 
     const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY
     if (!paystackSecretKey) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/events?error=config_error`
+        `${baseUrl}/events?error=config_error`
       )
+    }
+
+    // Get user
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return NextResponse.redirect(`${baseUrl}/events?error=unauthorized`)
+    }
+
+    // Ensure profile exists
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile) {
+      // Create profile if it doesn't exist
+      await supabase
+        .from("profiles")
+        .insert({
+          id: user.id,
+          email: user.email,
+          username: user.email?.split('@')[0] || 'user',
+          full_name: user.user_metadata?.full_name || '',
+          coins_balance: 0,
+          tier: 'free'
+        })
     }
 
     const verifyResponse = await fetch(
@@ -78,14 +110,14 @@ export async function GET(request: NextRequest) {
 
     if (!verifyResponse.ok || !verifyData.status) {
       console.error("Paystack verification failed:", verifyData)
-      
+
       await supabase
         .from("event_payments")
         .update({ status: "failed" })
         .eq("paystack_reference", reference)
 
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/events?error=verification_failed`
+        `${baseUrl}/events?error=verification_failed`
       )
     }
 
@@ -98,7 +130,7 @@ export async function GET(request: NextRequest) {
         .eq("paystack_reference", reference)
 
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/events?error=payment_failed`
+        `${baseUrl}/events?error=payment_failed`
       )
     }
 
@@ -107,19 +139,19 @@ export async function GET(request: NextRequest) {
 
     if (paidAmount < expectedAmount) {
       console.error("Amount mismatch:", { expected: expectedAmount, paid: paidAmount })
-      
+
       await supabase
         .from("event_payments")
         .update({ status: "failed" })
         .eq("paystack_reference", reference)
 
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/events?error=amount_mismatch`
+        `${baseUrl}/events?error=amount_mismatch`
       )
     }
 
     const ticketNumber = `ELT-${Date.now().toString().slice(-8)}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`
-    
+
     const ticketId = crypto.randomUUID()
     const { qrCode, qrToken } = generateQRCode(
       ticketId,
@@ -154,7 +186,7 @@ export async function GET(request: NextRequest) {
     if (ticketError) {
       console.error("Failed to create ticket:", ticketError)
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/events?error=ticket_creation_failed`
+        `${baseUrl}/events?error=ticket_creation_failed`
       )
     }
 
@@ -184,13 +216,14 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/events?success=payment_complete&ticket=${ticketId}`
+      `${baseUrl}/dashboard/events?success=payment_complete&ticket=${ticketId}`
     )
 
   } catch (error) {
     console.error("Payment verification error:", error)
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_BASE_URL}/events?error=server_error`
+      `${baseUrl}/events?error=server_error`
     )
   }
 }
