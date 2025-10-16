@@ -19,17 +19,16 @@ export async function POST(request: NextRequest) {
 
     // Check user's coin balance
     const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("coins_balance") // Changed from "coins" to "coins_balance" for consistency
-      .eq("id", userId)
+      .from("users")
+      .select("coins")
+      .eq("auth_user_id", userId)
       .single()
 
     if (profileError) {
       return NextResponse.json({ error: "Failed to fetch user profile" }, { status: 500 })
     }
 
-    if (profile.coins_balance < coinAmount) {
-      // Updated to use coins_balance
+    if (profile.coins < coinAmount) {
       return NextResponse.json({ error: "Insufficient coin balance" }, { status: 400 })
     }
 
@@ -78,9 +77,9 @@ export async function POST(request: NextRequest) {
 
     // Deduct coins from user balance
     const { error: balanceError } = await supabase
-      .from("profiles")
-      .update({ coins_balance: profile.coins_balance - coinAmount }) // Updated to use coins_balance consistently
-      .eq("id", userId)
+      .from("users")
+      .update({ coins: profile.coins - coinAmount })
+      .eq("auth_user_id", userId)
 
     if (balanceError) {
       // Rollback ticket creation

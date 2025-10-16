@@ -14,12 +14,12 @@ async function verifyAdmin(request: NextRequest) {
     }
 
     const { data: profile, error: profileError } = await supabase
-      .from("profiles")
+      .from("users")
       .select("*")
-      .eq("id", user.id)
+      .eq("auth_user_id", user.id)
       .single()
 
-    if (profileError || !profile || !profile.is_admin) {
+    if (profileError || !profile || profile.role !== "admin") {
       return { error: "Admin access required", user: null, profile: null }
     }
 

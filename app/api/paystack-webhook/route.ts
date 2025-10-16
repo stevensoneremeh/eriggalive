@@ -50,8 +50,8 @@ async function handle(body: any) {
   }
 
   const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("id, email, coins_balance, wallet_balance")
+    .from("users")
+    .select("id, email, coins, wallet")
     .eq("email", email)
     .single()
 

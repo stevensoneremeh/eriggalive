@@ -27,9 +27,9 @@ async function verifyUser(request: NextRequest) {
     }
 
     const { data: profile, error: profileError } = await supabase
-      .from("profiles")
+      .from("users")
       .select("*")
-      .eq("id", user.id)
+      .eq("auth_user_id", user.id)
       .single()
 
     if (profileError || !profile) {
@@ -176,18 +176,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: "Payment verification failed" }, { status: 500 })
       }
     } else if (paymentMethod === "coins") {
-      if (profile.coins_balance < totalCoins) {
+      if (profile.coins < totalCoins) {
         return NextResponse.json({ success: false, error: "Insufficient coins balance" }, { status: 400 })
       }
 
       // Deduct coins
       const { error: coinsError } = await supabase
-        .from("profiles")
+        .from("users")
         .update({
-          coins_balance: profile.coins_balance - totalCoins,
+          coins: profile.coins - totalCoins,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", user.id)
+        .eq("auth_user_id", user.id)
 
       if (coinsError) {
         console.error("Coins deduction error:", coinsError) // Added error logging

@@ -20,9 +20,9 @@ export async function GET(request: NextRequest) {
 
     // Get user profile with coins balance
     const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("coins_balance")
-      .eq("id", user.id)
+      .from("users")
+      .select("coins")
+      .eq("auth_user_id", user.id)
       .single()
 
     if (profileError || !profile) {
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       .limit(10)
 
     const balanceData = {
-      currentBalance: profile.coins_balance || 0,
+      currentBalance: profile.coins || 0,
       transactions: transactions || [],
     }
 

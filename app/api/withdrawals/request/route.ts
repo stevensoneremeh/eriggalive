@@ -31,9 +31,9 @@ export async function POST(request: NextRequest) {
 
     // Get user profile with current coin balance
     const { data: profile, error: profileError } = await supabase
-      .from("profiles")
+      .from("users")
       .select("id, coins")
-      .eq("id", user.id)
+      .eq("auth_user_id", user.id)
       .single()
 
     if (profileError || !profile) {

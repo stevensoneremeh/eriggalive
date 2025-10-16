@@ -36,9 +36,9 @@ async function verifyUser(request: NextRequest) {
     }
 
     const { data: profile, error: profileError } = await supabase
-      .from("profiles")
+      .from("users")
       .select("*")
-      .eq("id", user.id)
+      .eq("auth_user_id", user.id)
       .single()
 
     if (profileError || !profile) {
@@ -109,8 +109,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already has this tier or higher
-    const tierLevels = { free: 0, pro: 1, enterprise: 2 }
-    const currentTierLevel = tierLevels[profile.membership_tier as keyof typeof tierLevels] || 0
+    const tierLevels = { erigga_citizen: 0, erigga_insider: 1, erigga_legend: 2 }
+    const currentTierLevel = tierLevels[profile.tier as keyof typeof tierLevels] || 0
     const requestedTierLevel = tierLevels[tier as keyof typeof tierLevels]
 
     if (
@@ -164,18 +164,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: "Payment verification failed" }, { status: 500 })
       }
     } else if (paymentMethod === "coins") {
-      if (profile.coins_balance < totalCoins) {
+      if (profile.coins < totalCoins) {
         return NextResponse.json({ success: false, error: "Insufficient coins balance" }, { status: 400 })
       }
 
       // Deduct coins
       const { error: coinsError } = await supabase
-        .from("profiles")
+        .from("users")
         .update({
-          coins_balance: profile.coins_balance - totalCoins,
+          coins: profile.coins - totalCoins,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", user.id)
+        .eq("auth_user_id", user.id)
 
       if (coinsError) {
         return NextResponse.json({ success: false, error: "Failed to deduct coins" }, { status: 500 })
@@ -196,13 +196,13 @@ export async function POST(request: NextRequest) {
 
     // Update user membership
     const { error: updateError } = await supabase
-      .from("profiles")
+      .from("users")
       .update({
-        membership_tier: tier,
+        tier: tier,
         membership_expires_at: expiryDate.toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq("id", user.id)
+      .eq("auth_user_id", user.id)
 
     if (updateError) {
       console.error("Membership update error:", updateError)
@@ -211,8 +211,8 @@ export async function POST(request: NextRequest) {
 
     // Create membership transaction record
     await supabase.from("membership_transactions").insert({
-      user_id: user.id,
-      from_tier: profile.membership_tier,
+      user_id: profile.id,
+      from_tier: profile.tier,
       to_tier: tier,
       duration_months: duration === "monthly" ? 1 : 12,
       amount_paid_naira: paymentMethod === "paystack" ? totalPrice : null,
@@ -226,7 +226,7 @@ export async function POST(request: NextRequest) {
 
     // Create transaction record
     await supabase.from("transactions").insert({
-      user_id: user.id,
+      user_id: profile.id,
       type: "purchase",
       category: "membership",
       amount_naira: paymentMethod === "paystack" ? totalPrice : null,
