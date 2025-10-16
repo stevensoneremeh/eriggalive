@@ -76,23 +76,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${baseUrl}/events?error=unauthorized`)
     }
 
-    // Ensure profile exists with upsert
-    const { error: profileUpsertError } = await supabase
-      .from("profiles")
-      .upsert({
-        id: user.id,
-        email: user.email,
-        username: user.email?.split('@')[0] || 'user',
-        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-        coins_balance: 0,
-        tier: 'free'
-      }, {
-        onConflict: 'id',
-        ignoreDuplicates: false
-      })
+    // Ensure user profile exists
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .single()
 
-    if (profileUpsertError) {
-      console.error("Profile upsert error:", profileUpsertError)
+    if (!existingUser) {
+      const { error: createError } = await supabase
+        .from("users")
+        .insert({
+          auth_user_id: user.id,
+          email: user.email,
+          username: user.email?.split('@')[0] || 'user',
+          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+          coins: 0,
+          tier: 'erigga_citizen'
+        })
+
+      if (createError) {
+        console.error("Failed to create user profile:", createError)
+      }
     }
 
     const verifyResponse = await fetch(

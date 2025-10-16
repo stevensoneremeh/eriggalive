@@ -26,24 +26,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "User email is required" }, { status: 400 })
     }
 
-    // Ensure profile exists with upsert
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .upsert({
-        id: user.id,
-        email: user.email,
-        username: user.email?.split('@')[0] || 'user',
-        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-        coins_balance: 0,
-        tier: 'free'
-      }, {
-        onConflict: 'id',
-        ignoreDuplicates: false
-      })
-      .select()
+    // Get or create user profile
+    let { data: profile, error: profileError } = await supabase
+      .from("users")
+      .select("id, auth_user_id, username, full_name, email, coins, tier")
+      .eq("auth_user_id", user.id)
       .single()
 
-    if (profileError) {
+    if (profileError && profileError.code === "PGRST116") {
+      // User doesn't exist, create them
+      const { data: newProfile, error: createError } = await supabase
+        .from("users")
+        .insert({
+          auth_user_id: user.id,
+          email: user.email,
+          username: user.email?.split('@')[0] || 'user',
+          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+          coins: 0,
+          tier: 'erigga_citizen'
+        })
+        .select("id, auth_user_id, username, full_name, email, coins, tier")
+        .single()
+
+      if (createError) {
+        console.error("Failed to create user profile:", createError)
+        return NextResponse.json({ success: false, error: "Failed to create user profile" }, { status: 500 })
+      }
+      profile = newProfile
+    } else if (profileError) {
       console.error("Profile error:", profileError)
       return NextResponse.json({ success: false, error: "Failed to manage user profile" }, { status: 500 })
     }

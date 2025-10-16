@@ -52,7 +52,11 @@ export default function EventPaymentPage() {
     if (!user) return
 
     try {
-      const { data, error } = await supabase.from("profiles").select("coins").eq("id", user.id).single()
+      const { data, error } = await supabase
+        .from("users")
+        .select("coins")
+        .eq("auth_user_id", user.id)
+        .single()
 
       if (error) throw error
       setCoinBalance(data?.coins || 0)
