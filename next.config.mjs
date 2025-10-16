@@ -121,12 +121,10 @@ const nextConfig = {
     serverComponentsExternalPackages: [],
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
-  // Force static generation for specific pages
-  output: 'standalone',
-  // Enable SWC minification for faster builds with less memory
-  swcMinify: true,
   // Optimize production builds
   productionBrowserSourceMaps: false,
+  // Enable SWC minification for faster builds with less memory
+  swcMinify: true,
 };
 
 export default nextConfig;
