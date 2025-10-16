@@ -18,10 +18,15 @@ const nextConfig = {
     
     // Memory optimization for build
     if (!dev) {
+      // Disable caching to prevent disk errors
+      config.cache = false
+      
       config.optimization = {
         ...config.optimization,
+        minimize: true,
         splitChunks: {
           chunks: 'all',
+          maxSize: 200000,
           cacheGroups: {
             default: false,
             vendors: false,
