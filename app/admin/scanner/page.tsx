@@ -130,10 +130,6 @@ export default function AdminScannerPage() {
         .from("tickets")
         .select(`
           *,
-          users:user_id (
-            full_name,
-            email
-          ),
           events:event_id (
             title,
             event_date,
@@ -145,14 +141,25 @@ export default function AdminScannerPage() {
 
       if (error) throw error
 
-      const ticketsData = (data || []).map((ticket: any) => ({
-        ...ticket,
-        user: ticket.users,
-        event: ticket.events
-      }))
+      // Fetch user data separately to avoid RLS issues
+      const ticketsWithUsers = await Promise.all(
+        (data || []).map(async (ticket: any) => {
+          const { data: userData } = await supabase
+            .from("users")
+            .select("full_name, email")
+            .eq("auth_user_id", ticket.user_id)
+            .single()
 
-      setTickets(ticketsData)
-      calculateStats(ticketsData)
+          return {
+            ...ticket,
+            user: userData || { full_name: "Unknown", email: "N/A" },
+            event: ticket.events
+          }
+        })
+      )
+
+      setTickets(ticketsWithUsers)
+      calculateStats(ticketsWithUsers)
     } catch (error) {
       console.error("Error fetching tickets:", error)
       toast.error("Failed to load tickets")

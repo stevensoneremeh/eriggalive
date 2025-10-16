@@ -1,4 +1,3 @@
-
 # Event Ticketing System - Testing Checklist
 
 ## System Overview
@@ -11,7 +10,11 @@ The enhanced event ticketing system includes:
 
 ## Testing Checklist
 
-### 1. Event Payment Flow
+### 1. Admin Authentication
+- [x] Login as admin (info@eriggalive.com)
+- [x] Verify admin role access
+
+### 2. Event Payment Flow
 - [ ] Navigate to `/events` page
 - [ ] Verify event details display correctly
 - [ ] Test fixed price payment (₦20,000)
@@ -19,14 +22,14 @@ The enhanced event ticketing system includes:
 - [ ] Verify Paystack integration redirects correctly
 - [ ] Complete payment and verify redirect to dashboard
 
-### 2. Ticket Generation
+### 3. Ticket Generation
 - [ ] After payment, verify ticket appears in `/dashboard/events`
 - [ ] Check ticket number format: `ELT-XXXXXXXX-XXXX`
 - [ ] Verify QR code is generated
 - [ ] Verify seating priority is calculated correctly
 - [ ] Check seating assignment based on payment amount
 
-### 3. Payment and Seating Details
+### 4. Payment and Seating Details
 - [ ] Verify amount paid is displayed correctly
 - [ ] Check custom payment badge appears for priority payments
 - [ ] Verify seating assignment shows correct section
@@ -36,7 +39,7 @@ The enhanced event ticketing system includes:
   - Priority >= 700: Third Row Premium (Green)
   - Priority < 700: General Admission (Gray)
 
-### 4. Admin Scanner (`/admin/scanner`)
+### 5. Admin Scanner (`/admin/scanner`)
 - [ ] Login as admin (info@eriggalive.com)
 - [ ] Navigate to `/admin/scanner`
 - [ ] Select an event from dropdown
@@ -54,7 +57,7 @@ The enhanced event ticketing system includes:
   - Admission status
   - Admitted timestamp
 
-### 5. QR Code Scanning
+### 6. QR Code Scanning
 - [ ] Click "Open Scanner" button
 - [ ] Test manual entry with ticket number
 - [ ] Verify validation response includes:
@@ -66,7 +69,7 @@ The enhanced event ticketing system includes:
 - [ ] Verify admitted timestamp is recorded
 - [ ] Test scanning already admitted ticket (should fail)
 
-### 6. Ticket Details Expansion
+### 7. Ticket Details Expansion
 - [ ] Click expand arrow on any ticket row
 - [ ] Verify expanded details show:
   - Purchase timestamp
@@ -75,7 +78,7 @@ The enhanced event ticketing system includes:
   - QR token preview
 - [ ] Test collapse functionality
 
-### 7. Search and Export
+### 8. Search and Export
 - [ ] Test search by ticket number
 - [ ] Test search by holder name
 - [ ] Test search by email
@@ -83,7 +86,7 @@ The enhanced event ticketing system includes:
 - [ ] Verify CSV download includes all columns
 - [ ] Check CSV formatting is correct
 
-### 8. Priority Seating Logic
+### 9. Priority Seating Logic
 - [ ] Create tickets with different payment amounts:
   - ₦50,000 (should get priority 900+)
   - ₦35,000 (should get priority 800+)
@@ -95,13 +98,13 @@ The enhanced event ticketing system includes:
   - Third Row Premium for medium
   - General Admission for standard
 
-### 9. Real-time Updates
+### 10. Real-time Updates
 - [ ] Admit a ticket via scanner
 - [ ] Verify ticket list refreshes
 - [ ] Check statistics update immediately
 - [ ] Verify admitted count increases
 
-### 10. Edge Cases
+### 11. Edge Cases
 - [ ] Test with no tickets for event
 - [ ] Test scanning invalid QR code
 - [ ] Test scanning ticket for wrong event

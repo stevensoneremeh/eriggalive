@@ -57,11 +57,6 @@ export async function POST(request: NextRequest) {
           event_date,
           venue,
           status
-        ),
-        users:user_id (
-          id,
-          full_name,
-          email
         )
       `)
       .eq("qr_code", qrCode)
@@ -88,6 +83,15 @@ export async function POST(request: NextRequest) {
         { status: 404 },
       )
     }
+
+    // Fetch user data separately
+    const { data: ticketUser } = await supabase
+      .from("users")
+      .select("id, full_name, email")
+      .eq("auth_user_id", ticket.user_id)
+      .single()
+
+    const users = ticketUser || { id: ticket.user_id, full_name: "Unknown User", email: "N/A" }
 
     // Validate QR token
     const { data: isValidToken, error: tokenError } = await supabase.rpc("validate_qr_token", {
@@ -138,7 +142,7 @@ export async function POST(request: NextRequest) {
           ticket: {
             ticket_number: ticket.ticket_number,
             event_title: ticket.events?.title,
-            holder_name: ticket.users?.full_name,
+            holder_name: users.full_name,
           },
         },
         { status: 400 },
@@ -166,7 +170,7 @@ export async function POST(request: NextRequest) {
           ticket: {
             ticket_number: ticket.ticket_number,
             event_title: ticket.events?.title,
-            holder_name: ticket.users?.full_name,
+            holder_name: users.full_name,
             admitted_at: ticket.admitted_at,
             seating_assignment: ticket.seating_assignment,
           },
@@ -196,7 +200,7 @@ export async function POST(request: NextRequest) {
           ticket: {
             ticket_number: ticket.ticket_number,
             event_title: ticket.events?.title,
-            holder_name: ticket.users?.full_name,
+            holder_name: users.full_name,
             used_at: ticket.used_at,
           },
         },
@@ -225,7 +229,7 @@ export async function POST(request: NextRequest) {
           ticket: {
             ticket_number: ticket.ticket_number,
             event_title: ticket.events?.title,
-            holder_name: ticket.users?.full_name,
+            holder_name: users.full_name,
             status: ticket.status,
           },
         },
@@ -254,7 +258,7 @@ export async function POST(request: NextRequest) {
           ticket: {
             ticket_number: ticket.ticket_number,
             event_title: ticket.events?.title,
-            holder_name: ticket.users?.full_name,
+            holder_name: users.full_name,
           },
         },
         { status: 400 },
@@ -310,8 +314,8 @@ export async function POST(request: NextRequest) {
         event_title: ticket.events?.title,
         event_date: ticket.events?.event_date,
         venue: ticket.events?.venue,
-        holder_name: ticket.users?.full_name,
-        holder_email: ticket.users?.email,
+        holder_name: users.full_name,
+        holder_email: users.email,
         seating_assignment: ticket.seating_assignment,
         seating_priority: ticket.seating_priority,
         price_paid: ticket.custom_amount || ticket.price_paid_naira,
