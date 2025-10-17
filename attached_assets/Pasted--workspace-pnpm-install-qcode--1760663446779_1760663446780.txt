@@ -1,0 +1,211 @@
+~/workspace$ pnpm install qcode
+
+   ╭──────────────────────────────────────────╮
+   │                                          │
+   │   Update available! 10.12.4 → 10.18.3.   │
+   │   Changelog: https://pnpm.io/v/10.18.3   │
+   │     To update, run: pnpm add -g pnpm     │
+   │                                          │
+   ╰──────────────────────────────────────────╯
+
+ WARN  deprecated eslint@8.57.1: This version is no longer supported. Please see https://eslint.org/version-support for other options.
+ ERR_PNPM_FETCH_404  GET https://registry.npmjs.org/qcode: Not Found - 404
+
+This error happened while installing a direct dependency of /home/runner/workspace
+
+qcode is not in the npm registry, or you have no permission to fetch it.
+
+No authorization header was set for the request.
+Progress: resolved 86, reused 86, downloaded 0, added 0
+~/workspace$ npm install qrcode
+npm error Cannot read properties of null (reading 'matches')
+npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2025-10-17T01_08_53_734Z-debug-0.log
+~/workspace$ pnpm install
+Lockfile is up to date, resolution step is skipped
+Already up to date
+
+╭ Warning ───────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                            │
+│   Ignored build scripts: unrs-resolver.                                                    │
+│   Run "pnpm approve-builds" to pick which dependencies should be allowed to run scripts.   │
+│                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────╯
+
+Done in 2.1s using pnpm v10.12.4
+~/workspace$ pnpm run build
+
+> erigga-fan-platform@0.1.0 build /home/runner/workspace
+> next build
+
+  ▲ Next.js 14.2.16
+  - Experiments (use with caution):
+    · missingSuspenseWithCSRBailout
+
+   Creating an optimized production build ...
+Failed to compile.
+
+./app/api/admin/vault/upload/route.ts
+Error: 
+  × the name `dynamic` is defined multiple times
+     ╭─[/home/runner/workspace/app/api/admin/vault/upload/route.ts:3:1]
+   3 │ import { createServerSupabaseClient } from "@/lib/supabase/server"
+   4 │ 
+   5 │ // Force dynamic rendering
+   6 │ export const dynamic = 'force-dynamic'
+     ·              ───┬───
+     ·                 ╰── previous definition of `dynamic` here
+   7 │ 
+   8 │ export async function POST(request: NextRequest) {
+   9 │   try {
+  10 │     const supabase = await createServerSupabaseClient()
+  11 │ 
+  12 │     // Check authentication and admin privileges
+  13 │     const {
+  14 │       data: { user },
+  15 │       error: authError,
+  16 │     } = await supabase.auth.getUser()
+  17 │     
+  18 │     if (authError || !user) {
+  19 │       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  20 │     }
+  21 │ 
+  22 │     // Verify admin access
+  23 │     const { data: profile } = await supabase
+  24 │       .from("users")
+  25 │       .select("role, tier")
+  26 │       .eq("auth_user_id", user.id)
+  27 │       .single()
+  28 │ 
+  29 │     if (!profile || (profile.role !== "admin" && profile.role !== "super_admin" && user.email !== "info@eriggalive.com")) {
+  30 │       return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+  31 │     }
+  32 │ 
+  33 │     const formData = await request.formData()
+  34 │     const file = formData.get("file") as File
+  35 │     const thumbnail = formData.get("thumbnail") as File
+  36 │     const title = formData.get("title") as string
+  37 │     const description = formData.get("description") as string
+  38 │     const type = formData.get("type") as string
+  39 │     const category = formData.get("category") as string
+  40 │     const tier_required = formData.get("tier_required") as string
+  41 │     const is_premium = formData.get("is_premium") === "true"
+  42 │     const unlock_price_coins = parseInt(formData.get("unlock_price_coins") as string) || 0
+  43 │     const unlock_price_naira = parseInt(formData.get("unlock_price_naira") as string) || 0
+  44 │ 
+  45 │     if (!file || !title?.trim()) {
+  46 │       return NextResponse.json({ error: "File and title are required" }, { status: 400 })
+  47 │     }
+  48 │ 
+  49 │     // Upload main file to Supabase Storage
+  50 │     const fileExt = file.name.split(".").pop()
+  51 │     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+  52 │     const filePath = `vault/${type}s/${fileName}`
+  53 │ 
+  54 │     const { data: fileData, error: fileError } = await supabase.storage
+  55 │       .from("media")
+  56 │       .upload(filePath, file, {
+  57 │         cacheControl: "3600",
+  58 │         upsert: false,
+  59 │       })
+  60 │ 
+  61 │     if (fileError) {
+  62 │       console.error("File upload error:", fileError)
+  63 │       return NextResponse.json({ error: "Failed to upload file" }, { status: 500 })
+  64 │     }
+  65 │ 
+  66 │     // Get public URL for the file
+  67 │     const { data: { publicUrl } } = supabase.storage
+  68 │       .from("media")
+  69 │       .getPublicUrl(filePath)
+  70 │ 
+  71 │     let thumbnailUrl = null
+  72 │     if (thumbnail) {
+  73 │       const thumbExt = thumbnail.name.split(".").pop()
+  74 │       const thumbName = `thumb-${Date.now()}.${thumbExt}`
+  75 │       const thumbPath = `vault/thumbnails/${thumbName}`
+  76 │ 
+  77 │       const { data: thumbData, error: thumbError } = await supabase.storage
+  78 │         .from("media")
+  79 │         .upload(thumbPath, thumbnail)
+  80 │ 
+  81 │       if (!thumbError) {
+  82 │         const { data: { publicUrl: thumbPublicUrl } } = supabase.storage
+  83 │           .from("media")
+  84 │           .getPublicUrl(thumbPath)
+  85 │         thumbnailUrl = thumbPublicUrl
+  86 │       }
+  87 │     }
+  88 │ 
+  89 │     // Create slug from title
+  90 │     const slug = title
+  91 │       .toLowerCase()
+  92 │       .replace(/[^a-z0-9]+/g, "-")
+  93 │       .replace(/(^-|-$)/g, "")
+  94 │ 
+  95 │     // Insert media record
+  96 │     const { data: mediaItem, error: dbError } = await supabase
+  97 │       .from("vault_media")
+  98 │       .insert({
+  99 │         title: title.trim(),
+ 100 │         description: description?.trim() || "",
+ 101 │         slug,
+ 102 │         type,
+ 103 │         category: category?.trim() || "General",
+ 104 │         file_url: publicUrl,
+ 105 │         thumbnail_url: thumbnailUrl,
+ 106 │         tier_required,
+ 107 │         is_premium,
+ 108 │         unlock_price_coins: is_premium ? unlock_price_coins : null,
+ 109 │         unlock_price_naira: is_premium ? unlock_price_naira : null,
+ 110 │         views: 0,
+ 111 │         likes: 0,
+ 112 │         dislikes: 0,
+ 113 │         comments_count: 0,
+ 114 │         is_featured: false,
+ 115 │         is_published: true,
+ 116 │         file_size: file.size,
+ 117 │         duration_seconds: null, // Will be updated if it's a video/audio file
+ 118 │         quality: "HD",
+ 119 │         tags: [],
+ 120 │         metadata: {
+ 121 │           original_filename: file.name,
+ 122 │           content_type: file.type,
+ 123 │           uploaded_by: profile.id,
+ 124 │         },
+ 125 │       })
+ 126 │       .select()
+ 127 │       .single()
+ 128 │ 
+ 129 │     if (dbError) {
+ 130 │       console.error("Database error:", dbError)
+ 131 │       // Clean up uploaded file
+ 132 │       await supabase.storage.from("media").remove([filePath])
+ 133 │       if (thumbnailUrl) {
+ 134 │         await supabase.storage.from("media").remove([`vault/thumbnails/${thumbName}`])
+ 135 │       }
+ 136 │       return NextResponse.json({ error: "Failed to save media record" }, { status: 500 })
+ 137 │     }
+ 138 │ 
+ 139 │     return NextResponse.json({ 
+ 140 │       success: true, 
+ 141 │       mediaItem,
+ 142 │       message: "Media uploaded successfully"
+ 143 │     })
+ 144 │ 
+ 145 │   } catch (error) {
+ 146 │     console.error("Upload error:", error)
+ 147 │     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+ 148 │   }
+ 149 │ }
+ 150 │ 
+ 151 │ export const dynamic = 'force-dynamic'
+     ·              ───┬───
+     ·                 ╰── `dynamic` redefined here
+     ╰────
+
+Import trace for requested module:
+./app/api/admin/vault/upload/route.ts
+
+
+> Build failed because of webpack errors
+ ELIFECYCLE  Command failed with exit code 1.
