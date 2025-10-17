@@ -1,4 +1,6 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { createServerClient } from "@supabase/ssr"
+import { cookies } from "next/headers"
 
 // Check if we're in a browser environment
 const isBrowser = typeof window !== "undefined"
@@ -259,4 +261,34 @@ export const supabaseClient = createClient()
 // Get a server-side client
 export const getServerClient = async () => {
   return createServerSupabaseClient()
+}
+
+// Create a route handler client for API routes using @supabase/ssr
+export async function createRouteHandlerClient() {
+  const cookieStore = await cookies()
+  
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("Missing Supabase environment variables")
+    throw new Error("Missing Supabase configuration")
+  }
+
+  return createServerClient(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
 }

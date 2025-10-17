@@ -36,7 +36,7 @@ const validateEmail = (email: string): boolean => {
 }
 
 export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhancedProps) {
-  const { profile, refreshSession } = useAuth()
+  const { profile, refreshSession, user } = useAuth()
   const { toast } = useToast()
   const [selectedPackage, setSelectedPackage] = useState(COIN_PACKAGES[1])
   const [customCoins, setCustomCoins] = useState("")
@@ -112,67 +112,65 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
     setSuccess(null)
   }, [])
 
-  const verifyPayment = useCallback(
-    async (reference: string, expectedAmount: number, expectedCoins: number) => {
-      try {
-        const response = await fetch("/api/coins/purchase", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("auth_token") || "mock-token"}`,
-          },
-          body: JSON.stringify({
-            reference,
-            amount: expectedAmount,
-            coins: expectedCoins,
-            userId: profile?.id,
-          }),
-        })
+  const verifyPayment = useCallback(async (reference: string, expectedAmount: number, expectedCoins: number) => {
+    try {
+      const response = await fetch("/api/coins/purchase", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          reference,
+          amount: expectedAmount,
+          coins: expectedCoins,
+        }),
+      })
 
-        const result = await response.json()
+      const result = await response.json()
 
-        if (!response.ok) {
-          // Handle different error types
-          let errorMessage = result.error || "Payment verification failed"
+      if (!response.ok) {
+        // Handle different error types
+        let errorMessage = result.error || "Payment verification failed"
 
-          switch (result.code) {
-            case "AUTH_ERROR":
-              errorMessage = "Please log in to complete your purchase"
-              break
-            case "VALIDATION_ERROR":
-              errorMessage = `Validation failed: ${result.error}`
-              break
-            case "PAYMENT_FAILED":
-              errorMessage = "Payment was not successful. Please try again."
-              break
-            case "AMOUNT_MISMATCH":
-              errorMessage = "Payment amount doesn't match. Please contact support."
-              break
-            case "VERIFICATION_ERROR":
-              errorMessage = "Unable to verify payment. Please contact support if money was deducted."
-              break
-            case "CONFIG_ERROR":
-              errorMessage = "Payment system configuration error. Please try again later."
-              break
-            default:
-              errorMessage = result.error || `Payment verification failed (${response.status})`
-          }
-
-          throw new Error(errorMessage)
+        switch (result.code) {
+          case "AUTH_ERROR":
+            errorMessage = "Please log in to complete your purchase"
+            break
+          case "VALIDATION_ERROR":
+            errorMessage = `Validation failed: ${result.error}`
+            break
+          case "PAYMENT_FAILED":
+            errorMessage = "Payment was not successful. Please try again."
+            break
+          case "AMOUNT_MISMATCH":
+            errorMessage = "Payment amount doesn't match. Please contact support."
+            break
+          case "VERIFICATION_ERROR":
+            errorMessage = "Unable to verify payment. Please contact support if money was deducted."
+            break
+          case "CONFIG_ERROR":
+            errorMessage = "Payment system configuration error. Please try again later."
+            break
+          case "DUPLICATE_REFERENCE":
+            errorMessage = "This transaction has already been processed."
+            break
+          default:
+            errorMessage = result.error || `Payment verification failed (${response.status})`
         }
 
-        if (!result.success) {
-          throw new Error(result.error || "Payment verification failed")
-        }
-
-        return result
-      } catch (err) {
-        console.error("Payment verification error:", err)
-        throw err
+        throw new Error(errorMessage)
       }
-    },
-    [profile],
-  )
+
+      if (!result.success) {
+        throw new Error(result.error || "Payment verification failed")
+      }
+
+      return result
+    } catch (err) {
+      console.error("Payment verification error:", err)
+      throw err
+    }
+  }, [])
 
   const handlePaymentSuccess = useCallback(
     async (response: any, totalCoins: number, nairaAmount: number) => {
@@ -232,12 +230,12 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
   const handlePurchaseValidation = useCallback(() => {
     resetState()
 
-    if (!profile?.email) {
+    if (!user?.email) {
       setError("Please log in to purchase coins")
       return false
     }
 
-    if (!validateEmail(profile.email)) {
+    if (!validateEmail(user.email)) {
       setError("Invalid email address in profile")
       return false
     }
@@ -261,7 +259,7 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
     }
 
     return true
-  }, [profile, isPaystackLoaded, isCustom, customCoins, selectedPackage, paymentAttempts, resetState])
+  }, [user, isPaystackLoaded, isCustom, customCoins, selectedPackage, paymentAttempts, resetState])
 
   const handlePurchase = useCallback(async () => {
     if (!handlePurchaseValidation()) return
@@ -281,7 +279,7 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
         // Create the configuration object with proper function references
         const paystackConfig = {
           key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_0123456789abcdef0123456789abcdef01234567",
-          email: profile?.email || "",
+          email: user?.email || "",
           amount: Math.round(nairaAmount * 100), // Convert to kobo and ensure integer
           currency: "NGN",
           ref: paymentReference,
@@ -289,7 +287,7 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
             coin_amount: totalCoins,
             base_coins: baseCoins,
             bonus_coins: bonusCoins,
-            user_id: profile?.id || "guest",
+            user_id: profile?.id || user?.id || "guest",
             package_id: isCustom ? "custom" : selectedPackage.id,
             timestamp: new Date().toISOString(),
             preview_mode: isPreviewMode,
@@ -330,6 +328,7 @@ export function CoinPurchaseEnhanced({ onSuccess, onError }: CoinPurchaseEnhance
     customCoins,
     selectedPackage,
     calculateNaira,
+    user,
     profile,
     handlePaymentSuccess,
     handlePaymentClose,

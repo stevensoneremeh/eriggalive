@@ -25,7 +25,7 @@ import {
 import { formatDistanceToNow } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/components/ui/use-toast"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase-utils"
 import type { Database } from "@/types/database"
 
 interface Conversation {
@@ -62,7 +62,7 @@ export function MessageCenter() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { user, profile } = useAuth()
   const { toast } = useToast()
-  const supabase = createClientComponentClient<Database>()
+  const supabase = createClient()
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })

@@ -1,0 +1,162 @@
+You are an expert full-stack engineer. I will give you a GitHub repo (stevensoneremeh/eriggalive, branch new, commit f43024e) already cloned into the workspace. Your goals: A. Fix the Next.js build errors (see logs pasted in build_log.txt — pasted below). B. Integrate Supabase for Auth and Storage (use existing project ref kmafzzvdleprqhkeztsp — replace with env var SUPABASE_URL and SUPABASE_ANON_KEY). C. Keep Neon as a secondary DB for analytics/read-heavy workloads; move heavy reads/analytics to Neon and ensure writes remain on Supabase to avoid egress issues. D. Make the app buildable and runnable in production (Next.js v14 on Vercel / Replit). Provide a short test checklist and commit the minimal, safe code changes.
+
+Important constraints and assumptions:
+
+Do not introduce paid services. No Coolify usage.
+Use only packages already in package.json when possible. If you must upgrade/downgrade packages, explain why and keep changes minimal.
+Don't store secrets in the repo — use environment variables.
+For any change that is potentially destructive (DB schema drops, deletes), ask for confirmation (you may simulate with a comment) — do not perform destructive actions.
+Files & logs available:
+
+build_log.txt (content is the pasted Vercel build log)
+Project root has package.json, next.config.js, app/ and lib/ directories (standard Next app)
+I already connected Neon and Supabase to the project (you can assume Neon connection string is in env var NEON_DB_URL and Supabase details in SUPABASE_URL and SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY).
+Step 0 — quick repo preparation
+
+Run: pnpm install
+Run the test build to reproduce the error: pnpm run build
+Capture stdout/stderr and save to build_log_after_fix.txt.
+Step 1 — Fix edge runtime incompatibility and import issues
+
+Problem: @supabase/supabase-js (and @supabase/realtime-js) are importing Node process APIs which fail in Edge Runtime.
+Fix approach:
+Locate any serverless Edge routes or middleware that run in Next.js Edge runtime but import full supabase-js module. Files to check: lib/supabase/middleware.ts, app/api/**/route.ts or route.js that export runtime = 'edge'.
+Replace imports in Edge runtime contexts with browser/edge-safe patterns:
+For server-side Edge routes using Supabase only for token verification or cookies, avoid importing the full server SDK. Instead:
+Use direct HTTP calls to Supabase REST endpoints or use lightweight JWT verification with JWKS (fetch SUPABASE_JWKS from https://<SUPABASE_HOST>/auth/v1/.well-known/jwks.json).
+Or import modular serverless-friendly packages: use import from 'npm:@supabase/supabase-js@2.x [blocked]' only in Node/runtime server contexts. For Edge routes, avoid realtime modules.
+If file lib/supabase/middleware.ts is used in Edge runtime, convert it to use only environment-safe code: do not import @supabase/realtime-js or code that references process.versions or process.version. Use fetch + JWKS verification for auth checks in Edge.
+If you still need server-side Supabase admin actions, move them to serverless API routes that run in Node (not edge) or to Edge Functions.
+Implement the minimal code edits:
+Detect and update files that import @supabase/supabase-js into two variants:
+For server-side Node (API routes, server components), continue to use supabase-js normally.
+For Edge runtime, replace with a small helper that verifies JWT with JWKS and fetches user metadata via REST if necessary.
+Commit changes as: fix(edge-runtime-supabase): make supabase usage edge-safe**
+Step 2 — Fix dynamic server usage (cookies) in prerendering routes
+
+Problem: routes like /api/me/balance and /api/meet-greet/check-room use cookies, causing Next.js pre-render static generation to fail.
+Fix approach:
+Find app/api/me/balance/route.js and app/api/meet-greet/check-room/route.js.
+Ensure they are not executed during static pre-rendering:
+Convert any exported route handlers to use dynamic: 'force-dynamic' or set export const runtime = 'nodejs' (or set export const dynamic = 'force-dynamic') at the top of these route files or mark them as server functions so Next won't attempt static prerendering.
+If using cookies in server components used during build, move cookie usage to client-side or fetch profile inside a server API route that is dynamic.
+If cookies are read in getStaticProps or during build, replace with client-side fetching or mark pages as dynamic.
+Implement minimal edits and commit: fix(dynamic-prerender): mark cookie-using routes dynamic
+Step 3 — Fix undefined hook / runtime errors (useToast)
+
+Problem: ReferenceError useToast is not defined in app/settings/page.js during prerender.
+Fix approach:
+Search for useToast usage in app/settings/page.js and any file where it might be used but not imported.
+Add missing import from the component library where it comes from (e.g., if useToast is from a UI library like Chakra/NextUI/shadcn/ui, import appropriately). If the project uses a custom hook, import from lib/hooks or components.
+If the hook is client-only, ensure the component using it is a client component. Add "use client" at the top of the file and convert children to client components where necessary.
+If the hook does not exist, implement a minimal fallback toast hook based on a simple context (only if safe) or replace usage with console.warn and a no-op so the build completes. Prefer adding the correct import.
+Implement edits and commit: fix(useToast): add import or convert to client component
+Step 4 — Reduce bundle size warnings (code-splitting)
+
+Issue: large commons.js and many entry points over recommendation.
+Actions (non-blocking for build):
+Identify heavy imports used across many routes (big UI libraries, charts).
+Convert large components to dynamic imports with Next's dynamic() or React.lazy where appropriate (especially admin pages and large admin dashboard components).
+For quick fix for build, mark non-critical pages to load components dynamically (e.g., import dynamic from 'next/dynamic' and wrap heavy components).
+Optionally enable Next.js experimental outputFileTracing or webpack tweaks in next.config.js — but keep minimal.
+Implement a small subset (top 5 heaviest pages per log: admin/content-overview, pages/_app, app/page, app/vault, app/wallet) convert their big child components to dynamic imports.
+Commit: perf(code-split): dynamic import large admin/dashboard components_
+Step 5 — Supabase integration (Auth + Storage)
+
+Goals:
+Use Supabase for Auth (sign-up, signin, JWT issuance) and Storage (media uploads).
+Ensure server-side token verification uses JWKS when running in Edge contexts.
+Steps:
+Ensure all client-side auth calls use the browser Supabase client (createBrowserClient from @supabase/auth-helpers or @supabase/supabase-js).
+Create lib/supabase/client.ts with createBrowserClient for client-side pages; ensure it uses SUPABASE_URL and SUPABASE_ANON_KEY from env.
+For server-side operations requiring service role key, create a server-only helper lib/supabase/admin.ts that initializes Supabase with SUPABASE_SERVICE_ROLE_KEY — ensure this file is only used in Node runtime (not Edge).
+Replace any custom JWT middleware with standard Supabase flows where possible. For Edge functions, use JWKS verification to decode/validate token and then call Supabase REST or server endpoints for user metadata.
+For storage:
+Ensure upload routes use signed URLs from Supabase Storage (signed upload URLs or use client SDK on the browser).
+Replace any direct Neon file storage usage with Supabase storage calls.
+Minimal code edits:
+Add lib/supabase/client.ts and lib/supabase/admin.ts
+Update upload handler routes to call Supabase Storage (server or client as appropriate)
+Commit: feat(supabase): add browser and server supabase clients, route updates
+Step 6 — Neon integration (analytics / read DB)
+
+Goal: Keep transactional writes on Supabase; route reads/analytics to Neon to reduce egress issues.
+Steps:
+Introduce a data access abstraction for tables that should read from Neon (analytics, heavy read endpoints such as admin stats, content-overview). Create lib/db/index.ts which exports two clients:
+primaryDb (Supabase Postgres connection using SUPABASE_DB_URL or via supabase-js server client when needed for writes).
+analyticsDb (Neon connection using NEON_DB_URL).
+For endpoints that perform heavy reads (those flagged in build logs: admin/stats, admin/stats-optimized, admin/content-overview, app/api/admin/stats-optimized/route.js), modify them to query analyticsDb (Neon). Ensure any joins requiring auth info fetch from Supabase as needed (or replicate minimal auth metadata to Neon).
+Implement a simple replication plan (sync jobs) comment in repo: create scripts/sync-to-neon.js — but do not run automatically. Provide instructions for daily/near-real-time replication using a CDC tool (Airbyte or Debezium) or a simple Edge Function that upserts changed rows into Neon.
+Add environment variables to .env.example: NEON_DB_URL, SUPABASE_DB_URL, SUPABASE_SERVICE_ROLE_KEY.
+Commit: feat(neon): add analytics DB client and route read routing
+Step 7 — Testing & build
+
+Commands to run:
+pnpm install
+pnpm run build
+pnpm run start (if applicable)
+Automated tests:
+Run a smoke test script (script/test-smoke.sh) that:
+Calls /api/health/route
+Signs up a test user with Supabase (using SUPABASE_ANON_KEY) then signs in and calls /api/me/balance
+Calls an analytics route that reads from Neon
+Save results to test_results.txt
+Step 8 — Documentation & checklist
+
+Create DEPLOYMENT.md with:
+Environment variables to set (list below)
+Migration steps (how to run database migrations on Supabase and Neon)
+Replication guidance (Airbyte/Debezium example, or a scheduled Edge Function)
+How to rotate JWKS keys and caching recommendations
+How to verify RLS and ensure security
+Add TODOs where manual action is required (e.g., confirm Neon extension support)
+Environment variables to set (add to .env.example)
+
+SUPABASE_URL=https://kmafzzvdleprqhkeztsp.supabase.co
+SUPABASE_ANON_KEY=xxx
+SUPABASE_SERVICE_ROLE_KEY=xxx
+SUPABASE_DB_URL=postgresql://... (if using direct PG connection)
+NEON_DB_URL=postgresql://...
+NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
+NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+OTHER existing env vars preserved (PAYSTACK keys, etc.)
+Deliverables (committed)
+
+Code changes fixing edge runtime imports, dynamic route marks, useToast import or client migration, and dynamic imports for big components.
+lib/supabase/client.ts and lib/supabase/admin.ts and lib/db/index.ts (analytics + primary).
+scripts/sync-to-neon.js (example), .env.example, DEPLOYMENT.md, test scripts.
+commit messages as indicated.
+A small summary in the commit message describing areas needing manual review (e.g., check Neon extension support for postgis/pgjwt/vector).
+Build log to analyze (pasted):
+
+Include the entire build log you provided (the assistant has it). Use it to find files and specific lines causing errors:
+Edge runtime issue: lib/supabase/middleware.ts — modify to avoid importing supabase-js in edge.
+Dynamic server usage: app/api/me/balance/route.js and app/api/meet-greet/check-room/route.js — mark dynamic.
+useToast undefined: app/settings/page.js — import or convert to client
+Bundle size warnings: large commons.js — code-split admin pages.
+Final instructions for the agent running this prompt:
+
+Run each code edit and run pnpm run build after each major fix to catch and iterate quickly.
+For any import you remove or change that affects functionality, leave a clear comment explaining why and what to revert if needed.
+If you must change package versions, run pnpm install and add a short justification in the commit message.
+If any fix requires manual confirmation (DB destructive changes, migration run), stop and report the exact command to run and wait for confirmation.
+If you understand, perform the fixes in this order:
+
+Reproduce the build error (pnpm run build)
+Fix Edge runtime imports (lib/supabase/middleware.ts)
+Mark cookie-using API routes dynamic
+Fix useToast undefined error
+Re-run build
+Implement Supabase + Neon abstraction and modify heavy-read endpoints to use Neon
+Run smoke tests and save results
+Commit changes with clear messages and produce DEPLOYMENT.md
+Return to me with:
+
+A single commit diff summary and the test_results.txt
+The updated build_log_after_fix.txt
+Any manual actions required (e.g., confirm migrations, rotate keys, or confirm Neon extension support)
+Notes for you (quick tips)
+
+For Edge-safe JWT verification use jose or a lightweight JWKS verifier. If adding a dependency, prefer npm:@panva/jose@... and explain why.
+For Next.js edge runtime, avoid importing modules that reference process/version or Node built-ins.
+Mark pages as dynamic using export const dynamic = 'force-dynamic'; at top of page or route files when they rely on cookies.

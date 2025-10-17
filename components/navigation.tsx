@@ -85,10 +85,10 @@ function NavigationContent() {
     { name: "Community", href: "/community", icon: <Users className="h-5 w-5" /> },
     { name: "Chronicles", href: "/chronicles", icon: <BookOpen className="h-5 w-5" /> },
     { name: "Media Vault", href: "/vault", icon: <Music className="h-5 w-5" /> },
+    { name: "Merch", href: "/merch", icon: <ShoppingBag className="h-5 w-5" /> },
     { name: "Dashboard", href: "/dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
     { name: "Tickets", href: "/tickets", icon: <Ticket className="h-5 w-5" /> },
     { name: "Premium", href: "/premium", icon: <Crown className="h-5 w-5" /> },
-    { name: "Merch", href: "/merch", icon: <ShoppingBag className="h-5 w-5" /> },
   ]
 
   const isActive = (path: string) => {
@@ -117,7 +117,7 @@ function NavigationContent() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2 z-10">
-            <DynamicLogo width={120} height={32} />
+            <DynamicLogo responsive={true} width={120} height={32} />
           </Link>
 
           {/* Desktop Navigation */}
@@ -186,7 +186,7 @@ function NavigationContent() {
                 {isAuthenticated && profile ? (
                   <>
                     <div className="hidden md:flex items-center space-x-2">
-                      <CoinBalance coins={profile.coins} size="sm" />
+                      <CoinBalance size="sm" />
                       <UserTierBadge tier={profile.tier} />
                     </div>
                     <Link href="/dashboard">
@@ -231,11 +231,11 @@ function NavigationContent() {
                   <span className="sr-only">Toggle menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-80 p-0">
+              <SheetContent side="right" className="w-80 p-0 bg-background border-border">
                 <div className="flex flex-col h-full">
                   {/* Mobile Header */}
-                  <div className="flex items-center justify-between p-4 border-b">
-                    <DynamicLogo width={100} height={28} />
+                  <div className="flex items-center justify-between p-4 border-b border-border">
+                    <DynamicLogo responsive={true} width={100} height={28} />
                     <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)}>
                       <X className="h-6 w-6" />
                     </Button>
@@ -243,7 +243,7 @@ function NavigationContent() {
 
                   {/* User Info (Mobile) */}
                   {isAuthenticated && profile && (
-                    <div className="p-4 border-b">
+                    <div className="p-4 border-b border-border">
                       <div className="flex items-center space-x-3 mb-4">
                         <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
                           <User className="h-6 w-6 text-primary" />
@@ -254,7 +254,7 @@ function NavigationContent() {
                         </div>
                       </div>
                       <div className="flex items-center justify-between">
-                        <CoinBalance coins={profile.coins} size="sm" />
+                        <CoinBalance size="sm" />
                         <UserTierBadge tier={profile.tier} />
                       </div>
                     </div>
@@ -284,7 +284,7 @@ function NavigationContent() {
                   </nav>
 
                   {/* Mobile Theme Toggle */}
-                  <div className="p-4 border-t">
+                  <div className="p-4 border-t border-border">
                     <div className="mb-4">
                       <p className="text-sm font-medium mb-2">Theme</p>
                       <div className="grid grid-cols-3 gap-2">

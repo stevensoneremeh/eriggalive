@@ -1,351 +1,123 @@
-"use client"
+'use client'
 
-import { AuthGuard } from "@/components/auth-guard"
-import { useAuth } from "@/contexts/auth-context"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Users, MessageCircle, Coins, Trophy, Music, Calendar, Star, Crown, Zap, TrendingUp } from "lucide-react"
-import Link from "next/link"
+import { useEffect, useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Users, DollarSign, Calendar, Activity } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
 
-export default function DashboardPage() {
-  const { user, profile, isLoading } = useAuth()
+interface DashboardStats {
+  totalUsers: number
+  activeUsers: number
+  totalRevenue: number
+  monthlyRevenue: number
+  upcomingEvents: number
+  activeStreams: number
+}
 
-  if (isLoading) {
+export default function AdminDashboard() {
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch('/api/admin/dashboard-stats')
+        if (!response.ok) throw new Error('Failed to fetch stats')
+        const data = await response.json()
+        setStats(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load stats')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchStats()
+  }, [])
+
+  if (loading) {
     return (
-      <AuthGuard>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <h1 className="text-3xl font-bold">Dashboard Overview</h1>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-4 rounded" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16 mb-1" />
+                <Skeleton className="h-3 w-32" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
-      </AuthGuard>
+      </div>
     )
   }
 
-  const getTierColor = (tier: string) => {
-    switch (tier) {
-      case "grassroot":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-      case "pioneer":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
-      case "elder":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-      case "blood_brotherhood":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
-    }
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Dashboard Overview</h1>
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <p className="text-destructive">Error: {error}</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
-  const getTierProgress = (tier: string) => {
-    switch (tier) {
-      case "grassroot":
-        return 25
-      case "pioneer":
-        return 50
-      case "elder":
-        return 75
-      case "blood_brotherhood":
-        return 100
-      default:
-        return 0
-    }
-  }
+  const statCards = [
+    {
+      title: 'Total Users',
+      value: stats?.totalUsers || 0,
+      description: `${stats?.activeUsers || 0} active this month`,
+      icon: Users,
+    },
+    {
+      title: 'Total Revenue',
+      value: `₦${(stats?.totalRevenue || 0).toLocaleString()}`,
+      description: `₦${(stats?.monthlyRevenue || 0).toLocaleString()} this month`,
+      icon: DollarSign,
+    },
+    {
+      title: 'Upcoming Events',
+      value: stats?.upcomingEvents || 0,
+      description: 'Scheduled events',
+      icon: Calendar,
+    },
+    {
+      title: 'Active Streams',
+      value: stats?.activeStreams || 0,
+      description: 'Live broadcasts',
+      icon: Activity,
+    },
+  ]
 
   return (
-    <AuthGuard>
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4 sm:p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Welcome Header */}
-          <div className="mb-8">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  Welcome back, {profile?.display_name || user?.email}!
-                </h1>
-                <p className="text-gray-600 dark:text-gray-300 mt-1">
-                  Here's what's happening in your Erigga Live community
-                </p>
-              </div>
-              <div className="mt-4 sm:mt-0">
-                <Badge className={`px-3 py-1 ${getTierColor(profile?.subscription_tier || "grassroot")}`}>
-                  <Crown className="w-4 h-4 mr-1" />
-                  {profile?.subscription_tier?.replace("_", " ").toUpperCase() || "GRASSROOT"}
-                </Badge>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Coins Balance</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {profile?.coins_balance?.toLocaleString() || "0"}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
-                    <Coins className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-                  </div>
-                </div>
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <h1 className="text-3xl font-bold">Dashboard Overview</h1>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {statCards.map((stat) => {
+          const Icon = stat.icon
+          return (
+            <Card key={stat.title} className="hover:shadow-md transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+                <Icon className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stat.value}</div>
+                <p className="text-xs text-muted-foreground">{stat.description}</p>
               </CardContent>
             </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Posts</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{profile?.total_posts || 0}</p>
-                  </div>
-                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                    <MessageCircle className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Votes Received</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {profile?.total_votes_received || 0}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Comments</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{profile?.total_comments || 0}</p>
-                  </div>
-                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-                    <Users className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Content */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Tier Progress */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Trophy className="w-5 h-5 mr-2" />
-                    Your Journey
-                  </CardTitle>
-                  <CardDescription>Progress through the Erigga Live community tiers</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">
-                        {profile?.subscription_tier?.replace("_", " ").toUpperCase() || "GRASSROOT"} Member
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        {getTierProgress(profile?.subscription_tier || "grassroot")}% Complete
-                      </span>
-                    </div>
-                    <Progress value={getTierProgress(profile?.subscription_tier || "grassroot")} className="h-2" />
-                    <div className="grid grid-cols-4 gap-2 text-xs">
-                      <div className="text-center">
-                        <div
-                          className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.subscription_tier || "grassroot") >= 25
-                              ? "bg-green-500"
-                              : "bg-gray-300"
-                          }`}
-                        />
-                        <span>Grassroot</span>
-                      </div>
-                      <div className="text-center">
-                        <div
-                          className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.subscription_tier || "grassroot") >= 50
-                              ? "bg-purple-500"
-                              : "bg-gray-300"
-                          }`}
-                        />
-                        <span>Pioneer</span>
-                      </div>
-                      <div className="text-center">
-                        <div
-                          className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.subscription_tier || "grassroot") >= 75
-                              ? "bg-blue-500"
-                              : "bg-gray-300"
-                          }`}
-                        />
-                        <span>Elder</span>
-                      </div>
-                      <div className="text-center">
-                        <div
-                          className={`w-3 h-3 rounded-full mx-auto mb-1 ${
-                            getTierProgress(profile?.subscription_tier || "grassroot") >= 100
-                              ? "bg-yellow-500"
-                              : "bg-gray-300"
-                          }`}
-                        />
-                        <span>Blood Brotherhood</span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Quick Actions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Zap className="w-5 h-5 mr-2" />
-                    Quick Actions
-                  </CardTitle>
-                  <CardDescription>Jump into your favorite activities</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/community">
-                        <MessageCircle className="w-6 h-6 mb-2" />
-                        <span className="text-sm">Join Discussion</span>
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/coins">
-                        <Coins className="w-6 h-6 mb-2" />
-                        <span className="text-sm">Manage Coins</span>
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/vault">
-                        <Music className="w-6 h-6 mb-2" />
-                        <span className="text-sm">Media Vault</span>
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/meet-greet">
-                        <Calendar className="w-6 h-6 mb-2" />
-                        <span className="text-sm">Meet & Greet</span>
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/merch">
-                        <Star className="w-6 h-6 mb-2" />
-                        <span className="text-sm">Merchandise</span>
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline" className="h-20 flex-col bg-transparent">
-                      <Link href="/premium">
-                        <Crown className="w-6 h-6 mb-2" />
-                        <span className="text-sm">Upgrade Tier</span>
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Sidebar */}
-            <div className="space-y-6">
-              {/* Profile Summary */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Profile Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                      {profile?.display_name?.charAt(0) || user?.email?.charAt(0) || "U"}
-                    </div>
-                    <div>
-                      <p className="font-medium">{profile?.display_name || "User"}</p>
-                      <p className="text-sm text-gray-500">@{profile?.username || "username"}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Member since:</span>
-                      <span>{new Date(profile?.created_at || Date.now()).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Last active:</span>
-                      <span>{new Date(profile?.last_seen_at || Date.now()).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Verified:</span>
-                      <span>{profile?.is_verified ? "✅" : "❌"}</span>
-                    </div>
-                  </div>
-                  <Button asChild variant="outline" className="w-full bg-transparent">
-                    <Link href="/profile">Edit Profile</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Recent Activity */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Activity</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full" />
-                      <span>Joined community discussion</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                      <span>Earned 50 coins</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                      <span>Updated profile</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Achievements */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Achievements</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="text-center p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                      <Trophy className="w-6 h-6 text-yellow-600 mx-auto mb-1" />
-                      <span className="text-xs">First Post</span>
-                    </div>
-                    <div className="text-center p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <Users className="w-6 h-6 text-blue-600 mx-auto mb-1" />
-                      <span className="text-xs">Community Member</span>
-                    </div>
-                    <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                      <Star className="w-6 h-6 text-green-600 mx-auto mb-1" />
-                      <span className="text-xs">Active User</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
+          )
+        })}
       </div>
-    </AuthGuard>
+    </div>
   )
 }

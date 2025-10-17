@@ -19,6 +19,7 @@ type ThemeProviderState = {
   setTheme: (theme: Theme) => void
   resolvedTheme: "dark" | "light"
   isLoading: boolean
+  toggleTheme: () => void
 }
 
 const initialState: ThemeProviderState = {
@@ -26,6 +27,7 @@ const initialState: ThemeProviderState = {
   setTheme: () => null,
   resolvedTheme: "light",
   isLoading: true,
+  toggleTheme: () => null,
 }
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
@@ -92,6 +94,15 @@ export function ThemeProvider({
     },
     resolvedTheme,
     isLoading,
+    toggleTheme: () => {
+      const newTheme = resolvedTheme === "dark" ? "light" : "dark"
+      try {
+        localStorage.setItem(storageKey, newTheme)
+      } catch (error) {
+        console.warn("Failed to save theme to localStorage:", error)
+      }
+      setTheme(newTheme)
+    },
   }
 
   return (

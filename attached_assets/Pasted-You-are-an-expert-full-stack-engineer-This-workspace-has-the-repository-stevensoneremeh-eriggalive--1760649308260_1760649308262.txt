@@ -1,0 +1,100 @@
+You are an expert full-stack engineer. This workspace has the repository stevensoneremeh/eriggalive (branch new). Your task: find the code that fetches user profiles (calls to Supabase REST /rest/v1/users or supabase.from('users')) and implement a safe, centralized solution that:
+
+Immediately stops repeated failing requests by short-circuiting when an env flag is set.
+Adds capped retries with exponential backoff and timeout.
+Centralizes profile fetches behind a single helper used by frontend components and server routes.
+Provides a server-side proxy API route that authorizes callers (using Supabase Auth verification) and caches responses for 60–300s to reduce load on Supabase.
+Ensures frontend and backend use the same canonical profile shape and mapping, and that profile IDs link properly to auth user IDs.
+Do not push secrets into the repo. Use env variables listed below.
+
+Files to search
+
+Search for these patterns (use ripgrep or grep):
+supabase.from('users'
+/rest/v1/users
+fetch(.*rest/v1/users
+"users?select="
+.from\(\s*['"]users['"]\s*\)
+Also check app/api/, lib/, hooks/, services/ and components/admin/*.
+Environment variables (add to .env or Replit secrets)
+
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY (server-only)
+NEXT_PUBLIC_DISABLE_ADMIN_STATS (set to 'true' temporarily to stop client calls)
+NEON_DB_URL (for later work)
+Step-by-step changes to make
+
+Add a centralized profile fetch helper (frontend)
+Create file: lib/api/getProfile.ts (or lib/api/usersClient.ts)
+Implement exported function getProfileByAuthId(authUserId: string)
+If NEXT_PUBLIC_DISABLE_ADMIN_STATS === 'true' return null / empty profile immediately.
+Implement fetch to Supabase REST endpoint with:
+AbortController timeout (10s).
+Maximum 3 attempts with exponential backoff (300ms, 600ms, 1200ms).
+Proper headers: apikey and Authorization (use NEXT_PUBLIC_SUPABASE_ANON_KEY).
+Validate HTTP status; throw after final failure.
+Normalize response to canonical shape: { id, auth_user_id, display_name, avatar_url, role, ... }
+Create a server-side proxy API (node runtime) to consolidate profile reads and enforce caching + auth
+Path: app/api/proxy/users/route.ts (or pages/api/proxy/users.js depending on repo)
+Add:
+export const runtime = 'nodejs'; export const dynamic = 'force-dynamic';
+Accept requests: GET /api/proxy/users?auth_user_id=
+Verify JWT from cookie or Authorization header:
+For Edge-safe verification in Node runtime, you can call Supabase Admin endpoint or verify JWT via JWKS. Use Supabase service key on server to call Admin REST if needed.
+If Auth is verified, proceed; else return 401.
+Use server-side caching (in-memory simple Map with timestamps) keyed by auth_user_id; cache TTL 120 seconds.
+On miss, call Supabase REST from server (use SUPABASE_SERVICE_ROLE_KEY in headers) or call the lib/api/getProfile server variant that uses service key.
+Return canonical profile JSON.
+Add rate-limiting: per-user simple counter with short TTL to prevent abuse (e.g., max 5 requests / 10s).
+Replace direct calls in frontend/server code
+For every occurrence of supabase.from('users') or direct REST call to /rest/v1/users, replace with one of:
+On client: call /api/proxy/users?auth_user_id= OR call getProfileByAuthId(...) from lib/api/getProfile.ts.
+On server: call the server helper (not the client helper) so you use service role key and don't expose secrets.
+If a page or component needs multiple user profiles, make it request them via the proxy route (server) to deduplicate and use caching.
+Add a short-circuit env flag
+Ensure both client helper and server route respect NEXT_PUBLIC_DISABLE_ADMIN_STATS (client) or DISABLE_ADMIN_STATS (server) env variable. When set, return safe defaults:
+Client: return null / []
+Server: return 204 or empty JSON
+Add logging and failures handling
+On any error from Supabase, server returns 502 with error reason. Do not retry infinitely.
+Log errors to console (so Replit logs show them); include timestamps.
+Provide a quick rollback / emergency patch
+If the codebase is large and you find many occurrences, as a quick emergency stop add to the top of the main admin page component (e.g., app/(admin)/page.tsx) or top-level layout:
+if (process.env.NEXT_PUBLIC_DISABLE_ADMIN_STATS === 'true') skip mounting admin fetch hooks; show 'Maintenance/Stats disabled' banner.
+This is temporary; then progressively fix each fetch to use helper.
+Tests to run
+pnpm install
+pnpm run build
+Start dev server: pnpm run dev
+Manual checks:
+With NEXT_PUBLIC_DISABLE_ADMIN_STATS=true, visit admin pages — ensure no network requests go to /rest/v1/users and pages render without infinite loops.
+Set NEXT_PUBLIC_DISABLE_ADMIN_STATS=false (after fixes), call /api/proxy/users?auth_user_id= and confirm response is canonical.
+Confirm client calls now hit /api/proxy/users instead of directly to Supabase REST.
+Deliverables
+
+New/modified files:
+lib/api/getProfile.ts (client helper)
+lib/api/getProfile.server.ts (server helper using SUPABASE_SERVICE_ROLE_KEY)
+app/api/proxy/users/route.ts (server proxy route)
+Edits to each file that previously called Supabase users REST (replace calls with helper or proxy endpoint).
+Optional quick temporary edit: add maintenance banner to admin layout to prevent further fetches while fixing.
+A short README snippet in DEPLOYMENT.md explaining the env variables and how to enable/disable the short-circuit.
+Constraints and safety
+
+Do not alter or drop any DB tables.
+Do not expose SUPABASE_SERVICE_ROLE_KEY to client code.
+For any code edits that affect many files, make them in small commits and run pnpm run build after each major step.
+If you understand, perform these steps now:
+
+Search for occurrences of supabase.from('users') and /rest/v1/users and output a list of file paths and line numbers.
+Add the files and changes above (helpers + proxy route), but before changing many callers, add a temporary maintenance banner patch to admin layout that disables the admin fetches while we refactor.
+Run pnpm run build and save build log as build_log_after_patch.txt.
+Return the list of modified files and the build log.
+End of prompt
+Notes / Hints for the assistant running this prompt
+
+Use AbortController for fetch timeouts.
+Use service key for server calls: header Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}
+For JWT verification on server: simplest safe approach is to call Supabase /auth/v1/user endpoint with the bearer token to validate. This is acceptable in node runtime and uses service key if needed.
+Keep the canonical profile shape minimal: id, auth_user_id, email, username/display_name, avatar_url, role, created_at.

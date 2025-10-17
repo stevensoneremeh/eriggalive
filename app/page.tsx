@@ -2,73 +2,89 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { motion, useScroll, useTransform, useSpring } from "framer-motion"
 import { useTheme } from "@/contexts/theme-context"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Music, Video, Newspaper, Users, ShoppingBag, Calendar } from "lucide-react"
+import { Music, Video, Users, ShoppingBag, Calendar, Play, Star, ArrowRight, Crown, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SafeHeroVideoCarousel } from "@/components/safe-hero-video-carousel"
 import { getOptimizedVideoSources } from "@/utils/video-utils"
-import EriggaRadio from "@/components/erigga-radio"
+import { ShoutOutDisplay } from "@/components/shout-out-display"
 
 export default function HomePage() {
   const { theme } = useTheme()
+  const { isAuthenticated } = useAuth()
   const [currentSlide, setCurrentSlide] = useState(0)
   const [mounted, setMounted] = useState(false)
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
+  const { scrollY } = useScroll()
   const videoSources = getOptimizedVideoSources()
-  const primaryVideoUrl = videoSources[0]?.src || "/videoshttps://hebbkx1anhila5yf.public.blob.vercel-storage.com/git-blob/prj_87iLY6t51DXvy0yPJ00SYhwlKXWl/K6Q-Lit6vuzvhNfoGXuTFB/public/erigga-hero-video.mp4"
+
+  const primaryVideoUrl = videoSources[0]?.src || "/videos/erigga-hero-video.mp4"
+
+  const heroY = useSpring(useTransform(scrollY, [0, 500], [0, 150]), { stiffness: 100, damping: 30 })
+  const heroOpacity = useSpring(useTransform(scrollY, [0, 300], [1, 0]), { stiffness: 100, damping: 30 })
+  const heroScale = useSpring(useTransform(scrollY, [0, 300], [1, 1.1]), { stiffness: 100, damping: 30 })
 
   // Hero images
   const heroImages = [
-    "/images/hero/erigga1.jpeg",
-    "/images/hero/erigga2.jpeg",
-    "/images/hero/erigga3.jpeg",
-    "/images/hero/erigga4.jpeg",
+    "/images/hero/erigga-aitiv-poster.jpeg",
+    "/images/hero/erigga-vintage-monitors.jpeg",
+    "/images/hero/erigga-metallic-mask.jpeg",
+    "/images/hero/erigga-denim-hoodie.jpeg",
+    "/images/hero/erigga-metallic-chain.jpeg",
   ]
 
-  // Features data
   const features = [
     {
       title: "Media Vault",
-      description: "Access Erigga's complete discography, music videos, and exclusive content.",
+      description: "Access Erigga's complete discography, music videos, and exclusive behind-the-scenes content.",
       icon: Music,
       href: "/vault",
-      color: "from-brand-lime to-brand-teal dark:from-white dark:to-harkonnen-gray",
+      gradient: "from-cyan-500 to-blue-600",
+      delay: 0,
     },
     {
       title: "Erigga Chronicles",
-      description: "Follow Erigga's journey through animated stories and documentaries.",
+      description: "Follow Erigga's journey through animated stories, documentaries, and personal insights.",
       icon: Video,
       href: "/chronicles",
-      color: "from-brand-teal to-brand-lime-dark dark:from-harkonnen-gray dark:to-white",
+      gradient: "from-purple-500 to-pink-600",
+      delay: 0.1,
     },
     {
-      title: "Community",
-      description: "Connect with other fans, share content, and participate in discussions.",
+      title: "Community Hub",
+      description: "Connect with fellow fans, share content, and participate in exclusive discussions.",
       icon: Users,
       href: "/community",
-      color: "from-brand-lime-dark to-brand-teal-light dark:from-white dark:to-harkonnen-light-gray",
+      gradient: "from-emerald-500 to-teal-600",
+      delay: 0.2,
     },
     {
       title: "Merch Store",
-      description: "Shop exclusive Erigga merchandise and limited edition items.",
+      description: "Shop exclusive Erigga merchandise, limited editions, and fan-designed items.",
       icon: ShoppingBag,
       href: "/merch",
-      color: "from-brand-teal-light to-brand-lime dark:from-harkonnen-light-gray dark:to-white",
+      gradient: "from-orange-500 to-red-600",
+      delay: 0.3,
     },
     {
-      title: "Events & Tickets",
-      description: "Get early access to concert tickets and exclusive events.",
+      title: "Live Events",
+      description: "Get early access to concert tickets, meet & greets, and exclusive events.",
       icon: Calendar,
       href: "/tickets",
-      color: "from-brand-lime to-brand-teal-dark dark:from-white dark:to-harkonnen-dark-gray",
+      gradient: "from-indigo-500 to-purple-600",
+      delay: 0.4,
     },
     {
-      title: "Premium Tiers",
-      description: "Upgrade your experience with exclusive perks and content.",
-      icon: Newspaper,
+      title: "Premium Access",
+      description: "Upgrade your experience with exclusive perks, content, and direct artist access.",
+      icon: Star,
       href: "/premium",
-      color: "from-brand-teal-dark to-brand-lime-light dark:from-harkonnen-dark-gray dark:to-white",
+      gradient: "from-amber-500 to-yellow-600",
+      delay: 0.5,
     },
   ]
 
@@ -77,83 +93,90 @@ export default function HomePage() {
     {
       quote: "Erigga's platform connects me directly with real fans. The community here is authentic.",
       author: "WarriKing23",
-      tier: "Blood Brotherhood",
+      tier: "Enterprise",
     },
     {
       quote: "The exclusive content in the vault is worth every coin. Can't get this anywhere else!",
       author: "PaperBoi99",
-      tier: "Elder",
+      tier: "Pro",
     },
     {
       quote: "Chronicles series tells Erigga's story in a way I've never seen before. Pure street wisdom.",
       author: "LagosHustler",
-      tier: "Pioneer",
+      tier: "Pro",
     },
   ]
 
-  // Tier plans data
   const tierPlans = [
     {
-      name: "Grassroot",
+      name: "Free",
       price: "Free",
-      description: "Basic access to the platform",
+      description: "Start your journey with basic platform access",
       features: ["Community access", "Public content", "Event announcements", "Basic profile"],
-      color: "border-grassroot-primary dark:border-grassroot-primary",
-      bgColor: "bg-grassroot-secondary/20 dark:bg-grassroot-secondary",
+      color: "border-gray-200 dark:border-gray-700",
+      bgColor: "bg-gray-50/50 dark:bg-gray-900/20",
+      textColor: "text-gray-600 dark:text-gray-400",
       href: "/signup",
+      icon: Star,
     },
     {
-      name: "Pioneer",
-      price: "₦2,000",
-      period: "monthly",
-      description: "Enhanced access with exclusive content",
-      features: [
-        "All Grassroot features",
-        "Early music releases",
-        "Exclusive interviews",
-        "Discounted merch",
-        "Pioneer badge",
-      ],
-      color: "border-pioneer-primary dark:border-pioneer-primary",
-      bgColor: "bg-pioneer-secondary/20 dark:bg-pioneer-secondary",
-      href: "/premium",
-      popular: true,
-    },
-    {
-      name: "Elder",
-      price: "₦5,000",
-      period: "monthly",
-      description: "Premium access with VIP benefits",
-      features: [
-        "All Pioneer features",
-        "Behind-the-scenes content",
-        "Studio session videos",
-        "Priority event access",
-        "Monthly Erigga coins",
-        "Elder badge",
-      ],
-      color: "border-elder-primary dark:border-elder-primary",
-      bgColor: "bg-elder-secondary/20 dark:bg-elder-secondary",
-      href: "/premium",
-    },
-    {
-      name: "Blood Brotherhood",
+      name: "Pro",
       price: "₦10,000",
       period: "monthly",
-      description: "Ultimate fan experience",
+      description: "Enhanced access with exclusive content and perks",
       features: [
-        "All Elder features",
-        "Direct messaging with Erigga",
-        "Virtual meet & greets",
-        "Exclusive merchandise",
-        "Blood Brotherhood badge",
-        "Voting rights on new content",
+        "All Free features",
+        "Early music releases",
+        "Exclusive interviews",
+        "15% discount on merchandise",
+        "Pro community badge",
+        "Premium vault access",
+        "Monthly exclusive freestyles",
+        "Advanced community features",
       ],
-      color: "border-blood-primary dark:border-blood-primary",
-      bgColor: "bg-blood-secondary/20 dark:bg-blood-secondary",
+      color: "border-blue-200 dark:border-blue-800",
+      bgColor: "bg-blue-50/50 dark:bg-blue-950/20",
+      textColor: "text-blue-600 dark:text-blue-400",
       href: "/premium",
+      popular: true,
+      icon: Crown,
+    },
+    {
+      name: "Enterprise",
+      price: "Custom",
+      period: "annually",
+      description: "Ultimate fan experience with direct artist access",
+      features: [
+        "All Pro features",
+        "VIP access to all events",
+        "30% discount on all purchases",
+        "Backstage access at events",
+        "Direct contact with Erigga",
+        "Custom Enterprise 'E' badge",
+        "Full vault access",
+        "Quarterly private sessions",
+        "Input on upcoming releases",
+        "Limited edition merchandise",
+        "Priority customer support",
+        "Exclusive meet & greet opportunities",
+      ],
+      color: "border-purple-200 dark:border-purple-800",
+      bgColor: "bg-purple-50/50 dark:bg-purple-950/20",
+      textColor: "text-purple-600 dark:text-purple-400",
+      href: "/premium",
+      icon: Zap,
     },
   ]
+
+  // Check for reduced motion preference
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)")
+    setPrefersReducedMotion(mediaQuery.matches)
+
+    const handleChange = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches)
+    mediaQuery.addEventListener("change", handleChange)
+    return () => mediaQuery.removeEventListener("change", handleChange)
+  }, [])
 
   // Auto-advance carousel
   useEffect(() => {
@@ -165,145 +188,222 @@ export default function HomePage() {
   }, [heroImages.length])
 
   if (!mounted) {
-    return null
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    )
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Erigga Radio Widget - Only on home page */}
-      <EriggaRadio />
+    <div className="flex flex-col min-h-screen overflow-x-hidden">
+      <ShoutOutDisplay position="top" />
 
-      {/* Hero Section */}
-      <section className="relative h-[80vh] w-full">
-        <SafeHeroVideoCarousel images={heroImages} videoUrl={primaryVideoUrl} className="absolute inset-0" />
+      <section className="relative h-[100vh] w-full overflow-hidden">
+        {/* Background with enhanced parallax effect */}
+        <motion.div className="absolute inset-0" style={{ y: heroY, scale: heroScale }}>
+          <SafeHeroVideoCarousel
+            images={heroImages}
+            videoUrl={primaryVideoUrl}
+            className="absolute inset-0 object-cover w-full h-full"
+          />
+          {/* Enhanced gradient overlays */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/70" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-black/30" />
+          {/* Animated noise texture */}
+          <motion.div
+            className="absolute inset-0 noise-texture opacity-20"
+            animate={{ opacity: [0.15, 0.25, 0.15] }}
+            transition={{ duration: 4, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
+          />
+        </motion.div>
 
-        <div className="absolute inset-0 flex items-center justify-center z-10">
-          <div className="text-center max-w-3xl px-4">
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 drop-shadow-lg">
-              Welcome to the Official Erigga Live Platform
-            </h1>
-            <p className="text-xl md:text-2xl text-white/90 mb-8 drop-shadow-md">
-              Join the community and get exclusive access to music, videos, and events
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/signup" className="inline-block">
-                <div
-                  className={cn(
-                    "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
-                    "transform hover:scale-105 hover:shadow-xl",
-                    theme === "dark"
-                      ? "bg-white text-harkonnen-black hover:bg-gray-200"
-                      : "bg-brand-lime text-brand-teal hover:bg-brand-lime-dark",
-                  )}
+        {/* Enhanced hero content with better typography and animations */}
+        <motion.div className="absolute inset-0 flex items-center justify-center z-10" style={{ opacity: heroOpacity }}>
+          <div className="text-center max-w-6xl px-4">
+            <motion.div
+              className="glass-card rounded-3xl p-8 md:p-16 backdrop-blur-xl border border-white/20 shadow-2xl"
+              initial={{ opacity: 0, y: 60, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{
+                duration: prefersReducedMotion ? 0 : 1.2,
+                delay: prefersReducedMotion ? 0 : 0.3,
+                ease: [0.25, 0.46, 0.45, 0.94],
+              }}
+            >
+              <motion.h1
+                className="text-5xl md:text-8xl font-black text-white mb-8 drop-shadow-2xl leading-tight"
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: prefersReducedMotion ? 0 : 0.8,
+                  delay: prefersReducedMotion ? 0 : 0.6,
+                }}
+              >
+                Welcome to{" "}
+                <motion.span
+                  className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent"
+                  animate={{
+                    backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
+                  }}
+                  transition={{
+                    duration: 5,
+                    repeat: Number.POSITIVE_INFINITY,
+                    ease: "linear",
+                  }}
+                  style={{ backgroundSize: "200% 200%" }}
                 >
-                  Join Now
-                </div>
-              </Link>
-              <Link href="/vault" className="inline-block">
-                <div
-                  className={cn(
-                    "transition-all duration-300 font-bold rounded-lg py-3 px-8 text-center shadow-lg",
-                    "transform hover:scale-105 hover:shadow-xl",
-                    theme === "dark"
-                      ? "bg-transparent border-2 border-white text-white hover:bg-white/10"
-                      : "bg-brand-teal text-white hover:bg-brand-teal-dark",
-                  )}
-                >
-                  Explore Content
-                </div>
-              </Link>
-            </div>
+                  Erigga Live
+                </motion.span>
+              </motion.h1>
+
+              <motion.p
+                className="text-xl md:text-3xl text-white/95 mb-10 drop-shadow-lg font-light leading-relaxed"
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: prefersReducedMotion ? 0 : 0.8,
+                  delay: prefersReducedMotion ? 0 : 0.8,
+                }}
+              >
+                The official platform for exclusive music, videos, events, and community
+              </motion.p>
+
+              <motion.div
+                className="flex flex-col sm:flex-row gap-6 justify-center"
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: prefersReducedMotion ? 0 : 0.8,
+                  delay: prefersReducedMotion ? 0 : 1,
+                }}
+              >
+                <Link href="/signup" className="inline-block">
+                  <motion.div
+                    className="group relative bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-2xl py-5 px-10 text-lg shadow-2xl border border-white/30 overflow-hidden"
+                    whileHover={
+                      prefersReducedMotion
+                        ? {}
+                        : {
+                            scale: 1.05,
+                            boxShadow: "0 25px 50px rgba(0,0,0,0.4)",
+                          }
+                    }
+                    whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent"
+                      initial={{ x: "-100%" }}
+                      whileHover={{ x: "100%" }}
+                      transition={{ duration: 0.6 }}
+                    />
+                    <span className="relative z-10 flex items-center">
+                      Join the Movement
+                      <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </span>
+                  </motion.div>
+                </Link>
+
+                <Link href="/vault" className="inline-block">
+                  <motion.div
+                    className="group glass-card text-white font-bold rounded-2xl py-5 px-10 text-lg border border-white/40 backdrop-blur-xl"
+                    whileHover={
+                      prefersReducedMotion
+                        ? {}
+                        : {
+                            scale: 1.05,
+                            backgroundColor: "rgba(255,255,255,0.15)",
+                          }
+                    }
+                    whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <span className="flex items-center">
+                      Explore Content
+                      <Play className="ml-2 w-5 h-5 group-hover:scale-110 transition-transform" />
+                    </span>
+                  </motion.div>
+                </Link>
+              </motion.div>
+            </motion.div>
           </div>
-        </div>
+        </motion.div>
+
+        <motion.div
+          className="absolute bottom-10 left-10 hidden md:flex space-x-2 opacity-30"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 0.3, x: 0 }}
+          transition={{ delay: 1.5, duration: 0.8 }}
+        >
+          {[...Array(7)].map((_, i) => (
+            <motion.div
+              key={i}
+              className="w-1 bg-gradient-to-t from-cyan-400 to-blue-600 rounded-full"
+              animate={{
+                height: [20, 40, 60, 30, 50, 25, 45],
+              }}
+              transition={{
+                duration: 1.5,
+                repeat: Number.POSITIVE_INFINITY,
+                delay: i * 0.1,
+                ease: "easeInOut",
+              }}
+            />
+          ))}
+        </motion.div>
       </section>
 
-      {/* Rest of the home page content */}
-      <section className="py-12 px-4 bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12 text-gray-900 dark:text-white">Explore the Platform</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Media Vault</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Access exclusive music, videos, and behind-the-scenes content
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/vault">Explore Vault</Link>
-                </Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Community</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Connect with others, share content, and join discussions
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/community">Join Community</Link>
-                </Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-2">Chronicles</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Follow Erigga's journey through exclusive stories and updates
-                </p>
-                <Button asChild variant="outline">
-                  <Link href="/chronicles">Read Chronicles</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
+      <section className="py-24 relative overflow-hidden bg-gradient-to-b from-background to-muted/20">
+        {/* Animated background elements */}
+        <motion.div
+          className="absolute inset-0 gradient-mesh opacity-5"
+          animate={{
+            backgroundPosition: ["0% 0%", "100% 100%", "0% 0%"],
+          }}
+          transition={{
+            duration: 20,
+            repeat: Number.POSITIVE_INFINITY,
+            ease: "linear",
+          }}
+        />
 
-      {/* Features Section */}
-      <section className="py-20 bg-background">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Platform Features</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Everything you need to connect with Erigga and fellow fans in one place.
-            </p>
-          </div>
+        <div className="container mx-auto px-4 relative z-10">
+          <motion.div
+            className="text-center mb-20"
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.8 }}
+          >
+            <motion.h2
+              className="text-5xl md:text-6xl font-black mb-8 bg-gradient-to-r from-cyan-600 via-blue-600 to-purple-600 bg-clip-text text-transparent"
+              animate={{
+                backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
+              }}
+              transition={{
+                duration: 8,
+                repeat: Number.POSITIVE_INFINITY,
+                ease: "linear",
+              }}
+              style={{ backgroundSize: "200% 200%" }}
+            >
+              Platform Features
+            </motion.h2>
+            <motion.p
+              className="text-muted-foreground max-w-3xl mx-auto text-xl leading-relaxed"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+            >
+              Everything you need to connect with Erigga and fellow fans in one comprehensive platform.
+            </motion.p>
+          </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <Link key={index} href={feature.href}>
-                <Card
-                  className={cn(
-                    "h-full transition-all duration-300 hover:scale-105 overflow-hidden",
-                    theme === "dark" ? "harkonnen-card" : "border border-gray-200",
-                  )}
-                >
-                  <CardContent className="p-6 flex flex-col h-full">
-                    <div
-                      className={cn(
-                        "w-12 h-12 rounded-full mb-4 flex items-center justify-center bg-gradient-to-br",
-                        feature.color,
-                      )}
-                    >
-                      <feature.icon className={cn("h-6 w-6", theme === "dark" ? "text-black" : "text-white")} />
-                    </div>
-                    <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
-                    <p className="text-muted-foreground flex-grow">{feature.description}</p>
-                    <div className="mt-4 flex items-center text-sm font-medium text-brand-teal dark:text-white">
-                      Learn more
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4 ml-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+              <FeatureCard key={index} feature={feature} index={index} prefersReducedMotion={prefersReducedMotion} />
             ))}
           </div>
         </div>
@@ -350,79 +450,129 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section className="py-20 bg-background">
+      <section className="py-24 bg-gradient-to-b from-muted/20 to-background">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Membership Tiers</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Choose the tier that fits your level of fandom and unlock exclusive perks.
+          <motion.div
+            className="text-center mb-16"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+          >
+            <h2 className="text-4xl md:text-5xl font-black mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Membership Tiers
+            </h2>
+            <p className="text-muted-foreground max-w-3xl mx-auto text-lg">
+              Choose the tier that matches your level of fandom and unlock exclusive perks and content.
             </p>
-          </div>
+          </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {tierPlans.map((plan, index) => (
-              <div key={index} className="relative">
+              <motion.div
+                key={index}
+                className="relative"
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{
+                  duration: prefersReducedMotion ? 0 : 0.6,
+                  delay: prefersReducedMotion ? 0 : index * 0.1,
+                }}
+              >
                 {plan.popular && (
-                  <div className="absolute -top-4 left-0 right-0 flex justify-center">
-                    <span className="bg-brand-lime text-brand-teal dark:bg-white dark:text-black px-3 py-1 rounded-full text-sm font-medium">
+                  <motion.div
+                    className="absolute -top-4 left-0 right-0 flex justify-center z-10"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <span className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">
                       Most Popular
                     </span>
-                  </div>
+                  </motion.div>
                 )}
-                <Card
-                  className={cn(
-                    "h-full border-2 transition-all duration-300",
-                    plan.color,
-                    plan.popular ? "transform scale-105" : "",
-                    theme === "dark" ? "harkonnen-card" : "",
-                  )}
+                <motion.div
+                  whileHover={{
+                    y: prefersReducedMotion ? 0 : -8,
+                    scale: prefersReducedMotion ? 1 : 1.02,
+                  }}
+                  transition={{ duration: 0.3 }}
                 >
-                  <CardContent className={cn("p-6", plan.bgColor)}>
-                    <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
-                    <div className="mb-4">
-                      <span className="text-3xl font-bold">{plan.price}</span>
-                      {plan.period && <span className="text-muted-foreground">/{plan.period}</span>}
-                    </div>
-                    <p className="text-muted-foreground mb-6">{plan.description}</p>
-                    <ul className="space-y-2 mb-6">
-                      {plan.features.map((feature, i) => (
-                        <li key={i} className="flex items-start">
-                          <svg
-                            className="h-5 w-5 text-green-500 mr-2 mt-0.5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                  <Card
+                    className={cn(
+                      "h-full border-2 transition-all duration-300 backdrop-blur-sm",
+                      plan.color,
+                      plan.popular ? "shadow-2xl" : "shadow-lg",
+                    )}
+                  >
+                    <CardContent className={cn("p-8", plan.bgColor)}>
+                      <div className="text-center mb-6">
+                        <motion.div
+                          className={cn(
+                            "w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center",
+                            plan.textColor.replace("text-", "bg-").replace("dark:text-", "dark:bg-"),
+                          )}
+                          whileHover={{ rotate: 360 }}
+                          transition={{ duration: 0.6 }}
+                        >
+                          <plan.icon className="h-8 w-8 text-white" />
+                        </motion.div>
+                        <h3 className={cn("text-2xl font-bold mb-2", plan.textColor)}>{plan.name}</h3>
+                        <div className="mb-4">
+                          <span className="text-4xl font-black">{plan.price}</span>
+                          {plan.period && <span className="text-muted-foreground text-lg">/{plan.period}</span>}
+                        </div>
+                        <p className="text-muted-foreground leading-relaxed">{plan.description}</p>
+                      </div>
+
+                      <ul className="space-y-3 mb-8">
+                        {plan.features.map((feature, i) => (
+                          <motion.li
+                            key={i}
+                            className="flex items-start"
+                            initial={{ opacity: 0, x: -10 }}
+                            whileInView={{ opacity: 1, x: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: 0.1 * i }}
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M5 13l4 4L19 7"
-                            ></path>
-                          </svg>
-                          <span>{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Button
-                      className={cn(
-                        "w-full",
-                        plan.name === "Grassroot"
-                          ? "bg-grassroot-primary text-white hover:bg-opacity-90"
-                          : plan.name === "Pioneer"
-                            ? "bg-pioneer-primary text-white hover:bg-opacity-90"
-                            : plan.name === "Elder"
-                              ? "bg-elder-primary text-white hover:bg-opacity-90"
-                              : "bg-blood-primary text-white hover:bg-opacity-90",
-                      )}
-                      asChild
-                    >
-                      <Link href={plan.href}>{plan.name === "Grassroot" ? "Sign Up Free" : "Subscribe Now"}</Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
+                            <div
+                              className={cn(
+                                "w-5 h-5 rounded-full flex items-center justify-center mr-3 mt-0.5",
+                                plan.textColor.replace("text-", "bg-").replace("dark:text-", "dark:bg-"),
+                              )}
+                            >
+                              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </div>
+                            <span className="text-sm leading-relaxed">{feature}</span>
+                          </motion.li>
+                        ))}
+                      </ul>
+
+                      <Link href={plan.href} className="block">
+                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                          <Button
+                            className={cn(
+                              "w-full font-bold py-3 rounded-xl shadow-lg transition-all duration-300",
+                              plan.textColor.replace("text-", "bg-").replace("dark:text-", "dark:bg-"),
+                              "text-white hover:shadow-xl",
+                            )}
+                          >
+                            {plan.name === "Free" ? "Start Free" : "Subscribe Now"}
+                          </Button>
+                        </motion.div>
+                      </Link>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -451,5 +601,115 @@ export default function HomePage() {
         </div>
       </section>
     </div>
+  )
+}
+
+function FeatureCard({
+  feature,
+  index,
+  prefersReducedMotion,
+}: {
+  feature: any
+  index: number
+  prefersReducedMotion: boolean
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 60 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{
+        duration: prefersReducedMotion ? 0 : 0.8,
+        delay: prefersReducedMotion ? 0 : feature.delay,
+        ease: [0.25, 0.46, 0.45, 0.94],
+      }}
+    >
+      <Link href={feature.href}>
+        <motion.div
+          className="glass-card rounded-3xl p-10 h-full group cursor-pointer overflow-hidden relative border border-white/10 shadow-xl backdrop-blur-xl"
+          whileHover={
+            prefersReducedMotion
+              ? {}
+              : {
+                  y: -12,
+                  scale: 1.02,
+                  transition: { duration: 0.3, ease: "easeOut" },
+                }
+          }
+          whileTap={prefersReducedMotion ? {} : { scale: 0.98 }}
+        >
+          {/* Animated gradient background */}
+          <motion.div
+            className={cn(
+              "absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-10 transition-opacity duration-500",
+              feature.gradient,
+            )}
+            whileHover={{ opacity: 0.1 }}
+          />
+
+          {/* Floating particles effect */}
+          <div className="absolute inset-0 overflow-hidden">
+            {[...Array(3)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-2 h-2 bg-white/20 rounded-full"
+                animate={{
+                  x: [0, 100, 0],
+                  y: [0, -100, 0],
+                  opacity: [0, 1, 0],
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Number.POSITIVE_INFINITY,
+                  delay: i * 1.5,
+                  ease: "easeInOut",
+                }}
+                style={{
+                  left: `${20 + i * 30}%`,
+                  top: `${80 - i * 20}%`,
+                }}
+              />
+            ))}
+          </div>
+
+          <div className="relative z-10">
+            <motion.div
+              className={cn(
+                "w-20 h-20 rounded-3xl mb-8 flex items-center justify-center bg-gradient-to-br shadow-xl",
+                feature.gradient,
+              )}
+              whileHover={
+                prefersReducedMotion
+                  ? {}
+                  : {
+                      rotate: 10,
+                      scale: 1.1,
+                    }
+              }
+              transition={{ duration: 0.3 }}
+            >
+              <feature.icon className="h-10 w-10 text-white drop-shadow-lg" />
+            </motion.div>
+
+            <h3 className="text-2xl font-bold mb-4 group-hover:text-primary transition-colors duration-300">
+              {feature.title}
+            </h3>
+
+            <p className="text-muted-foreground leading-relaxed mb-8 text-base">{feature.description}</p>
+
+            <motion.div
+              className="flex items-center text-primary font-semibold group-hover:text-accent transition-colors duration-300"
+              whileHover={prefersReducedMotion ? {} : { x: 8 }}
+              transition={{ duration: 0.2 }}
+            >
+              Explore feature
+              <motion.div whileHover={{ x: 4 }} transition={{ duration: 0.2 }}>
+                <ArrowRight className="h-5 w-5 ml-2" />
+              </motion.div>
+            </motion.div>
+          </div>
+        </motion.div>
+      </Link>
+    </motion.div>
   )
 }
