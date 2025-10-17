@@ -2,13 +2,10 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createAdminSupabaseClient } from "@/lib/supabase/server"
 
-// Force dynamic rendering
-export const dynamic = 'force-dynamic'
-
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient()
-    const adminSupabase = await createAdminSupabaseClient()
+    const supabase = createServerSupabaseClient()
+    const adminSupabase = createAdminSupabaseClient()
 
     // Check authentication
     const {

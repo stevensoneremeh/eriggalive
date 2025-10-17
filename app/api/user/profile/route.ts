@@ -1,49 +1,37 @@
+import { NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 
-import { type NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-
-export const dynamic = "force-dynamic"
-
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const supabase = await createServerSupabaseClient()
-    
+    const supabase = await createClient()
+
+    // Get authenticated user
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
-
     if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
-    // Fetch user profile data
+    // Get user profile
     const { data: profile, error: profileError } = await supabase
-      .from("users")
+      .from("user_profiles")
       .select("*")
-      .eq("auth_user_id", user.id)
+      .eq("id", user.id)
       .single()
 
     if (profileError) {
-      console.error("Profile fetch error:", profileError)
-      return NextResponse.json(
-        { error: "Profile not found" },
-        { status: 404 }
-      )
+      console.error("Error fetching profile:", profileError)
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 })
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
+      profile: { ...profile, email: user.email },
       success: true,
-      profile 
     })
   } catch (error) {
-    console.error("Profile route error:", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
+    console.error("API error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

@@ -7,132 +7,135 @@ import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, Mail, Lock, LogIn } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const { signIn } = useAuth()
+  const { signIn, user } = useAuth()
   const router = useRouter()
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user) {
+      router.push("/dashboard")
+    }
+  }, [user, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setLoading(true)
     setError("")
-    setIsLoading(true)
 
-    try {
-      const { error } = await signIn(email, password)
-
-      if (error) {
-        setError(error.message || "Invalid email or password")
-      } else {
-        // Success - the auth context will handle the redirect
-        router.push("/dashboard")
-      }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred")
-    } finally {
-      setIsLoading(false)
+    if (!email || !password) {
+      setError("Please fill in all fields")
+      setLoading(false)
+      return
     }
+
+    const { error } = await signIn(email, password)
+
+    if (error) {
+      if (error.message === "Supabase not configured") {
+        setError("Authentication service is not configured. Please check your environment variables.")
+      } else {
+        setError(error.message || "An error occurred during login")
+      }
+      setLoading(false)
+    }
+    // Don't set loading to false on success - let the auth context handle the redirect
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
-      <div className="absolute inset-0 bg-[url('/placeholder.svg?height=1080&width=1920')] bg-cover bg-center opacity-10" />
-
-      <Card className="w-full max-w-md relative z-10 bg-black/40 backdrop-blur-xl border-purple-500/20">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            Welcome Back
-          </CardTitle>
-          <CardDescription className="text-center text-gray-300">Sign in to your EriggaLive account</CardDescription>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-4 w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+            <LogIn className="w-8 h-8 text-white" />
+          </div>
+          <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
+          <CardDescription>Sign in to your Erigga Live account</CardDescription>
         </CardHeader>
-
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <Alert className="border-red-500/20 bg-red-500/10">
-                <AlertDescription className="text-red-400">{error}</AlertDescription>
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-gray-200">
-                Email
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="bg-black/20 border-purple-500/30 text-white placeholder:text-gray-400 focus:border-purple-400"
-              />
+              <Label htmlFor="email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-10"
+                  required
+                  disabled={loading}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-gray-200">
-                Password
-              </Label>
+              <Label htmlFor="password">Password</Label>
               <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10 pr-10"
                   required
-                  className="bg-black/20 border-purple-500/30 text-white placeholder:text-gray-400 focus:border-purple-400 pr-10"
+                  disabled={loading}
                 />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200"
+                  disabled={loading}
                 >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <Link href="/forgot-password" className="text-sm text-purple-400 hover:text-purple-300 transition-colors">
-                Forgot password?
-              </Link>
-            </div>
-          </CardContent>
-
-          <CardFooter className="flex flex-col space-y-4">
-            <Button
-              type="submit"
-              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                "Sign In"
-              )}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Signing in..." : "Sign In"}
             </Button>
+          </form>
 
-            <p className="text-center text-sm text-gray-300">
+          <div className="mt-6 text-center space-y-2">
+            <Link
+              href="/forgot-password"
+              className="text-sm text-purple-600 hover:text-purple-500 dark:text-purple-400"
+            >
+              Forgot your password?
+            </Link>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
               Don't have an account?{" "}
-              <Link href="/signup" className="text-purple-400 hover:text-purple-300 font-semibold transition-colors">
+              <Link href="/signup" className="text-purple-600 hover:text-purple-500 dark:text-purple-400 font-medium">
                 Sign up
               </Link>
-            </p>
-          </CardFooter>
-        </form>
+            </div>
+          </div>
+        </CardContent>
       </Card>
     </div>
   )

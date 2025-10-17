@@ -47,8 +47,6 @@ body {
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-    /* Added bronze accent color for Dune-like aesthetic */
-    --accent-bronze: #8a6b3f;
   }
   .dark {
     --background: 0 0% 3.9%;
@@ -83,25 +81,7 @@ body {
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-    /* Added bronze accent and sepia tones for dark theme */
-    --accent-bronze: #b8956a;
   }
-}
-
-/* Added theme-specific typography and transition styles */
-[data-theme="dark"] {
-  color-scheme: dark;
-}
-
-[data-theme="dark"] h1,
-[data-theme="dark"] h2,
-[data-theme="dark"] .display {
-  letter-spacing: 0.02em;
-}
-
-/* Added smooth transitions for theme switching */
-* {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 @layer base {

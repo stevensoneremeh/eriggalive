@@ -1,87 +1,90 @@
-import { createBrowserClient } from "@supabase/ssr"
+import { createClient as supabaseCreateClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 
-let client: ReturnType<typeof createBrowserClient> | null = null
+const isBrowser = typeof window !== "undefined"
+
+const isPreviewMode =
+  isBrowser &&
+  (window.location.hostname.includes("vusercontent.net") ||
+    window.location.hostname.includes("v0.dev") ||
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+
+const createMockClient = () => {
+  return {
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+      getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+      signInWithPassword: () =>
+        Promise.resolve({
+          data: { user: null, session: null },
+          error: { message: "Supabase not configured" },
+        }),
+      signUp: () =>
+        Promise.resolve({
+          data: { user: null, session: null },
+          error: { message: "Supabase not configured" },
+        }),
+      signOut: () => Promise.resolve({ error: null }),
+      resetPasswordForEmail: () => Promise.resolve({ error: { message: "Supabase not configured" } }),
+      updateUser: () =>
+        Promise.resolve({
+          data: { user: null },
+          error: { message: "Supabase not configured" },
+        }),
+      onAuthStateChange: (callback: any) => {
+        return {
+          data: {
+            subscription: {
+              unsubscribe: () => {},
+            },
+          },
+        }
+      },
+    },
+    from: () => ({
+      select: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
+      insert: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      update: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      delete: () => Promise.resolve({ error: { message: "Supabase not configured" } }),
+    }),
+    storage: {
+      from: () => ({
+        upload: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+        getPublicUrl: () => ({ data: { publicUrl: "" } }),
+      }),
+    },
+    rpc: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+  } as any
+}
 
 export function createClient() {
-  // Validate environment variables
+  if (isPreviewMode) {
+    console.warn("⚠️ Using mock client - Supabase environment variables not configured")
+    return createMockClient()
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn("Missing Supabase environment variables. Some features may not work properly.")
-    // Return a mock client that prevents crashes
+    console.warn("Missing Supabase environment variables, using mock client")
     return createMockClient()
   }
 
-  // Use singleton pattern for Supabase client
-  if (client) {
-    return client
-  }
-
   try {
-    client = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-      realtime: {
-        params: {
-          eventsPerSecond: 2,
-        },
-      },
-      global: {
-        headers: {
-          "X-Client-Info": "eriggalive-web",
-        },
-      },
-    })
-    return client
+    return supabaseCreateClient<Database>(supabaseUrl, supabaseAnonKey)
   } catch (error) {
     console.error("Failed to create Supabase client:", error)
     return createMockClient()
   }
 }
 
-function createMockClient() {
-  return {
-    auth: {
-      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-      getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-      signInWithPassword: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-      signUp: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-      signOut: () => Promise.resolve({ error: null }),
-      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-      resetPasswordForEmail: () => Promise.resolve({ error: { message: "Supabase not configured" } }),
-      updateUser: () => Promise.resolve({ error: { message: "Supabase not configured" } }),
-      refreshSession: () => Promise.resolve({ data: { session: null }, error: null }),
-    },
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-          single: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-        }),
-      }),
-      insert: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-      update: () => ({
-        eq: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-      }),
-      delete: () => ({
-        eq: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-      }),
-    }),
-    // Disable realtime for mock client to prevent WebSocket errors
-    channel: () => ({
-      on: () => ({
-        subscribe: () => ({
-          unsubscribe: () => {}
-        }),
-      }),
-    }),
-    removeChannel: () => {},
-  } as any
-}
+let supabaseClient: ReturnType<typeof createClient> | null = null
 
-// Legacy exports removed - use createClient() instead
+export function getSupabaseClient() {
+  if (!supabaseClient) {
+    supabaseClient = createClient()
+  }
+  return supabaseClient
+}

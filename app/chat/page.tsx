@@ -1,14 +1,14 @@
 "use client"
 
 import type React from "react"
+
 import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Users, Lock, MessageCircle, Star, Building } from "lucide-react"
+import { Users, Lock, MessageCircle, Crown } from "lucide-react"
 import Link from "next/link"
-import { UserTierBadge } from "@/components/user-tier-badge" // Fixed import to use named export
 
 interface ChatRoom {
   id: string
@@ -26,47 +26,57 @@ const CHAT_ROOMS: ChatRoom[] = [
     id: "general",
     name: "General Chat",
     description: "Open discussion for all community members",
-    requiredTier: "free",
+    requiredTier: "grassroot",
     memberCount: 1250,
     isActive: true,
     icon: <MessageCircle className="h-6 w-6" />,
     color: "bg-blue-500",
   },
   {
-    id: "citizen",
-    name: "Erigga Citizen Lounge", // Updated room name
-    description: "For Erigga Citizen members and above",
-    requiredTier: "free",
+    id: "grassroot",
+    name: "Grassroot Lounge",
+    description: "For Grassroot tier members and above",
+    requiredTier: "grassroot",
     memberCount: 890,
     isActive: true,
     icon: <Users className="h-6 w-6" />,
     color: "bg-green-500",
   },
   {
-    id: "indigen",
-    name: "Erigga Indigen Hub", // Updated room name
-    description: "Exclusive to Erigga Indigen members and above",
-    requiredTier: "pro",
+    id: "pioneer",
+    name: "Pioneer Hub",
+    description: "Exclusive to Pioneer tier members and above",
+    requiredTier: "pioneer",
     memberCount: 340,
     isActive: true,
-    icon: <Star className="h-6 w-6" />,
+    icon: <Crown className="h-6 w-6" />,
     color: "bg-blue-600",
   },
   {
-    id: "enterprise",
-    name: "Enterprise Elite", // Updated room name
-    description: "The most exclusive tier - Enterprise members only",
-    requiredTier: "enterprise",
+    id: "elder",
+    name: "Elder Council",
+    description: "For Elder tier members and above",
+    requiredTier: "elder",
+    memberCount: 120,
+    isActive: true,
+    icon: <Crown className="h-6 w-6" />,
+    color: "bg-purple-600",
+  },
+  {
+    id: "blood",
+    name: "Blood Brotherhood",
+    description: "The most exclusive tier - Blood members only",
+    requiredTier: "blood",
     memberCount: 45,
     isActive: true,
-    icon: <Building className="h-6 w-6" />,
-    color: "bg-gradient-to-r from-yellow-400 to-yellow-600",
+    icon: <Crown className="h-6 w-6" />,
+    color: "bg-red-600",
   },
   {
     id: "freebies",
     name: "Freebies Room",
     description: "Vote on and access free content",
-    requiredTier: "free",
+    requiredTier: "grassroot",
     memberCount: 2100,
     isActive: true,
     icon: <MessageCircle className="h-6 w-6" />,
@@ -75,14 +85,15 @@ const CHAT_ROOMS: ChatRoom[] = [
 ]
 
 const TIER_HIERARCHY = {
-  free: 1,
-  pro: 2,
-  enterprise: 3,
-  admin: 4,
+  grassroot: 1,
+  pioneer: 2,
+  elder: 3,
+  blood: 4,
+  admin: 5,
 }
 
 export default function ChatPage() {
-  const { profile, loading } = useAuth()
+  const { profile } = useAuth()
   const [availableRooms, setAvailableRooms] = useState<ChatRoom[]>([])
 
   useEffect(() => {
@@ -97,14 +108,6 @@ export default function ChatPage() {
       setAvailableRooms(accessible)
     }
   }, [profile])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <span>Loading...</span>
-      </div>
-    )
-  }
 
   if (!profile) {
     return (
@@ -135,7 +138,7 @@ export default function ChatPage() {
             Connect with community members in tier-based chat rooms
           </p>
           <div className="mt-4">
-            <UserTierBadge tier={profile.tier} /> {/* Updated badge display */}
+            <Badge className="bg-gradient-to-r from-purple-600 to-blue-600 text-white">Your Tier: {profile.tier}</Badge>
           </div>
         </div>
 

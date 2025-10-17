@@ -1,111 +1,122 @@
-import { createServerClient as createSupabaseServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
+import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
+import { cookies } from "next/headers"
 
-export async function createClient() {
-  const cookieStore = await cookies()
+export const isProduction = () => process.env.NODE_ENV === "production"
+export const isDevelopment = () => process.env.NODE_ENV === "development"
 
-  // Validate environment variables
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+export const isPreviewMode = () =>
+  !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_VERCEL_ENV === "preview"
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("[SERVER] Missing Supabase environment variables")
-    // Return a mock client that prevents crashes
-    return {
-      auth: {
-        getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-        getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-        signInWithPassword: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-        signUp: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-        signOut: () => Promise.resolve({ error: null }),
-        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-        resetPasswordForEmail: () => Promise.resolve({ error: { message: "Supabase not configured" } }),
-        updateUser: () => Promise.resolve({ error: { message: "Supabase not configured" } }),
+export function createMockServerClient(): SupabaseClient<Database> {
+  // @ts-expect-error – minimal mock implementation
+  return {
+    from: (table: string) => ({
+      select: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
+      insert: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      upsert: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
+      update: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
+      delete: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      eq: function () {
+        return this
       },
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            maybeSingle: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-            single: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-            order: () => ({
-              eq: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
-            }),
-          }),
-          order: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
-        }),
-        insert: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-        update: () => ({
-          eq: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-        }),
-        delete: () => ({
-          eq: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-        }),
-      }),
-      storage: {
-        from: () => ({
-          upload: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-          download: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-          list: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
-          remove: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
-        }),
-        listBuckets: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
-        createBucket: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      single: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      order: function () {
+        return this
       },
-      // Add real-time functionality for mock server client  
-      channel: (name: string) => ({
-        on: (event: string, config: any, callback: any) => ({
-          subscribe: () => ({ 
-            unsubscribe: () => {} 
-          }),
-        }),
-      }),
-      removeChannel: () => {},
-    } as any
-  }
-
-  return createSupabaseServerClient<Database>(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
+      limit: function () {
+        return this
       },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-        } catch (error: any) {
-          console.warn("[SERVER] Cookie setting failed in server component:", error.message)
-        }
+      range: function () {
+        return this
       },
-    },
-  })
-}
-
-export async function createAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    console.error("[SERVER] Missing Supabase admin environment variables")
-    throw new Error("Missing Supabase admin environment variables")
-  }
-
-  return createSupabaseServerClient<Database>(supabaseUrl, supabaseServiceKey, {
-    cookies: {
-      getAll() {
-        return []
-      },
-      setAll() {
-        // Admin client doesn't need cookies
-      },
-    },
+    }),
     auth: {
-      autoRefreshToken: false,
-      persistSession: false,
+      getUser: async () => ({ data: { user: null }, error: null }),
+      getSession: async () => ({ data: { session: null }, error: null }),
     },
-  })
+    rpc: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+    storage: {
+      from: () => ({
+        upload: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+        getPublicUrl: () => ({ data: { publicUrl: "" } }),
+      }),
+    },
+  }
 }
 
-// Legacy exports - aliases for backward compatibility
-export const createServerSupabaseClient = createClient
-export const createAdminSupabaseClient = createAdminClient
-// Note: createServerClient is from @supabase/ssr, not aliased here to avoid conflicts
+export function createServerSupabaseClient() {
+  if (isPreviewMode()) {
+    console.warn("⚠️ Using mock server Supabase client - environment variables not configured")
+    return createMockServerClient()
+  }
+
+  try {
+    const cookieStore = cookies()
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+    return createSupabaseClient<Database>(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: false,
+      },
+      global: {
+        headers: {
+          Cookie: cookieStore.toString(),
+        },
+      },
+    })
+  } catch (error) {
+    console.warn("Failed to create real Supabase client, falling back to mock:", error)
+    return createMockServerClient()
+  }
+}
+
+export function createServerSupabaseClientWithAuth(): SupabaseClient<Database> {
+  if (isPreviewMode()) {
+    return createMockServerClient()
+  }
+
+  try {
+    const cookieStore = cookies()
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+    return createSupabaseClient<Database>(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: false,
+      },
+      global: {
+        headers: {
+          Cookie: cookieStore.toString(),
+        },
+      },
+    })
+  } catch (error) {
+    console.warn("Failed to create authenticated Supabase client, falling back to mock:", error)
+    return createMockServerClient()
+  }
+}
+
+export function createAdminSupabaseClient(): SupabaseClient<Database> {
+  if (isPreviewMode()) {
+    return createMockServerClient()
+  }
+
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+    return createSupabaseClient<Database>(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    })
+  } catch (error) {
+    console.warn("Failed to create admin Supabase client, falling back to mock:", error)
+    return createMockServerClient()
+  }
+}
+
+export const createClient = createServerSupabaseClient
+export const getServerClient = createServerSupabaseClient

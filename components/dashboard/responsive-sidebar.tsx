@@ -37,7 +37,6 @@ import { DynamicLogo } from "@/components/dynamic-logo"
 import { CoinBalance } from "@/components/coin-balance"
 import { UserTierBadge } from "@/components/user-tier-badge"
 import { cn } from "@/lib/utils"
-import { useMediaQuery } from "@/hooks/use-media-query"
 
 interface SidebarItem {
   name: string
@@ -50,7 +49,7 @@ interface SidebarItem {
 
 // Updated sidebarItems: "Coins" item is removed.
 const sidebarItems: SidebarItem[] = [
-  {
+{
     name: "Home",
     href: "/",
     icon: Home, // Main dashboard uses Home icon
@@ -138,7 +137,6 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
   const pathname = usePathname()
   const { user, profile, signOut } = useAuth()
   const { theme, setTheme, resolvedTheme } = useTheme()
-  const isMobile = useMediaQuery("(max-width: 768px)")
 
   // Screen size detection with debouncing
   const updateScreenSize = useCallback(() => {
@@ -365,14 +363,14 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
         <div className={cn("flex items-center p-4 border-b", isCollapsed && "justify-center px-2")}>
           {!isCollapsed ? (
             <Link href="/" className="flex items-center space-x-2">
-              <DynamicLogo responsive={false} width={isMobile ? 120 : 100} height={isMobile ? 32 : 28} />
+              <DynamicLogo width={isMobile ? 120 : 100} height={isMobile ? 32 : 28} />
             </Link>
           ) : (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Link href="/">
-                    <DynamicLogo responsive={false} width={32} height={32} />
+                    <DynamicLogo width={32} height={32} />
                   </Link>
                 </TooltipTrigger>
                 <TooltipContent side="right">Erigga Live</TooltipContent>
@@ -438,7 +436,7 @@ export function ResponsiveSidebar({ children }: ResponsiveSidebarProps) {
         <div className={cn("p-4 border-t", isCollapsed && "px-2")}>
           {!isCollapsed ? (
             <div className="space-y-2">
-              <Button variant="outline" size="sm" className="w-full justify-start bg-transparent" asChild>
+              <Button variant="outline" size="sm" className="w-full justify-start" asChild>
                 <Link href="/profile">
                   {" "}
                   {/* Assuming /profile exists or will be created */}

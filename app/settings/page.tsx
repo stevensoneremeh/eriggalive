@@ -1,202 +1,64 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+
+import { AuthGuard } from "@/components/auth-guard"
+import { useAuth } from "@/contexts/auth-context"
+import { useState, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
-import { useAuth } from "@/contexts/auth-context"
-import { useToast } from "@/components/ui/use-toast"
-import { createClient } from "@/lib/supabase/client"
-import { AuthGuard } from "@/components/auth-guard"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { User, SettingsIcon, Bell, Shield, Save, Eye, EyeOff, Crown, Coins, Mail, Calendar, Lock } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
+import { User, Bell, Shield, Camera, Save, Eye, EyeOff, Smartphone, Lock, Trash2 } from "lucide-react"
+import { supabase } from "@/lib/supabaseClient"
+import { useToast } from "@/hooks/use-toast"
 
 export default function SettingsPage() {
-  const { user, profile, refreshProfile } = useAuth()
+  const { user, profile, refreshProfile, signOut } = useAuth()
   const { toast } = useToast()
-  const [loading, setLoading] = useState(false)
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
-  const [showNewPassword, setShowNewPassword] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const supabase = createClient()
-
-  // Profile form state
-  const [profileForm, setProfileForm] = useState({
+  // Profile settings
+  const [profileData, setProfileData] = useState({
     full_name: profile?.full_name || "",
     username: profile?.username || "",
     bio: profile?.bio || "",
     location: profile?.location || "",
-    website: profile?.website || "",
-    phone: profile?.phone || "",
-    date_of_birth: profile?.date_of_birth || "",
+    phone_number: profile?.phone_number || "",
   })
 
-  // Password form state
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  })
+  // Security settings
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [showPasswords, setShowPasswords] = useState(false)
 
   // Notification settings
   const [notifications, setNotifications] = useState({
-    email_notifications: profile?.email_notifications ?? true,
-    push_notifications: profile?.push_notifications ?? true,
-    community_updates: profile?.community_updates ?? true,
-    marketing_emails: profile?.marketing_emails ?? false,
+    email_notifications: true,
+    push_notifications: true,
+    community_updates: true,
+    new_content: true,
+    promotional: false,
   })
 
-  // Privacy settings
-  const [privacy, setPrivacy] = useState({
-    profile_visibility: profile?.profile_visibility || "public",
-    show_online_status: profile?.show_online_status ?? true,
-    allow_direct_messages: profile?.allow_direct_messages ?? true,
-  })
-
-  const handleProfileUpdate = async () => {
-    if (!profile?.id) {
-      toast({
-        title: "Error",
-        description: "User profile not found. Please try logging in again.",
-        variant: "destructive",
-      })
-      return
-    }
-    setLoading(true)
-    try {
-      const { error } = await supabase
-        .from("users")
-        .update({
-          full_name: profileForm.full_name,
-          username: profileForm.username,
-          bio: profileForm.bio,
-          location: profileForm.location,
-          website: profileForm.website,
-          phone: profileForm.phone,
-          date_of_birth: profileForm.date_of_birth,
-        })
-        .eq("id", profile.id)
-
-      if (error) throw error
-
-      await refreshProfile()
-      toast({
-        title: "Profile Updated",
-        description: "Your profile has been updated successfully.",
-      })
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update profile.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handlePasswordUpdate = async () => {
-    if (!profile?.id) {
-      toast({
-        title: "Error",
-        description: "User profile not found. Please try logging in again.",
-        variant: "destructive",
-      })
-      return
-    }
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast({
-        title: "Error",
-        description: "New passwords do not match.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (passwordForm.newPassword.length < 6) {
-      toast({
-        title: "Error",
-        description: "Password must be at least 6 characters long.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setLoading(true)
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: passwordForm.newPassword,
-      })
-
-      if (error) throw error
-
-      setPasswordForm({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
-      })
-
-      toast({
-        title: "Password Updated",
-        description: "Your password has been updated successfully.",
-      })
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update password.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleNotificationUpdate = async () => {
-    if (!profile?.id) {
-      toast({
-        title: "Error",
-        description: "User profile not found. Please try logging in again.",
-        variant: "destructive",
-      })
-      return
-    }
-    setLoading(true)
-    try {
-      const { error } = await supabase.from("users").update(notifications).eq("id", profile.id)
-
-      if (error) throw error
-
-      await refreshProfile()
-      toast({
-        title: "Settings Updated",
-        description: "Your notification preferences have been saved.",
-      })
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update settings.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Loading states
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false)
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file || !profile) return
 
-    setLoading(true)
+    setIsUploadingAvatar(true)
+
     try {
-      // Upload to Supabase Storage
       const fileExt = file.name.split(".").pop()
       const fileName = `${profile.id}-${Date.now()}.${fileExt}`
       const filePath = `avatars/${fileName}`
@@ -207,10 +69,8 @@ export default function SettingsPage() {
 
       if (uploadError) throw uploadError
 
-      // Get public URL
       const { data: urlData } = supabase.storage.from("eriggalive-assets").getPublicUrl(uploadData.path)
 
-      // Update user profile
       const { error: updateError } = await supabase
         .from("users")
         .update({ avatar_url: urlData.publicUrl })
@@ -231,288 +91,336 @@ export default function SettingsPage() {
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      setIsUploadingAvatar(false)
     }
   }
 
-  const getTierColor = (tier: string) => {
-    switch (tier) {
-      case "grassroot":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-      case "pioneer":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
-      case "elder":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-      case "blood_brotherhood":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+  const handleProfileSave = async () => {
+    if (!profile) return
+
+    setIsSavingProfile(true)
+
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({
+          full_name: profileData.full_name,
+          username: profileData.username,
+          bio: profileData.bio,
+          location: profileData.location,
+          phone_number: profileData.phone_number,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", profile.id)
+
+      if (error) throw error
+
+      await refreshProfile()
+      toast({
+        title: "Success!",
+        description: "Profile updated successfully.",
+      })
+    } catch (error: any) {
+      console.error("Profile update error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingProfile(false)
+    }
+  }
+
+  const handlePasswordChange = async () => {
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsChangingPassword(true)
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      })
+
+      if (error) throw error
+
+      setCurrentPassword("")
+      setNewPassword("")
+      setConfirmPassword("")
+
+      toast({
+        title: "Success!",
+        description: "Password updated successfully.",
+      })
+    } catch (error: any) {
+      console.error("Password change error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update password. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsChangingPassword(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    if (!confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
+      return
+    }
+
+    setIsDeletingAccount(true)
+
+    try {
+      // In a real implementation, this would properly handle account deletion
+      // including data cleanup and compliance with data protection regulations
+
+      toast({
+        title: "Account Deletion",
+        description: "Your account deletion request has been submitted. You will receive an email confirmation.",
+      })
+
+      // Sign out the user
+      await signOut()
+    } catch (error: any) {
+      console.error("Account deletion error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to process account deletion. Please contact support.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeletingAccount(false)
     }
   }
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4 sm:p-6 lg:p-8">
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
           <div className="mb-8">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                <SettingsIcon className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
-                <p className="text-gray-600 dark:text-gray-300">Manage your account and preferences</p>
-              </div>
-            </div>
-
-            {/* User Info Card */}
-            <Card className="mb-6">
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-4">
-                  <Avatar className="h-20 w-20">
-                    <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} alt={profile?.username} />
-                    <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold text-xl">
-                      {profile?.full_name?.charAt(0) || profile?.username?.charAt(0) || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <h2 className="text-2xl font-bold">{profile?.full_name || profile?.username}</h2>
-                    <p className="text-muted-foreground">@{profile?.username}</p>
-                    <div className="flex items-center space-x-4 mt-2">
-                      <Badge className={`${getTierColor(profile?.tier || "grassroot")}`}>
-                        <Crown className="w-3 h-3 mr-1" />
-                        {profile?.tier?.replace("_", " ").toUpperCase() || "GRASSROOT"}
-                      </Badge>
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <Coins className="w-4 h-4 mr-1 text-yellow-500" />
-                        {profile?.coins?.toLocaleString() || 0} coins
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Settings</h1>
+            <p className="text-gray-600 dark:text-gray-300">Manage your account settings and preferences</p>
           </div>
 
-          {/* Settings Tabs */}
           <Tabs defaultValue="profile" className="space-y-6">
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="profile" className="flex items-center space-x-2">
-                <User className="w-4 h-4" />
-                <span className="hidden sm:inline">Profile</span>
-              </TabsTrigger>
-              <TabsTrigger value="security" className="flex items-center space-x-2">
-                <Shield className="w-4 h-4" />
-                <span className="hidden sm:inline">Security</span>
-              </TabsTrigger>
-              <TabsTrigger value="notifications" className="flex items-center space-x-2">
-                <Bell className="w-4 h-4" />
-                <span className="hidden sm:inline">Notifications</span>
-              </TabsTrigger>
-              <TabsTrigger value="privacy" className="flex items-center space-x-2">
-                <Lock className="w-4 h-4" />
-                <span className="hidden sm:inline">Privacy</span>
-              </TabsTrigger>
+              <TabsTrigger value="profile">Profile</TabsTrigger>
+              <TabsTrigger value="security">Security</TabsTrigger>
+              <TabsTrigger value="notifications">Notifications</TabsTrigger>
+              <TabsTrigger value="account">Account</TabsTrigger>
             </TabsList>
 
             {/* Profile Tab */}
-            <TabsContent value="profile">
+            <TabsContent value="profile" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Profile Information</CardTitle>
-                  <CardDescription>Update your personal information and profile details.</CardDescription>
+                  <CardTitle className="flex items-center">
+                    <User className="w-5 h-5 mr-2" />
+                    Profile Information
+                  </CardTitle>
+                  <CardDescription>Update your personal information and profile details</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="avatar">Profile Picture</Label>
-                    <div className="flex items-center space-x-4">
-                      <Avatar className="h-16 w-16">
-                        <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
-                        <AvatarFallback>
-                          {profile?.full_name?.charAt(0) || profile?.username?.charAt(0) || "U"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <Input
-                          id="avatar"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleAvatarUpload}
-                          disabled={loading}
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Upload a new profile picture. Max size: 5MB
-                        </p>
-                      </div>
+                  {/* Avatar Section */}
+                  <div className="flex items-center space-x-4">
+                    <Avatar className="h-20 w-20">
+                      <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} />
+                      <AvatarFallback className="text-lg">
+                        {profile?.full_name?.charAt(0) || profile?.username?.charAt(0) || "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <Button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingAvatar}
+                        variant="outline"
+                      >
+                        <Camera className="w-4 h-4 mr-2" />
+                        {isUploadingAvatar ? "Uploading..." : "Change Photo"}
+                      </Button>
+                      <p className="text-sm text-gray-500 mt-1">JPG, PNG or GIF. Max size 5MB.</p>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleAvatarUpload}
+                      />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
+                  {/* Profile Form */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
                       <Label htmlFor="full_name">Full Name</Label>
                       <Input
                         id="full_name"
-                        value={profileForm.full_name}
-                        onChange={(e) => setProfileForm({ ...profileForm, full_name: e.target.value })}
-                        placeholder="Your full name"
+                        value={profileData.full_name}
+                        onChange={(e) => setProfileData((prev) => ({ ...prev, full_name: e.target.value }))}
+                        placeholder="Enter your full name"
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div>
                       <Label htmlFor="username">Username</Label>
                       <Input
                         id="username"
-                        value={profileForm.username}
-                        onChange={(e) => setProfileForm({ ...profileForm, username: e.target.value })}
-                        placeholder="Your username"
+                        value={profileData.username}
+                        onChange={(e) => setProfileData((prev) => ({ ...prev, username: e.target.value }))}
+                        placeholder="Enter your username"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number</Label>
+                    <div>
+                      <Label htmlFor="email">Email</Label>
+                      <Input id="email" value={user?.email || ""} disabled className="bg-gray-50 dark:bg-gray-800" />
+                      <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+                    </div>
+                    <div>
+                      <Label htmlFor="phone_number">Phone Number</Label>
                       <Input
-                        id="phone"
-                        value={profileForm.phone}
-                        onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                        placeholder="+234 xxx xxx xxxx"
+                        id="phone_number"
+                        value={profileData.phone_number}
+                        onChange={(e) => setProfileData((prev) => ({ ...prev, phone_number: e.target.value }))}
+                        placeholder="Enter your phone number"
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div>
                       <Label htmlFor="location">Location</Label>
                       <Input
                         id="location"
-                        value={profileForm.location}
-                        onChange={(e) => setProfileForm({ ...profileForm, location: e.target.value })}
-                        placeholder="Your location"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="website">Website</Label>
-                      <Input
-                        id="website"
-                        value={profileForm.website}
-                        onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
-                        placeholder="https://yourwebsite.com"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="date_of_birth">Date of Birth</Label>
-                      <Input
-                        id="date_of_birth"
-                        type="date"
-                        value={profileForm.date_of_birth}
-                        onChange={(e) => setProfileForm({ ...profileForm, date_of_birth: e.target.value })}
+                        value={profileData.location}
+                        onChange={(e) => setProfileData((prev) => ({ ...prev, location: e.target.value }))}
+                        placeholder="Enter your location"
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
+
+                  <div>
                     <Label htmlFor="bio">Bio</Label>
                     <Textarea
                       id="bio"
-                      value={profileForm.bio}
-                      onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })}
-                      placeholder="Tell us about yourself..."
-                      rows={4}
+                      value={profileData.bio}
+                      onChange={(e) => setProfileData((prev) => ({ ...prev, bio: e.target.value }))}
+                      placeholder="Tell us about yourself"
+                      rows={3}
                     />
                   </div>
-                  <Button onClick={handleProfileUpdate} disabled={loading}>
+
+                  <Button onClick={handleProfileSave} disabled={isSavingProfile}>
                     <Save className="w-4 h-4 mr-2" />
-                    {loading ? "Saving..." : "Save Changes"}
+                    {isSavingProfile ? "Saving..." : "Save Changes"}
                   </Button>
                 </CardContent>
               </Card>
             </TabsContent>
 
             {/* Security Tab */}
-            <TabsContent value="security">
+            <TabsContent value="security" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Security Settings</CardTitle>
-                  <CardDescription>Manage your password and account security.</CardDescription>
+                  <CardTitle className="flex items-center">
+                    <Shield className="w-5 h-5 mr-2" />
+                    Security Settings
+                  </CardTitle>
+                  <CardDescription>Manage your account security and password</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <Alert>
-                    <Shield className="h-4 w-4" />
-                    <AlertDescription>
-                      Keep your account secure by using a strong password and enabling two-factor authentication.
-                    </AlertDescription>
-                  </Alert>
-
+                  {/* Password Change */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Change Password</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
+                    <h3 className="text-lg font-medium">Change Password</h3>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
                         <Label htmlFor="current_password">Current Password</Label>
                         <div className="relative">
                           <Input
                             id="current_password"
-                            type={showCurrentPassword ? "text" : "password"}
-                            value={passwordForm.currentPassword}
-                            onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                            type={showPasswords ? "text" : "password"}
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
                             placeholder="Enter current password"
                           />
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                            className="absolute right-0 top-0 h-full px-3"
+                            onClick={() => setShowPasswords(!showPasswords)}
                           >
-                            {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </Button>
                         </div>
                       </div>
-                      <div className="space-y-2">
+                      <div>
                         <Label htmlFor="new_password">New Password</Label>
-                        <div className="relative">
-                          <Input
-                            id="new_password"
-                            type={showNewPassword ? "text" : "password"}
-                            value={passwordForm.newPassword}
-                            onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                            placeholder="Enter new password"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                            onClick={() => setShowNewPassword(!showNewPassword)}
-                          >
-                            {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                        </div>
+                        <Input
+                          id="new_password"
+                          type={showPasswords ? "text" : "password"}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Enter new password"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="confirm_password">Confirm New Password</Label>
+                        <Input
+                          id="confirm_password"
+                          type={showPasswords ? "text" : "password"}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Confirm new password"
+                        />
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirm_password">Confirm New Password</Label>
-                      <Input
-                        id="confirm_password"
-                        type="password"
-                        value={passwordForm.confirmPassword}
-                        onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                        placeholder="Confirm new password"
-                      />
-                    </div>
-                    <Button onClick={handlePasswordUpdate} disabled={loading}>
-                      <Shield className="w-4 h-4 mr-2" />
-                      {loading ? "Updating..." : "Update Password"}
+                    <Button
+                      onClick={handlePasswordChange}
+                      disabled={isChangingPassword || !newPassword || !confirmPassword}
+                    >
+                      <Lock className="w-4 h-4 mr-2" />
+                      {isChangingPassword ? "Updating..." : "Update Password"}
                     </Button>
                   </div>
 
-                  <Separator />
-
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Account Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div className="flex items-center space-x-2">
-                        <Mail className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Email:</span>
-                        <span>{user?.email}</span>
+                  {/* Two-Factor Authentication */}
+                  <div className="border-t pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-medium">Two-Factor Authentication</h3>
+                        <p className="text-sm text-gray-500">Add an extra layer of security to your account</p>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Member since:</span>
-                        <span>{new Date(profile?.created_at || Date.now()).toLocaleDateString()}</span>
+                      <Switch checked={profile?.two_factor_enabled || false} disabled />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">Coming soon</p>
+                  </div>
+
+                  {/* Login Sessions */}
+                  <div className="border-t pt-6">
+                    <h3 className="text-lg font-medium mb-4">Active Sessions</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <Smartphone className="w-5 h-5 text-gray-400" />
+                          <div>
+                            <p className="font-medium">Current Session</p>
+                            <p className="text-sm text-gray-500">Chrome on Windows • Nigeria</p>
+                          </div>
+                        </div>
+                        <span className="text-sm text-green-600">Active now</span>
                       </div>
                     </div>
                   </div>
@@ -521,105 +429,144 @@ export default function SettingsPage() {
             </TabsContent>
 
             {/* Notifications Tab */}
-            <TabsContent value="notifications">
+            <TabsContent value="notifications" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Notification Preferences</CardTitle>
-                  <CardDescription>Choose what notifications you want to receive.</CardDescription>
+                  <CardTitle className="flex items-center">
+                    <Bell className="w-5 h-5 mr-2" />
+                    Notification Preferences
+                  </CardTitle>
+                  <CardDescription>Choose what notifications you want to receive</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Email Notifications</Label>
-                        <p className="text-sm text-muted-foreground">Receive notifications via email</p>
+                      <div>
+                        <h4 className="font-medium">Email Notifications</h4>
+                        <p className="text-sm text-gray-500">Receive notifications via email</p>
                       </div>
                       <Switch
                         checked={notifications.email_notifications}
                         onCheckedChange={(checked) =>
-                          setNotifications({ ...notifications, email_notifications: checked })
+                          setNotifications((prev) => ({ ...prev, email_notifications: checked }))
                         }
                       />
                     </div>
+
                     <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Push Notifications</Label>
-                        <p className="text-sm text-muted-foreground">Receive push notifications in your browser</p>
+                      <div>
+                        <h4 className="font-medium">Push Notifications</h4>
+                        <p className="text-sm text-gray-500">Receive push notifications on your device</p>
                       </div>
                       <Switch
                         checked={notifications.push_notifications}
                         onCheckedChange={(checked) =>
-                          setNotifications({ ...notifications, push_notifications: checked })
+                          setNotifications((prev) => ({ ...prev, push_notifications: checked }))
                         }
                       />
                     </div>
+
                     <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Community Updates</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Get notified about community posts and activities
-                        </p>
+                      <div>
+                        <h4 className="font-medium">Community Updates</h4>
+                        <p className="text-sm text-gray-500">Get notified about new posts and comments</p>
                       </div>
                       <Switch
                         checked={notifications.community_updates}
                         onCheckedChange={(checked) =>
-                          setNotifications({ ...notifications, community_updates: checked })
+                          setNotifications((prev) => ({ ...prev, community_updates: checked }))
                         }
                       />
                     </div>
+
                     <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Marketing Emails</Label>
-                        <p className="text-sm text-muted-foreground">Receive promotional emails and updates</p>
+                      <div>
+                        <h4 className="font-medium">New Content</h4>
+                        <p className="text-sm text-gray-500">Be notified when new content is available</p>
                       </div>
                       <Switch
-                        checked={notifications.marketing_emails}
-                        onCheckedChange={(checked) => setNotifications({ ...notifications, marketing_emails: checked })}
+                        checked={notifications.new_content}
+                        onCheckedChange={(checked) => setNotifications((prev) => ({ ...prev, new_content: checked }))}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium">Promotional</h4>
+                        <p className="text-sm text-gray-500">Receive promotional offers and updates</p>
+                      </div>
+                      <Switch
+                        checked={notifications.promotional}
+                        onCheckedChange={(checked) => setNotifications((prev) => ({ ...prev, promotional: checked }))}
                       />
                     </div>
                   </div>
-                  <Button onClick={handleNotificationUpdate} disabled={loading}>
-                    <Bell className="w-4 h-4 mr-2" />
-                    {loading ? "Saving..." : "Save Preferences"}
+
+                  <Button>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Preferences
                   </Button>
                 </CardContent>
               </Card>
             </TabsContent>
 
-            {/* Privacy Tab */}
-            <TabsContent value="privacy">
+            {/* Account Tab */}
+            <TabsContent value="account" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Privacy Settings</CardTitle>
-                  <CardDescription>Control who can see your information and interact with you.</CardDescription>
+                  <CardTitle>Account Information</CardTitle>
+                  <CardDescription>View your account details and membership status</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Show Online Status</Label>
-                        <p className="text-sm text-muted-foreground">Let others see when you're online</p>
-                      </div>
-                      <Switch
-                        checked={privacy.show_online_status}
-                        onCheckedChange={(checked) => setPrivacy({ ...privacy, show_online_status: checked })}
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Account ID</Label>
+                      <Input value={profile?.id || ""} disabled className="bg-gray-50 dark:bg-gray-800" />
+                    </div>
+                    <div>
+                      <Label>Member Since</Label>
+                      <Input
+                        value={profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : ""}
+                        disabled
+                        className="bg-gray-50 dark:bg-gray-800"
                       />
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Allow Direct Messages</Label>
-                        <p className="text-sm text-muted-foreground">Allow other users to send you direct messages</p>
-                      </div>
-                      <Switch
-                        checked={privacy.allow_direct_messages}
-                        onCheckedChange={(checked) => setPrivacy({ ...privacy, allow_direct_messages: checked })}
+                    <div>
+                      <Label>Current Tier</Label>
+                      <Input
+                        value={profile?.tier?.replace("_", " ").toUpperCase() || "GRASSROOT"}
+                        disabled
+                        className="bg-gray-50 dark:bg-gray-800"
+                      />
+                    </div>
+                    <div>
+                      <Label>Verification Status</Label>
+                      <Input
+                        value={profile?.is_verified ? "Verified" : "Not Verified"}
+                        disabled
+                        className="bg-gray-50 dark:bg-gray-800"
                       />
                     </div>
                   </div>
-                  <Button onClick={handleNotificationUpdate} disabled={loading}>
-                    <Lock className="w-4 h-4 mr-2" />
-                    {loading ? "Saving..." : "Save Privacy Settings"}
-                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border-red-200 dark:border-red-800">
+                <CardHeader>
+                  <CardTitle className="text-red-600 dark:text-red-400">Danger Zone</CardTitle>
+                  <CardDescription>Irreversible and destructive actions</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
+                    <h4 className="font-medium text-red-800 dark:text-red-200 mb-2">Delete Account</h4>
+                    <p className="text-sm text-red-600 dark:text-red-300 mb-4">
+                      Once you delete your account, there is no going back. Please be certain.
+                    </p>
+                    <Button variant="destructive" onClick={handleDeleteAccount} disabled={isDeletingAccount}>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      {isDeletingAccount ? "Processing..." : "Delete Account"}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

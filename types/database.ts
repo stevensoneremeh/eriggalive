@@ -1,6 +1,6 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
-export type UserTier = "erigga_citizen" | "erigga_indigen" | "enterprise"
+export type UserTier = "grassroot" | "pioneer" | "elder" | "blood_brotherhood" | "admin"
 export type UserRole = "user" | "moderator" | "admin" | "super_admin"
 export type SubscriptionStatus = "active" | "canceled" | "past_due" | "incomplete" | "trialing"
 export type PaymentStatus = "pending" | "processing" | "completed" | "failed" | "refunded" | "canceled"
@@ -15,25 +15,22 @@ export type ReportReason = "spam" | "harassment" | "hate_speech" | "misinformati
 export type ReportTargetType = "post" | "comment"
 
 export interface User {
-  id: string
+  id: number
   auth_user_id: string
   username: string
   full_name: string | null
   email: string
   avatar_url: string | null
-  profile_image_url: string | null
   tier: UserTier
-  subscription_tier: UserTier
   role: UserRole
   level: number
   points: number
   coins: number
-  coins_balance: number
   erigga_id?: string
   bio: string | null
   location?: string
-  website?: string
-  phone?: string
+  wallet_address?: string
+  phone_number?: string
   date_of_birth?: string
   gender?: string
   is_verified: boolean
@@ -42,30 +39,22 @@ export interface User {
   ban_reason?: string
   banned_until?: string
   last_login?: string
-  last_seen_at?: string
   login_count: number
   referral_code?: string
-  referred_by?: string
+  referred_by?: number
   subscription_expires_at?: string
   email_verified: boolean
   phone_verified: boolean
   two_factor_enabled: boolean
   two_factor_secret?: string
   preferences: Record<string, any>
-  social_links: Record<string, any>
   metadata: Record<string, any>
-  profile_completeness: number
-  reputation_score: number
-  total_posts: number
-  total_comments: number
-  total_votes_received: number
-  is_profile_public: boolean
   created_at: string
   updated_at: string
 }
 
 export interface CommunityCategory {
-  id: string
+  id: number
   name: string
   slug: string
   description: string | null
@@ -77,47 +66,46 @@ export interface CommunityCategory {
   updated_at: string
 }
 
-export interface CommunityPostRow {
-  id: string
-  user_id: string
-  category_id: string
+export interface CommunityPost {
+  id: number
+  user_id: number
+  category_id: number
   title: string | null
   content: string
   media_url: string | null
   media_type: string | null
   vote_count: number
   comment_count: number
-  hashtags: string[]
-  tags: string[]
-  mentions: { user_id: string; username: string; position: number }[]
+  is_pinned: boolean
+  is_locked: boolean
+  tags?: string[]
+  mentions?: { user_id: string; username: string; position: number }[]
   is_published: boolean
   is_edited: boolean
   is_deleted: boolean
   deleted_at?: string
   created_at: string
   updated_at: string
-}
-
-export interface CommunityPost extends CommunityPostRow {
-  user?: Pick<User, "id" | "auth_user_id" | "username" | "full_name" | "avatar_url" | "profile_image_url" | "tier">
-  category?: Pick<CommunityCategory, "id" | "name" | "slug" | "color" | "icon">
+  // Joined data
+  user?: Pick<User, "id" | "auth_user_id" | "username" | "full_name" | "avatar_url" | "tier">
+  category?: Pick<CommunityCategory, "id" | "name" | "slug">
   has_voted?: boolean
-  user_voted?: boolean
   comments?: CommunityComment[]
 }
 
 export interface CommunityPostVote {
-  post_id: string
-  user_id: string
+  post_id: number
+  user_id: number
   created_at: string
 }
 
 export interface CommunityComment {
-  id: string
-  post_id: string
-  user_id: string
-  parent_comment_id: string | null
+  id: number
+  post_id: number
+  user_id: number
+  parent_id: number | null
   content: string
+  vote_count: number
   like_count: number
   reply_count: number
   is_edited: boolean
@@ -125,21 +113,22 @@ export interface CommunityComment {
   deleted_at?: string
   created_at: string
   updated_at: string
-  user?: Pick<User, "id" | "auth_user_id" | "username" | "full_name" | "avatar_url" | "profile_image_url" | "tier">
+  // Joined data
+  user?: Pick<User, "id" | "auth_user_id" | "username" | "full_name" | "avatar_url" | "tier">
   replies?: CommunityComment[]
   has_liked?: boolean
 }
 
 export interface CommunityCommentLike {
-  comment_id: string
-  user_id: string
+  comment_id: number
+  user_id: number
   created_at: string
 }
 
 export interface CommunityReport {
-  id: string
-  reporter_user_id: string
-  target_id: string
+  id: number
+  reporter_user_id: number
+  target_id: number
   target_type: ReportTargetType
   reason: ReportReason
   additional_notes?: string
@@ -155,48 +144,56 @@ export interface Database {
       users: {
         Row: User
         Insert: {
-          id?: string
+          id?: number
           auth_user_id: string
           username: string
           full_name?: string | null
           email: string
           tier?: UserTier
-          subscription_tier?: UserTier
+          role?: UserRole
           coins?: number
-          coins_balance?: number
           level?: number
           points?: number
           avatar_url?: string | null
-          profile_image_url?: string | null
           bio?: string | null
+          location?: string | null
+          phone_number?: string | null
           is_verified?: boolean
           is_active?: boolean
           is_banned?: boolean
-          reputation_score?: number
-          profile_completeness?: number
+          email_verified?: boolean
+          phone_verified?: boolean
+          two_factor_enabled?: boolean
+          login_count?: number
+          preferences?: Record<string, any>
+          metadata?: Record<string, any>
           created_at?: string
           updated_at?: string
         }
         Update: {
-          id?: string
+          id?: number
           auth_user_id?: string
           username?: string
           full_name?: string | null
           email?: string
           tier?: UserTier
-          subscription_tier?: UserTier
+          role?: UserRole
           coins?: number
-          coins_balance?: number
           level?: number
           points?: number
           avatar_url?: string | null
-          profile_image_url?: string | null
           bio?: string | null
+          location?: string | null
+          phone_number?: string | null
           is_verified?: boolean
           is_active?: boolean
           is_banned?: boolean
-          reputation_score?: number
-          profile_completeness?: number
+          email_verified?: boolean
+          phone_verified?: boolean
+          two_factor_enabled?: boolean
+          login_count?: number
+          preferences?: Record<string, any>
+          metadata?: Record<string, any>
           created_at?: string
           updated_at?: string
         }
@@ -205,24 +202,24 @@ export interface Database {
       community_categories: {
         Row: CommunityCategory
         Insert: {
-          id?: string
+          id?: number
           name: string
           slug: string
           description?: string | null
-          icon?: string
-          color?: string
+          icon?: string | null
+          color?: string | null
           display_order?: number
           is_active?: boolean
           created_at?: string
           updated_at?: string
         }
         Update: {
-          id?: string
+          id?: number
           name?: string
           slug?: string
           description?: string | null
-          icon?: string
-          color?: string
+          icon?: string | null
+          color?: string | null
           display_order?: number
           is_active?: boolean
           created_at?: string
@@ -231,20 +228,20 @@ export interface Database {
         Relationships: []
       }
       community_posts: {
-        Row: CommunityPostRow
+        Row: CommunityPost
         Insert: {
-          id?: string
-          user_id: string
-          category_id: string
+          id?: number
+          user_id: number
+          category_id: number
           title?: string | null
           content: string
           media_url?: string | null
           media_type?: string | null
           vote_count?: number
           comment_count?: number
-          hashtags?: string[]
+          is_pinned?: boolean
+          is_locked?: boolean
           tags?: string[]
-          mentions?: { user_id: string; username: string; position: number }[]
           is_published?: boolean
           is_edited?: boolean
           is_deleted?: boolean
@@ -252,18 +249,18 @@ export interface Database {
           updated_at?: string
         }
         Update: {
-          id?: string
-          user_id?: string
-          category_id?: string
+          id?: number
+          user_id?: number
+          category_id?: number
           title?: string | null
           content?: string
           media_url?: string | null
           media_type?: string | null
           vote_count?: number
           comment_count?: number
-          hashtags?: string[]
+          is_pinned?: boolean
+          is_locked?: boolean
           tags?: string[]
-          mentions?: { user_id: string; username: string; position: number }[]
           is_published?: boolean
           is_edited?: boolean
           is_deleted?: boolean
@@ -290,31 +287,37 @@ export interface Database {
       community_comments: {
         Row: CommunityComment
         Insert: {
-          id?: string
-          post_id: string
-          user_id: string
-          parent_comment_id?: string | null
+          id?: number
+          post_id: number
+          user_id: number
+          parent_id?: number | null
           content: string
+          vote_count?: number
           like_count?: number
           reply_count?: number
+          is_edited?: boolean
+          is_deleted?: boolean
           created_at?: string
           updated_at?: string
         }
         Update: {
-          id?: string
-          post_id?: string
-          user_id?: string
-          parent_comment_id?: string | null
+          id?: number
+          post_id?: number
+          user_id?: number
+          parent_id?: number | null
           content?: string
+          vote_count?: number
           like_count?: number
           reply_count?: number
+          is_edited?: boolean
+          is_deleted?: boolean
           created_at?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "community_comments_parent_comment_id_fkey"
-            columns: ["parent_comment_id"]
+            foreignKeyName: "community_comments_parent_id_fkey"
+            columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "community_comments"
             referencedColumns: ["id"]
@@ -335,49 +338,112 @@ export interface Database {
           },
         ]
       }
+      community_votes: {
+        Row: {
+          id: number
+          user_id: number
+          post_id: number | null
+          comment_id: number | null
+          vote_type: "up" | "down"
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          user_id: number
+          post_id?: number | null
+          comment_id?: number | null
+          vote_type: "up" | "down"
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          user_id?: number
+          post_id?: number | null
+          comment_id?: number | null
+          vote_type?: "up" | "down"
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_votes_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "community_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_votes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_votes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_likes: {
+        Row: {
+          id: number
+          post_id: string
+          user_id: number
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          post_id: string
+          user_id: number
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          post_id?: string
+          user_id?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      post_comments: {
+        Row: {
+          id: string
+          post_id: string
+          author_id: number
+          content: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          author_id: number
+          content: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          author_id?: number
+          content?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      get_community_posts_with_user_data: {
-        Args: {
-          category_filter?: string
-        }
-        Returns: {
-          id: string
-          user_id: string
-          category_id: string
-          title: string
-          content: string
-          media_url: string | null
-          media_type: string | null
-          vote_count: number
-          comment_count: number
-          created_at: string
-          updated_at: string
-          username: string
-          full_name: string
-          avatar_url: string | null
-          tier: string
-          category_name: string
-          category_color: string
-          category_icon: string
-          user_voted: boolean
-        }[]
-      }
-      toggle_post_vote: {
-        Args: {
-          post_id_param: string
-        }
-        Returns: Json
-      }
+      [_ in never]: never
     }
     Enums: {
-      user_tier: "erigga_citizen" | "erigga_indigen" | "enterprise"
-      user_role: "user" | "moderator" | "admin" | "super_admin"
-      report_reason: "spam" | "harassment" | "hate_speech" | "misinformation" | "inappropriate_content" | "other"
-      report_target_type: "post" | "comment"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never

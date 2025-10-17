@@ -2,13 +2,10 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createAdminSupabaseClient } from "@/lib/supabase/server"
 
-// Force dynamic rendering
-export const dynamic = 'force-dynamic'
-
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient()
-    const adminSupabase = await createAdminSupabaseClient()
+    const supabase = createServerSupabaseClient()
+    const adminSupabase = createAdminSupabaseClient()
 
     // Check authentication
     const {
@@ -22,7 +19,7 @@ export async function POST(request: NextRequest) {
     // Get user profile to check admin privileges
     const { data: profile } = await supabase.from("users").select("tier, role").eq("auth_user_id", user.id).single()
 
-    if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
+    if (!profile || (profile.tier === "grassroot" && profile.role !== "admin")) {
       return NextResponse.json({ error: "Insufficient privileges" }, { status: 403 })
     }
 

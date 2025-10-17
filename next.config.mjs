@@ -7,49 +7,6 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Enable development server for all hostnames in Replit environment
-  webpack: (config, { dev, isServer }) => {
-    if (dev) {
-      config.watchOptions = {
-        poll: 1000,
-        aggregateTimeout: 300,
-      }
-    }
-    
-    // Memory optimization for build
-    if (!dev) {
-      // Disable caching to prevent disk errors
-      config.cache = false
-      
-      config.optimization = {
-        ...config.optimization,
-        minimize: true,
-        splitChunks: {
-          chunks: 'all',
-          maxSize: 200000,
-          cacheGroups: {
-            default: false,
-            vendors: false,
-            commons: {
-              name: 'commons',
-              chunks: 'all',
-              minChunks: 2,
-            },
-          },
-        },
-      }
-      
-      // Reduce memory usage during build
-      config.performance = {
-        ...config.performance,
-        maxAssetSize: 500000,
-        maxEntrypointSize: 500000,
-      }
-    }
-    
-    return config
-  },
-  // Configuration for Replit proxy environment
   images: {
     domains: [
       'localhost',
@@ -62,20 +19,8 @@ const nextConfig = {
         protocol: 'https',
         hostname: '**.supabase.co',
       },
-      {
-        protocol: 'https',
-        hostname: '**.replit.dev',
-      },
-      {
-        protocol: 'https',
-        hostname: '**.repl.co',
-      },
     ],
     unoptimized: true,
-  },
-  // Enable allowedHosts for Replit proxy environment
-  async rewrites() {
-    return []
   },
   async headers() {
     return [
@@ -119,12 +64,10 @@ const nextConfig = {
     missingSuspenseWithCSRBailout: false,
     // Additional experimental flags to help with SSR issues
     serverComponentsExternalPackages: [],
-    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+    optimizePackageImports: ['lucide-react'],
   },
-  // Optimize production builds
-  productionBrowserSourceMaps: false,
-  // Enable SWC minification for faster builds with less memory
-  swcMinify: true,
+  // Force static generation for specific pages
+  output: 'standalone',
 };
 
 export default nextConfig;

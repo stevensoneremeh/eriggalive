@@ -20,7 +20,7 @@ import {
 import { formatDistanceToNow } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/components/ui/use-toast"
-import { createClient } from "@/lib/supabase-utils"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Database } from "@/types/database"
 
 interface Notification {
@@ -40,7 +40,7 @@ export function NotificationCenter() {
   const [loading, setLoading] = useState(true)
   const { user, profile } = useAuth()
   const { toast } = useToast()
-  const supabase = createClient()
+  const supabase = createClientComponentClient<Database>()
 
   const loadNotifications = useCallback(async () => {
     if (!user || !profile) return

@@ -5,8 +5,7 @@ CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
 
 -- Create custom types
 DO $$ BEGIN
-    -- Updated user_tier enum to only include free, pro, enterprise
-    CREATE TYPE user_tier AS ENUM ('free', 'pro', 'enterprise');
+    CREATE TYPE user_tier AS ENUM ('grassroot', 'pioneer', 'elder', 'blood');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;

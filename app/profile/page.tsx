@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { AuthGuard } from "@/components/auth-guard"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,7 +13,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
-import { Switch } from "@/components/ui/switch"
 import {
   User,
   Camera,
@@ -30,16 +29,9 @@ import {
   Star,
   TrendingUp,
   MessageCircle,
-  Globe,
-  Instagram,
-  Twitter,
-  Facebook,
-  Youtube,
-  Shield,
-  CheckCircle,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabaseClient"
 
 export default function ProfilePage() {
   const { user, profile, refreshProfile } = useAuth()
@@ -48,8 +40,8 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false)
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const supabase = createClient()
 
+  // Form state
   const [formData, setFormData] = useState({
     full_name: profile?.full_name || "",
     username: profile?.username || "",
@@ -58,28 +50,10 @@ export default function ProfilePage() {
     website: profile?.website || "",
     phone: profile?.phone || "",
     date_of_birth: profile?.date_of_birth || "",
-    social_links: {
-      twitter: profile?.social_links?.twitter || "",
-      instagram: profile?.social_links?.instagram || "",
-      facebook: profile?.social_links?.facebook || "",
-      youtube: profile?.social_links?.youtube || "",
-    },
-    is_profile_public: profile?.is_profile_public ?? true,
   })
 
-  const handleInputChange = (field: string, value: string | boolean) => {
-    if (field.startsWith("social_links.")) {
-      const socialField = field.split(".")[1]
-      setFormData((prev) => ({
-        ...prev,
-        social_links: {
-          ...prev.social_links,
-          [socialField]: value as string,
-        },
-      }))
-    } else {
-      setFormData((prev) => ({ ...prev, [field]: value }))
-    }
+  const handleInputChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
   const handleSaveProfile = async () => {
@@ -87,17 +61,20 @@ export default function ProfilePage() {
 
     setLoading(true)
     try {
-      const response = await fetch("/api/profile/update", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      })
+      const { error } = await supabase
+        .from("users")
+        .update({
+          full_name: formData.full_name,
+          username: formData.username,
+          bio: formData.bio,
+          location: formData.location,
+          website: formData.website,
+          phone: formData.phone,
+          date_of_birth: formData.date_of_birth,
+        })
+        .eq("id", profile.id)
 
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to update profile")
-      }
+      if (error) throw error
 
       await refreshProfile()
       setIsEditing(false)
@@ -123,19 +100,27 @@ export default function ProfilePage() {
 
     setIsUploadingAvatar(true)
     try {
-      const formData = new FormData()
-      formData.append("file", file)
+      // Upload to Supabase Storage
+      const fileExt = file.name.split(".").pop()
+      const fileName = `${profile.id}-${Date.now()}.${fileExt}`
+      const filePath = `avatars/${fileName}`
 
-      const response = await fetch("/api/profile/upload-image", {
-        method: "POST",
-        body: formData,
-      })
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("eriggalive-assets")
+        .upload(filePath, file)
 
-      const result = await response.json()
+      if (uploadError) throw uploadError
 
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to upload image")
-      }
+      // Get public URL
+      const { data: urlData } = supabase.storage.from("eriggalive-assets").getPublicUrl(uploadData.path)
+
+      // Update user profile
+      const { error: updateError } = await supabase
+        .from("users")
+        .update({ avatar_url: urlData.publicUrl })
+        .eq("id", profile.id)
+
+      if (updateError) throw updateError
 
       await refreshProfile()
       toast({
@@ -146,7 +131,7 @@ export default function ProfilePage() {
       console.error("Avatar upload error:", error)
       toast({
         title: "Error",
-        description: error.message || "Failed to update profile picture. Please try again.",
+        description: "Failed to update profile picture. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -155,88 +140,34 @@ export default function ProfilePage() {
   }
 
   const getTierColor = (tier: string) => {
-    switch (tier?.toLowerCase()) {
-      case "free":
-      case "erigga_citizen":
+    switch (tier) {
+      case "grassroot":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-      case "pro":
-      case "erigga_indigen":
+      case "pioneer":
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+      case "elder":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-      case "ent":
-      case "enterprise":
+      case "blood_brotherhood":
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
       default:
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
     }
   }
 
   const getTierProgress = (tier: string) => {
-    switch (tier?.toLowerCase()) {
-      case "free":
-      case "erigga_citizen":
-        return 33
-      case "pro":
-      case "erigga_indigen":
-        return 66
-      case "ent":
-      case "enterprise":
+    switch (tier) {
+      case "grassroot":
+        return 25
+      case "pioneer":
+        return 50
+      case "elder":
+        return 75
+      case "blood_brotherhood":
         return 100
       default:
-        return 33
+        return 0
     }
   }
-
-  const getTierDisplayName = (tier: string) => {
-    switch (tier?.toLowerCase()) {
-      case "free":
-      case "erigga_citizen":
-        return "Erigga Citizen"
-      case "pro":
-      case "erigga_indigen":
-        return "Erigga Indigen"
-      case "ent":
-      case "enterprise":
-        return "E"
-      default:
-        return "Erigga Citizen"
-    }
-  }
-
-  const getProfileCompleteness = () => {
-    return profile?.profile_completeness || 0
-  }
-
-  const getCompletenessColor = (completeness: number) => {
-    if (completeness >= 80) return "text-green-600"
-    if (completeness >= 60) return "text-yellow-600"
-    return "text-red-600"
-  }
-
-  // Debounced fetch for profile data to prevent request storms
-  const loadUserProfile = async () => {
-    try {
-      // This is a placeholder, assuming refreshProfile() fetches necessary data
-      // or you might have another fetch call here.
-      // For now, we rely on refreshProfile() to update the auth context.
-      await refreshProfile();
-    } catch (error) {
-      console.error("Failed to load user profile:", error);
-      toast({
-        title: "Error loading profile",
-        description: "Could not fetch your profile data. Please try again later.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      loadUserProfile()
-    }, 100)
-
-    return () => clearTimeout(timeoutId)
-  }, [])
-
 
   return (
     <AuthGuard>
@@ -255,44 +186,6 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <Card className="mb-8 border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5" />
-                Profile Completeness
-              </CardTitle>
-              <CardDescription>
-                Complete your profile to unlock all features and improve your visibility
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Progress</span>
-                  <span className={`text-sm font-bold ${getCompletenessColor(getProfileCompleteness())}`}>
-                    {getProfileCompleteness()}%
-                  </span>
-                </div>
-                <Progress value={getProfileCompleteness()} className="h-2" />
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
-                  <Badge variant={profile?.username ? "default" : "secondary"}>
-                    Username {profile?.username ? "✓" : "✗"}
-                  </Badge>
-                  <Badge variant={profile?.full_name ? "default" : "secondary"}>
-                    Full Name {profile?.full_name ? "✓" : "✗"}
-                  </Badge>
-                  <Badge variant={profile?.profile_image_url || profile?.avatar_url ? "default" : "secondary"}>
-                    Photo {profile?.profile_image_url || profile?.avatar_url ? "✓" : "✗"}
-                  </Badge>
-                  <Badge variant={profile?.bio ? "default" : "secondary"}>Bio {profile?.bio ? "✓" : "✗"}</Badge>
-                  <Badge variant={profile?.date_of_birth ? "default" : "secondary"}>
-                    Birthday {profile?.date_of_birth ? "✓" : "✗"}
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Profile Header Card */}
           <Card className="mb-8 border-0 shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
             <CardContent className="p-8">
@@ -300,10 +193,7 @@ export default function ProfilePage() {
                 {/* Avatar Section */}
                 <div className="relative">
                   <Avatar className="h-32 w-32 ring-4 ring-primary/10">
-                    <AvatarImage
-                      src={profile?.profile_image_url || profile?.avatar_url || "/placeholder-user.jpg"}
-                      alt={profile?.username}
-                    />
+                    <AvatarImage src={profile?.avatar_url || "/placeholder-user.jpg"} alt={profile?.username} />
                     <AvatarFallback className="bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold text-3xl">
                       {profile?.full_name?.charAt(0) || profile?.username?.charAt(0) || "U"}
                     </AvatarFallback>
@@ -418,7 +308,7 @@ export default function ProfilePage() {
                     <div className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                          <Label htmlFor="full_name">Full Name *</Label>
+                          <Label htmlFor="full_name">Full Name</Label>
                           <Input
                             id="full_name"
                             value={formData.full_name}
@@ -427,7 +317,7 @@ export default function ProfilePage() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="username">Username *</Label>
+                          <Label htmlFor="username">Username</Label>
                           <Input
                             id="username"
                             value={formData.username}
@@ -445,22 +335,16 @@ export default function ProfilePage() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="location" className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4" />
-                            Location
-                          </Label>
+                          <Label htmlFor="location">Location</Label>
                           <Input
                             id="location"
                             value={formData.location}
                             onChange={(e) => handleInputChange("location", e.target.value)}
-                            placeholder="City, Country"
+                            placeholder="Your location"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="website" className="flex items-center gap-2">
-                            <Globe className="h-4 w-4" />
-                            Website
-                          </Label>
+                          <Label htmlFor="website">Website</Label>
                           <Input
                             id="website"
                             value={formData.website}
@@ -469,10 +353,7 @@ export default function ProfilePage() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="date_of_birth" className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
-                            Date of Birth
-                          </Label>
+                          <Label htmlFor="date_of_birth">Date of Birth</Label>
                           <Input
                             id="date_of_birth"
                             type="date"
@@ -481,7 +362,6 @@ export default function ProfilePage() {
                           />
                         </div>
                       </div>
-
                       <div className="space-y-2">
                         <Label htmlFor="bio">Bio</Label>
                         <Textarea
@@ -491,83 +371,7 @@ export default function ProfilePage() {
                           placeholder="Tell us about yourself..."
                           rows={4}
                         />
-                        <p className="text-xs text-muted-foreground">{formData.bio?.length || 0}/500 characters</p>
                       </div>
-
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Social Links</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="twitter" className="flex items-center gap-2">
-                              <Twitter className="h-4 w-4" />
-                              Twitter
-                            </Label>
-                            <Input
-                              id="twitter"
-                              value={formData.social_links.twitter}
-                              onChange={(e) => handleInputChange("social_links.twitter", e.target.value)}
-                              placeholder="@username"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="instagram" className="flex items-center gap-2">
-                              <Instagram className="h-4 w-4" />
-                              Instagram
-                            </Label>
-                            <Input
-                              id="instagram"
-                              value={formData.social_links.instagram}
-                              onChange={(e) => handleInputChange("social_links.instagram", e.target.value)}
-                              placeholder="@username"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="facebook" className="flex items-center gap-2">
-                              <Facebook className="h-4 w-4" />
-                              Facebook
-                            </Label>
-                            <Input
-                              id="facebook"
-                              value={formData.social_links.facebook}
-                              onChange={(e) => handleInputChange("social_links.facebook", e.target.value)}
-                              placeholder="facebook.com/username"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="youtube" className="flex items-center gap-2">
-                              <Youtube className="h-4 w-4" />
-                              YouTube
-                            </Label>
-                            <Input
-                              id="youtube"
-                              value={formData.social_links.youtube}
-                              onChange={(e) => handleInputChange("social_links.youtube", e.target.value)}
-                              placeholder="youtube.com/@username"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold flex items-center gap-2">
-                          <Shield className="h-5 w-5" />
-                          Privacy Settings
-                        </h3>
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-1">
-                            <Label htmlFor="is_profile_public">Public Profile</Label>
-                            <p className="text-sm text-muted-foreground">
-                              Allow others to view your profile information
-                            </p>
-                          </div>
-                          <Switch
-                            id="is_profile_public"
-                            checked={formData.is_profile_public}
-                            onCheckedChange={(checked) => handleInputChange("is_profile_public", checked)}
-                          />
-                        </div>
-                      </div>
-
                       <div className="flex space-x-4">
                         <Button onClick={handleSaveProfile} disabled={loading}>
                           <Save className="w-4 h-4 mr-2" />
@@ -646,69 +450,6 @@ export default function ProfilePage() {
                           )}
                         </div>
                       </div>
-
-                      {(profile?.social_links?.twitter ||
-                        profile?.social_links?.instagram ||
-                        profile?.social_links?.facebook ||
-                        profile?.social_links?.youtube) && (
-                        <div className="space-y-4">
-                          <h3 className="text-lg font-semibold">Social Links</h3>
-                          <div className="flex flex-wrap gap-4">
-                            {profile?.social_links?.twitter && (
-                              <a
-                                href={`https://twitter.com/${profile.social_links.twitter.replace("@", "")}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 text-blue-500 hover:text-blue-600"
-                              >
-                                <Twitter className="h-4 w-4" />
-                                {profile.social_links.twitter}
-                              </a>
-                            )}
-                            {profile?.social_links?.instagram && (
-                              <a
-                                href={`https://instagram.com/${profile.social_links.instagram.replace("@", "")}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 text-pink-500 hover:text-pink-600"
-                              >
-                                <Instagram className="h-4 w-4" />
-                                {profile.social_links.instagram}
-                              </a>
-                            )}
-                            {profile?.social_links?.facebook && (
-                              <a
-                                href={
-                                  profile.social_links.facebook.startsWith("http")
-                                    ? profile.social_links.facebook
-                                    : `https://facebook.com/${profile.social_links.facebook}`
-                                }
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 text-blue-600 hover:text-blue-700"
-                              >
-                                <Facebook className="h-4 w-4" />
-                                Facebook
-                              </a>
-                            )}
-                            {profile?.social_links?.youtube && (
-                              <a
-                                href={
-                                  profile.social_links.youtube.startsWith("http")
-                                    ? profile.social_links.youtube
-                                    : `https://youtube.com/${profile.social_links.youtube}`
-                                }
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 text-red-500 hover:text-red-600"
-                              >
-                                <Youtube className="h-4 w-4" />
-                                YouTube
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
                 </CardContent>
@@ -768,19 +509,19 @@ export default function ProfilePage() {
                         <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                           <div
                             className={`w-4 h-4 rounded-full mx-auto mb-2 ${
-                              getTierProgress(profile?.tier || "erigga_citizen") >= 75 ? "bg-blue-500" : "bg-gray-300"
+                              getTierProgress(profile?.tier || "grassroot") >= 75 ? "bg-blue-500" : "bg-gray-300"
                             }`}
                           />
-                          <p className="text-sm font-medium">Erigga Indigen</p>
+                          <p className="text-sm font-medium">Elder</p>
                           <p className="text-xs text-gray-500">Respected</p>
                         </div>
                         <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                           <div
                             className={`w-4 h-4 rounded-full mx-auto mb-2 ${
-                              getTierProgress(profile?.tier || "erigga_citizen") >= 100 ? "bg-yellow-500" : "bg-gray-300"
+                              getTierProgress(profile?.tier || "grassroot") >= 100 ? "bg-yellow-500" : "bg-gray-300"
                             }`}
                           />
-                          <p className="text-sm font-medium">Enterprise</p>
+                          <p className="text-sm font-medium">Blood Brotherhood</p>
                           <p className="text-xs text-gray-500">Elite</p>
                         </div>
                       </div>
