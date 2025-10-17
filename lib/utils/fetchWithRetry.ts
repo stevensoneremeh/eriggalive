@@ -13,7 +13,7 @@ export async function fetchWithRetry<T>(
       
       // Don't retry on client errors (4xx)
       if (response.status >= 400 && response.status < 500) {
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         throw new Error(data.error || `Request failed with status ${response.status}`);
       }
 
@@ -23,7 +23,7 @@ export async function fetchWithRetry<T>(
       }
 
       if (!response.ok) {
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         throw new Error(data.error || `Request failed with status ${response.status}`);
       }
 
@@ -32,8 +32,10 @@ export async function fetchWithRetry<T>(
       lastError = error as Error;
       
       if (attempt < maxRetries) {
-        const delay = baseDelay * Math.pow(2, attempt);
-        console.warn(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`, error);
+        // Add jitter to prevent thundering herd
+        const jitter = Math.random() * 100;
+        const delay = (baseDelay * Math.pow(2, attempt)) + jitter;
+        console.warn(`Retry attempt ${attempt + 1}/${maxRetries} after ${Math.round(delay)}ms`, error);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }

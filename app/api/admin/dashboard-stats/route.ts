@@ -6,11 +6,6 @@ import { serverCache } from "@/lib/utils/server-cache"
 import { adminRateLimiter } from "@/lib/utils/rate-limiter"
 
 export const dynamic = 'force-dynamic'
-// export const revalidate = 60 // Cache for 60 seconds
-
-let cachedStats: any = null
-let cacheTimestamp: number = 0
-const CACHE_DURATION = 120000
 
 export async function GET(request: Request) {
   // Check if admin stats are disabled
@@ -22,13 +17,13 @@ export async function GET(request: Request) {
   }
 
   // Rate limiting
-  const ip = request.headers.get("x-forwarded-for") || "unknown"
+  const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
   const { allowed, remaining } = adminRateLimiter.check(`admin-stats:${ip}`)
 
   if (!allowed) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "X-RateLimit-Remaining": "0" } }
+      { status: 429, headers: { "X-RateLimit-Remaining": remaining.toString() } }
     )
   }
 
@@ -36,24 +31,20 @@ export async function GET(request: Request) {
   const cacheKey = "admin-dashboard-stats"
   const cached = serverCache.get(cacheKey)
   if (cached) {
-    return NextResponse.json({ success: true, ...cached, cached: true })
+    return NextResponse.json({ 
+      success: true, 
+      ...cached, 
+      cached: true 
+    }, {
+      headers: {
+        "X-RateLimit-Remaining": remaining.toString(),
+        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60"
+      }
+    })
   }
 
   try {
     const now = Date.now()
-    // This block is now redundant due to serverCache, but kept for reference
-    // if (cachedStats && (now - cacheTimestamp) < CACHE_DURATION) {
-    //   return NextResponse.json({
-    //     success: true,
-    //     stats: cachedStats,
-    //     cached: true,
-    //   }, {
-    //     headers: {
-    //       'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
-    //     }
-    //   })
-    // }
-
     const supabase = await createClient()
 
     const {
@@ -119,9 +110,6 @@ export async function GET(request: Request) {
       lastUpdated: now,
     }
 
-    // cachedStats = stats
-    // cacheTimestamp = now
-
     // Cache for 60 seconds
     serverCache.set(cacheKey, stats, 60000)
 
@@ -131,6 +119,7 @@ export async function GET(request: Request) {
     }, {
       headers: {
         'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+        'X-RateLimit-Remaining': remaining.toString()
       }
     })
   } catch (error) {

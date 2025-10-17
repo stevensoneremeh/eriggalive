@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Fetch user profile data
+    // Fetch user profile data using the correct mapping
     const { data: profile, error: profileError } = await supabase
       .from("users")
       .select("*")
@@ -29,10 +29,18 @@ export async function GET(request: NextRequest) {
 
     if (profileError) {
       console.error("Profile fetch error:", profileError)
-      return NextResponse.json(
-        { error: "Profile not found" },
-        { status: 404 }
-      )
+      
+      // If profile doesn't exist, return user data from auth
+      return NextResponse.json({ 
+        success: true,
+        profile: {
+          id: user.id,
+          email: user.email,
+          auth_user_id: user.id,
+          created_at: user.created_at
+        },
+        message: "Profile not found in users table, using auth data"
+      })
     }
 
     return NextResponse.json({ 

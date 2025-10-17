@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { fetchWithRetry } from "@/lib/utils/fetchWithRetry"
 import { debounce } from "@/lib/utils/debounce"
+import { dedupe } from "@/lib/utils/dedupe"
 
 interface AdminStats {
   totalUsers: number
@@ -18,6 +19,21 @@ interface AdminStats {
   cached?: boolean
 }
 
+// Dedupe the fetch function to prevent parallel duplicate requests
+const fetchStatsDeduped = dedupe(async () => {
+  return await fetchWithRetry<{ success: boolean } & AdminStats>(
+    "/api/admin/dashboard-stats",
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+    3,
+    1000
+  )
+})
+
 export function useAdminStats() {
   const [data, setData] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -25,7 +41,7 @@ export function useAdminStats() {
 
   const fetchStats = useCallback(
     debounce(async () => {
-      // Short-circuit if disabled
+      // Short-circuit if disabled via env flag
       if (process.env.NEXT_PUBLIC_DISABLE_ADMIN_STATS === 'true') {
         setData(null)
         setLoading(false)
@@ -37,17 +53,7 @@ export function useAdminStats() {
         setLoading(true)
         setError(null)
 
-        const stats = await fetchWithRetry<{ success: boolean } & AdminStats>(
-          "/api/admin/dashboard-stats",
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          },
-          3,
-          1000
-        )
+        const stats = await fetchStatsDeduped()
 
         if (stats.success) {
           setData(stats)
