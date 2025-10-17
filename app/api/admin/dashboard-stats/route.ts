@@ -2,28 +2,57 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { db } from "@/lib/db/client"
 import { sql } from "drizzle-orm"
+import { serverCache } from "@/lib/utils/server-cache"
+import { adminRateLimiter } from "@/lib/utils/rate-limiter"
 
 export const dynamic = 'force-dynamic'
-export const revalidate = 60 // Cache for 60 seconds
+// export const revalidate = 60 // Cache for 60 seconds
 
 let cachedStats: any = null
 let cacheTimestamp: number = 0
 const CACHE_DURATION = 120000
 
-export async function GET() {
+export async function GET(request: Request) {
+  // Check if admin stats are disabled
+  if (process.env.NEXT_PUBLIC_DISABLE_ADMIN_STATS === 'true') {
+    return NextResponse.json({
+      success: false,
+      message: "Admin stats temporarily disabled"
+    }, { status: 503 })
+  }
+
+  // Rate limiting
+  const ip = request.headers.get("x-forwarded-for") || "unknown"
+  const { allowed, remaining } = adminRateLimiter.check(`admin-stats:${ip}`)
+
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "X-RateLimit-Remaining": "0" } }
+    )
+  }
+
+  // Check cache first (60 second TTL)
+  const cacheKey = "admin-dashboard-stats"
+  const cached = serverCache.get(cacheKey)
+  if (cached) {
+    return NextResponse.json({ success: true, ...cached, cached: true })
+  }
+
   try {
     const now = Date.now()
-    if (cachedStats && (now - cacheTimestamp) < CACHE_DURATION) {
-      return NextResponse.json({
-        success: true,
-        stats: cachedStats,
-        cached: true,
-      }, {
-        headers: {
-          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
-        }
-      })
-    }
+    // This block is now redundant due to serverCache, but kept for reference
+    // if (cachedStats && (now - cacheTimestamp) < CACHE_DURATION) {
+    //   return NextResponse.json({
+    //     success: true,
+    //     stats: cachedStats,
+    //     cached: true,
+    //   }, {
+    //     headers: {
+    //       'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+    //     }
+    //   })
+    // }
 
     const supabase = await createClient()
 
@@ -90,13 +119,15 @@ export async function GET() {
       lastUpdated: now,
     }
 
-    cachedStats = stats
-    cacheTimestamp = now
+    // cachedStats = stats
+    // cacheTimestamp = now
+
+    // Cache for 60 seconds
+    serverCache.set(cacheKey, stats, 60000)
 
     return NextResponse.json({
       success: true,
-      stats,
-      cached: false,
+      ...stats
     }, {
       headers: {
         'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
@@ -104,7 +135,7 @@ export async function GET() {
     })
   } catch (error) {
     console.error("Dashboard stats error:", error)
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: "Internal server error",
       details: error instanceof Error ? error.message : "Unknown error"
     }, { status: 500 })
