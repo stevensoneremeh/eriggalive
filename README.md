@@ -9,36 +9,6 @@
 
 EriggaLive is a comprehensive fan platform featuring community interactions, media management, payment processing, and administrative tools. The platform includes mobile-responsive design, theme switching, secure payment webhooks, and a full-featured admin panel.
 
-## 🌿 Branch Management
-
-### Branches
-- **main**: Production branch - deployed to [https://eriggalive.vercel.app](https://eriggalive.vercel.app)
-- **new**: Development/Staging branch - deployed to preview URL on Vercel
-
-### Switching Branches
-```bash
-# Switch to main (production)
-git checkout main
-
-# Switch to new (development)
-git checkout new
-
-# View branch info and URLs
-bash scripts/branch-info.sh
-```
-
-### Deploying Changes
-Both branches automatically deploy to Vercel on push:
-```bash
-# Deploy to production
-git checkout main
-git push origin main
-
-# Deploy to staging
-git checkout new
-git push origin new
-```
-
 ## 🚀 Recent Enhancements
 
 ### Mobile Responsive Community Pages

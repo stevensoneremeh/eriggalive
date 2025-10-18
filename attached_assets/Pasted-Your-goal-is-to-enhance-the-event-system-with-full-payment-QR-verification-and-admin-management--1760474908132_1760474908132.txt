@@ -1,0 +1,45 @@
+Your goal is to enhance the event system with full payment, QR verification, and admin management.
+
+TASK INSTRUCTIONS:
+Replace the uploaded event image with the image used on the “Events” page (accessible from the top navigation).
+Fully integrate Paystack payment for event tickets.
+Allow custom (user-entered) payment amounts.
+On successful payment, automatically:
+Create a payment record in Supabase (with user ID, amount, event ID, timestamp).
+Generate a unique QR code for that user and event.
+Store the QR code data in Supabase (image or unique string).
+Display a success prompt and a redirect button leading to the user’s Events page (inside the user dashboard).
+On the user dashboard, display:
+The event details they paid for.
+Their unique QR code (retrieved from Supabase).
+On the admin dashboard (where a scan page already exists):
+Enable scanning of user QR codes.
+When a user’s QR code is successfully scanned, update that event’s participation record in Supabase to show "status": "admitted".
+The event page for that user should now visually display “Admitted” instead of the QR code.
+Also show all users who have paid for each event in the admin dashboard, with details:
+Name, email, amount paid, event name, admission status, and generated QR code.
+Implement priority seating logic:
+Sort users by amount paid for the event.
+Assign "front row" to users with the highest payment, "next row" to lower ones, etc.
+Store this rank or seat level in Supabase.
+Make sure the system works cleanly with Supabase Auth and the Neon connection already configured.
+
+GOAL:
+Produce the necessary Next.js (App Router) code, Supabase schema updates, API routes, and frontend logic to achieve this end-to-end flow:
+Payment → QR generation → User view → Admin scan → Admission update → Seat priority.
+
+Focus on clean modular code and maintain state consistency between Supabase and the frontend.
+💡 Notes for Best Results in Replit
+Before pasting this, make sure your Replit project is set to Next.js runtime and linked to your Supabase keys and Paystack test keys in .env.
+
+After Replit generates code, ask it step-by-step to:
+
+Create/update the Supabase tables (events, payments, qr_codes).
+
+Write the Paystack integration API route.
+
+Handle the QR generation and verification logic.
+
+Build the user dashboard section.
+
+Build the admin scan/update logic.

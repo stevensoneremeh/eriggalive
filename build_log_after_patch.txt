@@ -1,0 +1,17 @@
+
+> erigga-fan-platform@0.1.0 build /home/runner/workspace
+> next build
+
+  ▲ Next.js 14.2.16
+  - Experiments (use with caution):
+    · missingSuspenseWithCSRBailout
+
+   Creating an optimized production build ...
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: Unknown system error -122: Unknown system error -122, write
+Failed to compile.
+
+Error: Unknown system error -122: Unknown system error -122, write
+
+
+> Build failed because of webpack errors
+ ELIFECYCLE  Command failed with exit code 1.
