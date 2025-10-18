@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     const { error: paymentError } = await supabase
       .from("event_payments")
       .insert({
-        user_id: user.id,
+        user_id: profile.id,
         event_id: eventId,
         amount: amount,
         custom_amount: isCustomAmount,
@@ -140,7 +140,8 @@ export async function POST(request: NextRequest) {
       reference,
       callback_url: `${process.env.NEXT_PUBLIC_BASE_URL}/api/events/payment/verify`,
       metadata: {
-        user_id: user.id,
+        user_id: profile.id,
+        auth_user_id: user.id,
         event_id: eventId,
         event_title: event.title,
         custom_amount: isCustomAmount,

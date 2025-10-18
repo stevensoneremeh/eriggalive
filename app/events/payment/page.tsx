@@ -116,7 +116,7 @@ export default function EventPaymentPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          eventId: "erigga-september-2025",
+          eventId: eventId || "erigga-september-2025",
           userId: user.id,
           paystackReference: reference,
           amount: TICKET_PRICE,

@@ -76,15 +76,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${baseUrl}/events?error=unauthorized`)
     }
 
-    // Ensure user profile exists
-    const { data: existingUser } = await supabase
+    // Get or create user profile
+    let { data: userProfile, error: profileError } = await supabase
       .from("users")
-      .select("id")
+      .select("id, auth_user_id, username, full_name, email, coins, tier")
       .eq("auth_user_id", user.id)
       .single()
 
-    if (!existingUser) {
-      const { error: createError } = await supabase
+    if (profileError && profileError.code === "PGRST116") {
+      const { data: newProfile, error: createError } = await supabase
         .from("users")
         .insert({
           auth_user_id: user.id,
@@ -94,10 +94,17 @@ export async function GET(request: NextRequest) {
           coins: 0,
           tier: 'erigga_citizen'
         })
+        .select("id, auth_user_id, username, full_name, email, coins, tier")
+        .single()
 
       if (createError) {
         console.error("Failed to create user profile:", createError)
+        return NextResponse.redirect(`${baseUrl}/events?error=profile_creation_failed`)
       }
+      userProfile = newProfile
+    } else if (profileError) {
+      console.error("Profile error:", profileError)
+      return NextResponse.redirect(`${baseUrl}/events?error=profile_error`)
     }
 
     const verifyResponse = await fetch(
@@ -159,7 +166,7 @@ export async function GET(request: NextRequest) {
     const { qrCode, qrToken } = generateQRCode(
       ticketId,
       payment.event_id,
-      payment.user_id,
+      userProfile.id,
       payment.amount
     )
 
@@ -168,7 +175,7 @@ export async function GET(request: NextRequest) {
       .insert({
         id: ticketId,
         event_id: payment.event_id,
-        user_id: payment.user_id,
+        user_id: userProfile.id,
         ticket_type: payment.custom_amount ? "vip" : "regular",
         ticket_number: ticketNumber,
         qr_code: qrCode,
@@ -183,6 +190,7 @@ export async function GET(request: NextRequest) {
           transaction_id: transactionData.id,
           paid_at: transactionData.paid_at,
           channel: transactionData.channel,
+          auth_user_id: user.id,
         },
       })
 
