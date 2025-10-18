@@ -1,0 +1,24 @@
+
+{
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "new": true
+    }
+  },
+  "github": {
+    "autoAlias": true,
+    "enabled": true,
+    "silent": false
+  },
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "@supabase-url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase-anon-key",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase-service-role-key",
+    "NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY": "@paystack-public-key",
+    "PAYSTACK_SECRET_KEY": "@paystack-secret-key"
+  }
+}
